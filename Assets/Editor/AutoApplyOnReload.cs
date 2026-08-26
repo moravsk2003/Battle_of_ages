@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
 
@@ -11,6 +11,8 @@ namespace BattleOfAges.EditorTools
         {
             EditorApplication.delayCall += () =>
             {
+                if (Application.isBatchMode) return;
+
                 // Auto setup Pause Menu if missing in open scene
                 if (GameObject.Find("PauseCanvas") == null)
                 {

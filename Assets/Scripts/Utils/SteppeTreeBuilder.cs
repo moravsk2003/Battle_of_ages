@@ -3,73 +3,78 @@ using BattleOfAges.Resources;
 
 namespace BattleOfAges.Utils
 {
-    /// <summary>Builds a varied, low-poly steppe tree with a real trunk, branch silhouette and layered crown.</summary>
+    /// <summary>
+    /// Builds high-quality AAA stylized trees with organic flared trunks and faceted wind-swaying foliage clusters.
+    /// </summary>
     public static class SteppeTreeBuilder
     {
+        private static readonly System.Collections.Generic.Dictionary<int, Mesh> CachedTrunkMeshes = new System.Collections.Generic.Dictionary<int, Mesh>();
+        private static readonly System.Collections.Generic.Dictionary<int, Mesh> CachedFoliageMeshes = new System.Collections.Generic.Dictionary<int, Mesh>();
+
         public static GameObject CreateSteppeTree(string name = "SteppeTree", int variant = 0)
         {
             GameObject root = new GameObject(name);
             root.AddComponent<ResourceNodeTree>();
 
-            Color barkColor = Color.Lerp(new Color(0.22f, 0.105f, 0.035f), new Color(0.38f, 0.21f, 0.07f), Mathf.Repeat(variant * 0.27f, 1f));
-            Color leafColor = (variant % 3 == 0)
-                ? new Color(0.30f, 0.46f, 0.10f)
-                : (variant % 3 == 1 ? new Color(0.19f, 0.40f, 0.12f) : new Color(0.53f, 0.48f, 0.09f));
-            Color leafHighlight = Color.Lerp(leafColor, new Color(0.82f, 0.72f, 0.24f), 0.18f);
+            int varIdx = Mathf.Abs(variant) % 4;
 
-            Material bark = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, barkColor, 0f, 0.22f);
-            Material leaf = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Foliage, leafColor, 0f, 0.18f);
-            Material leafLight = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Foliage, leafHighlight, 0f, 0.16f);
+            Color barkColor = Color.Lerp(new Color(0.26f, 0.16f, 0.08f), new Color(0.38f, 0.24f, 0.12f), Mathf.Repeat(varIdx * 0.31f, 1f));
+            Color foliageBase = (varIdx % 3 == 0)
+                ? new Color(0.32f, 0.52f, 0.14f)
+                : (varIdx % 3 == 1 ? new Color(0.22f, 0.44f, 0.15f) : new Color(0.56f, 0.52f, 0.12f));
 
-            GameObject trunk = CreatePart(PrimitiveType.Cylinder, "Trunk", root.transform, new Vector3(0f, 1.45f, 0f), new Vector3(0.38f, 1.45f, 0.38f), Quaternion.identity, bark);
-            CapsuleCollider trunkCollider = trunk.AddComponent<CapsuleCollider>();
-            trunkCollider.radius = 0.43f;
-            trunkCollider.height = 3.0f;
+            Material barkMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, barkColor, 0f, 0.22f);
+            Material foliageMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Foliage, foliageBase, 0f, 0.25f);
 
-            // Four asymmetric, upward branches avoid the old stacked-sphere silhouette.
-            float phase = variant * 37f;
-            CreateBranch(root.transform, bark, new Vector3(0f, 2.15f, 0f), Quaternion.Euler(20f, phase + 25f, -38f), 0.72f, 0.16f, "Branch_A");
-            CreateBranch(root.transform, bark, new Vector3(0f, 2.35f, 0f), Quaternion.Euler(-18f, phase + 125f, 42f), 0.84f, 0.14f, "Branch_B");
-            CreateBranch(root.transform, bark, new Vector3(0f, 2.60f, 0f), Quaternion.Euler(28f, phase + 220f, -34f), 0.67f, 0.13f, "Branch_C");
-            CreateBranch(root.transform, bark, new Vector3(0f, 2.82f, 0f), Quaternion.Euler(-12f, phase + 305f, 30f), 0.55f, 0.11f, "Branch_D");
+            // 1. Organic Tapered Trunk
+            GameObject trunk = new GameObject("StylizedTrunk");
+            trunk.transform.SetParent(root.transform, false);
+            MeshFilter trunkMf = trunk.AddComponent<MeshFilter>();
+            if (!CachedTrunkMeshes.TryGetValue(varIdx, out Mesh trunkMesh) || trunkMesh == null)
+            {
+                trunkMesh = ProceduralMeshBuilder.CreateStylizedTrunkMesh(0.48f, 0.22f, 3.4f, 7, 5, varIdx * 99);
+                trunkMesh.name = $"StylizedTrunk_Var{varIdx}";
+                CachedTrunkMeshes[varIdx] = trunkMesh;
+            }
+            trunkMf.sharedMesh = trunkMesh;
+            MeshRenderer trunkMr = trunk.AddComponent<MeshRenderer>();
+            trunkMr.sharedMaterial = barkMat;
+            trunkMr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            trunkMr.receiveShadows = true;
 
-            CreateCrown(root.transform, leaf, new Vector3(0.00f, 3.08f, 0.00f), new Vector3(1.55f, 1.10f, 1.45f), "Crown_Main");
-            CreateCrown(root.transform, leaf, new Vector3(0.55f, 3.34f, 0.18f), new Vector3(1.04f, 0.85f, 1.02f), "Crown_East");
-            CreateCrown(root.transform, leaf, new Vector3(-0.48f, 3.30f, -0.22f), new Vector3(1.10f, 0.82f, 1.00f), "Crown_West");
-            CreateCrown(root.transform, leafLight, new Vector3(0.08f, 3.78f, -0.05f), new Vector3(0.95f, 0.70f, 0.92f), "Crown_Top");
+            CapsuleCollider trunkCollider = root.AddComponent<CapsuleCollider>();
+            trunkCollider.center = new Vector3(0f, 1.7f, 0f);
+            trunkCollider.radius = 0.45f;
+            trunkCollider.height = 3.4f;
+
+            // 2. Foliage Crown Clusters (Layered canopy with sun-dappled tops and deep AO underneath)
+            CreateFoliageCloud(root.transform, foliageMat, new Vector3(0.00f, 3.35f, 0.00f), new Vector3(2.4f, 1.8f, 2.4f), varIdx * 17 + 1, varIdx * 10 + 1);
+            CreateFoliageCloud(root.transform, foliageMat, new Vector3(0.75f, 3.85f, 0.35f), new Vector3(1.7f, 1.4f, 1.6f), varIdx * 17 + 2, varIdx * 10 + 2);
+            CreateFoliageCloud(root.transform, foliageMat, new Vector3(-0.65f, 3.75f, -0.40f), new Vector3(1.8f, 1.5f, 1.7f), varIdx * 17 + 3, varIdx * 10 + 3);
+            CreateFoliageCloud(root.transform, foliageMat, new Vector3(0.15f, 4.55f, -0.10f), new Vector3(1.5f, 1.3f, 1.5f), varIdx * 17 + 4, varIdx * 10 + 4);
 
             return root;
         }
 
-        private static void CreateBranch(Transform parent, Material material, Vector3 localPosition, Quaternion rotation, float length, float radius, string name)
+        private static void CreateFoliageCloud(Transform parent, Material material, Vector3 localPos, Vector3 scale, int seed, int cacheKey)
         {
-            CreatePart(PrimitiveType.Cylinder, name, parent, localPosition, new Vector3(radius, length * 0.5f, radius), rotation, material);
-        }
+            GameObject cloud = new GameObject($"CrownCluster_{seed}");
+            cloud.transform.SetParent(parent, false);
+            cloud.transform.localPosition = localPos;
 
-        private static void CreateCrown(Transform parent, Material material, Vector3 localPosition, Vector3 localScale, string name)
-        {
-            GameObject crown = CreatePart(PrimitiveType.Sphere, name, parent, localPosition, localScale, Quaternion.identity, material);
-            crown.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-        }
-
-        private static GameObject CreatePart(PrimitiveType type, string name, Transform parent, Vector3 localPosition, Vector3 localScale, Quaternion localRotation, Material material)
-        {
-            GameObject part = GameObject.CreatePrimitive(type);
-            part.name = name;
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = localPosition;
-            part.transform.localScale = localScale;
-            part.transform.localRotation = localRotation;
-            part.GetComponent<MeshRenderer>().sharedMaterial = material;
-
-            Collider collider = part.GetComponent<Collider>();
-            if (collider != null)
+            MeshFilter mf = cloud.AddComponent<MeshFilter>();
+            if (!CachedFoliageMeshes.TryGetValue(cacheKey, out Mesh foliageMesh) || foliageMesh == null)
             {
-                if (Application.isPlaying) Object.Destroy(collider);
-                else Object.DestroyImmediate(collider);
+                foliageMesh = ProceduralMeshBuilder.CreateStylizedFoliageCluster(scale, seed);
+                foliageMesh.name = $"FoliageCluster_{cacheKey}";
+                CachedFoliageMeshes[cacheKey] = foliageMesh;
             }
+            mf.sharedMesh = foliageMesh;
 
-            return part;
+            MeshRenderer mr = cloud.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = material;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            mr.receiveShadows = true;
         }
     }
 }

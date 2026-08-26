@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Resources
 {
@@ -11,37 +12,65 @@ namespace BattleOfAges.Resources
     }
 
     /// <summary>
-    /// Resource node component for trees supporting Branch Gathering (1 Wood/5s) and Chopping (2 Wood/1s into Wood Pile).
-    /// Uses static shader caching and shared procedural materials.
+    /// Resource node component for trees supporting Branch Gathering (1 Wood/2.5s) and Tree Chopping (fells tree into Wood Pile).
+    /// Features dynamic tree wobble animation, wood chip VFX, and realistic resource yield.
     /// </summary>
     [DisallowMultipleComponent]
     public class ResourceNodeTree : MonoBehaviour
     {
         private static Shader cachedLitShader;
         private static Material cachedBarkMaterial;
+        private static Material cachedWoodCutMaterial;
 
         [Header("Resource Configuration")]
         [SerializeField] private TreeState currentState = TreeState.WholeTree;
-        [SerializeField] private int maxWoodCapacity = 1000;
-        [SerializeField] private int currentWoodRemaining = 1000;
+        [SerializeField] private int maxWoodCapacity = 10;
+        [SerializeField] private int currentWoodRemaining = 10;
 
         private float branchTimer = 0f;
-        private float chopTimer = 0f;
+        private float fellingChopProgress = 0f;
+        private float woodPileChopTimer = 0f;
+
+        private Vector3 initialEuler;
+        private float wobbleVelocity = 0f;
+        private float wobbleAngle = 0f;
 
         public TreeState CurrentState => currentState;
         public int WoodRemaining => currentWoodRemaining;
         public int MaxWoodCapacity => maxWoodCapacity;
-        public float BranchProgress => Mathf.Clamp01(branchTimer / 5.0f);
+        public float BranchProgress => Mathf.Clamp01(branchTimer / 2.5f);
+        public float FellingProgress => Mathf.Clamp01(fellingChopProgress / 2.8f);
 
         public event Action<int> OnWoodHarvested;
         public event Action OnTreeChoppedDown;
         public event Action OnTreeDepleted;
 
         private GameObject woodPileObj;
+        private GameObject stumpObj;
 
         private void Awake()
         {
             currentWoodRemaining = maxWoodCapacity;
+            initialEuler = transform.localEulerAngles;
+        }
+
+        private void Update()
+        {
+            // Smooth spring damping for tree wobble reaction on hit
+            if (Mathf.Abs(wobbleAngle) > 0.01f || Mathf.Abs(wobbleVelocity) > 0.01f)
+            {
+                float springForce = -wobbleAngle * 45f;
+                float dampingForce = -wobbleVelocity * 8f;
+                wobbleVelocity += (springForce + dampingForce) * Time.deltaTime;
+                wobbleAngle += wobbleVelocity * Time.deltaTime;
+
+                transform.localRotation = Quaternion.Euler(initialEuler.x + wobbleAngle, initialEuler.y, initialEuler.z);
+            }
+        }
+
+        public void ApplyHitImpulse(float strength = 3.5f)
+        {
+            wobbleVelocity += UnityEngine.Random.Range(strength * 0.7f, strength * 1.3f);
         }
 
         public bool GatherBranchesProgress(float deltaTime)
@@ -49,9 +78,10 @@ namespace BattleOfAges.Resources
             if (currentState != TreeState.WholeTree) return false;
 
             branchTimer += deltaTime;
-            if (branchTimer >= 5.0f)
+            if (branchTimer >= 2.5f)
             {
                 branchTimer = 0f;
+                ApplyHitImpulse(1.8f);
                 OnWoodHarvested?.Invoke(1);
                 return true;
             }
@@ -65,32 +95,58 @@ namespace BattleOfAges.Resources
 
         public bool ChopWoodProgress(float deltaTime)
         {
+            ApplyHitImpulse(3.2f);
+
             if (currentState == TreeState.WholeTree)
             {
-                ConvertToWoodPile();
-            }
-
-            if (currentState != TreeState.WoodPile) return false;
-
-            chopTimer += deltaTime;
-            if (chopTimer >= 0.5f)
-            {
-                chopTimer = 0f;
-
-                int woodExtracted = Mathf.Min(1, currentWoodRemaining);
-                currentWoodRemaining -= woodExtracted;
-
-                OnWoodHarvested?.Invoke(woodExtracted);
-
-                if (currentWoodRemaining <= 0)
+                fellingChopProgress += deltaTime;
+                if (fellingChopProgress >= 2.8f)
                 {
-                    currentState = TreeState.Depleted;
-                    OnTreeDepleted?.Invoke();
-                    Destroy(gameObject);
-                    return false;
+                    fellingChopProgress = 0f;
+                    ConvertToWoodPile();
+                    
+                    // Yield initial 4 wood on tree fell
+                    int fellYield = Mathf.Min(4, currentWoodRemaining);
+                    currentWoodRemaining -= fellYield;
+                    OnWoodHarvested?.Invoke(fellYield);
+                    return true;
                 }
-                return true;
+                return false;
             }
+
+            if (currentState == TreeState.WoodPile)
+            {
+                woodPileChopTimer += deltaTime;
+                if (woodPileChopTimer >= 0.8f)
+                {
+                    woodPileChopTimer = 0f;
+
+                    int woodExtracted = Mathf.Min(2, currentWoodRemaining);
+                    currentWoodRemaining -= woodExtracted;
+
+                    OnWoodHarvested?.Invoke(woodExtracted);
+
+                        if (currentWoodRemaining <= 0)
+                        {
+                            currentState = TreeState.Depleted;
+                            OnTreeDepleted?.Invoke();
+                            
+                            if (woodPileObj != null)
+                            {
+                                Destroy(woodPileObj);
+                                woodPileObj = null;
+                            }
+
+                            // Disable colliders on depleted stump
+                            Collider col = GetComponent<Collider>();
+                            if (col != null) col.enabled = false;
+
+                            return true;
+                        }
+                        return true;
+                }
+            }
+
             return false;
         }
 
@@ -99,55 +155,125 @@ namespace BattleOfAges.Resources
             if (currentState != TreeState.WholeTree) return;
 
             currentState = TreeState.WoodPile;
-            currentWoodRemaining = maxWoodCapacity;
 
-            for (int i = 0; i < 3; i++)
+            // Hide all crown / foliage clusters
+            for (int i = 0; i < transform.childCount; i++)
             {
-                Transform foliage = transform.Find($"Foliage_{i}");
-                if (foliage != null) foliage.gameObject.SetActive(false);
+                Transform child = transform.GetChild(i);
+                if (child == null) continue;
+
+                string cName = child.name.ToLower();
+                if (cName.Contains("crown") || cName.Contains("foliage") || cName.Contains("leaves"))
+                {
+                    child.gameObject.SetActive(false);
+                }
             }
 
-            Transform trunk = transform.Find("Trunk");
+            // Replace tall trunk with low stump
+            Transform trunk = transform.Find("StylizedTrunk") ?? transform.Find("Trunk");
             if (trunk != null)
             {
-                trunk.localScale = new Vector3(0.7f, 0.3f, 0.7f);
-                trunk.localPosition = new Vector3(0, 0.3f, 0);
+                trunk.gameObject.SetActive(false);
             }
 
-            CreateWoodPileVisuals();
+            CreateStumpAndWoodPileVisuals();
+
+            // Adjust collider for stump
+            CapsuleCollider capsule = GetComponent<CapsuleCollider>();
+            if (capsule != null)
+            {
+                capsule.center = new Vector3(0f, 0.25f, 0f);
+                capsule.height = 0.5f;
+                capsule.radius = 0.5f;
+            }
+
             OnTreeChoppedDown?.Invoke();
         }
 
-        private void CreateWoodPileVisuals()
+        private void CreateStumpAndWoodPileVisuals()
         {
-            if (woodPileObj != null) return;
-
-            woodPileObj = new GameObject("WoodPileLogs");
-            woodPileObj.transform.SetParent(transform, false);
-
-            if (cachedLitShader == null)
+            if (stumpObj == null)
             {
-                cachedLitShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                stumpObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                stumpObj.name = "TreeStump";
+                stumpObj.transform.SetParent(transform, false);
+                stumpObj.transform.localPosition = new Vector3(0f, 0.22f, 0f);
+                stumpObj.transform.localScale = new Vector3(0.85f, 0.22f, 0.85f);
+
+                Material barkMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, new Color(0.32f, 0.20f, 0.10f), 0f, 0.22f);
+                stumpObj.GetComponent<MeshRenderer>().sharedMaterial = barkMat;
+
+                Collider sc = stumpObj.GetComponent<Collider>();
+                if (sc != null) DestroyImmediate(sc);
             }
-            if (cachedBarkMaterial == null)
+
+            if (woodPileObj == null)
             {
-                cachedBarkMaterial = new Material(cachedLitShader) { color = new Color(0.42f, 0.28f, 0.14f) };
+                woodPileObj = new GameObject("WoodPileLogs");
+                woodPileObj.transform.SetParent(transform, false);
+
+                Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.38f, 0.24f, 0.12f), 0f, 0.25f);
+                Material cutEndMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.72f, 0.55f, 0.32f), 0f, 0.20f);
+
+                // Stacked 4 fallen logs next to the stump
+                Vector3[] logOffsets = {
+                    new Vector3(0.55f, 0.18f, 0.2f),
+                    new Vector3(0.55f, 0.18f, -0.25f),
+                    new Vector3(-0.5f, 0.18f, 0.05f),
+                    new Vector3(0.55f, 0.42f, -0.05f)
+                };
+
+                for (int i = 0; i < 4; i++)
+                {
+                    GameObject log = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    log.name = $"FallenLog_{i}";
+                    log.transform.SetParent(woodPileObj.transform, false);
+                    log.transform.localPosition = logOffsets[i];
+                    log.transform.localScale = new Vector3(0.34f, 0.85f, 0.34f);
+                    log.transform.localRotation = Quaternion.Euler(0f, 15f + i * 25f, 90f);
+
+                    MeshRenderer mr = log.GetComponent<MeshRenderer>();
+                    mr.sharedMaterial = woodMat;
+
+                    Collider col = log.GetComponent<Collider>();
+                    if (col != null) DestroyImmediate(col);
+                }
+            }
+        }
+
+        public void ResetTreeState()
+        {
+            currentState = TreeState.WholeTree;
+            currentWoodRemaining = maxWoodCapacity;
+            branchTimer = 0f;
+            fellingChopProgress = 0f;
+            woodPileChopTimer = 0f;
+
+            if (woodPileObj != null)
+            {
+                Destroy(woodPileObj);
+                woodPileObj = null;
             }
 
-            for (int i = 0; i < 4; i++)
+            if (stumpObj != null)
             {
-                GameObject log = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                log.name = $"Log_{i}";
-                log.transform.SetParent(woodPileObj.transform, false);
-                log.transform.localScale = new Vector3(0.4f, 1.0f, 0.4f);
-                log.transform.localRotation = Quaternion.Euler(0, 45f * i, 90f);
-                log.transform.localPosition = new Vector3((i % 2 - 0.5f) * 0.6f, 0.2f + (i / 2 * 0.25f), 0);
-                
-                MeshRenderer mr = log.GetComponent<MeshRenderer>();
-                if (mr != null) mr.material = cachedBarkMaterial;
+                Destroy(stumpObj);
+                stumpObj = null;
+            }
 
-                Collider col = log.GetComponent<Collider>();
-                if (col != null) Destroy(col);
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform child = transform.GetChild(i);
+                if (child != null) child.gameObject.SetActive(true);
+            }
+
+            CapsuleCollider capsule = GetComponent<CapsuleCollider>();
+            if (capsule != null)
+            {
+                capsule.enabled = true;
+                capsule.center = new Vector3(0f, 1.7f, 0f);
+                capsule.radius = 0.45f;
+                capsule.height = 3.4f;
             }
         }
     }

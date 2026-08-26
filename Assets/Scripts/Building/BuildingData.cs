@@ -6,7 +6,9 @@ namespace BattleOfAges.Building
     {
         WorkerHouse,
         StorageChest,
-        Mine
+        Mine,
+        Workbench,
+        CastleWall
     }
 
     /// <summary>
@@ -22,6 +24,7 @@ namespace BattleOfAges.Building
         public int OreTierRequired; // which ore tier level is consumed
         public int NpcSpawnCount;   // how many NPC workers spawn on build
         public Vector3 Size;        // approximate footprint for ghost preview
+        public int MaxHealth;       // structure durability
     }
 
     public static class BuildingData
@@ -37,7 +40,8 @@ namespace BattleOfAges.Building
                 OreCost = 1,
                 OreTierRequired = 0,
                 NpcSpawnCount = 1,
-                Size = new Vector3(3.0f, 2.5f, 3.0f)
+                Size = new Vector3(3.0f, 2.5f, 3.0f),
+                MaxHealth = 250
             },
             new BuildingDefinition
             {
@@ -48,7 +52,8 @@ namespace BattleOfAges.Building
                 OreCost = 1,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
-                Size = new Vector3(2.0f, 1.8f, 2.0f)
+                Size = new Vector3(2.0f, 1.8f, 2.0f),
+                MaxHealth = 200
             },
             new BuildingDefinition
             {
@@ -59,7 +64,32 @@ namespace BattleOfAges.Building
                 OreCost = 2,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
-                Size = new Vector3(4.0f, 3.2f, 4.0f)
+                Size = new Vector3(4.0f, 3.2f, 4.0f),
+                MaxHealth = 500
+            },
+            new BuildingDefinition
+            {
+                Type = BuildingType.Workbench,
+                DisplayName = "Верстак (Крафт)",
+                Description = "Виготовлення зброї та броні (до 4 NPC робітників)",
+                WoodCost = 3,
+                OreCost = 1,
+                OreTierRequired = 0,
+                NpcSpawnCount = 0,
+                Size = new Vector3(3.2f, 2.2f, 2.2f),
+                MaxHealth = 350
+            },
+            new BuildingDefinition
+            {
+                Type = BuildingType.CastleWall,
+                DisplayName = "Замкова Стіна",
+                Description = "Оборонний кам'яний мур для захисту від набігів",
+                WoodCost = 2,
+                OreCost = 3,
+                OreTierRequired = 0,
+                NpcSpawnCount = 0,
+                Size = new Vector3(4.0f, 3.5f, 1.2f),
+                MaxHealth = 600
             }
         };
 

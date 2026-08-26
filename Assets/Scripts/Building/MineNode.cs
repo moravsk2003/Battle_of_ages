@@ -39,9 +39,16 @@ namespace BattleOfAges.Building
             }
         }
 
-        private void OnDisable()
+        private void Start()
         {
-            activeMines.Remove(this);
+            SnapToTerrain();
+        }
+
+        public void SnapToTerrain()
+        {
+            Vector3 pos = transform.position;
+            pos.y = RtsUnit.GetTerrainHeight(pos);
+            transform.position = pos;
         }
 
         private void Update()

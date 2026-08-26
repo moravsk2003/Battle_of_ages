@@ -5,9 +5,8 @@ using UnityEngine;
 namespace BattleOfAges.Utils
 {
     /// <summary>
-    /// Shared, lightweight material library for the procedural world models.
-    /// The textures are generated once and reused, which keeps the art readable
-    /// without adding runtime material instances for every object in the scene.
+    /// AAA Stylized Procedural Material Library with crisp Normal Maps, PBR Roughness/Metallic,
+    /// and support for dynamic Wind Foliage shaders.
     /// </summary>
     public static class ProceduralVisualMaterials
     {
@@ -24,11 +23,22 @@ namespace BattleOfAges.Utils
             Grass,
             RoofTile,
             Gold,
-            Dark
+            Dark,
+            GemRuby,
+            GemSapphire,
+            Rope
         }
 
         private static readonly Dictionary<string, Material> CachedMaterials = new Dictionary<string, Material>();
+        private static readonly Dictionary<Surface, (Texture2D albedo, Texture2D normal)> CachedTextures = new Dictionary<Surface, (Texture2D, Texture2D)>();
         private static Shader litShader;
+        private static Shader windFoliageShader;
+
+        public static void ClearCache()
+        {
+            CachedMaterials.Clear();
+            CachedTextures.Clear();
+        }
 
         public static Material Get(Surface surface, Color baseColor, float metallic = 0f, float smoothness = 0.35f)
         {
@@ -42,39 +52,85 @@ namespace BattleOfAges.Utils
             {
                 litShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             }
+            if (windFoliageShader == null)
+            {
+                windFoliageShader = Shader.Find("Custom/StylizedWindFoliage");
+            }
 
-            Material material = new Material(litShader)
+            Shader targetShader = (surface == Surface.Foliage || surface == Surface.Grass) && windFoliageShader != null
+                ? windFoliageShader
+                : litShader;
+
+            Material material = new Material(targetShader)
             {
                 name = "MAT_" + key,
-                color = Color.white,
                 enableInstancing = true
             };
 
-            Texture2D texture = BuildTexture(surface, baseColor);
-            material.mainTexture = texture;
-            material.SetTexture("_BaseMap", texture);
-            material.SetColor("_BaseColor", Color.white);
-            material.SetFloat("_Metallic", metallic);
-            material.SetFloat("_Smoothness", smoothness);
-            material.SetFloat("_Glossiness", smoothness);
+            if (!CachedTextures.TryGetValue(surface, out var textures) || textures.albedo == null)
+            {
+                textures = BuildTextures(surface);
+                CachedTextures[surface] = textures;
+            }
+            var albedoTex = textures.albedo;
+            var normalTex = textures.normal;
+            
+            if (targetShader == windFoliageShader)
+            {
+                material.SetTexture("_BaseMap", albedoTex);
+                material.SetColor("_BaseColor", baseColor);
+                material.SetColor("_TopColor", Color.Lerp(baseColor, new Color(0.85f, 0.95f, 0.35f), 0.45f));
+                material.SetColor("_BottomColor", baseColor * 0.45f);
+                material.SetFloat("_Translucency", 0.55f);
+                material.SetFloat("_WindSpeed", 1.6f);
+                material.SetFloat("_WindStrength", surface == Surface.Grass ? 0.18f : 0.08f);
+                material.SetFloat("_WindFrequency", 0.6f);
+            }
+            else
+            {
+                material.mainTexture = albedoTex;
+                material.SetTexture("_BaseMap", albedoTex);
+                material.SetColor("_BaseColor", baseColor);
+                if (material.HasProperty("_Color")) material.SetColor("_Color", baseColor);
+                if (normalTex != null)
+                {
+                    material.EnableKeyword("_NORMALMAP");
+                    material.SetTexture("_BumpMap", normalTex);
+                    material.SetFloat("_BumpScale", surface == Surface.Bark || surface == Surface.Stone || surface == Surface.Wood ? 1.35f : 0.8f);
+                }
+                material.SetFloat("_Metallic", metallic);
+                material.SetFloat("_Smoothness", smoothness);
+                material.SetFloat("_Glossiness", smoothness);
+
+                if (surface == Surface.Gold || surface == Surface.GemRuby || surface == Surface.GemSapphire || surface == Surface.Ore)
+                {
+                    material.EnableKeyword("_EMISSION");
+                    Color emitCol = (surface == Surface.GemRuby) ? new Color(0.9f, 0.1f, 0.2f) * 0.8f :
+                                    (surface == Surface.GemSapphire) ? new Color(0.1f, 0.5f, 1.0f) * 0.8f :
+                                    (surface == Surface.Gold) ? new Color(0.8f, 0.55f, 0.1f) * 0.25f :
+                                    baseColor * 0.3f;
+                    material.SetColor("_EmissionColor", emitCol);
+                }
+            }
+
             CachedMaterials[key] = material;
             return material;
         }
 
-        private static Texture2D BuildTexture(Surface surface, Color baseColor)
+        private static (Texture2D albedo, Texture2D normal) BuildTextures(Surface surface)
         {
             const int size = 128;
-            Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, true)
+            Texture2D albedo = new Texture2D(size, size, TextureFormat.RGBA32, true)
             {
-                name = "TEX_" + surface,
+                name = "TEX_Albedo_" + surface,
                 wrapMode = TextureWrapMode.Repeat,
                 filterMode = FilterMode.Trilinear,
-                anisoLevel = 4
+                anisoLevel = 8
             };
 
+            float[,] heights = new float[size, size];
             Color[] pixels = new Color[size * size];
-            int seed = ((int)surface + 1) * 173;
-            float hueVariation = surface == Surface.Metal || surface == Surface.Gold ? 0.055f : 0.12f;
+            int seed = ((int)surface + 1) * 317;
 
             for (int y = 0; y < size; y++)
             {
@@ -82,53 +138,100 @@ namespace BattleOfAges.Utils
                 {
                     float u = (float)x / size;
                     float v = (float)y / size;
-                    float largeNoise = Mathf.PerlinNoise(u * 3.5f + seed, v * 3.5f + seed * 0.37f);
-                    float detailNoise = Mathf.PerlinNoise(u * 19f + seed * 0.61f, v * 19f + seed * 0.19f);
-                    float shade = Mathf.Lerp(0.83f, 1.12f, largeNoise) + (detailNoise - 0.5f) * hueVariation;
+                    float nLarge = Mathf.PerlinNoise(u * 4f + seed, v * 4f + seed * 0.5f);
+                    float nMed = Mathf.PerlinNoise(u * 12f + seed * 1.3f, v * 12f + seed * 0.7f);
+                    float nFine = Mathf.PerlinNoise(u * 32f + seed * 2.1f, v * 32f + seed * 1.9f);
+
+                    float shade = Mathf.Lerp(0.88f, 1.12f, nLarge) + (nMed - 0.5f) * 0.12f + (nFine - 0.5f) * 0.06f;
+                    float height = nLarge * 0.5f + nMed * 0.35f + nFine * 0.15f;
 
                     switch (surface)
                     {
                         case Surface.Cloth:
-                            shade += (Mathf.Sin(u * Mathf.PI * 64f) + Mathf.Sin(v * Mathf.PI * 64f)) * 0.018f;
+                            float weave = Mathf.Sin(u * Mathf.PI * 64f) * Mathf.Sin(v * Mathf.PI * 64f) * 0.08f;
+                            shade += weave;
+                            height += weave;
                             break;
                         case Surface.Leather:
-                        case Surface.Bark:
-                            shade += Mathf.Sin(v * Mathf.PI * 18f + largeNoise * 4f) * 0.075f;
+                            float grain = Mathf.Sin(v * Mathf.PI * 24f + nLarge * 5f) * 0.08f;
+                            shade += grain;
+                            height += grain;
                             break;
                         case Surface.Wood:
-                            shade += Mathf.Sin(v * Mathf.PI * 12f + largeNoise * 7f) * 0.1f;
+                            float woodRing = Mathf.Sin(v * Mathf.PI * 18f + nLarge * 8f + u * 2f) * 0.14f;
+                            shade += woodRing;
+                            height += woodRing * 1.5f;
+                            break;
+                        case Surface.Bark:
+                            float furrow = Mathf.Abs(Mathf.Sin(v * Mathf.PI * 10f + nLarge * 6f)) * 0.25f;
+                            shade -= furrow * 0.5f;
+                            height += furrow * 2.0f;
                             break;
                         case Surface.Metal:
-                            shade += Mathf.Sin(u * Mathf.PI * 34f) * 0.035f;
-                            break;
-                        case Surface.RoofTile:
-                            float row = Mathf.Repeat(v * 7f, 1f);
-                            float brick = Mathf.Repeat(u * 6f + Mathf.Floor(v * 7f) * 0.5f, 1f);
-                            shade -= (row < 0.07f || brick < 0.045f) ? 0.2f : 0f;
+                            float brush = Mathf.Sin(u * Mathf.PI * 48f) * 0.04f;
+                            shade += brush;
+                            height += brush * 0.5f;
                             break;
                         case Surface.Stone:
-                        case Surface.Ore:
-                            shade += (detailNoise > 0.72f ? -0.12f : 0f);
+                            float facet = (nMed > 0.65f ? 0.15f : 0f) - (nFine > 0.7f ? 0.12f : 0f);
+                            shade += facet;
+                            height += facet * 2.0f;
                             break;
-                        case Surface.Grass:
-                        case Surface.Foliage:
-                            shade += Mathf.Sin((u + v) * Mathf.PI * 20f) * 0.025f;
+                        case Surface.Rope:
+                            float strand = Mathf.Sin((u + v * 3f) * Mathf.PI * 16f) * 0.18f;
+                            shade += strand;
+                            height += strand * 2.0f;
+                            break;
+                        case Surface.RoofTile:
+                            float row = Mathf.Repeat(v * 8f, 1f);
+                            float brick = Mathf.Repeat(u * 6f + Mathf.Floor(v * 8f) * 0.5f, 1f);
+                            if (row < 0.08f || brick < 0.06f) { shade *= 0.65f; height = 0f; }
                             break;
                     }
 
-                    Color pixel = baseColor * Mathf.Clamp(shade, 0.55f, 1.28f);
-                    if (surface == Surface.Ore && detailNoise > 0.76f)
-                    {
-                        pixel = Color.Lerp(pixel, new Color(1f, 0.76f, 0.23f), 0.35f);
-                    }
-
-                    pixels[y * size + x] = pixel;
+                    heights[x, y] = height;
+                    float val = Mathf.Clamp(shade, 0.45f, 1.45f);
+                    Color pix = new Color(val, val, val, 1f);
+                    pixels[y * size + x] = pix;
                 }
             }
 
-            texture.SetPixels(pixels);
-            texture.Apply(true, true);
-            return texture;
+            albedo.SetPixels(pixels);
+            albedo.Apply(true, true);
+
+            // Generate Normal Map via Sobel derivative
+            Texture2D normal = new Texture2D(size, size, TextureFormat.RGBA32, true)
+            {
+                name = "TEX_Normal_" + surface,
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Trilinear,
+                anisoLevel = 8
+            };
+
+            Color[] normPixels = new Color[size * size];
+            float bumpFactor = 3.5f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    int xL = (x - 1 + size) % size;
+                    int xR = (x + 1) % size;
+                    int yD = (y - 1 + size) % size;
+                    int yU = (y + 1) % size;
+
+                    float dX = (heights[xR, y] - heights[xL, y]) * bumpFactor;
+                    float dY = (heights[x, yU] - heights[x, yD]) * bumpFactor;
+
+                    Vector3 n = new Vector3(-dX, -dY, 1f).normalized;
+                    normPixels[y * size + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1f);
+                }
+            }
+
+            normal.SetPixels(normPixels);
+            normal.Apply(true, true);
+
+            return (albedo, normal);
         }
     }
 }

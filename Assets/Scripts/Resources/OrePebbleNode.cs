@@ -6,16 +6,11 @@ using BattleOfAges.Utils;
 namespace BattleOfAges.Resources
 {
     /// <summary>
-    /// Ore pebble pickup node. Randomly rolls 100 ore tiers (Lvl 0..99) on pickup and respawns across steppe terrain.
-    /// Uses static shader caching and shared procedural materials.
+    /// Ore pebble pickup node with faceted stylized crystal nodes and glowing ore gems.
     /// </summary>
     [DisallowMultipleComponent]
     public class OrePebbleNode : MonoBehaviour
     {
-        private static Shader cachedLitShader;
-        private static Material cachedPebbleMaterial;
-        private static Material cachedOreVeinMaterial;
-
         public bool IsPickedUp { get; private set; }
         public MonoBehaviour TargetedBy { get; set; }
 
@@ -24,9 +19,7 @@ namespace BattleOfAges.Resources
             if (IsPickedUp) return 0;
 
             IsPickedUp = true;
-
             int rolledTier = OreTierHelper.DeterminePebbleOreTier();
-
             Debug.Log($"[Pebble Ore Pickup] Picked up Pebble! {OreTierHelper.GetTierName(rolledTier)}");
 
             StartCoroutine(RespawnRoutine(3.0f));
@@ -69,53 +62,64 @@ namespace BattleOfAges.Resources
             }
         }
 
+        private static Mesh sharedPebbleMesh;
+
         public static GameObject CreatePebblePrefab(string name = "OrePebble")
         {
             GameObject root = new GameObject(name);
             root.AddComponent<OrePebbleNode>();
 
-            if (cachedLitShader == null)
-            {
-                cachedLitShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            }
-            if (cachedPebbleMaterial == null)
-            {
-                cachedPebbleMaterial = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.31f, 0.34f, 0.37f), 0f, 0.24f);
-            }
-            if (cachedOreVeinMaterial == null)
-            {
-                cachedOreVeinMaterial = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Ore, new Color(0.58f, 0.31f, 0.08f), 0.35f, 0.50f);
-            }
+            Material stoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.42f, 0.40f, 0.38f), 0.05f, 0.25f);
+            Material oreMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Gold, new Color(1.0f, 0.78f, 0.22f), 0.85f, 0.75f);
+            Material rubyMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.GemRuby, new Color(0.95f, 0.15f, 0.25f), 0.35f, 0.90f);
 
-            // A three-stone cluster has a more believable outline than the former single sphere.
-            CreateRock("PebbleCore", root.transform, new Vector3(0f, 0.24f, 0f), new Vector3(0.58f, 0.34f, 0.53f), cachedPebbleMaterial);
-            CreateRock("PebbleSideA", root.transform, new Vector3(-0.27f, 0.17f, 0.08f), new Vector3(0.30f, 0.22f, 0.28f), cachedPebbleMaterial);
-            CreateRock("OreVein", root.transform, new Vector3(0.18f, 0.31f, 0.24f), new Vector3(0.26f, 0.16f, 0.20f), cachedOreVeinMaterial);
+            GameObject visual = new GameObject("VisualModel");
+            visual.transform.SetParent(root.transform, false);
+
+            // Faceted Rock Core
+            GameObject coreRock = new GameObject("RockCore");
+            coreRock.transform.SetParent(visual.transform, false);
+            coreRock.transform.localPosition = new Vector3(0f, 0.22f, 0f);
+            coreRock.transform.localScale = new Vector3(0.65f, 0.45f, 0.58f);
+            MeshFilter mfCore = coreRock.AddComponent<MeshFilter>();
+            if (sharedPebbleMesh == null)
+            {
+                sharedPebbleMesh = ProceduralMeshBuilder.CreateFacetedRockMesh(1.0f, 2, 42, 0.4f);
+                sharedPebbleMesh.name = "PebbleCoreMesh";
+            }
+            mfCore.sharedMesh = sharedPebbleMesh;
+            MeshRenderer mrCore = coreRock.AddComponent<MeshRenderer>();
+            mrCore.sharedMaterial = stoneMat;
+            mrCore.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            mrCore.receiveShadows = true;
+
+            // Embedded Glowing Crystal Gems
+            CreateGemShard("GemShard_1", visual.transform, new Vector3(0.18f, 0.38f, 0.12f), new Vector3(0.18f, 0.28f, 0.18f), Quaternion.Euler(25f, 35f, 15f), oreMat);
+            CreateGemShard("GemShard_2", visual.transform, new Vector3(-0.16f, 0.32f, -0.10f), new Vector3(0.14f, 0.22f, 0.14f), Quaternion.Euler(-20f, -45f, 10f), rubyMat);
 
             SphereCollider col = root.AddComponent<SphereCollider>();
             col.center = new Vector3(0, 0.35f, 0);
             col.radius = 1.2f;
 
-            foreach (Collider childCollider in root.GetComponentsInChildren<Collider>())
-            {
-                if (childCollider == col) continue;
-                if (Application.isPlaying) Object.Destroy(childCollider);
-                else Object.DestroyImmediate(childCollider);
-            }
-
             return root;
         }
 
-        private static GameObject CreateRock(string objectName, Transform parent, Vector3 localPosition, Vector3 localScale, Material material)
+        private static void CreateGemShard(string name, Transform parent, Vector3 localPos, Vector3 localScale, Quaternion localRot, Material mat)
         {
-            GameObject rock = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            rock.name = objectName;
-            rock.transform.SetParent(parent, false);
-            rock.transform.localPosition = localPosition;
-            rock.transform.localScale = localScale;
-            rock.transform.localRotation = Quaternion.Euler(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
-            rock.GetComponent<MeshRenderer>().sharedMaterial = material;
-            return rock;
+            GameObject shard = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shard.name = name;
+            shard.transform.SetParent(parent, false);
+            shard.transform.localPosition = localPos;
+            shard.transform.localScale = localScale;
+            shard.transform.localRotation = localRot;
+
+            MeshRenderer mr = shard.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            mr.receiveShadows = true;
+
+            Collider c = shard.GetComponent<Collider>();
+            if (c != null) Object.DestroyImmediate(c);
         }
     }
 }

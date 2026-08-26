@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.RTS;
 using BattleOfAges.InputSystem;
+using BattleOfAges.Managers;
 
 namespace BattleOfAges.UI
 {
@@ -16,6 +17,7 @@ namespace BattleOfAges.UI
 
         private GameObject commandPanelObj;
         private Text statusText;
+        private Text titleTxt;
 
         // Allocation counts
         private int branchesCount = 0;
@@ -41,8 +43,15 @@ namespace BattleOfAges.UI
                 return;
             }
             Instance = this;
+            IsOpen = false;
 
             BuildCommandUI();
+            KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
+        }
+
+        private void OnDestroy()
+        {
+            KeybindsManager.OnKeybindsChanged -= UpdateHeaderText;
         }
 
         private void Start()
@@ -52,21 +61,41 @@ namespace BattleOfAges.UI
 
         private void Update()
         {
-            if (UniversalInput.GetKeyDownEscape() && IsOpen)
-            {
-                CloseMenu();
-                return;
-            }
+            if (Time.frameCount < 2 || Time.time < 0.5f) return;
+            if (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()) return;
 
-            if (IsToggleKeyPressed())
+            if (IsOpen)
             {
-                ToggleMenu();
+                if (Cursor.lockState != CursorLockMode.None || !Cursor.visible)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+
+                if (UniversalInput.GetKeyDownEscape() || IsToggleKeyPressed())
+                {
+                    CloseMenu();
+                    return;
+                }
+            }
+            else
+            {
+                if ((InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
+                    (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen))
+                {
+                    return;
+                }
+
+                if (IsToggleKeyPressed())
+                {
+                    OpenMenu();
+                }
             }
         }
 
         private bool IsToggleKeyPressed()
         {
-            return Input.GetKeyDown(KeyCode.K);
+            return KeybindsManager.GetKeyDown(KeyAction.WorkerCommandUI);
         }
 
         public void ToggleMenu()
@@ -78,12 +107,14 @@ namespace BattleOfAges.UI
         public void OpenMenu()
         {
             IsOpen = true;
+            if (commandPanelObj == null) BuildCommandUI();
             if (commandPanelObj != null) commandPanelObj.SetActive(true);
 
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
             SyncWithCurrentWorkerState();
+            UpdateHeaderText();
         }
 
         public void CloseMenu()
@@ -91,10 +122,21 @@ namespace BattleOfAges.UI
             IsOpen = false;
             if (commandPanelObj != null) commandPanelObj.SetActive(false);
 
-            if (InventoryUI.Instance == null || !InventoryUI.Instance.IsOpen)
+            foreach (Transform child in transform)
             {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
+                if (child != null) child.gameObject.SetActive(false);
+            }
+
+            if ((InventoryUI.Instance == null || !InventoryUI.Instance.IsOpen) &&
+                (BuildMenuUI.Instance == null || !BuildMenuUI.Instance.IsOpen) &&
+                (PauseMenuController.Instance == null || !PauseMenuController.Instance.IsPaused()))
+            {
+                GameModeManager gmm = FindFirstObjectByType<GameModeManager>();
+                if (gmm == null || gmm.CurrentMode == GameMode.FirstPerson)
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
             }
         }
 
@@ -126,26 +168,39 @@ namespace BattleOfAges.UI
             }
         }
 
+        private int GetTotalAssignedExcept(GatherDirective exceptDirective)
+        {
+            int sum = 0;
+            if (exceptDirective != GatherDirective.WoodGatherBranchesOnly) sum += branchesCount;
+            if (exceptDirective != GatherDirective.WoodChopTreesOnly) sum += chopCount;
+            if (exceptDirective != GatherDirective.OrePebblesOnly) sum += pebblesCount;
+            if (exceptDirective != GatherDirective.HaulOreFromMineToChest) sum += haulCount;
+            if (exceptDirective != GatherDirective.Auto) sum += autoCount;
+            return sum;
+        }
+
         private void ChangeJobCount(GatherDirective directive, int delta)
         {
             int total = WorkerRegistry.WorkerCount;
+            int currentlyAssignedOther = GetTotalAssignedExcept(directive);
+            int maxAllowed = Mathf.Max(0, total - currentlyAssignedOther);
 
             switch (directive)
             {
                 case GatherDirective.WoodGatherBranchesOnly:
-                    branchesCount = Mathf.Clamp(branchesCount + delta, 0, total);
+                    branchesCount = Mathf.Clamp(branchesCount + delta, 0, maxAllowed);
                     break;
                 case GatherDirective.WoodChopTreesOnly:
-                    chopCount = Mathf.Clamp(chopCount + delta, 0, total);
+                    chopCount = Mathf.Clamp(chopCount + delta, 0, maxAllowed);
                     break;
                 case GatherDirective.OrePebblesOnly:
-                    pebblesCount = Mathf.Clamp(pebblesCount + delta, 0, total);
+                    pebblesCount = Mathf.Clamp(pebblesCount + delta, 0, maxAllowed);
                     break;
                 case GatherDirective.HaulOreFromMineToChest:
-                    haulCount = Mathf.Clamp(haulCount + delta, 0, total);
+                    haulCount = Mathf.Clamp(haulCount + delta, 0, maxAllowed);
                     break;
                 case GatherDirective.Auto:
-                    autoCount = Mathf.Clamp(autoCount + delta, 0, total);
+                    autoCount = Mathf.Clamp(autoCount + delta, 0, maxAllowed);
                     break;
             }
 
@@ -224,16 +279,46 @@ namespace BattleOfAges.UI
             RectTransform titleRect = titleObj.GetComponent<RectTransform>();
             titleRect.anchorMin = Vector2.zero;
             titleRect.anchorMax = Vector2.one;
-            titleRect.offsetMin = new Vector2(25f, 0f);
-            titleRect.offsetMax = new Vector2(-25f, 0f);
+            titleRect.offsetMin = new Vector2(50f, 0f);
+            titleRect.offsetMax = new Vector2(-50f, 0f);
 
-            Text titleTxt = titleObj.AddComponent<Text>();
+            titleTxt = titleObj.AddComponent<Text>();
             titleTxt.font = font;
             titleTxt.fontSize = 22;
             titleTxt.fontStyle = FontStyle.Bold;
             titleTxt.alignment = TextAnchor.MiddleCenter;
             titleTxt.color = new Color(0.3f, 0.95f, 1.0f);
-            titleTxt.text = "📜 НАЛАШТУВАННЯ ТА РОЗПОДІЛ РОБІТ (Клавіша 'K')";
+            titleTxt.raycastTarget = false;
+            UpdateHeaderText();
+
+            // Header Close Button [ X ]
+            GameObject closeBtnObj = new GameObject("CloseBtn", typeof(RectTransform));
+            closeBtnObj.transform.SetParent(headerObj.transform, false);
+            RectTransform closeRect = closeBtnObj.GetComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(1f, 0.5f);
+            closeRect.anchorMax = new Vector2(1f, 0.5f);
+            closeRect.pivot = new Vector2(1f, 0.5f);
+            closeRect.anchoredPosition = new Vector2(-12f, 0f);
+            closeRect.sizeDelta = new Vector2(40f, 40f);
+
+            Image closeBg = closeBtnObj.AddComponent<Image>();
+            closeBg.color = new Color(0.85f, 0.20f, 0.20f, 0.95f);
+            Button closeBtn = closeBtnObj.AddComponent<Button>();
+            closeBtn.onClick.AddListener(CloseMenu);
+
+            GameObject closeTxtObj = new GameObject("Text", typeof(RectTransform));
+            closeTxtObj.transform.SetParent(closeBtnObj.transform, false);
+            RectTransform closeTxtRect = closeTxtObj.GetComponent<RectTransform>();
+            closeTxtRect.anchorMin = Vector2.zero;
+            closeTxtRect.anchorMax = Vector2.one;
+            Text closeTxt = closeTxtObj.AddComponent<Text>();
+            closeTxt.font = font;
+            closeTxt.fontSize = 20;
+            closeTxt.fontStyle = FontStyle.Bold;
+            closeTxt.alignment = TextAnchor.MiddleCenter;
+            closeTxt.color = Color.white;
+            closeTxt.text = "✖";
+            closeTxt.raycastTarget = false;
 
             // Status Subheader Text
             GameObject statusObj = new GameObject("StatusText", typeof(RectTransform));
@@ -251,6 +336,7 @@ namespace BattleOfAges.UI
             statusText.alignment = TextAnchor.MiddleCenter;
             statusText.color = new Color(0.85f, 0.94f, 1.0f);
             statusText.text = "Налаштуйте кількість робітників на кожну задачу:";
+            statusText.raycastTarget = false;
 
             // Rows Container with VerticalLayoutGroup
             GameObject rowsContainer = new GameObject("RowsContainer", typeof(RectTransform));
@@ -295,6 +381,18 @@ namespace BattleOfAges.UI
             CreateActionButton(bottomBar.transform, font, "🔄 Усі в Авто", new Color(0.18f, 0.32f, 0.55f), () => SetAllToDirective(GatherDirective.Auto));
             CreateActionButton(bottomBar.transform, font, "🪵 Усі Рубачі", new Color(0.55f, 0.35f, 0.12f), () => SetAllToDirective(GatherDirective.WoodChopTreesOnly));
             CreateActionButton(bottomBar.transform, font, "🪨 Усі Рудокопи", new Color(0.35f, 0.40f, 0.45f), () => SetAllToDirective(GatherDirective.OrePebblesOnly));
+
+            if (commandPanelObj != null) commandPanelObj.SetActive(false);
+        }
+
+        private void UpdateHeaderText()
+        {
+            if (titleTxt != null)
+            {
+                KeyCode key = KeybindsManager.GetKey(KeyAction.WorkerCommandUI);
+                string keyName = KeybindsManager.GetKeyDisplayString(key);
+                titleTxt.text = $"📜 НАЛАШТУВАННЯ ТА РОЗПОДІЛ РОБІТ (Клавіша '{keyName}')";
+            }
         }
 
         private Text CreateJobCounterRow(Transform parent, Font font, string label, GatherDirective directive)
@@ -326,6 +424,7 @@ namespace BattleOfAges.UI
             labelTxt.alignment = TextAnchor.MiddleLeft;
             labelTxt.color = Color.white;
             labelTxt.text = label;
+            labelTxt.raycastTarget = false;
 
             // Minus Button [-]
             GameObject minusBtnObj = new GameObject("MinusBtn", typeof(RectTransform));
@@ -353,6 +452,7 @@ namespace BattleOfAges.UI
             minusTxt.alignment = TextAnchor.MiddleCenter;
             minusTxt.color = Color.white;
             minusTxt.text = "-";
+            minusTxt.raycastTarget = false;
 
             // Counter Display [ 0 ]
             GameObject countObj = new GameObject("CountBox", typeof(RectTransform));
@@ -366,13 +466,20 @@ namespace BattleOfAges.UI
             Image countBg = countObj.AddComponent<Image>();
             countBg.color = new Color(0.04f, 0.08f, 0.14f, 0.95f);
 
-            Text countTxt = countObj.AddComponent<Text>();
+            GameObject countTxtObj = new GameObject("Text", typeof(RectTransform));
+            countTxtObj.transform.SetParent(countObj.transform, false);
+            RectTransform countTxtRect = countTxtObj.GetComponent<RectTransform>();
+            countTxtRect.anchorMin = Vector2.zero;
+            countTxtRect.anchorMax = Vector2.one;
+
+            Text countTxt = countTxtObj.AddComponent<Text>();
             countTxt.font = font;
             countTxt.fontSize = 20;
             countTxt.fontStyle = FontStyle.Bold;
             countTxt.alignment = TextAnchor.MiddleCenter;
             countTxt.color = new Color(0.3f, 0.95f, 1.0f);
             countTxt.text = "0";
+            countTxt.raycastTarget = false;
 
             // Plus Button [+]
             GameObject plusBtnObj = new GameObject("PlusBtn", typeof(RectTransform));
@@ -400,6 +507,7 @@ namespace BattleOfAges.UI
             plusTxt.alignment = TextAnchor.MiddleCenter;
             plusTxt.color = Color.white;
             plusTxt.text = "+";
+            plusTxt.raycastTarget = false;
 
             return countTxt;
         }
@@ -433,6 +541,7 @@ namespace BattleOfAges.UI
             txt.alignment = TextAnchor.MiddleCenter;
             txt.color = Color.white;
             txt.text = label;
+            txt.raycastTarget = false;
         }
     }
 }

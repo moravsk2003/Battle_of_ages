@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.Resources;
 using BattleOfAges.InputSystem;
+using BattleOfAges.Managers;
 
 namespace BattleOfAges.UI
 {
@@ -25,6 +26,8 @@ namespace BattleOfAges.UI
         private readonly Dictionary<int, Text> oreQuantityTextMap = new Dictionary<int, Text>();
         private readonly Dictionary<int, GameObject> oreSlotObjMap = new Dictionary<int, GameObject>();
 
+        private Text titleText;
+
         public bool IsOpen { get; private set; }
 
         private void Awake()
@@ -35,6 +38,7 @@ namespace BattleOfAges.UI
                 return;
             }
             Instance = this;
+            IsOpen = false;
 
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
@@ -42,6 +46,7 @@ namespace BattleOfAges.UI
             }
 
             BuildInventoryUI();
+            KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
         }
 
         private void Start()
@@ -57,6 +62,8 @@ namespace BattleOfAges.UI
 
         private void OnDestroy()
         {
+            KeybindsManager.OnKeybindsChanged -= UpdateHeaderText;
+
             if (ResourceManager.Instance != null)
             {
                 ResourceManager.Instance.OnResourceChanged -= OnResourceChangedHandler;
@@ -66,24 +73,41 @@ namespace BattleOfAges.UI
 
         private void Update()
         {
-            if (UniversalInput.GetKeyDownEscape() && IsOpen)
-            {
-                CloseInventory();
-                return;
-            }
+            if (Time.frameCount < 2 || Time.time < 0.5f) return;
+            if (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()) return;
 
-            if (IsToggleInventoryKeyPressed())
+            if (IsOpen)
             {
-                ToggleInventory();
+                if (Cursor.lockState != CursorLockMode.None || !Cursor.visible)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+
+                if (UniversalInput.GetKeyDownEscape() || IsToggleInventoryKeyPressed())
+                {
+                    CloseInventory();
+                    return;
+                }
+            }
+            else
+            {
+                if ((NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
+                    (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen))
+                {
+                    return;
+                }
+
+                if (IsToggleInventoryKeyPressed())
+                {
+                    OpenInventory();
+                }
             }
         }
 
         private bool IsToggleInventoryKeyPressed()
         {
-#if ENABLE_INPUT_SYSTEM
-            if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.iKey.wasPressedThisFrame) return true;
-#endif
-            try { return Input.GetKeyDown(KeyCode.I); } catch { return false; }
+            return KeybindsManager.GetKeyDown(KeyAction.Inventory);
         }
 
         public void ToggleInventory()
@@ -101,6 +125,7 @@ namespace BattleOfAges.UI
             Cursor.visible = true;
 
             RefreshInventoryDisplay();
+            UpdateHeaderText();
         }
 
         public void CloseInventory()
@@ -108,8 +133,17 @@ namespace BattleOfAges.UI
             IsOpen = false;
             if (inventoryPanelObj != null) inventoryPanelObj.SetActive(false);
 
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            if ((NpcGatherCommandUI.Instance == null || !NpcGatherCommandUI.Instance.IsOpen) &&
+                (BuildMenuUI.Instance == null || !BuildMenuUI.Instance.IsOpen) &&
+                (PauseMenuController.Instance == null || !PauseMenuController.Instance.IsPaused()))
+            {
+                GameModeManager gmm = FindFirstObjectByType<GameModeManager>();
+                if (gmm == null || gmm.CurrentMode == GameMode.FirstPerson)
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
+            }
         }
 
         private void OnResourceChangedHandler(ResourceType type, int amount)
@@ -302,13 +336,13 @@ namespace BattleOfAges.UI
             titleRect.offsetMin = new Vector2(25f, 0);
             titleRect.offsetMax = new Vector2(-25f, 0);
 
-            Text titleTxt = titleObj.AddComponent<Text>();
-            titleTxt.font = defaultFont;
-            titleTxt.fontSize = 28;
-            titleTxt.fontStyle = FontStyle.Bold;
-            titleTxt.alignment = TextAnchor.MiddleLeft;
-            titleTxt.color = new Color(0.3f, 0.9f, 1.0f);
-            titleTxt.text = "PLAYER INVENTORY (Press 'I' to Close)";
+            titleText = titleObj.AddComponent<Text>();
+            titleText.font = defaultFont;
+            titleText.fontSize = 28;
+            titleText.fontStyle = FontStyle.Bold;
+            titleText.alignment = TextAnchor.MiddleLeft;
+            titleText.color = new Color(0.3f, 0.9f, 1.0f);
+            UpdateHeaderText();
 
             GameObject scrollObj = new GameObject("ScrollView", typeof(RectTransform));
             scrollObj.transform.SetParent(inventoryPanelObj.transform, false);
@@ -433,6 +467,18 @@ namespace BattleOfAges.UI
             emptyTxt.alignment = TextAnchor.MiddleCenter;
             emptyTxt.color = new Color(0.6f, 0.68f, 0.78f);
             emptyTxt.text = "Inventory is empty!\nHarvest trees or pick up pebbles in the steppe.";
+
+            if (inventoryPanelObj != null) inventoryPanelObj.SetActive(false);
+        }
+
+        private void UpdateHeaderText()
+        {
+            if (titleText != null)
+            {
+                KeyCode key = KeybindsManager.GetKey(KeyAction.Inventory);
+                string keyName = KeybindsManager.GetKeyDisplayString(key);
+                titleText.text = $"🎒 ІНВЕНТАР ГРАВЦЯ (Клавіша '{keyName}')";
+            }
         }
     }
 }

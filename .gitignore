@@ -1,4 +1,6 @@
-# Unity generated folders
+# ==============================================================================
+# Unity generated folders and files
+# ==============================================================================
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
@@ -8,11 +10,31 @@
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
-
-# Asset store packages
+/[Aa]ssets/[_]Recovery*
 /[Aa]ssets/AssetStoreTools*
+/[Aa]ssets/Plugins/Editor/JetBrains*
+ExportedObj/
+.consulo/
+.gradle/
 
-# Visual Studio / Visual Studio Code / JetBrains Rider / MonoDevelop
+# Unity crash reports & build artifacts
+sysinfo.txt
+crashlytics-build.properties
+
+# Unity builds & packages
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Unity generated meta files
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# ==============================================================================
+# Visual Studio / VS Code / JetBrains Rider / Solution files
+# ==============================================================================
 .vs/
 .idea/
 .vscode/
@@ -32,19 +54,36 @@
 *.VC.db
 *.sln.docstates
 
-# Unity3D Generated Files On Crash Reports
-sysinfo.txt
+# ==============================================================================
+# Logs, Test Results, and Temporary files
+# ==============================================================================
+*.log
+*.log.meta
+TestResults/
+TestResults*.xml
+*.tmp
+*.bak
+temp_*
 
-# Builds
-*.apk
-*.aab
-*.unitypackage
-*.app
+# ==============================================================================
+# AI & Agent Artifacts / Scratchpads
+# ==============================================================================
+.agent_vision/
+.agents/
+.gemini/
+.antigravity/
+.claude/
 
-# Crash Reports
-crashlytics-build.properties
+# ==============================================================================
+# Obsidian Vault
+# Keep notes and general configuration, ignore workspace state and local caches
+# ==============================================================================
+**/.obsidian/workspace*.json
+**/.obsidian/cache/
 
+# ==============================================================================
 # OS generated files
+# ==============================================================================
 .DS_Store
 .DS_Store?
 ._*
@@ -52,3 +91,4 @@ crashlytics-build.properties
 .Trashes
 ehthumbs.db
 Thumbs.db
+[Dd]esktop.ini

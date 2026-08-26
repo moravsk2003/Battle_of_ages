@@ -50,22 +50,63 @@ namespace BattleOfAges.InputSystem
             }
         }
 
-        public static bool GetKeyDownM()
+        public static bool IsKeyDown(KeyCode key)
         {
+            if (key == KeyCode.None) return false;
+
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
+            try
             {
-                return Keyboard.current.mKey.wasPressedThisFrame;
+                if (Keyboard.current != null)
+                {
+                    if (System.Enum.TryParse<Key>(key.ToString(), true, out var inputKey) && inputKey != Key.None)
+                    {
+                        if (Keyboard.current[inputKey].wasPressedThisFrame) return true;
+                    }
+                }
             }
+            catch { }
 #endif
             try
             {
-                return Input.GetKeyDown(KeyCode.M);
+                return Input.GetKeyDown(key);
             }
             catch
             {
                 return false;
             }
+        }
+
+        public static bool IsKeyHeld(KeyCode key)
+        {
+            if (key == KeyCode.None) return false;
+
+#if ENABLE_INPUT_SYSTEM
+            try
+            {
+                if (Keyboard.current != null)
+                {
+                    if (System.Enum.TryParse<Key>(key.ToString(), true, out var inputKey) && inputKey != Key.None)
+                    {
+                        if (Keyboard.current[inputKey].isPressed) return true;
+                    }
+                }
+            }
+            catch { }
+#endif
+            try
+            {
+                return Input.GetKey(key);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool GetKeyDownM()
+        {
+            return KeybindsManager.GetKeyDown(KeyAction.ToggleGameMode);
         }
 
         public static Vector2 GetMoveInput()

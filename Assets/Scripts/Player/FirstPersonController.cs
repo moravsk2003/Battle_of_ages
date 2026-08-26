@@ -17,7 +17,7 @@ namespace BattleOfAges.Player
         private const float GROUND_STICK_FORCE = -2.0f;
 
         [Header("Movement Configuration")]
-        [SerializeField] private float moveSpeed = 6.0f;
+        [SerializeField] private float moveSpeed = 12.0f;
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float jumpHeight = 1.2f;
 
@@ -89,10 +89,18 @@ namespace BattleOfAges.Player
 
         private void Update()
         {
-            if (!isControlEnabled || (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen)) return;
+            if (!isControlEnabled || IsAnyUIOpen()) return;
 
             HandleMovement();
             HandleMouseLook();
+        }
+
+        private bool IsAnyUIOpen()
+        {
+            return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
+                   (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
+                   (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
+                   (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused());
         }
 
         private void HandleMovement()

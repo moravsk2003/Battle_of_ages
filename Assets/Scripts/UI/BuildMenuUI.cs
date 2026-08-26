@@ -20,6 +20,8 @@ namespace BattleOfAges.UI
         private Text statusText;
         private GameModeManager gameModeManager;
 
+        private Text titleText;
+
         public bool IsOpen { get; private set; }
 
         private void Awake()
@@ -30,6 +32,7 @@ namespace BattleOfAges.UI
                 return;
             }
             Instance = this;
+            IsOpen = false;
 
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
@@ -37,6 +40,12 @@ namespace BattleOfAges.UI
             }
 
             BuildUI();
+            KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
+        }
+
+        private void OnDestroy()
+        {
+            KeybindsManager.OnKeybindsChanged -= UpdateHeaderText;
         }
 
         private void Start()
@@ -47,6 +56,8 @@ namespace BattleOfAges.UI
 
         private void Update()
         {
+            if (Time.frameCount < 2 || Time.time < 0.5f) return;
+
             // Only show in RTS mode
             if (gameModeManager != null && gameModeManager.CurrentMode != GameMode.RtsMap)
             {
@@ -54,24 +65,34 @@ namespace BattleOfAges.UI
                 return;
             }
 
-            if (UniversalInput.GetKeyDownEscape() && IsOpen)
-            {
-                CloseMenu();
-                return;
-            }
+            if (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()) return;
 
-            if (IsToggleKeyPressed())
+            if (IsOpen)
             {
-                ToggleMenu();
+                if (UniversalInput.GetKeyDownEscape() || IsToggleKeyPressed())
+                {
+                    CloseMenu();
+                    return;
+                }
+            }
+            else
+            {
+                if ((NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
+                    (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen))
+                {
+                    return;
+                }
+
+                if (IsToggleKeyPressed())
+                {
+                    OpenMenu();
+                }
             }
         }
 
         private bool IsToggleKeyPressed()
         {
-#if ENABLE_INPUT_SYSTEM
-            if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.bKey.wasPressedThisFrame) return true;
-#endif
-            try { return Input.GetKeyDown(KeyCode.B); } catch { return false; }
+            return KeybindsManager.GetKeyDown(KeyAction.BuildMenu);
         }
 
         public void ToggleMenu()
@@ -84,6 +105,7 @@ namespace BattleOfAges.UI
         {
             IsOpen = true;
             if (menuPanelObj != null) menuPanelObj.SetActive(true);
+            UpdateHeaderText();
         }
 
         public void CloseMenu()
@@ -142,7 +164,7 @@ namespace BattleOfAges.UI
             panelRect.anchorMax = new Vector2(0.5f, 0f);
             panelRect.pivot = new Vector2(0.5f, 0f);
             panelRect.anchoredPosition = new Vector2(0f, 20f);
-            panelRect.sizeDelta = new Vector2(580f, 380f);
+            panelRect.sizeDelta = new Vector2(580f, 500f);
 
             Image panelBg = menuPanelObj.AddComponent<Image>();
             panelBg.color = new Color(0.04f, 0.07f, 0.14f, 0.96f);
@@ -165,13 +187,13 @@ namespace BattleOfAges.UI
             titleRect.anchorMax = Vector2.one;
             titleRect.offsetMin = new Vector2(15f, 0f);
 
-            Text titleTxt = titleObj.AddComponent<Text>();
-            titleTxt.font = defaultFont;
-            titleTxt.fontSize = 22;
-            titleTxt.fontStyle = FontStyle.Bold;
-            titleTxt.alignment = TextAnchor.MiddleLeft;
-            titleTxt.color = new Color(0.3f, 0.95f, 1.0f);
-            titleTxt.text = "🏗 БУДІВНИЦТВО (Клавіша 'B')";
+            titleText = titleObj.AddComponent<Text>();
+            titleText.font = defaultFont;
+            titleText.fontSize = 22;
+            titleText.fontStyle = FontStyle.Bold;
+            titleText.alignment = TextAnchor.MiddleLeft;
+            titleText.color = new Color(0.3f, 0.95f, 1.0f);
+            UpdateHeaderText();
 
             GameObject statusObj = new GameObject("StatusText", typeof(RectTransform));
             statusObj.transform.SetParent(menuPanelObj.transform, false);
@@ -208,6 +230,18 @@ namespace BattleOfAges.UI
             {
                 BuildingDefinition def = defs[i];
                 CreateBuildingButton(btnContainer.transform, defaultFont, def);
+            }
+
+            if (menuPanelObj != null) menuPanelObj.SetActive(false);
+        }
+
+        private void UpdateHeaderText()
+        {
+            if (titleText != null)
+            {
+                KeyCode key = KeybindsManager.GetKey(KeyAction.BuildMenu);
+                string keyName = KeybindsManager.GetKeyDisplayString(key);
+                titleText.text = $"🏗 БУДІВНИЦТВО (Клавіша '{keyName}')";
             }
         }
 
@@ -255,7 +289,10 @@ namespace BattleOfAges.UI
             icoTxt.fontSize = 26;
             icoTxt.alignment = TextAnchor.MiddleCenter;
             icoTxt.color = Color.white;
-            icoTxt.text = (def.Type == BuildingType.Mine) ? "⛏️" : ((def.Type == BuildingType.StorageChest) ? "📦" : "🏠");
+            icoTxt.text = (def.Type == BuildingType.Mine) ? "⛏️" :
+                          (def.Type == BuildingType.StorageChest) ? "📦" :
+                          (def.Type == BuildingType.Workbench) ? "⚒️" :
+                          (def.Type == BuildingType.CastleWall) ? "🧱" : "🏠";
 
             GameObject nameObj = new GameObject("NameText", typeof(RectTransform));
             nameObj.transform.SetParent(btnObj.transform, false);

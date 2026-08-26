@@ -1,12 +1,13 @@
 using UnityEngine;
 using BattleOfAges.Utils;
 using BattleOfAges.Resources;
+using BattleOfAges.World;
 
 namespace BattleOfAges.Utils
 {
     public static class SteppeTerrainGenerator
     {
-        public static GameObject CreateSteppeTerrain(string name = "SteppeTerrain", float size = 150f, int gridResolution = 75)
+        public static GameObject CreateSteppeTerrain(string name = "SteppeTerrain", float size = 192f, int gridResolution = 96)
         {
             GameObject terrainObj = new GameObject(name);
             terrainObj.transform.position = new Vector3(-size / 2f, 0, -size / 2f);
@@ -33,25 +34,11 @@ namespace BattleOfAges.Utils
                     float worldX = (x * step) - size / 2f;
                     float worldZ = (z * step) - size / 2f;
 
-                    // Layered Perlin Noise for natural steppe rolling hills
-                    float hillNoise = Mathf.PerlinNoise(worldX * 0.025f + 100f, worldZ * 0.025f + 100f) * 4.8f;
-                    float detailNoise = Mathf.PerlinNoise(worldX * 0.08f + 500f, worldZ * 0.08f + 500f) * 1.2f;
-                    float y = hillNoise + detailNoise;
-
-                    // Flatten slightly near center origin for smooth player start
-                    float distFromCenter = new Vector2(worldX, worldZ).magnitude;
-                    if (distFromCenter < 12f)
-                    {
-                        y = Mathf.Lerp(y, 0.5f, 1f - (distFromCenter / 12f));
-                    }
+                    float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
 
                     vertices[index] = new Vector3(x * step, y, z * step);
-                    uvs[index] = new Vector2((float)x / gridResolution * 12f, (float)z / gridResolution * 12f);
-
-                    // Vertex coloring for steppe grass & dirt slopes
-                    float slope = Mathf.Clamp01(y / 5.0f);
-                    Color grassColor = Color.Lerp(new Color(0.35f, 0.55f, 0.2f), new Color(0.6f, 0.65f, 0.25f), slope);
-                    colors[index] = grassColor;
+                    uvs[index] = new Vector2((float)x / gridResolution, (float)z / gridResolution);
+                    colors[index] = Color.white;
                 }
             }
 
@@ -85,70 +72,87 @@ namespace BattleOfAges.Utils
             mf.mesh = mesh;
             mc.sharedMesh = mesh;
 
-            // Generate a detailed repeating steppe albedo map without external placeholder textures.
-            Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            Material steppeMat = new Material(shader);
-            Texture2D steppeTex = CreateSteppeTexture();
-            steppeMat.mainTexture = steppeTex;
-            steppeMat.SetTexture("_BaseMap", steppeTex);
-            steppeMat.color = Color.white;
-            steppeMat.SetColor("_BaseColor", Color.white);
-            steppeMat.SetFloat("_Smoothness", 0.05f);
-            steppeMat.SetFloat("_Glossiness", 0.05f);
+            Shader terrainShader = Shader.Find("Custom/StylizedTerrain") 
+                ?? Shader.Find("Universal Render Pipeline/Lit") 
+                ?? Shader.Find("Standard");
 
-            mr.sharedMaterial = steppeMat;
+            Material terrainMat = new Material(terrainShader);
+            terrainMat.name = "MAT_StylizedSteppeTerrain";
+            terrainMat.SetColor("_GrassDeep", new Color(0.19f, 0.42f, 0.12f));
+            terrainMat.SetColor("_GrassMid", new Color(0.28f, 0.54f, 0.16f));
+            terrainMat.SetColor("_GrassLight", new Color(0.44f, 0.68f, 0.22f));
+            terrainMat.SetColor("_FlowerYellow", new Color(0.96f, 0.84f, 0.24f));
+            terrainMat.SetColor("_FlowerBlue", new Color(0.38f, 0.65f, 0.92f));
+            terrainMat.SetColor("_FlowerRed", new Color(0.92f, 0.24f, 0.26f));
+            terrainMat.SetColor("_DirtColor", new Color(0.35f, 0.24f, 0.14f));
+            terrainMat.SetColor("_RockColor", new Color(0.45f, 0.43f, 0.40f));
 
-            // Scatter 45 Steppe Trees & 60 Ore Pebbles across hills
+            mr.sharedMaterial = terrainMat;
+
+            // Scatter Vegetation & Environment Props
+            Scatter3DGrassAndFlowers(terrainObj.transform, size);
             ScatterSteppeTrees(terrainObj.transform, size);
             ScatterOrePebbles(terrainObj.transform, size);
+            ScatterFacetedBoulders(terrainObj.transform, size);
+            ScatterCampDecorations(terrainObj.transform);
 
             return terrainObj;
         }
 
-        private static Texture2D CreateSteppeTexture()
+        private static void Scatter3DGrassAndFlowers(Transform terrainParent, float size)
         {
-            const int texSize = 512;
-            Texture2D tex = new Texture2D(texSize, texSize, TextureFormat.RGBA32, true)
-            {
-                name = "Steppe_Grass_Albedo",
-                wrapMode = TextureWrapMode.Repeat,
-                filterMode = FilterMode.Trilinear,
-                anisoLevel = 8
-            };
-            Color[] pixels = new Color[texSize * texSize];
+            GameObject grassGroup = new GameObject("3D_Vegetation");
+            grassGroup.transform.SetParent(terrainParent, false);
 
-            Color grassBase = new Color(0.30f, 0.44f, 0.12f);
-            Color dryGrass = new Color(0.60f, 0.57f, 0.18f);
-            Color dirtSoil = new Color(0.30f, 0.20f, 0.095f);
-            Color strawHighlight = new Color(0.79f, 0.69f, 0.31f);
+            Random.InitState(4242);
+            int tuftCount = 300;
 
-            for (int y = 0; y < texSize; y++)
+            Material grassMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Grass, new Color(0.34f, 0.58f, 0.18f));
+            Material yellowFlowerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.98f, 0.85f, 0.22f), 0f, 0.3f);
+            Material redFlowerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.92f, 0.22f, 0.25f), 0f, 0.3f);
+            Material blueFlowerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.32f, 0.62f, 0.92f), 0f, 0.3f);
+
+            Mesh tuftMesh = ProceduralMeshBuilder.CreateGrassTuftMesh(0.85f, 0.70f, 3, 101);
+
+            for (int i = 0; i < tuftCount; i++)
             {
-                for (int x = 0; x < texSize; x++)
+                float localX = Random.Range(6f, size - 6f);
+                float localZ = Random.Range(6f, size - 6f);
+                Vector3 worldPos = terrainParent.position + new Vector3(localX, 100f, localZ);
+
+                if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
                 {
-                    float noise1 = Mathf.PerlinNoise(x * 0.018f, y * 0.018f);
-                    float noise2 = Mathf.PerlinNoise(x * 0.065f + 100f, y * 0.065f + 100f);
-                    float fineNoise = Mathf.PerlinNoise(x * 0.24f + 300f, y * 0.24f + 300f);
+                    if (Vector3.Distance(hit.point, new Vector3(1.5f, 0f, 3.5f)) < 3.2f) continue;
 
-                    Color blended = Color.Lerp(grassBase, dryGrass, noise1);
-                    if (noise2 > 0.61f)
+                    GameObject tuft = new GameObject($"GrassTuft_{i}");
+                    tuft.transform.SetParent(grassGroup.transform, false);
+                    tuft.transform.position = hit.point;
+                    float scale = Random.Range(0.75f, 1.35f);
+                    tuft.transform.localScale = new Vector3(scale, scale, scale);
+                    tuft.transform.rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
+
+                    MeshFilter mf = tuft.AddComponent<MeshFilter>();
+                    mf.mesh = tuftMesh;
+                    MeshRenderer mr = tuft.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = grassMat;
+                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    mr.receiveShadows = true;
+
+                    if (i % 3 == 0)
                     {
-                        blended = Color.Lerp(blended, dirtSoil, (noise2 - 0.61f) * 2.2f);
-                    }
+                        GameObject flower = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                        flower.name = "FlowerBlossom";
+                        flower.transform.SetParent(tuft.transform, false);
+                        flower.transform.localPosition = new Vector3(Random.Range(-0.12f, 0.12f), 0.68f, Random.Range(-0.12f, 0.12f));
+                        flower.transform.localScale = new Vector3(0.18f, 0.12f, 0.18f);
 
-                    float blade = Mathf.Abs(Mathf.Sin((x * 0.19f) + (y * 0.037f) + fineNoise * 5f));
-                    if (blade > 0.975f && fineNoise > 0.42f)
-                    {
-                        blended = Color.Lerp(blended, strawHighlight, 0.22f);
+                        Material fMat = (i % 9 == 0) ? redFlowerMat : ((i % 6 == 0) ? blueFlowerMat : yellowFlowerMat);
+                        flower.GetComponent<MeshRenderer>().sharedMaterial = fMat;
+                        Collider fc = flower.GetComponent<Collider>();
+                        if (fc != null) Object.DestroyImmediate(fc);
                     }
-
-                    pixels[y * texSize + x] = blended;
                 }
             }
-
-            tex.SetPixels(pixels);
-            tex.Apply(true, true);
-            return tex;
         }
 
         private static void ScatterSteppeTrees(Transform terrainParent, float size)
@@ -156,8 +160,29 @@ namespace BattleOfAges.Utils
             GameObject treesGroup = new GameObject("SteppeTrees");
             treesGroup.transform.SetParent(terrainParent, false);
 
+            // 1. Guaranteed Camp Grove Trees (immediately accessible to player at spawn)
+            Vector3[] campTreePositions = {
+                new Vector3(7.5f, 0f, 7.5f),
+                new Vector3(-8.5f, 0f, 7.0f),
+                new Vector3(8.0f, 0f, -6.5f),
+                new Vector3(-7.5f, 0f, -7.5f),
+                new Vector3(12.0f, 0f, 1.0f)
+            };
+
+            for (int t = 0; t < campTreePositions.Length; t++)
+            {
+                Vector3 pos = campTreePositions[t];
+                pos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(pos);
+                GameObject tree = SteppeTreeBuilder.CreateSteppeTree($"CampGroveTree_{t + 1}", t);
+                tree.transform.SetParent(treesGroup.transform, false);
+                tree.transform.position = pos;
+                tree.transform.localScale = Vector3.one * 1.15f;
+                tree.transform.rotation = Quaternion.Euler(0, t * 72f, 0);
+            }
+
+            // 2. Wilderness Trees
             Random.InitState(12345);
-            int treeCount = 45;
+            int treeCount = 40;
 
             for (int i = 0; i < treeCount; i++)
             {
@@ -168,13 +193,13 @@ namespace BattleOfAges.Utils
                 
                 if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
                 {
-                    if (Vector3.Distance(hit.point, Vector3.zero) < 15f) continue;
+                    if (Vector3.Distance(hit.point, Vector3.zero) < 12f) continue;
 
                     GameObject tree = SteppeTreeBuilder.CreateSteppeTree($"SteppeTree_{i}", i);
                     tree.transform.SetParent(treesGroup.transform, false);
                     tree.transform.position = hit.point;
 
-                    float randomScale = Random.Range(0.85f, 1.35f);
+                    float randomScale = Random.Range(0.95f, 1.45f);
                     tree.transform.localScale = new Vector3(randomScale, randomScale, randomScale);
                     tree.transform.rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
                 }
@@ -186,8 +211,24 @@ namespace BattleOfAges.Utils
             GameObject pebblesGroup = new GameObject("OrePebbles");
             pebblesGroup.transform.SetParent(terrainParent, false);
 
+            // Camp pebbles for immediate mining test
+            Vector3[] campPebbles = {
+                new Vector3(4.0f, 0f, 6.0f),
+                new Vector3(-4.5f, 0f, 5.5f),
+                new Vector3(5.5f, 0f, -4.5f)
+            };
+
+            for (int cp = 0; cp < campPebbles.Length; cp++)
+            {
+                Vector3 pos = campPebbles[cp];
+                pos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(pos);
+                GameObject pebble = OrePebbleNode.CreatePebblePrefab($"CampOrePebble_{cp + 1}");
+                pebble.transform.SetParent(pebblesGroup.transform, false);
+                pebble.transform.position = pos;
+            }
+
             Random.InitState(54321);
-            int pebbleCount = 60;
+            int pebbleCount = 50;
 
             for (int i = 0; i < pebbleCount; i++)
             {
@@ -203,6 +244,86 @@ namespace BattleOfAges.Utils
                     pebble.transform.position = hit.point;
                 }
             }
+        }
+
+        private static void ScatterFacetedBoulders(Transform terrainParent, float size)
+        {
+            GameObject bouldersGroup = new GameObject("StylizedBoulders");
+            bouldersGroup.transform.SetParent(terrainParent, false);
+
+            Random.InitState(9876);
+            int boulderCount = 20;
+            Material stoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.46f, 0.44f, 0.42f), 0.05f, 0.25f);
+
+            Mesh[] boulderMeshes = new Mesh[4];
+            for (int b = 0; b < 4; b++)
+            {
+                boulderMeshes[b] = ProceduralMeshBuilder.CreateFacetedRockMesh(1.0f, 2, b * 77, 0.4f);
+                boulderMeshes[b].name = $"FacetedBoulder_{b}";
+            }
+
+            for (int i = 0; i < boulderCount; i++)
+            {
+                float localX = Random.Range(12f, size - 12f);
+                float localZ = Random.Range(12f, size - 12f);
+                Vector3 worldPos = terrainParent.position + new Vector3(localX, 100f, localZ);
+
+                if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
+                {
+                    if (Vector3.Distance(hit.point, Vector3.zero) < 12f) continue;
+
+                    GameObject boulder = new GameObject($"Boulder_{i}");
+                    boulder.transform.SetParent(bouldersGroup.transform, false);
+                    boulder.transform.position = hit.point + Vector3.down * 0.15f;
+                    float scale = Random.Range(1.2f, 2.6f);
+                    boulder.transform.localScale = new Vector3(scale, scale * 0.75f, scale * 1.1f);
+                    boulder.transform.rotation = Quaternion.Euler(Random.Range(-5f, 5f), Random.Range(0f, 360f), Random.Range(-5f, 5f));
+
+                    MeshFilter mf = boulder.AddComponent<MeshFilter>();
+                    Mesh sharedBoulder = boulderMeshes[i % 4];
+                    mf.sharedMesh = sharedBoulder;
+                    MeshRenderer mr = boulder.AddComponent<MeshRenderer>();
+                    mr.sharedMaterial = stoneMat;
+                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                    mr.receiveShadows = true;
+
+                    MeshCollider mc = boulder.AddComponent<MeshCollider>();
+                    mc.sharedMesh = sharedBoulder;
+                }
+            }
+        }
+
+        private static void ScatterCampDecorations(Transform terrainParent)
+        {
+            GameObject decoGroup = new GameObject("Camp_Props");
+            decoGroup.transform.SetParent(terrainParent, false);
+
+            Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.32f, 0.20f, 0.10f), 0f, 0.22f);
+            Material metalMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Metal, new Color(0.25f, 0.26f, 0.28f), 0.7f, 0.5f);
+
+            Vector3[] barrelPos = { new Vector3(2.2f, 0f, 5.0f), new Vector3(2.8f, 0f, 5.5f) };
+            for (int b = 0; b < barrelPos.Length; b++)
+            {
+                Vector3 pos = barrelPos[b];
+                pos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(pos) + 0.45f;
+
+                GameObject barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                barrel.name = $"SupplyBarrel_{b + 1}";
+                barrel.transform.SetParent(decoGroup.transform, false);
+                barrel.transform.position = pos;
+                barrel.transform.localScale = new Vector3(0.55f, 0.45f, 0.55f);
+                barrel.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
+            }
+
+            Vector3 cratePos = new Vector3(1.4f, 0f, 5.2f);
+            cratePos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(cratePos) + 0.35f;
+            GameObject crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            crate.name = "SupplyCrate_1";
+            crate.transform.SetParent(decoGroup.transform, false);
+            crate.transform.position = cratePos;
+            crate.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+            crate.transform.rotation = Quaternion.Euler(0f, 25f, 0f);
+            crate.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
         }
     }
 }

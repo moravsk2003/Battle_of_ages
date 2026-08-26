@@ -1,0 +1,82 @@
+using System;
+using UnityEngine;
+
+namespace BattleOfAges.Combat
+{
+    [DisallowMultipleComponent]
+    public class CombatUnit : MonoBehaviour
+    {
+        [Header("Attack Configuration")]
+        [SerializeField] private int attackDamage = 10;
+        [SerializeField] private float attackCooldown = 2.0f; // 2 seconds between attacks as requested
+        [SerializeField] private float attackRange = 3.0f;
+
+        private float nextAttackTime = 0f;
+        private Vector3 originalLocalPos;
+        private bool isPunching = false;
+        private float punchProgress = 0f;
+
+        public int AttackDamage => attackDamage;
+        public float AttackCooldown => attackCooldown;
+        public float AttackRange => attackRange;
+        public bool CanAttack => Time.time >= nextAttackTime;
+
+        private void Awake()
+        {
+            originalLocalPos = transform.localPosition;
+        }
+
+        public void InitializeCombatStats(int damage, float cooldown = 2.0f, float range = 3.0f)
+        {
+            attackDamage = damage;
+            attackCooldown = cooldown;
+            attackRange = range;
+        }
+
+        public bool TryAttack(HealthComponent target)
+        {
+            if (target == null || !target.IsAlive) return false;
+            if (!CanAttack) return false;
+
+            float dst = Vector3.Distance(transform.position, target.transform.position);
+            if (dst > attackRange + 1.0f) return false;
+
+            nextAttackTime = Time.time + attackCooldown;
+            int finalDamage = BattleOfAges.Crafting.ItemStatCalculator.CalculateDamageWithHighGround(
+                attackDamage, transform.position.y, target.transform.position.y);
+            target.TakeDamage(finalDamage);
+
+            TriggerAttackAnimation();
+            return true;
+        }
+
+        public void TriggerAttackAnimation()
+        {
+            if (!isPunching)
+            {
+                isPunching = true;
+                punchProgress = 0f;
+            }
+        }
+
+        private void Update()
+        {
+            // Procedural punch/swing animation for unit visual feedback
+            if (isPunching)
+            {
+                punchProgress += Time.deltaTime * 6f; // Fast punch forward and back
+                if (punchProgress >= Mathf.PI)
+                {
+                    isPunching = false;
+                    punchProgress = 0f;
+                }
+                else
+                {
+                    float offset = Mathf.Sin(punchProgress) * 0.35f;
+                    // Visual punch impulse in forward direction
+                    transform.Translate(Vector3.forward * offset * Time.deltaTime * 4f, Space.Self);
+                }
+            }
+        }
+    }
+}

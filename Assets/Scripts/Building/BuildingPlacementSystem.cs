@@ -16,7 +16,7 @@ namespace BattleOfAges.Building
     {
         public static BuildingPlacementSystem Instance { get; private set; }
 
-        private static readonly Collider[] overlapBuffer = new Collider[32];
+        private static readonly Collider[] overlapBuffer = new Collider[64];
         private static readonly int ColorPropertyId = Shader.PropertyToID("_Color");
         private static readonly int BaseColorPropertyId = Shader.PropertyToID("_BaseColor");
 
@@ -166,8 +166,9 @@ namespace BattleOfAges.Building
 
         private bool CheckLocationValid(Vector3 position, Vector3 size)
         {
-            Vector3 paddedSize = size + new Vector3(3.2f, 0f, 3.2f);
-            Vector3 center = position + new Vector3(0f, paddedSize.y * 0.5f, 0f);
+            float padding = (currentBuildingType == BuildingType.CastleWall) ? 0.2f : 0.8f;
+            Vector3 paddedSize = size + new Vector3(padding, 0f, padding);
+            Vector3 center = position + new Vector3(0f, paddedSize.y * 0.5f + 0.1f, 0f);
             Vector3 halfExtents = paddedSize * 0.5f;
 
             int hitCount = Physics.OverlapBoxNonAlloc(center, halfExtents, overlapBuffer, Quaternion.identity);
@@ -177,15 +178,43 @@ namespace BattleOfAges.Building
                 Collider col = overlapBuffer[i];
                 if (col == null || col.isTrigger) continue;
 
-                if (ghostPreview != null && col.transform.IsChildOf(ghostPreview.transform)) continue;
+                if (ghostPreview != null && (col.gameObject == ghostPreview || col.transform.IsChildOf(ghostPreview.transform))) continue;
 
-                string colName = col.gameObject.name;
-                if (colName.Contains("SteppeTerrain") || colName.Contains("Ground")) continue;
+                // Ignore ground/terrain colliders (procedural chunks, steppe terrain, etc.)
+                if (IsTerrainCollider(col)) continue;
+
+                // Ignore mobile units / NPCs or UI indicators (NPCs steer around new buildings)
+                if (col.GetComponent<CharacterController>() != null || 
+                    col.GetComponent<RtsUnit>() != null || 
+                    col.gameObject.name.Contains("SelectionIndicator"))
+                {
+                    continue;
+                }
 
                 return false;
             }
 
             return true;
+        }
+
+        private static bool IsTerrainCollider(Collider col)
+        {
+            if (col == null) return false;
+            if (col is TerrainCollider) return true;
+            if (col.GetComponent<BattleOfAges.World.ProceduralBiomeChunk>() != null || 
+                col.GetComponentInParent<BattleOfAges.World.ProceduralBiomeChunk>() != null)
+            {
+                return true;
+            }
+
+            string colName = col.gameObject.name;
+            if (colName.Contains("Terrain") || colName.Contains("Ground") || 
+                colName.Contains("Chunk") || colName.Contains("Steppe"))
+            {
+                return true;
+            }
+
+            return false;
         }
 
         private void TryConfirmPlacement()
@@ -235,6 +264,14 @@ namespace BattleOfAges.Building
             else if (currentBuildingType == BuildingType.Mine)
             {
                 building = MineNode.CreateMinePrefab("Mine");
+            }
+            else if (currentBuildingType == BuildingType.Workbench)
+            {
+                building = BattleOfAges.Crafting.WorkbenchNode.CreateWorkbenchPrefab("Workbench");
+            }
+            else if (currentBuildingType == BuildingType.CastleWall)
+            {
+                building = BuildingNode.CreateCastleWallPrefab("CastleWall");
             }
 
             if (building != null)

@@ -38,11 +38,12 @@ namespace BattleOfAges.RTS
         [Header("Gatherer AI Configuration")]
         [SerializeField] private GatherDirective currentDirective = GatherDirective.Auto;
         [SerializeField] private float searchRadius = 150.0f;
-        [SerializeField] private float harvestDistance = 2.5f;
-        [SerializeField] private float chestDepositDistance = 2.2f;
+        [SerializeField] private float harvestDistance = 3.2f;
+        [SerializeField] private float chestDepositDistance = 3.6f;
 
         private RtsUnit rtsUnit;
         private GathererState currentState = GathererState.FindingResource;
+        private float stateWatchdogTimer = 0f;
 
         private ResourceNodeTree targetTree;
         private OrePebbleNode targetPebble;
@@ -59,9 +60,36 @@ namespace BattleOfAges.RTS
         public GatherDirective CurrentDirective => currentDirective;
         public GathererState CurrentState => currentState;
 
+        private BattleOfAges.Combat.HealthComponent healthComponent;
+
         private void Awake()
         {
             rtsUnit = GetComponent<RtsUnit>();
+            healthComponent = GetComponent<BattleOfAges.Combat.HealthComponent>();
+            if (healthComponent != null)
+            {
+                healthComponent.OnTakeDamage += HandleDamageTaken;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (healthComponent != null)
+            {
+                healthComponent.OnTakeDamage -= HandleDamageTaken;
+            }
+        }
+
+        private void HandleDamageTaken(int damage)
+        {
+            // Self-preservation: Immediately drop current target and flee towards base chest
+            ClearCurrentTargets();
+            Vector3 safePos = StorageChestNode.GetNearestChestDepositPosition(transform.position);
+            if (rtsUnit != null)
+            {
+                rtsUnit.IssueMoveCommand(safePos);
+            }
+            Debug.LogWarning($"[NPC Worker] ⚠️ {gameObject.name} атакований ({damage} урону)! Тікає під захист бази.");
         }
 
         private void OnEnable()
@@ -187,6 +215,21 @@ namespace BattleOfAges.RTS
 
             // Pause AI logic if worker is selected by player in RTS mode
             if (rtsUnit != null && rtsUnit.IsSelected) return;
+
+            if (currentState == GathererState.MovingToResource || currentState == GathererState.DeliveringToChest)
+            {
+                stateWatchdogTimer += Time.deltaTime;
+                if (stateWatchdogTimer > 10.0f)
+                {
+                    stateWatchdogTimer = 0f;
+                    ClearCurrentTargets();
+                    currentState = GathererState.FindingResource;
+                }
+            }
+            else
+            {
+                stateWatchdogTimer = 0f;
+            }
 
             switch (currentState)
             {

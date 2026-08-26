@@ -140,6 +140,13 @@ namespace BattleOfAges.RTS
                     return;
                 }
 
+                BattleOfAges.Crafting.WorkbenchNode wb = hit.collider.GetComponentInParent<BattleOfAges.Crafting.WorkbenchNode>();
+                if (wb != null)
+                {
+                    BattleOfAges.UI.WorkbenchUI.EnsureInstance().OpenUI(wb);
+                    return;
+                }
+
                 // Fallback nearest check at hit point
                 RtsUnit nearestUnit = UnitRegistry.FindNearestUnit(hit.point, singleClickRadius);
                 if (nearestUnit != null)
@@ -181,6 +188,20 @@ namespace BattleOfAges.RTS
 
                 if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
                 {
+                    // 0. Right-click Enemy Target / Dummy Target
+                    BattleOfAges.Combat.HealthComponent enemyTarget = hit.collider.GetComponentInParent<BattleOfAges.Combat.HealthComponent>();
+                    if (enemyTarget != null && enemyTarget.IsAlive)
+                    {
+                        for (int i = 0; i < count; i++)
+                        {
+                            RtsUnit unit = selectedUnits[i];
+                            if (unit == null) continue;
+
+                            unit.IssueAttackCommand(enemyTarget);
+                        }
+                        return;
+                    }
+
                     // 1. Right-click Mine
                     MineNode mine = hit.collider.GetComponentInParent<MineNode>();
                     if (mine != null)
@@ -194,6 +215,22 @@ namespace BattleOfAges.RTS
                             if (gatherer != null && !mine.IsFullWorkers)
                             {
                                 gatherer.AssignToWorkInMine(mine);
+                            }
+                        }
+                        return;
+                    }
+
+                    // 1.5. Right-click Workbench
+                    BattleOfAges.Crafting.WorkbenchNode workbench = hit.collider.GetComponentInParent<BattleOfAges.Crafting.WorkbenchNode>();
+                    if (workbench != null)
+                    {
+                        for (int i = 0; i < count; i++)
+                        {
+                            RtsUnit unit = selectedUnits[i];
+                            if (unit == null) continue;
+                            if (!workbench.IsWorkerFull)
+                            {
+                                workbench.AssignWorker(unit);
                             }
                         }
                         return;
