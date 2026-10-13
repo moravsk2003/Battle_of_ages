@@ -303,9 +303,12 @@ namespace BattleOfAges.World
 
         private readonly List<GameObject> activeEntities = new List<GameObject>();
 
-        public void ReleaseChunkResources()
+        public void ReleaseChunkResources() => ReleaseChunkResources(true);
+
+        /// <summary>returnToPool = false while the chunk itself is destroyed (scene unload): the pool may be going away too.</summary>
+        private void ReleaseChunkResources(bool returnToPool)
         {
-            EnvironmentPoolManager pool = EnvironmentPoolManager.Instance;
+            EnvironmentPoolManager pool = returnToPool ? EnvironmentPoolManager.Instance : null;
 
             for (int i = 0; i < activeTrees.Count; i++)
             {
@@ -339,7 +342,7 @@ namespace BattleOfAges.World
 
         private void OnDestroy()
         {
-            ReleaseChunkResources();
+            ReleaseChunkResources(false);
         }
     }
 }

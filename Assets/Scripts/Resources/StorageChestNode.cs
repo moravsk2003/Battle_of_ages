@@ -29,6 +29,12 @@ namespace BattleOfAges.Resources
             }
         }
 
+        private void OnDisable()
+        {
+            // Destroyed or unloaded chests must leave the registry (otherwise a scene reload leaves dead entries).
+            activeChests.Remove(this);
+        }
+
         private void Start()
         {
             SnapToTerrain();
@@ -48,13 +54,11 @@ namespace BattleOfAges.Resources
 
         public static Vector3 GetNearestChestDepositPosition(Vector3 searchPos)
         {
-            if (activeChests.Count == 0) return Vector3.zero;
-
-            StorageChestNode nearest = activeChests[0];
-            float minSqrDst = (searchPos - nearest.transform.position).sqrMagnitude;
+            StorageChestNode nearest = null;
+            float minSqrDst = float.MaxValue;
 
             int count = activeChests.Count;
-            for (int i = 1; i < count; i++)
+            for (int i = 0; i < count; i++)
             {
                 StorageChestNode chest = activeChests[i];
                 if (chest == null || !chest.gameObject.activeInHierarchy) continue;
@@ -67,7 +71,7 @@ namespace BattleOfAges.Resources
                 }
             }
 
-            return nearest.transform.position;
+            return nearest != null ? nearest.transform.position : Vector3.zero;
         }
 
         public static GameObject CreateStorageChestPrefab(string name = "StorageChest")
