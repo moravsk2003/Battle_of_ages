@@ -56,6 +56,70 @@ namespace BattleOfAges.Utils
             return root;
         }
 
+        private static readonly System.Collections.Generic.Dictionary<int, Mesh> CachedPineCrowns = new System.Collections.Generic.Dictionary<int, Mesh>();
+        private static readonly System.Collections.Generic.Dictionary<int, Mesh> CachedPineTrunks = new System.Collections.Generic.Dictionary<int, Mesh>();
+
+        /// <summary>
+        /// Tall northern spruce: thin tapered trunk and a dense crown of drooping star-shaped tiers.
+        /// Child names follow the broadleaf tree ("StylizedTrunk", "...Crown") so ResourceNodeTree can fell it.
+        /// </summary>
+        public static GameObject CreatePineTree(string name = "PineTree", int variant = 0)
+        {
+            GameObject root = new GameObject(name);
+            root.AddComponent<ResourceNodeTree>();
+
+            int varIdx = Mathf.Abs(variant) % 4;
+            Color[] needleColors =
+            {
+                new Color(0.20f, 0.38f, 0.20f), // spruce
+                new Color(0.25f, 0.42f, 0.18f), // pine green
+                new Color(0.19f, 0.36f, 0.27f), // blue spruce
+                new Color(0.30f, 0.44f, 0.18f)  // sunny pine
+            };
+            Color needles = needleColors[varIdx];
+            Color bark = Color.Lerp(new Color(0.20f, 0.14f, 0.10f), new Color(0.30f, 0.21f, 0.14f), varIdx / 3f);
+
+            Material barkMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, bark, 0f, 0.18f);
+            Material needleMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Foliage, needles, 0f, 0.15f);
+            needleMat.SetColor("_TopColor", Color.Lerp(needles, new Color(0.62f, 0.78f, 0.36f), 0.35f));
+            needleMat.SetColor("_BottomColor", needles * 0.6f);
+            needleMat.SetFloat("_Translucency", 0.25f);
+            needleMat.SetFloat("_WindStrength", 0.04f);
+
+            float height = 8.5f + varIdx * 0.6f;
+
+            GameObject trunk = new GameObject("StylizedTrunk");
+            trunk.transform.SetParent(root.transform, false);
+            if (!CachedPineTrunks.TryGetValue(varIdx, out Mesh trunkMesh) || trunkMesh == null)
+            {
+                trunkMesh = ProceduralMeshBuilder.CreateStylizedTrunkMesh(0.30f, 0.07f, height * 0.85f, 6, 5, 500 + varIdx * 31);
+                trunkMesh.name = $"PineTrunk_Var{varIdx}";
+                CachedPineTrunks[varIdx] = trunkMesh;
+            }
+            trunk.AddComponent<MeshFilter>().sharedMesh = trunkMesh;
+            MeshRenderer trunkMr = trunk.AddComponent<MeshRenderer>();
+            trunkMr.sharedMaterial = barkMat;
+
+            GameObject crown = new GameObject("PineFoliageCrown");
+            crown.transform.SetParent(root.transform, false);
+            if (!CachedPineCrowns.TryGetValue(varIdx, out Mesh crownMesh) || crownMesh == null)
+            {
+                crownMesh = ProceduralMeshBuilder.CreateConiferCrownMesh(2.0f + varIdx * 0.12f, height - 1.4f, 1.5f, 7 + varIdx % 2, 900 + varIdx * 53);
+                crownMesh.name = $"PineCrown_Var{varIdx}";
+                CachedPineCrowns[varIdx] = crownMesh;
+            }
+            crown.AddComponent<MeshFilter>().sharedMesh = crownMesh;
+            MeshRenderer crownMr = crown.AddComponent<MeshRenderer>();
+            crownMr.sharedMaterial = needleMat;
+
+            CapsuleCollider trunkCollider = root.AddComponent<CapsuleCollider>();
+            trunkCollider.center = new Vector3(0f, 1.7f, 0f);
+            trunkCollider.radius = 0.45f;
+            trunkCollider.height = 3.4f;
+
+            return root;
+        }
+
         private static void CreateFoliageCloud(Transform parent, Material material, Vector3 localPos, Vector3 scale, int seed, int cacheKey)
         {
             GameObject cloud = new GameObject($"CrownCluster_{seed}");

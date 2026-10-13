@@ -208,77 +208,6 @@ namespace BattleOfAges.Utils
             return mesh;
         }
 
-        // ----------------------------------------------------
-        // 4. Stylized 3D Grass & Flower Tufts Mesh
-        // ----------------------------------------------------
-        public static Mesh CreateGrassTuftMesh(float width = 0.75f, float height = 0.65f, int bladePlanes = 4, int seed = 0)
-        {
-            Random.InitState(seed);
-            List<Vector3> verts = new List<Vector3>();
-            List<Vector3> norms = new List<Vector3>();
-            List<Vector2> uvs = new List<Vector2>();
-            List<Color> cols = new List<Color>();
-            List<int> tris = new List<int>();
-
-            Color rootCol = new Color(0.24f, 0.44f, 0.16f);
-            Color tipCol = new Color(0.48f, 0.72f, 0.24f);
-
-            for (int p = 0; p < bladePlanes; p++)
-            {
-                float angle = (float)p / bladePlanes * Mathf.PI + Random.Range(-0.15f, 0.15f);
-                Vector3 dir = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
-                Vector3 right = new Vector3(-dir.z, 0, dir.x) * (width * 0.45f);
-
-                Vector3 curveOffset = dir * Random.Range(0.10f, 0.22f);
-                float bladeHeight = height * Random.Range(0.85f, 1.15f);
-
-                Vector3 bL = -right;
-                Vector3 bR = right;
-                Vector3 tL = -right * 0.4f + Vector3.up * (bladeHeight * 0.65f) + curveOffset * 0.5f;
-                Vector3 tR = right * 0.4f + Vector3.up * (bladeHeight * 0.65f) + curveOffset * 0.5f;
-                Vector3 tip = Vector3.up * bladeHeight + curveOffset;
-
-                int baseIdx = verts.Count;
-                verts.Add(bL); verts.Add(tL); verts.Add(bR);
-                verts.Add(bR); verts.Add(tL); verts.Add(tR);
-                verts.Add(tL); verts.Add(tip); verts.Add(tR);
-
-                for (int i = 0; i < 9; i++) norms.Add(Vector3.up);
-
-                uvs.Add(new Vector2(0, 0)); uvs.Add(new Vector2(0, 0.7f)); uvs.Add(new Vector2(1, 0));
-                uvs.Add(new Vector2(1, 0)); uvs.Add(new Vector2(0, 0.7f)); uvs.Add(new Vector2(1, 0.7f));
-                uvs.Add(new Vector2(0, 0.7f)); uvs.Add(new Vector2(0.5f, 1f)); uvs.Add(new Vector2(1, 0.7f));
-
-                cols.Add(rootCol); cols.Add(tipCol); cols.Add(rootCol);
-                cols.Add(rootCol); cols.Add(tipCol); cols.Add(tipCol);
-                cols.Add(tipCol); cols.Add(tipCol); cols.Add(tipCol);
-
-                for (int i = 0; i < 9; i++) tris.Add(baseIdx + i);
-
-                int backBase = verts.Count;
-                for (int i = 0; i < 9; i++)
-                {
-                    verts.Add(verts[baseIdx + i]);
-                    norms.Add(Vector3.up);
-                    uvs.Add(uvs[baseIdx + i]);
-                    cols.Add(cols[baseIdx + i]);
-                }
-                tris.Add(backBase + 2); tris.Add(backBase + 1); tris.Add(backBase + 0);
-                tris.Add(backBase + 5); tris.Add(backBase + 4); tris.Add(backBase + 3);
-                tris.Add(backBase + 8); tris.Add(backBase + 7); tris.Add(backBase + 6);
-            }
-
-            Mesh mesh = new Mesh();
-            mesh.name = "GrassTuft";
-            mesh.vertices = verts.ToArray();
-            mesh.normals = norms.ToArray();
-            mesh.uv = uvs.ToArray();
-            mesh.colors = cols.ToArray();
-            mesh.triangles = tris.ToArray();
-            mesh.RecalculateBounds();
-            return mesh;
-        }
-
         private static Mesh CreateIcoSphere(float radius, int subdivisions)
         {
             List<Vector3> verts = new List<Vector3>();
@@ -355,6 +284,74 @@ namespace BattleOfAges.Utils
             verts.Add(middle);
             cache.Add(key, i);
             return i;
+        }
+
+        // ----------------------------------------------------
+        // 4. Conifer (spruce / pine) crown
+        // ----------------------------------------------------
+        /// <summary>
+        /// Spruce crown made of stacked drooping star-shaped tiers (branch tips hang lower than the gaps between
+        /// them), faceted, with vertex colours darkening towards the inside/underside for cheap foliage AO.
+        /// </summary>
+        public static Mesh CreateConiferCrownMesh(float baseRadius, float crownHeight, float bottomY, int tiers, int seed)
+        {
+            System.Random rng = new System.Random(seed);
+            List<Vector3> verts = new List<Vector3>();
+            List<Color> cols = new List<Color>();
+            List<int> tris = new List<int>();
+
+            void Tri(Vector3 a, Vector3 b, Vector3 c, Color ca, Color cb, Color cc)
+            {
+                int i = verts.Count;
+                verts.Add(a); verts.Add(b); verts.Add(c);
+                cols.Add(ca); cols.Add(cb); cols.Add(cc);
+                tris.Add(i); tris.Add(i + 1); tris.Add(i + 2);
+            }
+
+            float R() => (float)rng.NextDouble();
+            float tierStep = crownHeight / (tiers + 0.6f);
+
+            for (int t = 0; t < tiers; t++)
+            {
+                float k = (float)t / Mathf.Max(1, tiers - 1);              // 0 = bottom tier, 1 = top tier
+                float radius = Mathf.Lerp(baseRadius, baseRadius * 0.22f, k) * (0.92f + R() * 0.16f);
+                float tierBase = bottomY + t * tierStep;
+                float tierHeight = tierStep * (1.85f - k * 0.45f);
+                int points = Mathf.Max(5, Mathf.RoundToInt(Mathf.Lerp(10f, 6f, k)));
+                int rim = points * 2;
+                float twist = R() * Mathf.PI * 2f;
+
+                Vector3 apex = new Vector3((R() - 0.5f) * 0.08f, tierBase + tierHeight, (R() - 0.5f) * 0.08f);
+                Vector3 underCenter = new Vector3(0f, tierBase + tierHeight * 0.30f, 0f);
+                Vector3[] ring = new Vector3[rim];
+                for (int i = 0; i < rim; i++)
+                {
+                    bool branchTip = i % 2 == 0;
+                    float a = twist + (i + (R() - 0.5f) * 0.35f) / rim * Mathf.PI * 2f;
+                    float r = branchTip ? radius * (0.88f + R() * 0.24f) : radius * (0.50f + R() * 0.10f);
+                    float y = branchTip ? tierBase - tierHeight * (0.10f + R() * 0.10f) : tierBase + tierHeight * 0.10f;
+                    ring[i] = new Vector3(Mathf.Cos(a) * r, y, Mathf.Sin(a) * r);
+                }
+
+                Color top = Color.Lerp(new Color(0.92f, 0.93f, 0.92f), Color.white, k);
+                Color tip = new Color(0.86f, 0.88f, 0.86f);
+                Color inner = new Color(0.62f, 0.65f, 0.63f);
+                for (int i = 0; i < rim; i++)
+                {
+                    Vector3 a0 = ring[i], a1 = ring[(i + 1) % rim];
+                    Color c0 = (i % 2 == 0) ? tip : inner, c1 = ((i + 1) % 2 == 0) ? tip : inner;
+                    Tri(apex, a1, a0, top, c1, c0);                                                  // outer surface
+                    Tri(underCenter, a0, a1, inner * 0.8f, c0 * 0.75f, c1 * 0.75f);                    // underside
+                }
+            }
+
+            Mesh mesh = new Mesh { name = "ConiferCrown" };
+            mesh.SetVertices(verts);
+            mesh.SetColors(cols);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
         }
     }
 }

@@ -28,6 +28,18 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void BiomeColor_LowMeadowIsGreen_NotSnow()
+        {
+            // Mathf.SmoothStep(from, to, t) used as a 0..1 ramp once made every vertex snow-coloured.
+            Color meadow = ProceduralBiomeChunk.GetBlendedBiomeColor(0f, 0f, InfiniteWorldManager.BaseZoneHeight);
+            Assert.Greater(meadow.g, meadow.r, "Meadow should be green-dominant.");
+            Assert.Less(meadow.r + meadow.g + meadow.b, 1.6f, "Meadow must not be snow-white.");
+            Assert.AreEqual(0f, ProceduralBiomeChunk.SmoothRange(10f, 20f, 5f), 1e-6f);
+            Assert.AreEqual(1f, ProceduralBiomeChunk.SmoothRange(10f, 20f, 25f), 1e-6f);
+            Assert.AreEqual(0.5f, ProceduralBiomeChunk.SmoothRange(10f, 20f, 15f), 1e-6f);
+        }
+
+        [Test]
         public void BasePlateau_IsFlatWithinBaseRadius()
         {
             float center = InfiniteWorldManager.GetSampledTerrainHeight(0f, 0f);

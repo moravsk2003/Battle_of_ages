@@ -16,10 +16,13 @@ namespace BattleOfAges.World
 
         [Header("Initial Pool Sizes")]
         [SerializeField] private int initialTrees = 100;
+        [SerializeField] private int initialPines = 160;
         [SerializeField] private int initialPebbles = 60;
         [SerializeField] private int initialChunks = 36;
 
         private readonly Queue<GameObject> treePool = new Queue<GameObject>();
+        private readonly Queue<GameObject> pinePool = new Queue<GameObject>();
+        private const string PinePrefix = "PooledPine";
         private readonly Queue<GameObject> pebblePool = new Queue<GameObject>();
         private readonly Queue<ProceduralBiomeChunk> chunkPool = new Queue<ProceduralBiomeChunk>();
 
@@ -52,6 +55,14 @@ namespace BattleOfAges.World
                 treePool.Enqueue(tree);
             }
 
+            for (int i = 0; i < initialPines; i++)
+            {
+                GameObject pine = SteppeTreeBuilder.CreatePineTree($"{PinePrefix}_{i}", i);
+                pine.transform.SetParent(poolContainer, false);
+                pine.SetActive(false);
+                pinePool.Enqueue(pine);
+            }
+
             for (int i = 0; i < initialPebbles; i++)
             {
                 GameObject pebble = OrePebbleNode.CreatePebblePrefab($"PooledPebble_{i}");
@@ -70,16 +81,19 @@ namespace BattleOfAges.World
             }
         }
 
-        public GameObject GetTree(Transform parent, Vector3 position, Quaternion rotation, Vector3 localScale, int variant = 0)
+        public GameObject GetTree(Transform parent, Vector3 position, Quaternion rotation, Vector3 localScale, int variant = 0, bool conifer = false)
         {
             GameObject tree;
-            if (treePool.Count > 0)
+            Queue<GameObject> pool = conifer ? pinePool : treePool;
+            if (pool.Count > 0)
             {
-                tree = treePool.Dequeue();
+                tree = pool.Dequeue();
             }
             else
             {
-                tree = SteppeTreeBuilder.CreateSteppeTree("PooledTree_Extra", variant);
+                tree = conifer
+                    ? SteppeTreeBuilder.CreatePineTree(PinePrefix + "_Extra", variant)
+                    : SteppeTreeBuilder.CreateSteppeTree("PooledTree_Extra", variant);
             }
 
             tree.transform.SetParent(parent, false);
@@ -103,7 +117,7 @@ namespace BattleOfAges.World
 
             tree.SetActive(false);
             tree.transform.SetParent(poolContainer, false);
-            treePool.Enqueue(tree);
+            (tree.name.StartsWith(PinePrefix) ? pinePool : treePool).Enqueue(tree);
         }
 
         public GameObject GetPebble(Transform parent, Vector3 position)

@@ -11,6 +11,27 @@ namespace BattleOfAges.World
     [RequireComponent(typeof(MeshCollider))]
     public class ProceduralBiomeChunk : MonoBehaviour
     {
+        /// <summary>Height above which ground turns to snow (terrain shader _SnowHeight, biome and spawn thresholds).</summary>
+        public const float SnowLineHeight = 46f;
+
+        /// <summary>
+        /// Hermite 0..1 ramp of x between edge0 and edge1 (like HLSL smoothstep). Note: Mathf.SmoothStep(from, to, t)
+        /// is an interpolation between from and to, not a ramp - using it here made every vertex snow-coloured.
+        /// </summary>
+        public static float SmoothRange(float edge0, float edge1, float x)
+        {
+            float t = Mathf.Clamp01((x - edge0) / (edge1 - edge0));
+            return t * t * (3f - 2f * t);
+        }
+
+        /// <summary>0..1 sandiness (hot and dry), same formula as the desert blend in GetBlendedBiomeColor.</summary>
+        public static float GetDesertWeight(float worldX, float worldZ)
+        {
+            float tempNoise = Mathf.PerlinNoise(worldX * 0.003f + 500f, worldZ * 0.003f + 500f);
+            float moistureNoise = Mathf.PerlinNoise(worldX * 0.004f + 1500f, worldZ * 0.004f + 1500f);
+            return SmoothRange(0.55f, 0.75f, tempNoise) * (1f - SmoothRange(0.3f, 0.5f, moistureNoise));
+        }
+
         public Vector2Int ChunkCoord { get; private set; }
         public BiomeType MainBiome { get; private set; }
         public bool IsLowLOD { get; private set; }
@@ -121,27 +142,28 @@ namespace BattleOfAges.World
             ScatterBiomeResources(startWorldX, startWorldZ, size, isLowLOD);
         }
 
-        private Color GetBlendedBiomeColor(float worldX, float worldZ, float height)
+        /// <summary>Per-vertex biome colour (smoothly blended); used as the grass tint by the terrain shader.</summary>
+        public static Color GetBlendedBiomeColor(float worldX, float worldZ, float height)
         {
-            Color steppeColor = new Color(0.35f, 0.55f, 0.22f);
-            Color forestColor = new Color(0.18f, 0.38f, 0.15f);
-            Color desertColor = new Color(0.78f, 0.68f, 0.38f);
-            Color snowColor = new Color(0.92f, 0.95f, 0.98f);
+            Color steppeColor = new Color(0.35f, 0.55f, 0.22f); // lush steppe meadow
+            Color forestColor = new Color(0.20f, 0.38f, 0.16f); // conifer forest floor
+            Color desertColor = new Color(0.74f, 0.64f, 0.40f); // sand
+            Color highlandColor = new Color(0.42f, 0.48f, 0.32f); // alpine meadow (snow and rock come from the shader)
 
             float tempNoise = Mathf.PerlinNoise(worldX * 0.003f + 500f, worldZ * 0.003f + 500f);
             float moistureNoise = Mathf.PerlinNoise(worldX * 0.004f + 1500f, worldZ * 0.004f + 1500f);
 
             // 1. Base Steppe & Pine Forest smooth blend based on moisture
-            float forestWeight = Mathf.SmoothStep(0.35f, 0.65f, moistureNoise);
+            float forestWeight = SmoothRange(0.35f, 0.65f, moistureNoise);
             Color baseColor = Color.Lerp(steppeColor, forestColor, forestWeight);
 
             // 2. Desert blend based on high temperature & low moisture
-            float desertWeight = Mathf.SmoothStep(0.55f, 0.75f, tempNoise) * (1f - Mathf.SmoothStep(0.3f, 0.5f, moistureNoise));
+            float desertWeight = SmoothRange(0.55f, 0.75f, tempNoise) * (1f - SmoothRange(0.3f, 0.5f, moistureNoise));
             baseColor = Color.Lerp(baseColor, desertColor, desertWeight);
 
             // 3. Snow blend based on height elevation
-            float snowWeight = Mathf.SmoothStep(14f, 20f, height);
-            baseColor = Color.Lerp(baseColor, snowColor, snowWeight);
+            float highlandWeight = SmoothRange(SnowLineHeight - 20f, SnowLineHeight, height);
+            baseColor = Color.Lerp(baseColor, highlandColor, highlandWeight);
 
             return baseColor;
         }
@@ -163,7 +185,9 @@ namespace BattleOfAges.World
             int seed = Mathf.Abs((ChunkCoord.x * 73856093) ^ (ChunkCoord.y * 19349663));
             Random.InitState(seed);
 
-            int baseTreeCount = (MainBiome == BiomeType.PineForest) ? 14 : (MainBiome == BiomeType.Steppe ? 6 : 2);
+            int baseTreeCount = (MainBiome == BiomeType.PineForest) ? 26 : (MainBiome == BiomeType.Steppe ? 7 : (MainBiome == BiomeType.SnowyPeaks ? 4 : 2));
+            // Share of conifers: the conifer-forest biome is spruce, the steppe keeps its broadleaf trees.
+            float coniferShare = (MainBiome == BiomeType.PineForest) ? 0.9f : (MainBiome == BiomeType.Steppe ? 0.1f : (MainBiome == BiomeType.SnowyPeaks ? 1f : 0.1f));
             int basePebbleCount = (MainBiome == BiomeType.Desert) ? 12 : 5;
 
             int treeCount = isLowLOD ? Mathf.Max(1, baseTreeCount / 2) : baseTreeCount;
@@ -182,16 +206,25 @@ namespace BattleOfAges.World
                 if (Vector2.Distance(new Vector2(worldX, worldZ), Vector2.zero) < 12f) continue;
 
                 float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
-                if (y > 22f) continue; // Don't spawn trees on high snow peaks
+                if (y > SnowLineHeight + 4f) continue; // Don't spawn trees on high snow peaks
 
-                Vector3 treePos = new Vector3(worldX, y, worldZ);
-                float scaleVal = Random.Range(0.85f, 1.35f);
+                // No trees on cliffs (rise over 2 m of more than ~1.3 m = steeper than ~33 degrees)
+                float rise = Mathf.Max(
+                    Mathf.Abs(InfiniteWorldManager.GetSampledTerrainHeight(worldX + 2f, worldZ) - y),
+                    Mathf.Abs(InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ + 2f) - y));
+                bool conifer = Random.value < coniferShare || y > SnowLineHeight - 16f; // only spruce up high
+                if (rise > 1.3f) continue;
+
+                Vector3 treePos = new Vector3(worldX, y - 0.15f, worldZ);
+                float scaleVal = conifer ? Random.Range(0.8f, 1.5f) : Random.Range(0.85f, 1.35f);
                 Vector3 treeScale = new Vector3(scaleVal, scaleVal, scaleVal);
                 Quaternion treeRot = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
 
                 GameObject tree = (pool != null)
-                    ? pool.GetTree(transform, treePos, treeRot, treeScale, i)
-                    : SteppeTreeBuilder.CreateSteppeTree($"Tree_{ChunkCoord.x}_{ChunkCoord.y}_{i}", i);
+                    ? pool.GetTree(transform, treePos, treeRot, treeScale, i, conifer)
+                    : (conifer
+                        ? SteppeTreeBuilder.CreatePineTree($"Pine_{ChunkCoord.x}_{ChunkCoord.y}_{i}", i)
+                        : SteppeTreeBuilder.CreateSteppeTree($"Tree_{ChunkCoord.x}_{ChunkCoord.y}_{i}", i));
 
                 if (pool == null)
                 {
@@ -259,7 +292,7 @@ namespace BattleOfAges.World
                 float campZ = startZ + size * 0.5f;
                 float campY = InfiniteWorldManager.GetSampledTerrainHeight(campX, campZ);
 
-                if (campY < 20f)
+                if (campY < SnowLineHeight - 10f)
                 {
                     GameObject camp = Utils.HostileCampBuilder.CreateHostileCamp(new Vector3(campX, campY, campZ), $"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
                     camp.transform.SetParent(transform);

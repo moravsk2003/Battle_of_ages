@@ -38,7 +38,7 @@ namespace BattleOfAges.Utils
 
                     vertices[index] = new Vector3(x * step, y, z * step);
                     uvs[index] = new Vector2((float)x / gridResolution, (float)z / gridResolution);
-                    colors[index] = Color.white;
+                    colors[index] = ProceduralBiomeChunk.GetBlendedBiomeColor(worldX, worldZ, y);
                 }
             }
 
@@ -90,7 +90,7 @@ namespace BattleOfAges.Utils
             mr.sharedMaterial = terrainMat;
 
             // Scatter Vegetation & Environment Props
-            Scatter3DGrassAndFlowers(terrainObj.transform, size);
+            // Grass is drawn at runtime by World.GrassFieldRenderer (dense instanced blades).
             ScatterSteppeTrees(terrainObj.transform, size);
             ScatterOrePebbles(terrainObj.transform, size);
             ScatterFacetedBoulders(terrainObj.transform, size);
@@ -103,62 +103,6 @@ namespace BattleOfAges.Utils
         private static float FlatDistance(Vector3 a, Vector3 b)
         {
             return new Vector2(a.x - b.x, a.z - b.z).magnitude;
-        }
-
-        private static void Scatter3DGrassAndFlowers(Transform terrainParent, float size)
-        {
-            GameObject grassGroup = new GameObject("3D_Vegetation");
-            grassGroup.transform.SetParent(terrainParent, false);
-
-            Random.InitState(4242);
-            int tuftCount = 300;
-
-            Material grassMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Grass, new Color(0.34f, 0.58f, 0.18f));
-            Material yellowFlowerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.98f, 0.85f, 0.22f), 0f, 0.3f);
-            Material redFlowerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.92f, 0.22f, 0.25f), 0f, 0.3f);
-            Material blueFlowerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.32f, 0.62f, 0.92f), 0f, 0.3f);
-
-            Mesh tuftMesh = ProceduralMeshBuilder.CreateGrassTuftMesh(0.85f, 0.70f, 3, 101);
-
-            for (int i = 0; i < tuftCount; i++)
-            {
-                float localX = Random.Range(6f, size - 6f);
-                float localZ = Random.Range(6f, size - 6f);
-                Vector3 worldPos = terrainParent.position + new Vector3(localX, 100f, localZ);
-
-                if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
-                {
-                    if (FlatDistance(hit.point, new Vector3(1.5f, 0f, 3.5f)) < 3.2f) continue;
-
-                    GameObject tuft = new GameObject($"GrassTuft_{i}");
-                    tuft.transform.SetParent(grassGroup.transform, false);
-                    tuft.transform.position = hit.point;
-                    float scale = Random.Range(0.75f, 1.35f);
-                    tuft.transform.localScale = new Vector3(scale, scale, scale);
-                    tuft.transform.rotation = Quaternion.Euler(0, Random.Range(0f, 360f), 0);
-
-                    MeshFilter mf = tuft.AddComponent<MeshFilter>();
-                    mf.mesh = tuftMesh;
-                    MeshRenderer mr = tuft.AddComponent<MeshRenderer>();
-                    mr.sharedMaterial = grassMat;
-                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    mr.receiveShadows = true;
-
-                    if (i % 3 == 0)
-                    {
-                        GameObject flower = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                        flower.name = "FlowerBlossom";
-                        flower.transform.SetParent(tuft.transform, false);
-                        flower.transform.localPosition = new Vector3(Random.Range(-0.12f, 0.12f), 0.68f, Random.Range(-0.12f, 0.12f));
-                        flower.transform.localScale = new Vector3(0.18f, 0.12f, 0.18f);
-
-                        Material fMat = (i % 9 == 0) ? redFlowerMat : ((i % 6 == 0) ? blueFlowerMat : yellowFlowerMat);
-                        flower.GetComponent<MeshRenderer>().sharedMaterial = fMat;
-                        Collider fc = flower.GetComponent<Collider>();
-                        if (fc != null) Object.DestroyImmediate(fc);
-                    }
-                }
-            }
         }
 
         private static void ScatterSteppeTrees(Transform terrainParent, float size)
@@ -201,7 +145,9 @@ namespace BattleOfAges.Utils
                 {
                     if (FlatDistance(hit.point, Vector3.zero) < 12f) continue;
 
-                    GameObject tree =SteppeTreeBuilder.CreateSteppeTree($"SteppeTree_{i}", i);
+                    GameObject tree = (i % 5 == 0)
+                        ? SteppeTreeBuilder.CreatePineTree($"SteppePine_{i}", i)
+                        : SteppeTreeBuilder.CreateSteppeTree($"SteppeTree_{i}", i);
                     tree.transform.SetParent(treesGroup.transform, false);
                     tree.transform.position = hit.point;
 

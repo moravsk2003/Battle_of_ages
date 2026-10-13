@@ -30,10 +30,10 @@ namespace BattleOfAges.EditorTools
             if (sun == null) sun = sunObj.AddComponent<Light>();
 
             sun.type = LightType.Directional;
-            sun.color = new Color(1.0f, 0.95f, 0.88f); // Warm sun
-            sun.intensity = 1.45f;
+            sun.color = new Color(1.0f, 0.95f, 0.86f); // Warm golden sun
+            sun.intensity = 1.6f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.82f;
+            sun.shadowStrength = 1.0f;
             sun.shadowNormalBias = 0.2f;
             sun.shadowBias = 0.05f;
 
@@ -41,19 +41,40 @@ namespace BattleOfAges.EditorTools
             if (sunData == null) sunData = sunObj.AddComponent<UniversalAdditionalLightData>();
             sunData.usePipelineSettings = true;
 
-            sunObj.transform.rotation = Quaternion.Euler(46f, -38f, 0f);
+            sunObj.transform.rotation = Quaternion.Euler(40f, -38f, 0f); // afternoon sun: long readable shadows
+            RenderSettings.sun = sun;
 
             // 2. Setup Environment Ambient & Fog
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.58f, 0.74f, 0.94f) * 1.1f;    // Sky blue
-            RenderSettings.ambientEquatorColor = new Color(0.48f, 0.62f, 0.38f) * 1.0f; // Steppe foliage bounce
-            RenderSettings.ambientGroundColor = new Color(0.28f, 0.24f, 0.16f) * 0.85f; // Warm earth bounce
-            RenderSettings.ambientIntensity = 1.05f;
+            RenderSettings.ambientSkyColor = new Color(0.58f, 0.74f, 0.94f) * 0.9f;   // Sky blue
+            RenderSettings.ambientEquatorColor = new Color(0.48f, 0.62f, 0.38f) * 0.85f; // Steppe foliage bounce
+            RenderSettings.ambientGroundColor = new Color(0.28f, 0.24f, 0.16f) * 0.8f;  // Warm earth bounce
+            RenderSettings.ambientIntensity = 1.0f;
 
             RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.72f, 0.82f, 0.90f);
-            RenderSettings.fogDensity = 0.0035f;
+            RenderSettings.fogMode = FogMode.Exponential;
+            RenderSettings.fogColor = new Color(0.74f, 0.82f, 0.90f); // warm light haze = sky horizon colour
+            RenderSettings.fogDensity = 0.0014f; // aerial perspective: clear nearby, hazy distant mountains (far terrain ~1.5 km)
+
+            GameObject mainCamObj = GameObject.FindWithTag("MainCamera");
+            if (mainCamObj != null && mainCamObj.TryGetComponent(out Camera mainCam)) mainCam.farClipPlane = 2000f;
+
+            // Procedural sky with clouds; its horizon colour matches the fog colour.
+            const string skyPath = "Assets/Settings/AtmosphericSky.mat";
+            Material sky = AssetDatabase.LoadAssetAtPath<Material>(skyPath);
+            Shader skyShader = Shader.Find("Custom/AtmosphericSky");
+            if (sky == null && skyShader != null)
+            {
+                sky = new Material(skyShader) { name = "AtmosphericSky" };
+                AssetDatabase.CreateAsset(sky, skyPath);
+            }
+            if (sky != null)
+            {
+                sky.SetColor("_HorizonColor", RenderSettings.fogColor);
+                sky.SetColor("_ZenithColor", new Color(0.30f, 0.50f, 0.80f));
+                RenderSettings.skybox = sky;
+                EditorUtility.SetDirty(sky);
+            }
 
             // 3. Setup Global Volume with ACES Tonemapping, Bloom, SSAO, Color Adjustments, Vignette
             GameObject volumeObj = GameObject.Find("Global Volume");
@@ -82,8 +103,8 @@ namespace BattleOfAges.EditorTools
                 bloom = profile.Add<Bloom>(true);
             }
             bloom.active = true;
-            bloom.threshold.Override(0.88f);
-            bloom.intensity.Override(0.45f);
+            bloom.threshold.Override(0.95f);
+            bloom.intensity.Override(0.35f);
             bloom.scatter.Override(0.65f);
             bloom.tint.Override(new Color(1.0f, 0.96f, 0.90f));
             bloom.highQualityFiltering.Override(true);
@@ -102,9 +123,9 @@ namespace BattleOfAges.EditorTools
                 colorAdj = profile.Add<ColorAdjustments>(true);
             }
             colorAdj.active = true;
-            colorAdj.postExposure.Override(0.06f);
-            colorAdj.contrast.Override(12f);
-            colorAdj.saturation.Override(8f);
+            colorAdj.postExposure.Override(0.08f);
+            colorAdj.contrast.Override(20f);
+            colorAdj.saturation.Override(6f);
             colorAdj.colorFilter.Override(Color.white);
 
             // Configure White Balance
@@ -114,7 +135,7 @@ namespace BattleOfAges.EditorTools
             }
             whiteBal.active = true;
             whiteBal.temperature.Override(3f);
-            whiteBal.tint.Override(-1f);
+            whiteBal.tint.Override(0f);
 
             // Configure Shadows, Midtones, Highlights
             if (!profile.TryGet(out ShadowsMidtonesHighlights smh))
@@ -145,18 +166,39 @@ namespace BattleOfAges.EditorTools
             UniversalRenderPipelineAsset urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             if (urpAsset != null)
             {
-                urpAsset.shadowDistance = 160f;
+                urpAsset.shadowDistance = 200f;
                 urpAsset.shadowCascadeCount = 4;
                 urpAsset.cascade4Split = new Vector3(0.08f, 0.22f, 0.50f);
                 urpAsset.supportsHDR = true;
                 EditorUtility.SetDirty(urpAsset);
             }
 
+            // Shaders only created from code (Shader.Find) must be in the build.
+            EnsureAlwaysIncluded("Custom/GrassBlades");
+            EnsureAlwaysIncluded("Custom/StylizedTerrain");
+            EnsureAlwaysIncluded("Custom/ProceduralRock");
+
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
             AssetDatabase.SaveAssets();
 
             Debug.Log("[Battle of Ages] Balanced AAA Lighting, Atmosphere & Post Processing Volume configured!");
+        }
+
+        private static void EnsureAlwaysIncluded(string shaderName)
+        {
+            Shader shader = Shader.Find(shaderName);
+            if (shader == null) return;
+            var graphicsSettings = AssetDatabase.LoadAssetAtPath<GraphicsSettings>("ProjectSettings/GraphicsSettings.asset");
+            var so = new SerializedObject(graphicsSettings);
+            SerializedProperty list = so.FindProperty("m_AlwaysIncludedShaders");
+            for (int i = 0; i < list.arraySize; i++)
+            {
+                if (list.GetArrayElementAtIndex(i).objectReferenceValue == shader) return;
+            }
+            list.InsertArrayElementAtIndex(list.arraySize);
+            list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = shader;
+            so.ApplyModifiedProperties();
         }
 
         private static void SetupAtmosphericDustMotes()

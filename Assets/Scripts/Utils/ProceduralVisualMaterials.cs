@@ -33,6 +33,7 @@ namespace BattleOfAges.Utils
         private static readonly Dictionary<Surface, (Texture2D albedo, Texture2D normal)> CachedTextures = new Dictionary<Surface, (Texture2D, Texture2D)>();
         private static Shader litShader;
         private static Shader windFoliageShader;
+        private static Shader rockShader;
 
         public static void ClearCache()
         {
@@ -56,10 +57,14 @@ namespace BattleOfAges.Utils
             {
                 windFoliageShader = Shader.Find("Custom/StylizedWindFoliage");
             }
+            if (rockShader == null)
+            {
+                rockShader = Shader.Find("Custom/ProceduralRock"); // UV-free procedural stone
+            }
 
             Shader targetShader = (surface == Surface.Foliage || surface == Surface.Grass) && windFoliageShader != null
                 ? windFoliageShader
-                : litShader;
+                : (surface == Surface.Stone && rockShader != null ? rockShader : litShader);
 
             Material material = new Material(targetShader)
             {
@@ -79,7 +84,7 @@ namespace BattleOfAges.Utils
             {
                 material.SetTexture("_BaseMap", albedoTex);
                 material.SetColor("_BaseColor", baseColor);
-                material.SetColor("_TopColor", Color.Lerp(baseColor, new Color(0.85f, 0.95f, 0.35f), 0.45f));
+                material.SetColor("_TopColor", Color.Lerp(baseColor, new Color(0.62f, 0.78f, 0.30f), 0.30f));
                 material.SetColor("_BottomColor", baseColor * 0.45f);
                 material.SetFloat("_Translucency", 0.55f);
                 material.SetFloat("_WindSpeed", 1.6f);

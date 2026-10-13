@@ -38,6 +38,7 @@ namespace BattleOfAges.World
         public int ChunkResolution => chunkResolution;
 
         private GameObject steppeTerrainRef;
+        private FarTerrainRenderer farTerrain;
 
         private void Awake()
         {
@@ -50,6 +51,7 @@ namespace BattleOfAges.World
 
             EnsurePoolManager();
             CreateBiomeMaterials();
+            CreateFarTerrain();
         }
 
         private void EnsurePoolManager()
@@ -66,6 +68,7 @@ namespace BattleOfAges.World
         {
             steppeTerrainRef = GameObject.Find("SteppeTerrain");
             FindViewerTarget();
+            if (viewerTarget != null) currentViewerChunk = GetChunkCoordFromWorldPos(viewerTarget.position); // not the (99999, 99999) placeholder
             UpdateChunksAroundViewer();
         }
 
@@ -182,6 +185,21 @@ namespace BattleOfAges.World
                     }
                 }
             }
+
+            if (farTerrain != null)
+            {
+                farTerrain.Rebuild(currentViewerChunk, chunkSize, renderDistanceRadius);
+            }
+        }
+
+        private void CreateFarTerrain()
+        {
+            GameObject farObj = new GameObject("FarTerrain");
+            farObj.transform.SetParent(transform, false);
+            farTerrain = farObj.AddComponent<FarTerrainRenderer>();
+            farTerrain.Initialize(steppeMat);
+
+            gameObject.AddComponent<GrassFieldRenderer>().Initialize(Shader.Find("Custom/GrassBlades"));
         }
 
         private ProceduralBiomeChunk CreateChunkAt(Vector2Int coord, bool isLowLOD)
@@ -221,24 +239,24 @@ namespace BattleOfAges.World
             forestMat.SetColor("_GrassDeep", new Color(0.12f, 0.28f, 0.10f));
             forestMat.SetColor("_GrassMid", new Color(0.18f, 0.38f, 0.14f));
             forestMat.SetColor("_GrassLight", new Color(0.32f, 0.52f, 0.18f));
-            forestMat.SetColor("_DirtColor", new Color(0.26f, 0.18f, 0.10f));
-            forestMat.SetColor("_RockColor", new Color(0.38f, 0.36f, 0.34f));
+            forestMat.SetColor("_DirtColor", new Color(0.35f, 0.24f, 0.14f));
+            forestMat.SetColor("_RockColor", new Color(0.45f, 0.43f, 0.40f));
 
             desertMat = new Material(terrainShader);
             desertMat.name = "MAT_Infinite_Desert";
             desertMat.SetColor("_GrassDeep", new Color(0.72f, 0.60f, 0.32f));
             desertMat.SetColor("_GrassMid", new Color(0.82f, 0.72f, 0.40f));
             desertMat.SetColor("_GrassLight", new Color(0.90f, 0.82f, 0.52f));
-            desertMat.SetColor("_DirtColor", new Color(0.65f, 0.48f, 0.28f));
-            desertMat.SetColor("_RockColor", new Color(0.62f, 0.52f, 0.40f));
+            desertMat.SetColor("_DirtColor", new Color(0.35f, 0.24f, 0.14f));
+            desertMat.SetColor("_RockColor", new Color(0.45f, 0.43f, 0.40f));
 
             snowMat = new Material(terrainShader);
             snowMat.name = "MAT_Infinite_Snow";
             snowMat.SetColor("_GrassDeep", new Color(0.82f, 0.88f, 0.94f));
             snowMat.SetColor("_GrassMid", new Color(0.92f, 0.95f, 0.98f));
             snowMat.SetColor("_GrassLight", new Color(0.98f, 0.99f, 1.00f));
-            snowMat.SetColor("_DirtColor", new Color(0.50f, 0.52f, 0.55f));
-            snowMat.SetColor("_RockColor", new Color(0.40f, 0.42f, 0.45f));
+            snowMat.SetColor("_DirtColor", new Color(0.35f, 0.24f, 0.14f));
+            snowMat.SetColor("_RockColor", new Color(0.45f, 0.43f, 0.40f));
         }
 
         public BiomeType GetBiomeAtWorldPos(Vector3 worldPos)
@@ -248,7 +266,7 @@ namespace BattleOfAges.World
 
             float height = GetSampledTerrainHeight(worldPos.x, worldPos.z);
 
-            if (height > 18f) return BiomeType.SnowyPeaks;
+            if (height > ProceduralBiomeChunk.SnowLineHeight) return BiomeType.SnowyPeaks;
             if (tempNoise > 0.65f && moistureNoise < 0.4f) return BiomeType.Desert;
             if (moistureNoise > 0.55f) return BiomeType.PineForest;
 
@@ -309,7 +327,28 @@ namespace BattleOfAges.World
             float hillNoise = Mathf.PerlinNoise(worldX * 0.02f + 300f, worldZ * 0.02f + 300f) * 6.5f;
             float detailNoise = Mathf.PerlinNoise(worldX * 0.08f + 700f, worldZ * 0.08f + 700f) * 1.5f;
 
-            return continentNoise + hillNoise + detailNoise;
+            return continentNoise + hillNoise + detailNoise + GetMountainHeight(worldX, worldZ);
+        }
+
+        /// <summary>
+        /// Ridged mountain ranges: large regions (low-frequency mask) of sharp ridges (ridged noise), kept away from the
+        /// spawn base so the area around it stays gentle hills. Peaks reach ~130 m and carry snow above the snow line.
+        /// </summary>
+        private static float GetMountainHeight(float worldX, float worldZ)
+        {
+            float distFromOrigin = new Vector2(worldX, worldZ).magnitude;
+            float zone = ProceduralBiomeChunk.SmoothRange(260f, 560f, distFromOrigin);
+            if (zone <= 0f) return 0f;
+
+            float region = Mathf.PerlinNoise(worldX * 0.0019f + 913f, worldZ * 0.0019f + 271f);
+            float mask = ProceduralBiomeChunk.SmoothRange(0.40f, 0.70f, region) * zone;
+            if (mask <= 0f) return 0f;
+
+            float r1 = 1f - Mathf.Abs(Mathf.PerlinNoise(worldX * 0.0065f + 55f, worldZ * 0.0065f + 77f) * 2f - 1f);
+            float r2 = 1f - Mathf.Abs(Mathf.PerlinNoise(worldX * 0.017f + 12f, worldZ * 0.017f + 91f) * 2f - 1f);
+            float r3 = 1f - Mathf.Abs(Mathf.PerlinNoise(worldX * 0.047f + 3f, worldZ * 0.047f + 41f) * 2f - 1f);
+            float ridges = r1 * r1 * 0.64f + r2 * r2 * 0.24f + r3 * r3 * 0.12f; // r3: craggy detail
+            return mask * (ridges * 105f + 12f);
         }
     }
 }

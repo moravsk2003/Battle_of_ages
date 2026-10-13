@@ -75,12 +75,18 @@ public static class AgentVisionCapture
             camData.antialiasingQuality = AntialiasingQuality.High;
         }
 
-        // 4 ракурси для усунення сліпих зон
+        // Ракурси задаються відносно реальної висоти землі в центрі бази (база не на y = 0).
+        float groundY = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(Vector3.zero);
+        Vector3 g = Vector3.up * groundY;
+
+        // 4 ракурси для усунення сліпих зон + 2 загальні плани бази та рельєфу навколо
         var views = new (string name, Vector3 pos, Vector3 target)[] {
-            ("front", new Vector3(0, 3, -8), Vector3.up * 1.5f),
-            ("side", new Vector3(-8, 3, 0), Vector3.up * 1.5f),
-            ("top", new Vector3(0, 12, 0.1f), Vector3.zero),
-            ("iso", new Vector3(-6, 6, -6), Vector3.up * 1.5f)
+            ("front", g + new Vector3(0, 3, -8), g + Vector3.up * 1.5f),
+            ("side", g + new Vector3(-8, 3, 0), g + Vector3.up * 1.5f),
+            ("top", g + new Vector3(0, 12, 0.1f), g),
+            ("iso", g + new Vector3(-6, 6, -6), g + Vector3.up * 1.5f),
+            ("overview", g + new Vector3(-75, 30, -75), g),
+            ("horizon", g + new Vector3(0, 2, -45), g + new Vector3(0, 2, 60))
         };
 
         foreach (var v in views)
@@ -108,7 +114,7 @@ public static class AgentVisionCapture
 
         Object.DestroyImmediate(camObj);
         File.WriteAllText(StatusPath, "READY " + System.DateTime.UtcNow.ToString("o"));
-        Debug.Log("[AgentVision] Усі 4 скріншоти успішно збережено.");
+        Debug.Log($"[AgentVision] Усі {views.Length} скріншоти успішно збережено.");
     }
 }
 #endif
