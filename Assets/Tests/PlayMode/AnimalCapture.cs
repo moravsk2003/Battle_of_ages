@@ -14,7 +14,8 @@ namespace BattleOfAges.PlayModeTests
     /// <summary>
     /// Visual review tool for one animal model (not a regular test): 14 views around a single specimen that faces the
     /// sun, plus a gait strip, a grazing pose, a group and a scale comparison. CAPTURE_ANIMAL = Boar / Deer / Rabbit,
-    /// CAPTURE_VIEWS = 1..14 (priority order), CAPTURE_FROM = first view, CAPTURE_DIR = output folder.
+    /// CAPTURE_VIEWS = 1..14 (priority order), CAPTURE_FROM = first view, CAPTURE_LIST = "3,8,10" (view numbers),
+    /// CAPTURE_LOD = forced LOD level of the animals, CAPTURE_DIR = output folder.
     /// </summary>
     [Explicit("Visual capture tool, run on demand")]
     public class AnimalCapture
@@ -72,18 +73,29 @@ namespace BattleOfAges.PlayModeTests
                 herd.Add(Make(p, facing * Quaternion.Euler(0f, (i - 1) * 35f, 0f), "Herd_" + i));
             }
             PeacefulAnimalAI scaled = Make(scale, side, "ScaleAnimal");
+            if (type == AnimalType.Deer)
+            {
+                // Fixed sexes for review (in game two hinds to a stag): stag specimen, hind grazing, mixed gait row and herd.
+                DeerModelBuilder.SetStag(specimen.transform.Find("VisualModel"), true);
+                DeerModelBuilder.SetStag(grazer.transform.Find("VisualModel"), false);
+                DeerModelBuilder.SetStag(scaled.transform.Find("VisualModel"), true);
+                for (int i = 0; i < gaitRow.Count; i++) DeerModelBuilder.SetStag(gaitRow[i].transform.Find("VisualModel"), i % 2 == 0);
+                for (int i = 0; i < herd.Count; i++) DeerModelBuilder.SetStag(herd[i].transform.Find("VisualModel"), i == 1);
+            }
             GameObject knight = HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.KnightGuard, "ScaleKnight");
             knight.transform.SetPositionAndRotation(scale + new Vector3(-1.6f, 0f, 0.4f), Quaternion.LookRotation(Vector3.right));
             yield return null;
             yield return null;
 
             specimen.PoseGait(0f, 0f);
-            grazer.PoseGait(0f, 0f);
-            Transform neck = grazer.transform.Find("VisualModel/NeckPivot");
-            if (neck != null) neck.localRotation *= Quaternion.Euler(type == AnimalType.Deer ? 58f : 26f, 0f, 0f);
+            grazer.PoseGrazing();
             for (int i = 0; i < gaitRow.Count; i++) gaitRow[i].PoseGait(i * 0.25f, 1f);
             for (int i = 0; i < herd.Count; i++) herd[i].PoseGait(0.15f + i * 0.3f, i == 1 ? 0f : 1f);
             scaled.PoseGait(0.1f, 1f);
+            // CAPTURE_LOD = 1 shows the distant meshes up close (to check them); unset = normal switching.
+            if (int.TryParse(Environment.GetEnvironmentVariable("CAPTURE_LOD"), out int forcedLod))
+                foreach (LODGroup g in UnityEngine.Object.FindObjectsByType<LODGroup>(FindObjectsSortMode.None))
+                    if (g.GetComponentInParent<PeacefulAnimalAI>() != null) g.ForceLOD(forcedLod);
             Animator knightAnim = knight.GetComponentInChildren<Animator>();
             if (knightAnim != null) { knightAnim.Update(0f); knightAnim.speed = 0f; }
             yield return null;

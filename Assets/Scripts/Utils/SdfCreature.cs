@@ -70,8 +70,8 @@ namespace BattleOfAges.Utils
             public int Bone;
             public Vector3[] Points;   // VisualModel space
             public float[] Radii;
-            public Color Color;
-            public bool Sphere;
+            public Color Color, TipColor;
+            public bool Sphere, Matte;
         }
 
         private static readonly Dictionary<string, Cached> Cache = new Dictionary<string, Cached>();
@@ -86,6 +86,8 @@ namespace BattleOfAges.Utils
         private readonly List<Tuft> tufts = new List<Tuft>();
         private readonly List<Fuzz> fuzz = new List<Fuzz>();
         private readonly List<Rigid> rigids = new List<Rigid>();
+
+        private float inflate; // set per build: distant meshes are slightly inflated
 
         public PaintFunc Paint;
         public float AmbientOcclusion = 0.5f;
@@ -149,6 +151,18 @@ namespace BattleOfAges.Utils
             rigids.Add(new Rigid { Bone = BoneIndex(bone), Points = new[] { ToRoot(bone).MultiplyPoint3x4(center) }, Radii = new[] { radius }, Color = color, Sphere = true });
         }
 
+        /// <summary>
+        /// Rigid matte tube (antlers), shaded from baseColor to tipColor. Matte tubes form an extra last submesh, so a
+        /// renderer given one material less skips them (antlerless individuals share the mesh).
+        /// </summary>
+        public void Tube(Transform bone, Vector3[] localPoints, float[] radii, Color baseColor, Color tipColor)
+        {
+            Matrix4x4 m = ToRoot(bone);
+            var pts = new Vector3[localPoints.Length];
+            for (int i = 0; i < pts.Length; i++) pts[i] = m.MultiplyPoint3x4(localPoints[i]);
+            rigids.Add(new Rigid { Bone = BoneIndex(bone), Points = pts, Radii = radii, Color = baseColor, TipColor = tipColor, Matte = true });
+        }
+
         // ------------------------------------------------------------------ build / apply
 
         /// <summary>Resources folder of meshes baked in the editor ("Battle of Ages/Bake Creature Meshes").</summary>
@@ -159,33 +173,55 @@ namespace BattleOfAges.Utils
         /// Builds (or reuses) the species mesh and attaches it to the visual root as a SkinnedMeshRenderer. A mesh baked
         /// into Resources is used when its signature matches the current declarations; otherwise it is sculpted now.
         /// </summary>
-        public SkinnedMeshRenderer Apply(string speciesKey, float cellSize)
-        {
-            if (!Cache.TryGetValue(speciesKey, out Cached cached) || cached.Mesh == null)
-            {
-                string meshName = "Sculpted_" + speciesKey + "_" + Signature(cellSize);
-                // The signature is part of the file name (Unity renames an asset's main object to its file name).
-                var loadTimer = System.Diagnostics.Stopwatch.StartNew();
-                Mesh baked = UnityEngine.Resources.Load<Mesh>(BakedFolder + "/" + meshName);
-                if (loadTimer.ElapsedMilliseconds > 5) Debug.Log($"[Creatures] loaded {meshName} in {loadTimer.ElapsedMilliseconds} ms");
-                if (baked != null)
-                {
-                    cached = new Cached { Mesh = baked, BonePaths = bonePaths.ToArray() };
-                }
-                else
-                {
-                    Debug.LogWarning($"[SdfCreature] No baked {meshName} mesh; sculpting {speciesKey} at runtime (run Battle of Ages/Bake Creature Meshes).");
-                    cached = Build(cellSize);
-                    cached.Mesh.name = meshName;
-                }
-                Cache[speciesKey] = cached;
-            }
+        public SkinnedMeshRenderer Apply(string speciesKey, float cellSize) => CreateRenderer("Skin", GetMesh(speciesKey, cellSize, true));
 
+        /// <summary>
+        /// As Apply, plus a distant mesh (cell lodCellSize; no hair or eyes, slightly inflated so thin legs survive the
+        /// coarse grid) and a LODGroup on the visual root: full mesh above lodScreenHeight, culled below cullScreenHeight.
+        /// Returns both renderers (full, distant).
+        /// </summary>
+        public SkinnedMeshRenderer[] ApplyWithLod(string speciesKey, float cellSize, float lodCellSize, float lodScreenHeight, float cullScreenHeight)
+        {
+            SkinnedMeshRenderer near = CreateRenderer("Skin", GetMesh(speciesKey, cellSize, true));
+            SkinnedMeshRenderer far = CreateRenderer("SkinLOD1", GetMesh(speciesKey + LodSuffix, lodCellSize, false));
+            LODGroup lod = root.gameObject.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(lodScreenHeight, new Renderer[] { near }), new LOD(cullScreenHeight, new Renderer[] { far }) });
+            lod.RecalculateBounds();
+            return new[] { near, far };
+        }
+
+        /// <summary>Cache key suffix of a species' distant mesh (the bake tool saves both).</summary>
+        public const string LodSuffix = "_LOD1";
+
+        private Cached GetMesh(string cacheKey, float cellSize, bool detail)
+        {
+            if (Cache.TryGetValue(cacheKey, out Cached cached) && cached.Mesh != null) return cached;
+            string meshName = "Sculpted_" + cacheKey + "_" + Signature(cellSize, detail);
+            // The signature is part of the file name (Unity renames an asset's main object to its file name).
+            var loadTimer = System.Diagnostics.Stopwatch.StartNew();
+            Mesh baked = UnityEngine.Resources.Load<Mesh>(BakedFolder + "/" + meshName);
+            if (loadTimer.ElapsedMilliseconds > 5) Debug.Log($"[Creatures] loaded {meshName} in {loadTimer.ElapsedMilliseconds} ms");
+            if (baked != null)
+            {
+                cached = new Cached { Mesh = baked, BonePaths = bonePaths.ToArray() };
+            }
+            else
+            {
+                Debug.LogWarning($"[SdfCreature] No baked {meshName} mesh; sculpting {cacheKey} at runtime (run Battle of Ages/Bake Creature Meshes).");
+                cached = Build(cellSize, detail);
+                cached.Mesh.name = meshName;
+            }
+            Cache[cacheKey] = cached;
+            return cached;
+        }
+
+        private SkinnedMeshRenderer CreateRenderer(string name, Cached cached)
+        {
             var bones = new Transform[cached.BonePaths.Length];
             for (int i = 0; i < bones.Length; i++)
                 bones[i] = cached.BonePaths[i].Length == 0 ? root : root.Find(cached.BonePaths[i]);
 
-            GameObject skinObj = new GameObject("Skin");
+            GameObject skinObj = new GameObject(name);
             skinObj.transform.SetParent(root, false);
             SkinnedMeshRenderer smr = skinObj.AddComponent<SkinnedMeshRenderer>();
             smr.sharedMesh = cached.Mesh;
@@ -194,14 +230,13 @@ namespace BattleOfAges.Utils
             Bounds b = cached.Mesh.bounds;
             b.Expand(0.3f); // room for the gait
             smr.localBounds = b;
-            smr.sharedMaterials = new[]
-            {
-                Surface("Coat", 6f, 0.16f), Surface("Hair", 4f, 0.22f), Surface("Gloss", 5f, 0.5f)
-            };
+            smr.sharedMaterials = cached.Mesh.subMeshCount > 3
+                ? new[] { Surface("Coat", 6f, 0.16f), Surface("Hair", 4f, 0.22f), Surface("Gloss", 5f, 0.5f), Surface("Matte", 4f, 0.3f) }
+                : new[] { Surface("Coat", 6f, 0.16f), Surface("Hair", 4f, 0.22f), Surface("Gloss", 5f, 0.5f) };
             return smr;
         }
 
-        /// <summary>The mesh built (or loaded) for a species in this session, for the bake tool.</summary>
+        /// <summary>The mesh built (or loaded) for a species in this session, for the bake tool (distant mesh: key + LodSuffix).</summary>
         public static Mesh CachedMesh(string speciesKey) => Cache.TryGetValue(speciesKey, out Cached c) ? c.Mesh : null;
 
         public static void ClearCache() => Cache.Clear();
@@ -210,13 +245,14 @@ namespace BattleOfAges.Utils
         /// Hash of everything that shapes the mesh: declarations, cell size and samples of the paint / density / length
         /// callbacks, so a baked mesh is never used after the species code changed.
         /// </summary>
-        private string Signature(float h)
+        private string Signature(float h, bool detail)
         {
             uint hash = 2166136261;
             void F(float v) { hash = (hash ^ (uint)Mathf.RoundToInt(v * 10000f)) * 16777619; } // quantized: transform matrices differ in the last bits between edit and play mode
             void V(Vector3 v) { F(v.x); F(v.y); F(v.z); }
             void C(Color c) { F(c.r); F(c.g); F(c.b); F(c.a); }
             F(AlgorithmVersion); F(h); F(AmbientOcclusion); F(SkinSigma);
+            if (!detail) { F(3); F(LodInflate); } // only for distant meshes: full meshes keep their signature
             foreach (List<Shape> list in new[] { unions, carves })
             {
                 foreach (Shape s in list)
@@ -234,7 +270,11 @@ namespace BattleOfAges.Utils
                 for (int i = 0; i <= 8; i++) F(l.Length(i / 8f));
             }
             foreach (Tuft t in tufts) { F(t.Bone); V(t.Root); V(t.Dir); F(t.Count); F(t.Length); F(t.Spread); F(t.Radius); C(t.Base); C(t.Tip); }
-            foreach (Rigid r in rigids) { F(r.Bone); foreach (Vector3 p in r.Points) V(p); foreach (float rr in r.Radii) F(rr); C(r.Color); F(r.Sphere ? 1 : 0); }
+            foreach (Rigid r in rigids)
+            {
+                F(r.Bone); foreach (Vector3 p in r.Points) V(p); foreach (float rr in r.Radii) F(rr); C(r.Color); F(r.Sphere ? 1 : 0);
+                if (r.Matte) { F(2); C(r.TipColor); } // only when used: older species keep their signature
+            }
             var rng = new System.Random(7);
             for (int i = 0; i < 48; i++)
             {
@@ -261,9 +301,13 @@ namespace BattleOfAges.Utils
             return m;
         }
 
-        private Cached Build(float h)
+        /// <summary>Distant meshes grow by this fraction of their cell size (thin legs would break up on the coarse grid).</summary>
+        private const float LodInflate = 0.3f;
+
+        private Cached Build(float h, bool detail)
         {
             var timer = System.Diagnostics.Stopwatch.StartNew();
+            inflate = detail ? 0f : h * LodInflate;
 
             // ---- grid over the shapes (narrow band: blocks far from the surface are filled without evaluation)
             Bounds bounds = new Bounds(unions[0].BC, Vector3.zero);
@@ -354,17 +398,23 @@ namespace BattleOfAges.Utils
             // ---- hair
             var hairTris = new List<int>();
             var rng = new System.Random(1234);
-            foreach (StrandLine line in strandLines) BuildStrandLine(line, rng, verts, normals, colors, weights, hairTris);
-            foreach (Tuft t in tufts) BuildTuft(t, rng, verts, normals, colors, weights, hairTris);
-            foreach (Fuzz f in fuzz) BuildFuzz(f, rng, bodyCount, paintable, verts, normals, colors, weights, hairTris);
+            if (detail)
+            {
+                foreach (StrandLine line in strandLines) BuildStrandLine(line, rng, verts, normals, colors, weights, hairTris);
+                foreach (Tuft t in tufts) BuildTuft(t, rng, verts, normals, colors, weights, hairTris);
+                foreach (Fuzz f in fuzz) BuildFuzz(f, rng, bodyCount, paintable, verts, normals, colors, weights, hairTris);
+            }
 
             // ---- rigid glossy details
             var glossTris = new List<int>();
+            var matteTris = new List<int>();
             foreach (Rigid r in rigids)
             {
                 var w = new BoneWeight { boneIndex0 = r.Bone, weight0 = 1f };
+                if (r.Sphere && !detail) continue; // eyes are not seen from afar
                 if (r.Sphere) AddSphere(r.Points[0], r.Radii[0], r.Color, w, verts, normals, colors, weights, glossTris);
-                else AddTube(r.Points, r.Radii, r.Color, w, verts, normals, colors, weights, glossTris);
+                else if (r.Matte) AddTube(r.Points, r.Radii, r.Color, r.TipColor, w, verts, normals, colors, weights, matteTris);
+                else AddTube(r.Points, r.Radii, r.Color, r.Color * 0.8f, w, verts, normals, colors, weights, glossTris);
             }
 
             // Colours are authored in sRGB; vertex colours reach the shader untouched, so convert for the linear pipeline.
@@ -376,16 +426,18 @@ namespace BattleOfAges.Utils
             mesh.SetNormals(normals);
             mesh.SetColors(colors);
             mesh.SetUVs(3, verts);
-            mesh.subMeshCount = 3;
+            mesh.subMeshCount = matteTris.Count > 0 ? 4 : 3;
             mesh.SetTriangles(bodyTris, 0);
             mesh.SetTriangles(hairTris, 1);
             mesh.SetTriangles(glossTris, 2);
+            if (matteTris.Count > 0) mesh.SetTriangles(matteTris, 3);
             mesh.boneWeights = weights.ToArray();
             var bindposes = new Matrix4x4[boneTransforms.Count];
             for (int b = 0; b < bindposes.Length; b++) bindposes[b] = boneTransforms[b].worldToLocalMatrix * root.localToWorldMatrix;
             mesh.bindposes = bindposes;
             mesh.RecalculateBounds();
-            Debug.Log($"[SdfCreature] {root.parent?.name}: {verts.Count} verts, {(bodyTris.Count + hairTris.Count + glossTris.Count) / 3} tris, grid {sx}x{sy}x{sz}, {timer.ElapsedMilliseconds} ms");
+            Debug.Log($"[SdfCreature] {root.parent?.name}: {verts.Count} verts, {(bodyTris.Count + hairTris.Count + glossTris.Count + matteTris.Count) / 3} tris " +
+                      $"(body {bodyTris.Count / 3}, hair {hairTris.Count / 3}, rigid {(glossTris.Count + matteTris.Count) / 3}), grid {sx}x{sy}x{sz}, {timer.ElapsedMilliseconds} ms");
             return new Cached { Mesh = mesh, BonePaths = bonePaths.ToArray() };
         }
 
@@ -406,7 +458,7 @@ namespace BattleOfAges.Utils
                 if ((p - s.BC).magnitude - s.BR > s.K - d) continue;
                 d = -SmoothMin(-d, Distance(s, p), s.K);
             }
-            return d;
+            return d - inflate;
         }
 
         private static float SmoothMin(float a, float b, float k)
@@ -614,7 +666,7 @@ namespace BattleOfAges.Utils
             for (int k = 0; k < 3; k++) { tris.Add(last + k); tris.Add(last + (k + 1) % 3); tris.Add(tip); }
         }
 
-        private static void AddTube(Vector3[] pts, float[] radii, Color color, BoneWeight w, List<Vector3> verts, List<Vector3> normals, List<Color> colors, List<BoneWeight> weights, List<int> tris)
+        private static void AddTube(Vector3[] pts, float[] radii, Color color, Color tipColor, BoneWeight w, List<Vector3> verts, List<Vector3> normals, List<Color> colors, List<BoneWeight> weights, List<int> tris)
         {
             const int Sides = 10;
             int start = verts.Count;
@@ -632,7 +684,7 @@ namespace BattleOfAges.Utils
                     Vector3 radial = t1 * Mathf.Cos(a) + t2 * Mathf.Sin(a);
                     verts.Add(pts[i] + radial * radii[i]);
                     normals.Add(radial);
-                    colors.Add(Color.Lerp(color, color * 0.8f, i / (float)pts.Length));
+                    colors.Add(Color.Lerp(color, tipColor, i / (float)pts.Length));
                     weights.Add(w);
                 }
             }

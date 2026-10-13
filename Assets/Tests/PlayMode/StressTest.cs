@@ -335,6 +335,19 @@ namespace BattleOfAges.PlayModeTests
             yield return Measure(45, (f, s) => fs0 = f);
             for (int i = 0; i < rends.Count; i++) rends[i].shadowCastingMode = modes[i];
             report.AppendLine($"| (unit shadows) | {rends.Count} | {fs1 - fs0:0.00} | - |");
+
+            // Wildlife around the arena (spawned by the world chunks): renderers and AI off
+            var animals = UnityEngine.Object.FindObjectsByType<PeacefulAnimalAI>(FindObjectsSortMode.None);
+            var animalRends = animals.SelectMany(a => a.GetComponentsInChildren<Renderer>()).Where(r => r.enabled).ToList();
+            float fa1 = 0, fa0 = 0;
+            yield return Measure(45, (f, s) => fa1 = f);
+            foreach (Renderer r in animalRends) r.enabled = false;
+            foreach (PeacefulAnimalAI a in animals) a.enabled = false;
+            yield return Measure(45, (f, s) => fa0 = f);
+            foreach (Renderer r in animalRends) r.enabled = true;
+            foreach (PeacefulAnimalAI a in animals) a.enabled = true;
+            string counts = string.Join(", ", animals.GroupBy(a => a.Type).Select(g => $"{g.Count()} {g.Key}"));
+            report.AppendLine($"| (wildlife: {counts}) | {animals.Length} | {fa1 - fa0:0.00} | - |");
         }
 
         private IEnumerator Measure(int frames, Action<float, float> result)

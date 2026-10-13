@@ -35,10 +35,10 @@ namespace BattleOfAges.Utils
             switch (type)
             {
                 case AnimalType.Deer:
-                    BuildDeerVisuals(visualModel.transform);
+                    DeerModelBuilder.Build(visualModel.transform); // sculpted directly, no blockout
                     break;
                 case AnimalType.Boar:
-                    BoarModelBuilder.Build(visualModel.transform); // sculpted directly, no blockout
+                    BoarModelBuilder.Build(visualModel.transform);
                     break;
                 case AnimalType.Rabbit:
                     BuildRabbitVisuals(visualModel.transform);
@@ -47,9 +47,8 @@ namespace BattleOfAges.Utils
 
             // Applies per-type stats and caches the VisualModel/Head nodes, which did not exist yet
             // when the AI's Awake ran (otherwise every animal behaved as a Deer and was never animated).
-            // Melt the blockout into one smooth skinned body (cell size and blend radius per species).
+            // Melt the rabbit blockout into one smooth skinned body (cell size and blend radius).
             if (type == AnimalType.Rabbit) AnimalSculptor.Sculpt(visualModel.transform, "Rabbit", 0.012f, 0.03f);
-            else if (type == AnimalType.Deer) AnimalSculptor.Sculpt(visualModel.transform, "Deer", 0.024f, 0.06f);
 
             ai.InitializeAnimal(type);
 
@@ -57,44 +56,6 @@ namespace BattleOfAges.Utils
         }
 
         // ------------------------------------------------------------------ species
-
-        private static void BuildDeerVisuals(Transform root)
-        {
-            Material coat = Fur(new Color(0.50f, 0.32f, 0.18f));
-            Material belly = Fur(new Color(0.88f, 0.80f, 0.66f));
-            Material dark = Fur(new Color(0.09f, 0.07f, 0.06f), 0.35f);
-            Material antler = Fur(new Color(0.62f, 0.54f, 0.42f), 0.2f);
-
-            // Barrel-shaped body: chest, belly and haunch volumes
-            Part(PrimitiveType.Capsule, "Body", root, new Vector3(0f, 1.05f, 0f), new Vector3(0.50f, 0.62f, 0.48f), Quaternion.Euler(90f, 0f, 0f), coat);
-            Part(PrimitiveType.Sphere, "Chest", root, new Vector3(0f, 1.08f, 0.40f), new Vector3(0.48f, 0.54f, 0.50f), Quaternion.identity, coat);
-            Part(PrimitiveType.Sphere, "Haunch", root, new Vector3(0f, 1.08f, -0.44f), new Vector3(0.46f, 0.50f, 0.46f), Quaternion.identity, coat);
-            Part(PrimitiveType.Capsule, "Belly", root, new Vector3(0f, 0.90f, 0f), new Vector3(0.34f, 0.48f, 0.30f), Quaternion.Euler(90f, 0f, 0f), belly);
-
-            float[] legLen = { 0.98f, 0.98f, 1.0f, 1.0f }; // = joint height, so hooves touch the ground
-            BuildLegs(root, new Vector3(0.16f, 0.98f, 0.42f), new Vector3(0.15f, 0.98f, -0.46f), legLen, 0.085f, coat, dark, hindHock: true);
-
-            Transform neck = Joint("NeckPivot", root, new Vector3(0f, 1.22f, 0.52f), Quaternion.Euler(-42f, 0f, 0f));
-            Part(PrimitiveType.Capsule, "Neck", neck, new Vector3(0f, 0f, 0.26f), new Vector3(0.20f, 0.32f, 0.22f), Quaternion.Euler(90f, 0f, 0f), coat);
-            Transform head = Joint("Head", neck, new Vector3(0f, 0.02f, 0.56f), Quaternion.Euler(52f, 0f, 0f));
-            Part(PrimitiveType.Sphere, "Skull", head, new Vector3(0f, 0.04f, 0.02f), new Vector3(0.22f, 0.22f, 0.28f), Quaternion.identity, coat);
-            Part(PrimitiveType.Capsule, "Muzzle", head, new Vector3(0f, -0.03f, 0.20f), new Vector3(0.13f, 0.14f, 0.12f), Quaternion.Euler(90f, 0f, 0f), coat);
-            Part(PrimitiveType.Sphere, "Nose", head, new Vector3(0f, -0.02f, 0.33f), new Vector3(0.07f, 0.06f, 0.05f), Quaternion.identity, dark);
-            Part(PrimitiveType.Sphere, "Chin", head, new Vector3(0f, -0.08f, 0.16f), new Vector3(0.10f, 0.06f, 0.14f), Quaternion.identity, belly);
-            foreach (int s in new[] { -1, 1 })
-            {
-                Part(PrimitiveType.Sphere, "Eye" + s, head, new Vector3(s * 0.095f, 0.07f, 0.09f), Vector3.one * 0.04f, dark);
-                Part(PrimitiveType.Capsule, "Ear" + s, head, new Vector3(s * 0.13f, 0.14f, -0.04f), new Vector3(0.07f, 0.12f, 0.035f), Quaternion.Euler(0f, 0f, s * -55f), coat);
-                // Antlers: main beam with two tines
-                Transform beam = Joint("Antler" + s, head, new Vector3(s * 0.07f, 0.15f, -0.02f), Quaternion.Euler(-18f, 0f, s * -28f));
-                Part(PrimitiveType.Capsule, "Beam", beam, new Vector3(0f, 0.17f, 0f), new Vector3(0.035f, 0.18f, 0.035f), Quaternion.identity, antler);
-                Part(PrimitiveType.Capsule, "Tine1", beam, new Vector3(0f, 0.17f, 0.06f), new Vector3(0.025f, 0.09f, 0.025f), Quaternion.Euler(55f, 0f, 0f), antler);
-                Part(PrimitiveType.Capsule, "Tine2", beam, new Vector3(s * 0.04f, 0.32f, 0.03f), new Vector3(0.022f, 0.08f, 0.022f), Quaternion.Euler(35f, 0f, s * -30f), antler);
-            }
-
-            Transform tail = Joint("TailPivot", root, new Vector3(0f, 1.18f, -0.72f), Quaternion.Euler(-35f, 0f, 0f));
-            Part(PrimitiveType.Capsule, "Tail", tail, new Vector3(0f, 0f, -0.08f), new Vector3(0.08f, 0.09f, 0.06f), Quaternion.Euler(90f, 0f, 0f), belly);
-        }
 
         private static void BuildRabbitVisuals(Transform root)
         {
