@@ -47,6 +47,11 @@ namespace BattleOfAges.Utils
 
             // Applies per-type stats and caches the VisualModel/Head nodes, which did not exist yet
             // when the AI's Awake ran (otherwise every animal behaved as a Deer and was never animated).
+            // Melt the blockout into one smooth skinned body (cell size and blend radius per species).
+            if (type == AnimalType.Rabbit) AnimalSculptor.Sculpt(visualModel.transform, "Rabbit", 0.012f, 0.03f);
+            else if (type == AnimalType.Boar) AnimalSculptor.Sculpt(visualModel.transform, "Boar", 0.028f, 0.07f);
+            else AnimalSculptor.Sculpt(visualModel.transform, "Deer", 0.024f, 0.06f);
+
             ai.InitializeAnimal(type);
 
             return root;
@@ -56,7 +61,7 @@ namespace BattleOfAges.Utils
 
         private static void BuildDeerVisuals(Transform root)
         {
-            Material coat = Fur(new Color(0.58f, 0.38f, 0.22f));
+            Material coat = Fur(new Color(0.50f, 0.32f, 0.18f));
             Material belly = Fur(new Color(0.88f, 0.80f, 0.66f));
             Material dark = Fur(new Color(0.09f, 0.07f, 0.06f), 0.35f);
             Material antler = Fur(new Color(0.62f, 0.54f, 0.42f), 0.2f);
@@ -107,7 +112,7 @@ namespace BattleOfAges.Utils
             Part(PrimitiveType.Capsule, "Mane", root, new Vector3(0f, 1.02f, 0.12f), new Vector3(0.14f, 0.42f, 0.16f), Quaternion.Euler(80f, 0f, 0f), bristle);
 
             float[] legLen = { 0.50f, 0.50f, 0.50f, 0.50f };
-            BuildLegs(root, new Vector3(0.20f, 0.50f, 0.34f), new Vector3(0.19f, 0.50f, -0.42f), legLen, 0.14f, hide, dark, hindHock: false);
+            BuildLegs(root, new Vector3(0.20f, 0.50f, 0.34f), new Vector3(0.19f, 0.50f, -0.42f), legLen, 0.095f, hide, dark, hindHock: false); // boars stand on thin trotters
 
             Transform neck = Joint("NeckPivot", root, new Vector3(0f, 0.80f, 0.56f), Quaternion.Euler(14f, 0f, 0f));
             Transform head = Joint("Head", neck, new Vector3(0f, 0f, 0.10f), Quaternion.identity);
@@ -187,7 +192,7 @@ namespace BattleOfAges.Utils
                 Transform knee = Joint("Knee_" + i, pivot, kneePos, Quaternion.identity);
                 Part(PrimitiveType.Capsule, "Lower", knee, new Vector3(0f, -lower * 0.5f, 0f), new Vector3(thickness, lower * 0.56f, thickness), Quaternion.identity, upperMat);
                 Part(PrimitiveType.Capsule, "Hoof", knee, new Vector3(0f, -lower + thickness * 0.35f, isHind && hindFootLength > 0f ? hindFootLength * 0.3f : 0.01f),
-                     new Vector3(thickness * 1.15f, thickness * 0.7f, (isHind && hindFootLength > 0f ? hindFootLength : thickness * 1.5f)), Quaternion.Euler(90f, 0f, 0f), hoofMat);
+                     new Vector3(thickness * 0.9f, (isHind && hindFootLength > 0f ? hindFootLength * 0.6f : thickness * 0.55f), thickness * 0.95f), Quaternion.Euler(90f, 0f, 0f), hoofMat); // as wide as the leg: a hoof, not a ball
             }
         }
 

@@ -21,6 +21,10 @@ namespace BattleOfAges.Utils
         private float smoothedSpeed;
         private CombatUnit combat;
         private HealthComponent health;
+        private float attackTimer;      // seconds left in the upper-body swing
+        private float attackLength = 0.9f;
+        private float upperWeight;
+        private const int UpperBodyLayer = 1;
 
         /// <summary>When set (e.g. for screenshots), overrides the measured speed.</summary>
         public float? SpeedOverride { get; set; }
@@ -28,6 +32,11 @@ namespace BattleOfAges.Utils
         private void Awake()
         {
             animator = GetComponentInChildren<Animator>();
+            if (animator != null && animator.runtimeAnimatorController != null)
+            {
+                foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+                    if (clip.name == "Attack") attackLength = clip.length;
+            }
         }
 
         // Start, not Awake/OnEnable: builders add this component before the model is parented to its unit.
@@ -62,16 +71,33 @@ namespace BattleOfAges.Utils
 
             smoothedSpeed = Mathf.Lerp(smoothedSpeed, measured, 1f - Mathf.Exp(-10f * dt));
             animator.SetFloat(SpeedId, SpeedOverride ?? smoothedSpeed);
+
+            // Upper-body swing layer: quick blend in, hold for the clip, blend out over the follow-through.
+            if (animator.layerCount > UpperBodyLayer)
+            {
+                attackTimer -= dt;
+                float target = attackTimer > 0.18f ? 1f : 0f;
+                upperWeight = Mathf.MoveTowards(upperWeight, target, dt * (target > upperWeight ? 12f : 5f));
+                animator.SetLayerWeight(UpperBodyLayer, upperWeight);
+            }
         }
 
         private void HandleAttack()
         {
-            if (animator != null && (health == null || health.IsAlive)) animator.SetTrigger(AttackId);
+            if (animator == null || (health != null && !health.IsAlive)) return;
+            if (animator.layerCount > UpperBodyLayer)
+            {
+                animator.Play("Attack", UpperBodyLayer, 0f);
+                attackTimer = attackLength;
+            }
+            else animator.SetTrigger(AttackId);
         }
 
         private void HandleDeath()
         {
-            if (animator != null) animator.SetBool(DeadId, true);
+            if (animator == null) return;
+            animator.SetBool(DeadId, true);
+            attackTimer = 0f; // the death clip takes the whole body
         }
     }
 }

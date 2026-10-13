@@ -189,16 +189,70 @@ namespace BattleOfAges.EditorTools
             probe.importance = 0;
             probe.boxProjection = false;
 
+            FixParticleMaterials();
+
             // Shaders only created from code (Shader.Find) must be in the build.
             EnsureAlwaysIncluded("Custom/GrassBlades");
             EnsureAlwaysIncluded("Custom/StylizedTerrain");
             EnsureAlwaysIncluded("Custom/ProceduralRock");
+            EnsureAlwaysIncluded("Custom/CharacterSurface");
 
             EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
             AssetDatabase.SaveAssets();
 
             Debug.Log("[Battle of Ages] Balanced AAA Lighting, Atmosphere & Post Processing Volume configured!");
+        }
+
+        /// <summary>
+        /// Particle materials were created without a texture, so every particle rendered as a hard square (campfire,
+        /// dust motes). Gives them a soft round sprite and proper transparent blending: additive for fire, alpha otherwise.
+        /// </summary>
+        private static void FixParticleMaterials()
+        {
+            const string texPath = "Assets/Settings/SoftParticle.png";
+            Texture2D sprite = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+            if (sprite == null)
+            {
+                const int size = 64;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+                for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float r = new Vector2(x - (size - 1) * 0.5f, y - (size - 1) * 0.5f).magnitude / (size * 0.5f);
+                    float a = Mathf.Pow(Mathf.Clamp01(1f - r), 1.6f);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+                File.WriteAllBytes(texPath, tex.EncodeToPNG());
+                Object.DestroyImmediate(tex);
+                AssetDatabase.ImportAsset(texPath);
+                var importer = (TextureImporter)AssetImporter.GetAtPath(texPath);
+                importer.alphaIsTransparency = true;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.mipmapEnabled = true;
+                importer.SaveAndReimport();
+                sprite = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+            }
+
+            foreach (ParticleSystemRenderer psr in Object.FindObjectsByType<ParticleSystemRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                Material m = psr.sharedMaterial;
+                if (m == null || !m.HasProperty("_BaseMap")) continue;
+                bool fire = psr.name.ToLowerInvariant().Contains("fire");
+                m.SetTexture("_BaseMap", sprite);
+                m.mainTexture = sprite;
+                m.SetFloat("_Surface", 1f);
+                m.SetFloat("_Blend", fire ? 2f : 0f);
+                m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                m.SetFloat("_DstBlend", (float)(fire ? BlendMode.One : BlendMode.OneMinusSrcAlpha));
+                if (m.HasProperty("_SrcBlendAlpha")) m.SetFloat("_SrcBlendAlpha", (float)BlendMode.One);
+                if (m.HasProperty("_DstBlendAlpha")) m.SetFloat("_DstBlendAlpha", (float)(fire ? BlendMode.One : BlendMode.OneMinusSrcAlpha));
+                m.SetFloat("_ZWrite", 0f);
+                m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+                m.SetOverrideTag("RenderType", "Transparent");
+                m.renderQueue = (int)RenderQueue.Transparent;
+                EditorUtility.SetDirty(m);
+            }
         }
 
         private static void EnsureAlwaysIncluded(string shaderName)

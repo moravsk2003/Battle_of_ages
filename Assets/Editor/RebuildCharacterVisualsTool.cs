@@ -36,6 +36,10 @@ namespace BattleOfAges.EditorTools
                 GameObject hero = HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.HeroPlayer, "Hero3DModel");
                 hero.transform.SetParent(player.transform, false);
                 hero.transform.localPosition = new Vector3(0f, -1f, 0f); // player pivot is the capsule centre
+                // First-person arms (viewmodel camera) are rebuilt too, then hidden-body layers re-applied.
+                Camera mainCam = Camera.main != null ? Camera.main : player.GetComponentInChildren<Camera>(true);
+                if (mainCam != null) SetupFpsViewmodelTool.ConfigureForPlayer(player, mainCam, false);
+
                 FpsViewmodelSetup fps = player.GetComponent<FpsViewmodelSetup>();
                 if (fps != null)
                 {

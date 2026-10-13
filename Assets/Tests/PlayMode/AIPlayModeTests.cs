@@ -87,9 +87,11 @@ namespace BattleOfAges.PlayModeTests
 
             foreach (HostileMobAI mob in camp.GetComponentsInChildren<HostileMobAI>())
             {
-                Assert.Less(FlatDistance(mob.transform.position, campCenter), 10f, $"{mob.name} was teleported to {mob.transform.position}.");
+                // The bug teleports units ~280 m to the world origin; 40 m leaves room for patrol walking during long first
+                // frames (time scale 4, first-time mesh sculpting) without hiding a teleport.
+                Assert.Less(FlatDistance(mob.transform.position, campCenter), 40f, $"{mob.name} was teleported to {mob.transform.position}.");
             }
-            Assert.Less(FlatDistance(boar.transform.position, boarSpawn), 5f, $"Boar was teleported to {boar.transform.position}.");
+            Assert.Less(FlatDistance(boar.transform.position, boarSpawn), 30f, $"Boar was teleported to {boar.transform.position}.");
         }
 
         [UnityTest, Order(2)]

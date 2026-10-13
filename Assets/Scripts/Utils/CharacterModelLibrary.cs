@@ -15,9 +15,12 @@ namespace BattleOfAges.Utils
         public GameObject KnightModel;
         public RuntimeAnimatorController KnightController;
         public Avatar KnightAvatar;
+        public Mesh KnightMesh;       // processed: smoothed normals + rest positions in UV3
         public GameObject VillagerModel;
         public RuntimeAnimatorController VillagerController;
         public Avatar VillagerAvatar;
+        public Mesh VillagerMesh;
+        public Vector3 VillagerEyeLeft, VillagerEyeRight; // rest-pose eye centres (metres, character space), for brows / beards
 
         private static CharacterModelLibrary instance;
         private static bool searched;

@@ -19,6 +19,8 @@ namespace BattleOfAges.PlayModeTests
         private readonly int cols, rows;
         private readonly GrassFieldRenderer grass;
 
+        public Camera Camera => cam;
+
         public CaptureRenderer(string outputDir, int viewCount, float fieldOfView = 60f, bool drawGrass = true)
         {
             dir = outputDir;

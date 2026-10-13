@@ -37,6 +37,9 @@ namespace BattleOfAges.Utils
             GameObject root = new GameObject(name);
             GameObject model = Object.Instantiate(source, root.transform, false);
             model.name = "Rig";
+            Mesh processed = knight ? lib.KnightMesh : lib.VillagerMesh; // smoothed normals + rest positions
+            if (processed != null)
+                foreach (SkinnedMeshRenderer s in model.GetComponentsInChildren<SkinnedMeshRenderer>(true)) s.sharedMesh = processed;
             FitToHeight(root.transform, model.transform);
 
             Animator animator = model.GetComponent<Animator>();
@@ -50,6 +53,7 @@ namespace BattleOfAges.Utils
             AttachEquipment(model.transform, type);
             AttachHelmet(model.transform, type);
             AttachOutfit(model.transform, type);
+            if (!knight) AttachFaceDetails(model.transform, type, lib);
 
             foreach (SkinnedMeshRenderer smr in model.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
@@ -57,6 +61,7 @@ namespace BattleOfAges.Utils
                 smr.updateWhenOffscreen = false;
             }
 
+            model.AddComponent<FootIK>();
             root.AddComponent<CharacterAnimationDriver>();
             return root;
         }
@@ -67,7 +72,7 @@ namespace BattleOfAges.Utils
             type == HumanoidModelBuilder.HumanType.Warlord;
 
         /// <summary>Scales the rig so the top of the head is at HeadTopHeight and moves the lowest bone to y = 0.</summary>
-        private static void FitToHeight(Transform root, Transform model)
+        public static void FitToHeight(Transform root, Transform model)
         {
             Transform head = FindDeep(model, "Head_end") ?? FindDeep(model, "Head");
             if (head == null) return;
@@ -123,20 +128,33 @@ namespace BattleOfAges.Utils
                     string key = type + "_" + mats[i].name;
                     if (!MaterialCache.TryGetValue(key, out Material m) || m == null)
                     {
-                        m = new Material(mats[i]) { name = "MAT_" + key };
+                        Shader surface = Shader.Find("Custom/CharacterSurface");
+                        Color original = mats[i].HasProperty("_BaseColor") ? mats[i].GetColor("_BaseColor") : Color.white;
+                        m = surface != null ? new Material(surface) { name = "MAT_" + key, enableInstancing = true } : new Material(mats[i]) { name = "MAT_" + key };
                         string n = mats[i].name.ToLowerInvariant();
-                        if (n.Contains("armor")) Set(m, look.Primary, look.Metal, 0.55f);
-                        else if (n.Contains("shirt")) Set(m, look.Primary, 0f, 0.15f);
-                        else if (n.Contains("boots") || n.Contains("pants")) Set(m, look.Secondary, 0f, 0.2f);
-                        else if (n.Contains("skin")) Set(m, look.Skin, 0f, 0.32f);
-                        else if (n.Contains("hair") && look.Hair.a > 0f) Set(m, look.Hair, 0f, 0.25f);
-                        else if (n.Contains("socks")) Set(m, Color.Lerp(look.Secondary, Color.white, 0.35f), 0f, 0.15f);
+                        // Pattern: 0 skin, 1 cloth, 2 leather, 3 metal, 4 hair, 5 eyes (Custom/CharacterSurface)
+                        if (n.Contains("armor")) Style(m, look.Primary, look.Metal, 0.55f, 3);
+                        else if (n.Contains("shirt")) Style(m, look.Primary, 0f, 0.15f, 1);
+                        else if (n.Contains("boots")) Style(m, look.Secondary, 0f, 0.3f, 2);
+                        else if (n.Contains("pants")) Style(m, look.Secondary, 0f, 0.15f, 1);
+                        else if (n.Contains("skin")) Style(m, look.Skin, 0f, 0.35f, 0);
+                        else if (n.Contains("hair")) Style(m, look.Hair.a > 0f ? look.Hair : original, 0f, 0.3f, 4);
+                        else if (n.Contains("socks")) Style(m, Color.Lerp(look.Secondary, Color.white, 0.35f), 0f, 0.15f, 1);
+                        else if (n.Contains("eye")) Style(m, original, 0f, 0.6f, 5);
+                        else Style(m, original, 0f, 0.2f, 1);
                         MaterialCache[key] = m;
                     }
                     mats[i] = m;
                 }
                 smr.sharedMaterials = mats;
             }
+        }
+
+        private static void Style(Material m, Color color, float metallic, float smoothness, int pattern, bool objectSpace = false)
+        {
+            Set(m, color, metallic, smoothness);
+            if (m.HasProperty("_Pattern")) m.SetFloat("_Pattern", pattern);
+            if (m.HasProperty("_ObjectSpace")) m.SetFloat("_ObjectSpace", objectSpace ? 1f : 0f);
         }
 
         private static void Set(Material m, Color color, float metallic, float smoothness)
@@ -372,13 +390,72 @@ namespace BattleOfAges.Utils
 
         private static readonly Dictionary<string, Material> MetalCache = new Dictionary<string, Material>();
 
-        /// <summary>Clean URP Lit metal (the procedural Metal surface has a dark chain-mail texture).</summary>
+        /// <summary>Brushed, scratched procedural steel (the procedural Metal surface has a dark chain-mail texture).</summary>
         private static Material PlainMetal(Color color, float metallic, float smoothness)
         {
             string key = ColorUtility.ToHtmlStringRGB(color) + metallic + smoothness;
             if (MetalCache.TryGetValue(key, out Material m) && m != null) return m;
-            m = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "MAT_Steel_" + key, enableInstancing = true };
-            Set(m, color, metallic, smoothness);
+            Shader surface = Shader.Find("Custom/CharacterSurface"); // brushed, scratched metal in object space
+            m = new Material(surface != null ? surface : Shader.Find("Universal Render Pipeline/Lit")) { name = "MAT_Steel_" + key, enableInstancing = true };
+            Style(m, color, metallic, smoothness, 3, objectSpace: true);
+            MetalCache[key] = m;
+            return m;
+        }
+
+        /// <summary>
+        /// Brows (and a beard for some villagers) anchored at the eye centres found in the villager mesh, parented to
+        /// the head bone. Gives the faces expression instead of two dots and a line.
+        /// </summary>
+        private static void AttachFaceDetails(Transform model, HumanoidModelBuilder.HumanType type, CharacterModelLibrary lib)
+        {
+            if (lib.VillagerEyeLeft == Vector3.zero || lib.VillagerEyeRight == Vector3.zero) return;
+            Transform head = FindDeep(model, "Head");
+            if (head == null) return;
+            Transform root = model.parent != null ? model.parent : model;
+
+            Look look = LookFor(type);
+            Color hair = look.Hair.a > 0f ? look.Hair : new Color(0.25f, 0.17f, 0.10f);
+            if (type == HumanoidModelBuilder.HumanType.Goblin) hair = new Color(0.12f, 0.16f, 0.07f);
+            Material hairMat = HairMaterial(hair);
+
+            Vector3 eyeL = root.TransformPoint(lib.VillagerEyeLeft), eyeR = root.TransformPoint(lib.VillagerEyeRight);
+            Vector3 up = root.up, fwd = root.forward;
+            float frown = type == HumanoidModelBuilder.HumanType.Goblin ? 22f : (type == HumanoidModelBuilder.HumanType.Bandit ? 12f : -4f);
+
+            GameObject face = new GameObject("FaceDetails");
+            face.transform.SetPositionAndRotation((eyeL + eyeR) * 0.5f, root.rotation);
+            float eyeSpan = Vector3.Distance(eyeL, eyeR);
+            foreach (int side in new[] { -1, 1 })
+            {
+                Vector3 eye = side < 0 ? eyeL : eyeR;
+                GameObject brow = new GameObject(side < 0 ? "BrowL" : "BrowR");
+                brow.transform.SetParent(face.transform, false);
+                brow.transform.position = eye + up * (eyeSpan * 0.42f) + fwd * (eyeSpan * 0.12f);
+                brow.transform.localRotation = Quaternion.Euler(0f, 0f, 90f + side * frown); // inner end lower = frown
+                Part(PrimitiveType.Capsule, "Brow", brow.transform, Vector3.zero, new Vector3(eyeSpan * 0.16f, eyeSpan * 0.42f, eyeSpan * 0.12f), hairMat);
+            }
+
+            if (type == HumanoidModelBuilder.HumanType.Villager && Random.value < 0.6f)
+            {
+                // Short full beard around the jaw and chin
+                Vector3 chin = (eyeL + eyeR) * 0.5f - up * (eyeSpan * 1.55f) - fwd * (eyeSpan * 0.05f);
+                GameObject beard = new GameObject("Beard");
+                beard.transform.SetParent(face.transform, false);
+                beard.transform.position = chin;
+                Part(PrimitiveType.Sphere, "Jaw", beard.transform, Vector3.zero, new Vector3(eyeSpan * 2.3f, eyeSpan * 1.25f, eyeSpan * 1.9f), hairMat);
+                Part(PrimitiveType.Capsule, "Moustache", beard.transform, up * (eyeSpan * 0.72f) + fwd * (eyeSpan * 0.78f), new Vector3(eyeSpan * 0.2f, eyeSpan * 0.75f, eyeSpan * 0.18f), hairMat).transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            }
+
+            face.transform.SetParent(head, true);
+        }
+
+        private static Material HairMaterial(Color color)
+        {
+            string key = "Hair" + ColorUtility.ToHtmlStringRGB(color);
+            if (MetalCache.TryGetValue(key, out Material m) && m != null) return m;
+            Shader surface = Shader.Find("Custom/CharacterSurface");
+            m = new Material(surface != null ? surface : Shader.Find("Universal Render Pipeline/Lit")) { name = "MAT_" + key, enableInstancing = true };
+            Style(m, color, 0f, 0.3f, 4, objectSpace: true);
             MetalCache[key] = m;
             return m;
         }
@@ -422,7 +499,7 @@ namespace BattleOfAges.Utils
             Part(PrimitiveType.Sphere, "ShieldBoss", t, new Vector3(0f, 0.03f, 0f), new Vector3(0.12f, 0.06f, 0.12f), boss);
         }
 
-        private static void Part(PrimitiveType type, string name, Transform parent, Vector3 pos, Vector3 scale, Material mat)
+        private static GameObject Part(PrimitiveType type, string name, Transform parent, Vector3 pos, Vector3 scale, Material mat)
         {
             GameObject p = GameObject.CreatePrimitive(type);
             p.name = name;
@@ -432,6 +509,7 @@ namespace BattleOfAges.Utils
             p.GetComponent<MeshRenderer>().sharedMaterial = mat;
             Collider c = p.GetComponent<Collider>();
             if (Application.isPlaying) Object.Destroy(c); else Object.DestroyImmediate(c);
+            return p;
         }
 
         private static Transform FindDeep(Transform root, string name)
