@@ -20,7 +20,7 @@ namespace BattleOfAges.UI
         private Text label;
         private RawImage graphImage;
         private Texture2D graph;
-        private Color32[] pixels;
+        private readonly Color32[] column = new Color32[GraphHeight];
         private GameObject panel;
         private readonly float[] frameMs = new float[GraphFrames];
         private readonly float[] hitchTimes = new float[64];
@@ -71,8 +71,9 @@ namespace BattleOfAges.UI
             label.raycastTarget = false;
             label.text = "FPS …";
 
-            graph = new Texture2D(GraphFrames, GraphHeight, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
-            pixels = new Color32[GraphFrames * GraphHeight];
+            graph = new Texture2D(GraphFrames, GraphHeight, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Repeat };
+            graph.SetPixels32(new Color32[GraphFrames * GraphHeight]);
+            graph.Apply(false);
             GameObject graphObj = new GameObject("Graph", typeof(RectTransform));
             graphObj.transform.SetParent(panel.transform, false);
             RectTransform gr = (RectTransform)graphObj.transform;
@@ -118,7 +119,10 @@ namespace BattleOfAges.UI
             worstMs = 0f;
         }
 
-        /// <summary>Bar per frame, oldest on the left; green under 16.7 ms, yellow under 33 ms, red above. Lines at 60 / 30 FPS.</summary>
+        /// <summary>
+        /// Bar per frame, oldest on the left; green under 16.7 ms, yellow under 33 ms, red above. Lines at 60 / 30 FPS.
+        /// Only the newest column is written; the texture wraps and the image's UV offset scrolls it.
+        /// </summary>
         private void DrawGraph()
         {
             var clear = new Color32(0, 0, 0, 0);
@@ -127,16 +131,14 @@ namespace BattleOfAges.UI
             var red = new Color32(255, 70, 60, 255);
             var guide = new Color32(255, 255, 255, 70);
             int line60 = Mathf.RoundToInt(16.7f / GraphMaxMs * GraphHeight), line30 = Mathf.RoundToInt(33.3f / GraphMaxMs * GraphHeight);
-            for (int x = 0; x < GraphFrames; x++)
-            {
-                float ms = frameMs[(frameIndex + x) % GraphFrames];
-                int h = Mathf.Clamp(Mathf.CeilToInt(ms / GraphMaxMs * GraphHeight), 0, GraphHeight);
-                Color32 c = ms <= 16.7f ? green : ms <= 33.3f ? yellow : red;
-                for (int y = 0; y < GraphHeight; y++)
-                    pixels[y * GraphFrames + x] = y < h ? c : (y == line60 || y == line30 ? guide : clear);
-            }
-            graph.SetPixels32(pixels);
+            int x = (frameIndex + GraphFrames - 1) % GraphFrames; // column of the frame just recorded
+            float ms = frameMs[x];
+            int h = Mathf.Clamp(Mathf.CeilToInt(ms / GraphMaxMs * GraphHeight), 0, GraphHeight);
+            Color32 c = ms <= 16.7f ? green : ms <= 33.3f ? yellow : red;
+            for (int y = 0; y < GraphHeight; y++) column[y] = y < h ? c : (y == line60 || y == line30 ? guide : clear);
+            graph.SetPixels32(x, 0, 1, GraphHeight, column);
             graph.Apply(false);
+            graphImage.uvRect = new Rect((float)frameIndex / GraphFrames, 0f, 1f, 1f); // oldest column at the left edge
         }
 
         private static string Grade(float fps) => fps >= 55f ? "#7CFC7C" : fps >= 30f ? "#FFD84A" : "#FF5050";

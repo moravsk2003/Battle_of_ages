@@ -43,10 +43,23 @@ namespace BattleOfAges.Utils
 
             if (!Cache.TryGetValue(speciesKey, out Cached cached) || cached.Mesh == null)
             {
-                var timer = System.Diagnostics.Stopwatch.StartNew();
-                cached = Build(visualRoot, cellSize, blend);
-                Debug.Log($"[AnimalSculptor] {speciesKey} sculpted in {timer.ElapsedMilliseconds} ms");
-                if (cached == null) return;
+                // A mesh baked in the editor (Battle of Ages/Bake Creature Meshes) avoids a ~1 s freeze on first spawn.
+                string meshName = "Blockout_" + speciesKey + "_" + Signature(visualRoot, cellSize, blend);
+                var loadTimer = System.Diagnostics.Stopwatch.StartNew();
+                Mesh baked = UnityEngine.Resources.Load<Mesh>(SdfCreature.BakedFolder + "/" + meshName);
+                if (loadTimer.ElapsedMilliseconds > 5) Debug.Log($"[Creatures] loaded {meshName} in {loadTimer.ElapsedMilliseconds} ms");
+                if (baked != null)
+                {
+                    cached = new Cached { Mesh = baked, BonePaths = BonePaths(visualRoot) };
+                }
+                else
+                {
+                    var timer = System.Diagnostics.Stopwatch.StartNew();
+                    cached = Build(visualRoot, cellSize, blend);
+                    if (cached == null) return;
+                    cached.Mesh.name = meshName;
+                    Debug.LogWarning($"[AnimalSculptor] No baked {meshName}; sculpted {speciesKey} at runtime in {timer.ElapsedMilliseconds} ms (run Battle of Ages/Bake Creature Meshes).");
+                }
                 Cache[speciesKey] = cached;
             }
 
@@ -70,6 +83,44 @@ namespace BattleOfAges.Utils
             smr.localBounds = cached.Mesh.bounds;
             smr.updateWhenOffscreen = false;
             smr.sharedMaterial = FurMaterial(shader);
+        }
+
+        /// <summary>The mesh built (or loaded) for a species in this session, for the bake tool.</summary>
+        public static Mesh CachedMesh(string speciesKey) => Cache.TryGetValue(speciesKey, out Cached c) ? c.Mesh : null;
+
+        public static void ClearCache() => Cache.Clear();
+
+        /// <summary>Bone paths in the same order Build assigns them (first soft shape of each parent joint).</summary>
+        private static string[] BonePaths(Transform visualRoot)
+        {
+            var paths = new List<string> { "" };
+            foreach (MeshRenderer mr in visualRoot.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (IsRigid(mr.name) || !SoftShape(mr)) continue;
+                string path = RelativePath(visualRoot, mr.transform.parent);
+                if (!paths.Contains(path)) paths.Add(path);
+            }
+            return paths.ToArray();
+        }
+
+        /// <summary>Hash of the blockout (shape types, transforms, colours) and build settings; quantized like SdfCreature.</summary>
+        private static string Signature(Transform visualRoot, float h, float blend)
+        {
+            uint hash = 2166136261;
+            void F(float v) { hash = (hash ^ (uint)Mathf.RoundToInt(v * 10000f)) * 16777619; }
+            F(1); F(h); F(blend);
+            Matrix4x4 toRoot = visualRoot.worldToLocalMatrix;
+            foreach (MeshRenderer mr in visualRoot.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (IsRigid(mr.name) || !SoftShape(mr)) continue;
+                Matrix4x4 m = toRoot * mr.transform.localToWorldMatrix;
+                for (int i = 0; i < 16; i++) F(m[i]);
+                foreach (char ch in mr.GetComponent<MeshFilter>().sharedMesh.name) F(ch);
+                foreach (char ch in RelativePath(visualRoot, mr.transform.parent)) F(ch);
+                Color c = mr.sharedMaterial != null && mr.sharedMaterial.HasProperty("_BaseColor") ? mr.sharedMaterial.GetColor("_BaseColor") : Color.gray;
+                F(c.r); F(c.g); F(c.b);
+            }
+            return hash.ToString("x8");
         }
 
         private static Material furMaterial;

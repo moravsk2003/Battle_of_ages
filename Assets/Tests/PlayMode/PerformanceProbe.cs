@@ -138,6 +138,7 @@ namespace BattleOfAges.PlayModeTests
             var scriptMs = new List<float>(); var physMs = new List<float>(); var animMs = new List<float>();
             yield return null;
             last = Time.realtimeSinceStartup;
+            int gcCount = System.GC.CollectionCount(0);
             while (Time.realtimeSinceStartup < end)
             {
                 step?.Invoke(Time.deltaTime);
@@ -154,7 +155,9 @@ namespace BattleOfAges.PlayModeTests
                 animMs.Add(animators.LastValue * 1e-6f);
                 last = now;
                 samples.Add(s);
-                if (s.FrameMs > 50f) hitches.Add($"{s.FrameMs:0} ms (main {s.MainMs:0}, render {s.RenderMs:0}, scripts {scriptMs[scriptMs.Count - 1]:0}, GC {s.GcBytes / 1024} KB)");
+                int gcNow = System.GC.CollectionCount(0);
+                bool collected = gcNow != gcCount; gcCount = gcNow;
+                if (s.FrameMs > 50f) hitches.Add($"{s.FrameMs:0} ms{(collected ? " [GC collection]" : "")} (main {s.MainMs:0}, render {s.RenderMs:0}, scripts {scriptMs[scriptMs.Count - 1]:0}, GC {s.GcBytes / 1024} KB)");
             }
 
             var ms = samples.Select(x => x.FrameMs).OrderBy(x => x).ToList();

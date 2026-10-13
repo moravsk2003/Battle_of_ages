@@ -12,12 +12,14 @@ namespace BattleOfAges.RTS
         [SerializeField] private float wanderInterval = 6.0f;
 
         private RtsUnit rtsUnit;
+        private NpcResourceGatherer gatherer;
         private Vector3 originPosition;
         private float timer;
 
         private void Start()
         {
             rtsUnit = GetComponent<RtsUnit>();
+            gatherer = GetComponent<NpcResourceGatherer>();
             originPosition = transform.position;
             timer = Random.Range(1.0f, wanderInterval); // Stagger start time
         }
@@ -28,8 +30,9 @@ namespace BattleOfAges.RTS
             if (rtsUnit != null && rtsUnit.IsSelected)
                 return;
 
-            // If unit is a resource gatherer, let NpcResourceGatherer handle AI
-            if (GetComponent<NpcResourceGatherer>() != null)
+            // If unit is a resource gatherer, let NpcResourceGatherer handle AI (it may be added later; re-check rarely)
+            if (gatherer == null && Time.frameCount % 30 == 0) gatherer = GetComponent<NpcResourceGatherer>();
+            if (gatherer != null)
                 return;
 
             timer += Time.deltaTime;

@@ -165,7 +165,9 @@ namespace BattleOfAges.Utils
             {
                 string meshName = "Sculpted_" + speciesKey + "_" + Signature(cellSize);
                 // The signature is part of the file name (Unity renames an asset's main object to its file name).
+                var loadTimer = System.Diagnostics.Stopwatch.StartNew();
                 Mesh baked = UnityEngine.Resources.Load<Mesh>(BakedFolder + "/" + meshName);
+                if (loadTimer.ElapsedMilliseconds > 5) Debug.Log($"[Creatures] loaded {meshName} in {loadTimer.ElapsedMilliseconds} ms");
                 if (baked != null)
                 {
                     cached = new Cached { Mesh = baked, BonePaths = bonePaths.ToArray() };

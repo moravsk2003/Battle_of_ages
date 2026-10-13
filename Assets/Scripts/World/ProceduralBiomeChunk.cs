@@ -53,6 +53,14 @@ namespace BattleOfAges.World
 
         public void GenerateChunk(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
         {
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            GenerateChunkInternal(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            if (timer.ElapsedMilliseconds > 20)
+                Debug.Log($"[Chunk] {coord} generated in {timer.ElapsedMilliseconds} ms (low LOD {isLowLOD}, trees {activeTrees.Count}, pebbles {activePebbles.Count}, entities {activeEntities.Count})");
+        }
+
+        private void GenerateChunkInternal(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
+        {
             ChunkCoord = coord;
             IsLowLOD = isLowLOD;
 

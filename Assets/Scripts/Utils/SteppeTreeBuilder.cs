@@ -48,10 +48,7 @@ namespace BattleOfAges.Utils
             trunkCollider.height = 3.4f;
 
             // 2. Foliage Crown Clusters (Layered canopy with sun-dappled tops and deep AO underneath)
-            CreateFoliageCloud(root.transform, foliageMat, new Vector3(0.00f, 3.35f, 0.00f), new Vector3(2.4f, 1.8f, 2.4f), varIdx * 17 + 1, varIdx * 10 + 1);
-            CreateFoliageCloud(root.transform, foliageMat, new Vector3(0.75f, 3.85f, 0.35f), new Vector3(1.7f, 1.4f, 1.6f), varIdx * 17 + 2, varIdx * 10 + 2);
-            CreateFoliageCloud(root.transform, foliageMat, new Vector3(-0.65f, 3.75f, -0.40f), new Vector3(1.8f, 1.5f, 1.7f), varIdx * 17 + 3, varIdx * 10 + 3);
-            CreateFoliageCloud(root.transform, foliageMat, new Vector3(0.15f, 4.55f, -0.10f), new Vector3(1.5f, 1.3f, 1.5f), varIdx * 17 + 4, varIdx * 10 + 4);
+            CreateCombinedCrown(root.transform, foliageMat, varIdx); // four clusters merged: one renderer instead of four
 
             return root;
         }
@@ -120,22 +117,39 @@ namespace BattleOfAges.Utils
             return root;
         }
 
-        private static void CreateFoliageCloud(Transform parent, Material material, Vector3 localPos, Vector3 scale, int seed, int cacheKey)
+        /// <summary>
+        /// Layered canopy (sun-dappled tops, deep AO underneath) of four foliage clusters baked into one cached mesh per
+        /// variant, so a tree costs two draw calls (trunk + crown) instead of five.
+        /// </summary>
+        private static void CreateCombinedCrown(Transform parent, Material material, int varIdx)
         {
-            GameObject cloud = new GameObject($"CrownCluster_{seed}");
-            cloud.transform.SetParent(parent, false);
-            cloud.transform.localPosition = localPos;
-
-            MeshFilter mf = cloud.AddComponent<MeshFilter>();
-            if (!CachedFoliageMeshes.TryGetValue(cacheKey, out Mesh foliageMesh) || foliageMesh == null)
+            if (!CachedFoliageMeshes.TryGetValue(varIdx, out Mesh crownMesh) || crownMesh == null)
             {
-                foliageMesh = ProceduralMeshBuilder.CreateStylizedFoliageCluster(scale, seed);
-                foliageMesh.name = $"FoliageCluster_{cacheKey}";
-                CachedFoliageMeshes[cacheKey] = foliageMesh;
+                (Vector3 pos, Vector3 scale)[] clusters =
+                {
+                    (new Vector3(0.00f, 3.35f, 0.00f), new Vector3(2.4f, 1.8f, 2.4f)),
+                    (new Vector3(0.75f, 3.85f, 0.35f), new Vector3(1.7f, 1.4f, 1.6f)),
+                    (new Vector3(-0.65f, 3.75f, -0.40f), new Vector3(1.8f, 1.5f, 1.7f)),
+                    (new Vector3(0.15f, 4.55f, -0.10f), new Vector3(1.5f, 1.3f, 1.5f)),
+                };
+                var parts = new CombineInstance[clusters.Length];
+                var sources = new Mesh[clusters.Length];
+                for (int i = 0; i < clusters.Length; i++)
+                {
+                    sources[i] = ProceduralMeshBuilder.CreateStylizedFoliageCluster(clusters[i].scale, varIdx * 17 + i + 1);
+                    parts[i] = new CombineInstance { mesh = sources[i], transform = Matrix4x4.Translate(clusters[i].pos) };
+                }
+                crownMesh = new Mesh { name = $"SteppeCrown_Var{varIdx}" };
+                crownMesh.CombineMeshes(parts, true, true);
+                crownMesh.RecalculateBounds();
+                foreach (Mesh m in sources) { if (Application.isPlaying) Object.Destroy(m); else Object.DestroyImmediate(m); }
+                CachedFoliageMeshes[varIdx] = crownMesh;
             }
-            mf.sharedMesh = foliageMesh;
 
-            MeshRenderer mr = cloud.AddComponent<MeshRenderer>();
+            GameObject crown = new GameObject("SteppeCrown");
+            crown.transform.SetParent(parent, false);
+            crown.AddComponent<MeshFilter>().sharedMesh = crownMesh;
+            MeshRenderer mr = crown.AddComponent<MeshRenderer>();
             mr.sharedMaterial = material;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             mr.receiveShadows = true;
