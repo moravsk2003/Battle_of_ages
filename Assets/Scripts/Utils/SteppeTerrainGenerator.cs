@@ -99,6 +99,12 @@ namespace BattleOfAges.Utils
             return terrainObj;
         }
 
+        // Exclusion zones are horizontal: the base plateau is not at y = 0.
+        private static float FlatDistance(Vector3 a, Vector3 b)
+        {
+            return new Vector2(a.x - b.x, a.z - b.z).magnitude;
+        }
+
         private static void Scatter3DGrassAndFlowers(Transform terrainParent, float size)
         {
             GameObject grassGroup = new GameObject("3D_Vegetation");
@@ -122,7 +128,7 @@ namespace BattleOfAges.Utils
 
                 if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
                 {
-                    if (Vector3.Distance(hit.point, new Vector3(1.5f, 0f, 3.5f)) < 3.2f) continue;
+                    if (FlatDistance(hit.point, new Vector3(1.5f, 0f, 3.5f)) < 3.2f) continue;
 
                     GameObject tuft = new GameObject($"GrassTuft_{i}");
                     tuft.transform.SetParent(grassGroup.transform, false);
@@ -193,9 +199,9 @@ namespace BattleOfAges.Utils
                 
                 if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
                 {
-                    if (Vector3.Distance(hit.point, Vector3.zero) < 12f) continue;
+                    if (FlatDistance(hit.point, Vector3.zero) < 12f) continue;
 
-                    GameObject tree = SteppeTreeBuilder.CreateSteppeTree($"SteppeTree_{i}", i);
+                    GameObject tree =SteppeTreeBuilder.CreateSteppeTree($"SteppeTree_{i}", i);
                     tree.transform.SetParent(treesGroup.transform, false);
                     tree.transform.position = hit.point;
 
@@ -270,9 +276,9 @@ namespace BattleOfAges.Utils
 
                 if (Physics.Raycast(worldPos, Vector3.down, out RaycastHit hit, 200f))
                 {
-                    if (Vector3.Distance(hit.point, Vector3.zero) < 12f) continue;
+                    if (FlatDistance(hit.point, Vector3.zero) < 12f) continue;
 
-                    GameObject boulder = new GameObject($"Boulder_{i}");
+                    GameObject boulder =new GameObject($"Boulder_{i}");
                     boulder.transform.SetParent(bouldersGroup.transform, false);
                     boulder.transform.position = hit.point + Vector3.down * 0.15f;
                     float scale = Random.Range(1.2f, 2.6f);

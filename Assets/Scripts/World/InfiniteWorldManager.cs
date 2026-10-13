@@ -255,29 +255,61 @@ namespace BattleOfAges.World
             return BiomeType.Steppe;
         }
 
+        private const float BaseFlatRadius = 50f;
+        private const float BaseBlendRadius = 85f;
+        private static float? baseZoneHeight;
+
+        /// <summary>
+        /// Height of the flat spawn plateau: the average natural terrain height on the outer edge of the
+        /// blend ring, so the base sits level with its surroundings instead of in a pit at y = 0.
+        /// </summary>
+        public static float BaseZoneHeight
+        {
+            get
+            {
+                if (!baseZoneHeight.HasValue)
+                {
+                    const int samples = 72;
+                    float sum = 0f;
+                    for (int i = 0; i < samples; i++)
+                    {
+                        float a = i * Mathf.PI * 2f / samples;
+                        sum += GetNaturalTerrainHeight(Mathf.Cos(a) * BaseBlendRadius, Mathf.Sin(a) * BaseBlendRadius);
+                    }
+                    baseZoneHeight = sum / samples;
+                }
+                return baseZoneHeight.Value;
+            }
+        }
+
         public static float GetSampledTerrainHeight(float worldX, float worldZ)
         {
-            // Coherent Perlin Noise Heightmap across all chunks
+            float y = GetNaturalTerrainHeight(worldX, worldZ);
+
+            // Flat spawn base plateau within 50m radius, smooth transition to natural terrain up to 85m
+            float distFromOrigin = new Vector2(worldX, worldZ).magnitude;
+            if (distFromOrigin < BaseFlatRadius)
+            {
+                return BaseZoneHeight;
+            }
+            else if (distFromOrigin < BaseBlendRadius)
+            {
+                float t = Mathf.Clamp01((BaseBlendRadius - distFromOrigin) / (BaseBlendRadius - BaseFlatRadius));
+                float smoothT = t * t * (3f - 2f * t);
+                y = Mathf.Lerp(y, BaseZoneHeight, smoothT);
+            }
+
+            return y;
+        }
+
+        /// <summary>Coherent Perlin noise heightmap across all chunks (without the base plateau).</summary>
+        private static float GetNaturalTerrainHeight(float worldX, float worldZ)
+        {
             float continentNoise = Mathf.PerlinNoise(worldX * 0.005f + 100f, worldZ * 0.005f + 100f) * 22.0f;
             float hillNoise = Mathf.PerlinNoise(worldX * 0.02f + 300f, worldZ * 0.02f + 300f) * 6.5f;
             float detailNoise = Mathf.PerlinNoise(worldX * 0.08f + 700f, worldZ * 0.08f + 700f) * 1.5f;
 
-            float y = continentNoise + hillNoise + detailNoise;
-
-            // Flat spawn base area within 50m radius, smooth slope transition up to 85m
-            float distFromOrigin = new Vector2(worldX, worldZ).magnitude;
-            if (distFromOrigin < 50f)
-            {
-                return 0f;
-            }
-            else if (distFromOrigin < 85f)
-            {
-                float t = Mathf.Clamp01((85f - distFromOrigin) / 35f);
-                float smoothT = t * t * (3f - 2f * t);
-                y = Mathf.Lerp(y, 0f, smoothT);
-            }
-
-            return y;
+            return continentNoise + hillNoise + detailNoise;
         }
     }
 }
