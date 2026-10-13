@@ -24,6 +24,11 @@ namespace BattleOfAges.AI
         [SerializeField] protected float rotationSpeed = 8.0f;
         [SerializeField] protected float stoppingDistance = 1.2f;
 
+        [Header("Obstacle Unsticking (no NavMesh: movement is straight-line)")]
+        [SerializeField] private float stuckCheckInterval = 0.5f;
+        [SerializeField] private float stuckProgressRatio = 0.25f; // stuck if moved < 25% of expected distance
+        [SerializeField] private float detourDuration = 1.2f;
+
         protected CharacterController characterController;
         protected HealthComponent healthComponent;
         protected CombatUnit combatUnit;
@@ -37,6 +42,12 @@ namespace BattleOfAges.AI
 
         protected Vector3 destination;
         protected bool hasDestination = false;
+
+        private float stuckTimer;
+        private Vector3 lastProgressPos;
+        private float detourTimer;
+        private Vector3 detourDir;
+        private int detourSide = 1;
 
         public CharacterController CharacterCtrl => characterController != null ? characterController : (characterController = GetComponent<CharacterController>());
         public HealthComponent Health => healthComponent != null ? healthComponent : (healthComponent = GetComponent<HealthComponent>());
@@ -167,6 +178,7 @@ namespace BattleOfAges.AI
         {
             if (!hasDestination)
             {
+                ResetStuckDetection();
                 if (characterController != null && !characterController.isGrounded)
                 {
                     characterController.Move(Vector3.down * 9.81f * Time.deltaTime);
@@ -184,6 +196,7 @@ namespace BattleOfAges.AI
             if (moveDir.sqrMagnitude > stoppingDistance * stoppingDistance)
             {
                 moveDir.Normalize();
+                moveDir = ApplyObstacleDetour(moveDir, currentPos);
 
                 // Smooth rotation
                 if (moveDir.sqrMagnitude > 0.01f)
@@ -204,6 +217,49 @@ namespace BattleOfAges.AI
             {
                 hasDestination = false;
             }
+        }
+
+        /// <summary>
+        /// Without pathfinding a unit walking straight at its destination can get pinned against
+        /// tents, campfires, walls or trees. If it makes almost no progress, it side-steps along the
+        /// obstacle for a moment, alternating sides on repeated failures.
+        /// </summary>
+        private Vector3 ApplyObstacleDetour(Vector3 desiredDir, Vector3 currentPos)
+        {
+            float dt = Time.deltaTime;
+
+            if (detourTimer > 0f)
+            {
+                detourTimer -= dt;
+                if (detourTimer <= 0f) ResetStuckDetection();
+                return detourDir;
+            }
+
+            stuckTimer += dt;
+            if (stuckTimer >= stuckCheckInterval)
+            {
+                Vector3 delta = currentPos - lastProgressPos;
+                delta.y = 0f;
+                float expected = moveSpeed * stuckTimer;
+
+                if (delta.magnitude < expected * stuckProgressRatio)
+                {
+                    detourDir = Quaternion.Euler(0f, 90f * detourSide, 0f) * desiredDir;
+                    detourSide = -detourSide;
+                    detourTimer = detourDuration;
+                    return detourDir;
+                }
+
+                ResetStuckDetection();
+            }
+
+            return desiredDir;
+        }
+
+        private void ResetStuckDetection()
+        {
+            stuckTimer = 0f;
+            lastProgressPos = transform.position;
         }
     }
 }
