@@ -19,17 +19,20 @@ namespace BattleOfAges.PlayModeTests
         private const float SimulationSpeed = 4f;
 
         private readonly List<GameObject> spawned = new List<GameObject>();
+        private float defaultFixedDeltaTime;
 
         [SetUp]
         public void SetUp()
         {
             Time.timeScale = SimulationSpeed;
+            defaultFixedDeltaTime = Time.fixedDeltaTime;
         }
 
         [TearDown]
         public void TearDown()
         {
             Time.timeScale = 1f;
+            Time.fixedDeltaTime = defaultFixedDeltaTime;
             for (int i = 0; i < spawned.Count; i++)
             {
                 if (spawned[i] != null) Object.Destroy(spawned[i]);
@@ -60,6 +63,33 @@ namespace BattleOfAges.PlayModeTests
                 Assert.AreEqual(AIStateType.Wander, mob.CurrentStateType, $"{mob.name} has nothing to fight and should be patrolling.");
                 Assert.Less(FlatDistance(mob.transform.position, campCenter), 25f, $"{mob.name} wandered away from its camp.");
             }
+        }
+
+        /// <summary>
+        /// Spawners add the CharacterController at the world origin and move the object afterwards.
+        /// With Physics.autoSyncTransforms off, the first CharacterController.Move() before any physics step
+        /// used the stale origin position and teleported the unit back to (0,0,0) - i.e. into the player's base.
+        /// A huge fixed timestep guarantees no physics step runs before the first AI Update.
+        /// </summary>
+        [UnityTest, Order(0)]
+        public IEnumerator SpawnedMobsAndAnimals_KeepSpawnPosition_WhenNoPhysicsStepRunsFirst()
+        {
+            CreateGround();
+            Time.fixedDeltaTime = 5f;
+
+            Vector3 campCenter = new Vector3(200f, 0f, 200f);
+            GameObject camp = Track(HostileCampBuilder.CreateHostileCamp(campCenter, "TestCamp"));
+            Vector3 boarSpawn = new Vector3(-150f, 0f, -150f);
+            GameObject boar = Track(AnimalModelBuilder.CreateAnimalPrefab(AnimalType.Boar, "TestBoar"));
+            boar.transform.position = boarSpawn;
+
+            for (int i = 0; i < 5; i++) yield return null;
+
+            foreach (HostileMobAI mob in camp.GetComponentsInChildren<HostileMobAI>())
+            {
+                Assert.Less(FlatDistance(mob.transform.position, campCenter), 10f, $"{mob.name} was teleported to {mob.transform.position}.");
+            }
+            Assert.Less(FlatDistance(boar.transform.position, boarSpawn), 5f, $"Boar was teleported to {boar.transform.position}.");
         }
 
         [UnityTest, Order(2)]
@@ -113,32 +143,55 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(FlatDistance(boar.transform.position, spawnPos), ai.WanderRadius + 5f, "Animal wandered away from its spawn point.");
         }
 
+        /// <summary>
+        /// The assault is launched towards five directions, so the squad has to get past different camp
+        /// obstacles (campfire, tents, barricades) on the way out — AI movement has no pathfinding.
+        /// </summary>
         [UnityTest, Order(4)]
-        public IEnumerator SettlementLeader_AssaultOrder_SquadReachesPlayer()
+        public IEnumerator SettlementLeader_AssaultOrder_SquadReachesPlayerFromAnyDirection()
         {
             CreateGround();
-            Vector3 campCenter = new Vector3(300f, 0f, -300f);
-            GameObject camp = Track(HostileCampBuilder.CreateHostileCamp(campCenter, "TestCamp"));
-
-            GameObject player = Track(new GameObject("Player"));
-            player.AddComponent<CharacterController>();
-            player.AddComponent<HealthComponent>().InitializeHealth(100000);
-            // Beyond aggro (18m) and leash (28.8m), but within the leader's assault radius (80m).
-            player.transform.position = campCenter + new Vector3(0f, 0f, -55f);
-
-            yield return null;
-
-            HostileSettlementLeader leader = camp.GetComponentInChildren<HostileSettlementLeader>();
-            HostileMobAI[] mobs = camp.GetComponentsInChildren<HostileMobAI>();
-            leader.ConsiderAssault();
-
-            Assert.AreEqual(SquadCommand.AssaultPlayerBase, leader.CurrentCommand);
-
-            yield return WaitSimulated(25f);
-
-            foreach (HostileMobAI mob in mobs)
+            Vector3[] directions =
             {
-                Assert.Less(FlatDistance(mob.transform.position, player.transform.position), 15f, $"{mob.name} did not follow the assault order (state: {mob.CurrentStateType}).");
+                Vector3.back, Vector3.forward, Vector3.right, Vector3.left, new Vector3(1f, 0f, 1f).normalized
+            };
+
+            for (int d = 0; d < directions.Length; d++)
+            {
+                Vector3 campCenter = new Vector3(-600f + d * 300f, 0f, -300f);
+                GameObject camp = HostileCampBuilder.CreateHostileCamp(campCenter, $"TestCamp_{d}");
+
+                GameObject player = new GameObject("Player");
+                player.AddComponent<CharacterController>();
+                player.AddComponent<HealthComponent>().InitializeHealth(100000);
+                // Beyond aggro (18m) and leash (28.8m), but within the leader's assault radius (80m).
+                player.transform.position = campCenter + directions[d] * 55f;
+
+                yield return null;
+
+                HostileSettlementLeader leader = camp.GetComponentInChildren<HostileSettlementLeader>();
+                HostileMobAI[] mobs = camp.GetComponentsInChildren<HostileMobAI>();
+                leader.ConsiderAssault();
+                Assert.AreEqual(SquadCommand.AssaultPlayerBase, leader.CurrentCommand);
+
+                // Keep a coarse path per mob so a failure shows where it got stuck.
+                var paths = new Dictionary<HostileMobAI, System.Text.StringBuilder>();
+                foreach (HostileMobAI mob in mobs) paths[mob] = new System.Text.StringBuilder();
+                for (int s = 0; s < 5; s++)
+                {
+                    foreach (HostileMobAI mob in mobs) paths[mob].Append((mob.transform.position - campCenter).ToString("F1")).Append(' ');
+                    yield return WaitSimulated(5f);
+                }
+
+                foreach (HostileMobAI mob in mobs)
+                {
+                    Assert.Less(FlatDistance(mob.transform.position, player.transform.position), 15f,
+                        $"Direction {directions[d]}: {mob.name} did not reach the player (state: {mob.CurrentStateType}); path relative to camp: {paths[mob]}");
+                }
+
+                Object.Destroy(camp);
+                Object.Destroy(player);
+                yield return null;
             }
         }
 

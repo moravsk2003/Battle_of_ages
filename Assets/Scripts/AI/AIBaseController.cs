@@ -24,7 +24,9 @@ namespace BattleOfAges.AI
         [SerializeField] protected float rotationSpeed = 8.0f;
         [SerializeField] protected float stoppingDistance = 1.2f;
 
-        [Header("Obstacle Unsticking (no NavMesh: movement is straight-line)")]
+        [Header("Obstacle Avoidance (no NavMesh: movement is straight-line)")]
+        [SerializeField] private float avoidanceProbeDistance = 1.2f;
+        [SerializeField] private float avoidanceRecheckInterval = 0.1f;
         [SerializeField] private float stuckCheckInterval = 0.5f;
         [SerializeField] private float stuckProgressRatio = 0.25f; // stuck if moved < 25% of expected distance
         [SerializeField] private float detourDuration = 1.2f;
@@ -48,6 +50,13 @@ namespace BattleOfAges.AI
         private float detourTimer;
         private Vector3 detourDir;
         private int detourSide = 1;
+        private int consecutiveDetours;
+
+        private static readonly float[] SteerAngles = { 35f, 70f, 105f, 140f };
+        private static readonly RaycastHit[] probeHits = new RaycastHit[16];
+        private Vector3 steerDir;
+        private float steerTimer;
+        private int steerSide = 1;
 
         public CharacterController CharacterCtrl => characterController != null ? characterController : (characterController = GetComponent<CharacterController>());
         public HealthComponent Health => healthComponent != null ? healthComponent : (healthComponent = GetComponent<HealthComponent>());
@@ -76,6 +85,11 @@ namespace BattleOfAges.AI
 
         protected virtual void Start()
         {
+            // Spawners add the CharacterController and only then move the object into place. With
+            // Physics.autoSyncTransforms off, the first CharacterController.Move() would use the stale
+            // physics position and snap the unit back to where it was created (the world origin).
+            Physics.SyncTransforms();
+
             FindPlayerViewer();
             if (states.Count == 0) RegisterStates();
         }
@@ -195,7 +209,9 @@ namespace BattleOfAges.AI
 
             if (moveDir.sqrMagnitude > stoppingDistance * stoppingDistance)
             {
+                float remainingDistance = moveDir.magnitude;
                 moveDir.Normalize();
+                moveDir = SteerAroundObstacles(moveDir, remainingDistance);
                 moveDir = ApplyObstacleDetour(moveDir, currentPos);
 
                 // Smooth rotation
@@ -220,40 +236,127 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>
-        /// Without pathfinding a unit walking straight at its destination can get pinned against
-        /// tents, campfires, walls or trees. If it makes almost no progress, it side-steps along the
-        /// obstacle for a moment, alternating sides on repeated failures.
+        /// Local obstacle avoidance: probes ahead with the unit's capsule and, if the direct way is blocked,
+        /// picks the closest free direction (trying the side it turned to last time first, to avoid
+        /// oscillating). If it is boxed in, it backs out. Re-evaluated ~10 times per second.
+        /// </summary>
+        private Vector3 SteerAroundObstacles(Vector3 desiredDir, float remainingDistance)
+        {
+            steerTimer -= Time.deltaTime;
+            if (steerTimer > 0f && steerDir != Vector3.zero) return steerDir;
+            steerTimer = avoidanceRecheckInterval;
+
+            // Never probe past the destination, so units can still walk right up to what they are approaching.
+            float probeDistance = Mathf.Min(avoidanceProbeDistance, remainingDistance);
+            if (IsPathClear(desiredDir, probeDistance))
+            {
+                steerDir = desiredDir;
+                return steerDir;
+            }
+
+            for (int i = 0; i < SteerAngles.Length; i++)
+            {
+                Vector3 sameSide = Quaternion.Euler(0f, SteerAngles[i] * steerSide, 0f) * desiredDir;
+                if (IsPathClear(sameSide, avoidanceProbeDistance))
+                {
+                    steerDir = sameSide;
+                    return steerDir;
+                }
+
+                Vector3 otherSide = Quaternion.Euler(0f, -SteerAngles[i] * steerSide, 0f) * desiredDir;
+                if (IsPathClear(otherSide, avoidanceProbeDistance))
+                {
+                    steerSide = -steerSide;
+                    steerDir = otherSide;
+                    return steerDir;
+                }
+            }
+
+            steerDir = -desiredDir; // boxed in: back out
+            return steerDir;
+        }
+
+        private bool IsPathClear(Vector3 dir, float distance)
+        {
+            CharacterController cc = CharacterCtrl;
+            if (cc == null) return true;
+
+            // Slightly thinner than the controller so surfaces it is already touching are not "inside" the cast,
+            // and lifted by the step offset so the ground and small bumps are ignored.
+            float radius = cc.radius * 0.9f;
+            Vector3 center = transform.position + cc.center;
+            float half = Mathf.Max(0f, cc.height * 0.5f - cc.radius);
+            Vector3 bottom = center + Vector3.down * half + Vector3.up * cc.stepOffset;
+            Vector3 top = center + Vector3.up * half;
+            if (bottom.y > top.y) bottom.y = top.y;
+
+            float walkableNormalY = Mathf.Cos(cc.slopeLimit * Mathf.Deg2Rad);
+            int count = Physics.CapsuleCastNonAlloc(bottom, top, radius, dir, probeHits, distance, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = probeHits[i];
+                if (hit.distance <= 0f) continue;                         // overlapping at start
+                if (hit.collider.transform.IsChildOf(transform)) continue; // own colliders
+                if (hit.collider is CharacterController) continue;         // other units push/slide on their own
+                if (IsTerrain(hit.collider) && hit.normal.y >= walkableNormalY) continue; // walkable ground or slope
+                return false;                                              // props (campfire, tents, trees...) always block
+            }
+            return true;
+        }
+
+        private static bool IsTerrain(Collider c)
+        {
+            if (c is TerrainCollider) return true;
+            GameObject go = c.gameObject;
+            return go.GetComponent<BattleOfAges.World.ProceduralBiomeChunk>() != null
+                   || go.name == "SteppeTerrain"
+                   || go.name == "Ground";
+        }
+
+        /// <summary>
+        /// Fallback for when steering still makes no progress (e.g. concave spots): it side-steps along the
+        /// obstacle. It keeps to the same side (with a longer side-step the second time) and only switches
+        /// sides when the side-step itself is blocked. If it is still stuck after that, the destination is
+        /// treated as unreachable and dropped, so the AI state picks a new one instead of the unit drifting
+        /// further and further away.
         /// </summary>
         private Vector3 ApplyObstacleDetour(Vector3 desiredDir, Vector3 currentPos)
         {
-            float dt = Time.deltaTime;
+            const int maxDetoursPerDestination = 2;
 
-            if (detourTimer > 0f)
-            {
-                detourTimer -= dt;
-                if (detourTimer <= 0f) ResetStuckDetection();
-                return detourDir;
-            }
+            float dt = Time.deltaTime;
+            bool detouring = detourTimer > 0f;
+            if (detouring) detourTimer -= dt;
 
             stuckTimer += dt;
             if (stuckTimer >= stuckCheckInterval)
             {
                 Vector3 delta = currentPos - lastProgressPos;
                 delta.y = 0f;
-                float expected = moveSpeed * stuckTimer;
+                bool blocked = delta.magnitude < moveSpeed * stuckTimer * stuckProgressRatio;
+                ResetStuckDetection();
 
-                if (delta.magnitude < expected * stuckProgressRatio)
+                if (blocked)
                 {
+                    if (consecutiveDetours >= maxDetoursPerDestination)
+                    {
+                        consecutiveDetours = 0;
+                        detourTimer = 0f;
+                        hasDestination = false; // unreachable: let the state choose another destination
+                        return desiredDir;
+                    }
+
+                    if (detouring) detourSide = -detourSide; // this side is blocked too: try the other one
+                    consecutiveDetours++;
+                    detourTimer = detourDuration * consecutiveDetours;
                     detourDir = Quaternion.Euler(0f, 90f * detourSide, 0f) * desiredDir;
-                    detourSide = -detourSide;
-                    detourTimer = detourDuration;
                     return detourDir;
                 }
 
-                ResetStuckDetection();
+                if (!detouring) consecutiveDetours = 0; // free movement again
             }
 
-            return desiredDir;
+            return detourTimer > 0f ? detourDir : desiredDir;
         }
 
         private void ResetStuckDetection()

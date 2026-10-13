@@ -118,6 +118,12 @@ namespace BattleOfAges.Utils
             tentRoot.transform.localPosition = localPos;
             tentRoot.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
 
+            // One solid volume for the whole tent: the A-frame roof plates alone leave an open tunnel that
+            // units can walk into and get wedged in (AI movement has no pathfinding).
+            BoxCollider tentVolume = tentRoot.AddComponent<BoxCollider>();
+            tentVolume.center = new Vector3(0f, 1.15f, 0f);
+            tentVolume.size = new Vector3(3.6f, 2.3f, 3.4f);
+
             // Tent Triangular Roof
             GameObject leftRoof = GameObject.CreatePrimitive(PrimitiveType.Cube);
             leftRoof.transform.SetParent(tentRoot.transform, false);
