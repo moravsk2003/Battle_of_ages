@@ -35,6 +35,8 @@ namespace BattleOfAges.AI
         private readonly Transform[] knees = new Transform[4];
         private Transform neckPivot;
         private Transform tailPivot;
+        private Transform earL, earR;
+        private Quaternion earLRest = Quaternion.identity, earRRest = Quaternion.identity;
         private Quaternion neckRest = Quaternion.identity;
         private Quaternion tailRest = Quaternion.identity;
         private Vector3 lastAnimPos;
@@ -103,11 +105,18 @@ namespace BattleOfAges.AI
             visualModel = transform.Find("VisualModel");
             if (visualModel == null) return;
 
-            neckPivot = visualModel.Find("NeckPivot");
+            // Rest rotations are captured only when a joint is first found, never from an already animated pose.
+            Transform neck = visualModel.Find("NeckPivot");
+            if (neck != neckPivot && neck != null) neckRest = neck.localRotation;
+            neckPivot = neck;
             headTransform = neckPivot != null ? neckPivot.Find("Head") : visualModel.Find("Head");
-            tailPivot = visualModel.Find("TailPivot");
-            if (neckPivot != null) neckRest = neckPivot.localRotation;
-            if (tailPivot != null) tailRest = tailPivot.localRotation;
+            Transform tail = visualModel.Find("TailPivot");
+            if (tail != tailPivot && tail != null) tailRest = tail.localRotation;
+            tailPivot = tail;
+            Transform el = headTransform != null ? headTransform.Find("Ear_L") : null, er = headTransform != null ? headTransform.Find("Ear_R") : null;
+            if (el != earL && el != null) earLRest = el.localRotation;
+            if (er != earR && er != null) earRRest = er.localRotation;
+            earL = el; earR = er;
             for (int i = 0; i < 4; i++)
             {
                 legPivots[i] = visualModel.Find("LegPivot_" + i);
@@ -212,13 +221,30 @@ namespace BattleOfAges.AI
                 float grazeCycle = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Sin(grazeTimer * 0.45f + GetInstanceID() * 0.37f) * 1.6f));
                 float grazeAngle = (animalType == AnimalType.Deer ? 58f : (animalType == AnimalType.Boar ? 22f : 18f)) * grazeCycle;
                 float walkNod = Mathf.Sin(2f * phase) * 4f;
-                neckPivot.localRotation = neckRest * Quaternion.Euler(Mathf.Lerp(grazeAngle, walkNod, move), 0f, 0f);
+                float sniff = animalType == AnimalType.Boar ? Mathf.Sin(Time.time * 11f) * Mathf.Max(0f, Mathf.Sin(Time.time * 0.7f + GetInstanceID())) * 2.5f * (1f - move) : 0f;
+                neckPivot.localRotation = neckRest * Quaternion.Euler(Mathf.Lerp(grazeAngle + sniff, walkNod, move), 0f, 0f);
             }
 
             if (tailPivot != null)
             {
                 tailPivot.localRotation = tailRest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 7f + GetInstanceID()) * 15f * (0.4f + move), 0f);
             }
+
+            if (earL != null && earR != null)
+            {
+                // Ears: an occasional flick each (independent timing), laid back while running
+                float t = Time.time + GetInstanceID() * 0.37f;
+                float flickL = EarFlick(t), flickR = EarFlick(t * 1.13f + 2.1f);
+                earL.localRotation = earLRest * Quaternion.Euler(-28f * move - 22f * flickL, 0f, 14f * flickL);
+                earR.localRotation = earRRest * Quaternion.Euler(-28f * move - 22f * flickR, 0f, -14f * flickR);
+            }
+        }
+
+        /// <summary>0 most of the time, a quick 0..1..0 twitch for a quarter second every ~3.7 s.</summary>
+        private static float EarFlick(float t)
+        {
+            float c = Mathf.Repeat(t, 3.7f);
+            return c < 0.25f ? Mathf.Sin(c / 0.25f * Mathf.PI) : 0f;
         }
 
         public void AlertNearbyHerd(Transform threat)

@@ -198,7 +198,7 @@ namespace BattleOfAges.PlayModeTests
             return best;
         }
 
-        private static void ClearStage(Vector3[] areas, float radius)
+        internal static void ClearStage(Vector3[] areas, float radius)
         {
             foreach (Transform t in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
             {
