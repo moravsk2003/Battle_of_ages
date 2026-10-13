@@ -43,7 +43,9 @@ namespace BattleOfAges.Utils
 
             if (!Cache.TryGetValue(speciesKey, out Cached cached) || cached.Mesh == null)
             {
+                var timer = System.Diagnostics.Stopwatch.StartNew();
                 cached = Build(visualRoot, cellSize, blend);
+                Debug.Log($"[AnimalSculptor] {speciesKey} sculpted in {timer.ElapsedMilliseconds} ms");
                 if (cached == null) return;
                 Cache[speciesKey] = cached;
             }

@@ -90,7 +90,7 @@ namespace BattleOfAges.Resources
             mfCore.sharedMesh = sharedPebbleMesh;
             MeshRenderer mrCore = coreRock.AddComponent<MeshRenderer>();
             mrCore.sharedMaterial = stoneMat;
-            mrCore.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            mrCore.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // tiny props: shadows cost hundreds of draw calls for no visible gain
             mrCore.receiveShadows = true;
 
             // Embedded Glowing Crystal Gems
@@ -115,7 +115,7 @@ namespace BattleOfAges.Resources
 
             MeshRenderer mr = shard.GetComponent<MeshRenderer>();
             mr.sharedMaterial = mat;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // tiny props: shadows cost hundreds of draw calls for no visible gain
             mr.receiveShadows = true;
 
             Collider c = shard.GetComponent<Collider>();

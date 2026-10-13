@@ -89,9 +89,12 @@ namespace BattleOfAges.Player
             }
         }
 
+        private GameModeManager cachedModeManager;
+
         private void Update()
         {
-            GameModeManager gmm = FindFirstObjectByType<GameModeManager>();
+            if (cachedModeManager == null) cachedModeManager = FindFirstObjectByType<GameModeManager>(); // was a full scene search every frame
+            GameModeManager gmm = cachedModeManager;
             if (gmm != null && gmm.CurrentMode != GameMode.FirstPerson) return;
             if (IsAnyUIOpen()) return;
 
