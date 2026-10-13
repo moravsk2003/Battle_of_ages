@@ -21,6 +21,9 @@ namespace BattleOfAges.Combat
         public float AttackRange => attackRange;
         public bool CanAttack => Time.time >= nextAttackTime;
 
+        /// <summary>Raised when an attack swing starts (rigged characters play their attack clip).</summary>
+        public event Action OnAttackStarted;
+
         private void Awake()
         {
             originalLocalPos = transform.localPosition;
@@ -55,6 +58,7 @@ namespace BattleOfAges.Combat
             if (!isPunching)
             {
                 isPunching = true;
+                OnAttackStarted?.Invoke();
                 punchProgress = 0f;
             }
         }

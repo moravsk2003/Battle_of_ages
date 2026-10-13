@@ -31,6 +31,7 @@ namespace BattleOfAges.RTS
         private static readonly int SpeedHash = Animator.StringToHash("Speed");
         private bool hasWalkClip = false;
         private bool hasIdleClip = false;
+        private bool riggedDriver; // rigged models are animated by Utils.CharacterAnimationDriver
 
         private void FindVisualModelReferences()
         {
@@ -41,6 +42,7 @@ namespace BattleOfAges.RTS
 
             if (visualModel != null)
             {
+                riggedDriver = visualModel.GetComponent<BattleOfAges.Utils.CharacterAnimationDriver>() != null;
                 if (animator == null) animator = visualModel.GetComponentInChildren<Animator>();
                 if (legacyAnimation == null) legacyAnimation = visualModel.GetComponentInChildren<Animation>();
 
@@ -58,6 +60,7 @@ namespace BattleOfAges.RTS
         private void Update()
         {
             if (visualModel == null) FindVisualModelReferences();
+            if (riggedDriver) return;
 
             // Calculate current movement speed
             Vector3 delta = transform.position - lastPosition;

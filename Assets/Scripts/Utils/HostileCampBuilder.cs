@@ -207,9 +207,8 @@ namespace BattleOfAges.Utils
             if (mobAI == null) mobAI = root.AddComponent<HostileMobAI>();
             mobAI.InitializeMob(type);
 
-            HumanoidModelBuilder.HumanType humanType = (type == HostileMobType.WarlordGuard)
-                ? HumanoidModelBuilder.HumanType.KnightGuard
-                : HumanoidModelBuilder.HumanType.Villager;
+            HumanoidModelBuilder.HumanType humanType = (type == HostileMobType.WarlordGuard) ? HumanoidModelBuilder.HumanType.Warlord
+                : (type == HostileMobType.Goblin ? HumanoidModelBuilder.HumanType.Goblin : HumanoidModelBuilder.HumanType.Bandit);
             GameObject visual = HumanoidModelBuilder.CreateHumanoidModel(humanType, "VisualModel");
             visual.transform.SetParent(root.transform, false);
 

@@ -31,9 +31,17 @@ namespace BattleOfAges.AI
         private Transform detectedThreat;
         private Transform visualModel;
         private Transform headTransform;
-        private Transform[] legTransforms;
+        private readonly Transform[] legPivots = new Transform[4];
+        private readonly Transform[] knees = new Transform[4];
+        private Transform neckPivot;
+        private Transform tailPivot;
+        private Quaternion neckRest = Quaternion.identity;
+        private Quaternion tailRest = Quaternion.identity;
+        private Vector3 lastAnimPos;
+        private float gaitSpeed;
+        private float gaitPhase;
 
-        private float animPhase;
+
         private float grazeTimer;
 
         public AnimalType Type => animalType;
@@ -93,10 +101,19 @@ namespace BattleOfAges.AI
         private void CacheVisualNodes()
         {
             visualModel = transform.Find("VisualModel");
-            if (visualModel != null)
+            if (visualModel == null) return;
+
+            neckPivot = visualModel.Find("NeckPivot");
+            headTransform = neckPivot != null ? neckPivot.Find("Head") : visualModel.Find("Head");
+            tailPivot = visualModel.Find("TailPivot");
+            if (neckPivot != null) neckRest = neckPivot.localRotation;
+            if (tailPivot != null) tailRest = tailPivot.localRotation;
+            for (int i = 0; i < 4; i++)
             {
-                headTransform = visualModel.Find("Head");
+                legPivots[i] = visualModel.Find("LegPivot_" + i);
+                knees[i] = legPivots[i] != null ? legPivots[i].Find("Knee_" + i) : null;
             }
+            lastAnimPos = transform.position;
         }
 
         protected override void RegisterStates()
@@ -138,47 +155,69 @@ namespace BattleOfAges.AI
             AnimateProceduralVisuals(Time.deltaTime);
         }
 
+        /// <summary>Gait from the measured ground speed: phase advances one cycle per stride length.</summary>
         private void AnimateProceduralVisuals(float dt)
         {
-            if (visualModel == null) return;
+            if (visualModel == null || dt <= 0f) return;
 
-            bool isMoving = (CurrentStateType == AIStateType.Wander || CurrentStateType == AIStateType.Flee) &&
-                            Vector3.Distance(transform.position, destination) > 0.6f;
+            Vector3 d = transform.position - lastAnimPos;
+            d.y = 0f;
+            lastAnimPos = transform.position;
+            float measured = d.magnitude / dt;
+            if (measured > 30f) measured = 0f; // teleport / respawn
+            gaitSpeed = Mathf.Lerp(gaitSpeed, measured, 1f - Mathf.Exp(-8f * dt));
 
-            if (isMoving)
+            float stride = animalType == AnimalType.Rabbit ? 0.7f : (animalType == AnimalType.Boar ? 0.9f : 1.5f);
+            gaitPhase = Mathf.Repeat(gaitPhase + dt * gaitSpeed / stride * Mathf.PI * 2f, Mathf.PI * 2f);
+            grazeTimer += dt;
+            ApplyGaitPose(gaitPhase, Mathf.Clamp01(gaitSpeed / 1.2f));
+        }
+
+        /// <summary>Freezes the animal at a gait phase (0..1) and movement amount (0 idle .. 1 moving); for previews.</summary>
+        public void PoseGait(float phase01, float move)
+        {
+            CacheVisualNodes();
+            ApplyGaitPose(phase01 * Mathf.PI * 2f, move);
+        }
+
+        private void ApplyGaitPose(float phase, float move)
+        {
+            bool rabbit = animalType == AnimalType.Rabbit;
+            float swing = rabbit ? 40f : 28f;
+            float kneeAmp = rabbit ? 30f : 45f;
+
+            for (int i = 0; i < 4; i++)
             {
-                float freq = (CurrentStateType == AIStateType.Flee) ? 14f : 8f;
-                animPhase += dt * freq;
-
-                // Hopping/trotting vertical bounce
-                float bounce = (animalType == AnimalType.Rabbit)
-                    ? Mathf.Abs(Mathf.Sin(animPhase)) * 0.22f
-                    : Mathf.Sin(animPhase * 2f) * 0.06f;
-
-                visualModel.localPosition = new Vector3(0f, bounce, 0f);
-
-                // Body pitch/roll lean
-                float roll = Mathf.Sin(animPhase) * 3.5f;
-                visualModel.localRotation = Quaternion.Euler(0f, 0f, roll);
-
-                if (headTransform != null)
+                if (legPivots[i] == null) continue;
+                // Trot: diagonal pairs (0+3, 1+2) in phase. Rabbit: bound, front pair vs hind pair.
+                float off = rabbit ? (i < 2 ? 0f : Mathf.PI) : ((i == 0 || i == 3) ? 0f : Mathf.PI);
+                float s = Mathf.Sin(phase + off);
+                legPivots[i].localRotation = Quaternion.Euler(s * swing * move, 0f, 0f);
+                if (knees[i] != null)
                 {
-                    headTransform.localRotation = Quaternion.identity;
+                    float flex = Mathf.Max(0f, Mathf.Cos(phase + off)) * kneeAmp * move; // fold while the leg swings forward
+                    knees[i].localRotation = Quaternion.Euler(flex, 0f, 0f);
                 }
             }
-            else
-            {
-                // Idle / Grazing animation: gentle breathing and head dip down to eat grass
-                grazeTimer += dt;
-                float grazeDip = Mathf.Sin(grazeTimer * 1.5f);
-                visualModel.localPosition = Vector3.Lerp(visualModel.localPosition, Vector3.zero, dt * 5f);
 
-                if (headTransform != null)
-                {
-                    // Head lowers towards the ground when grazing
-                    float headPitch = Mathf.Clamp(grazeDip * 25f + 10f, 0f, 35f);
-                    headTransform.localRotation = Quaternion.Euler(headPitch, 0f, 0f);
-                }
+            // Body: trot rises twice per cycle; rabbit hops in an arc and pitches with the jump
+            float bob = rabbit ? Mathf.Max(0f, Mathf.Sin(phase)) * 0.16f : (0.5f - 0.5f * Mathf.Cos(2f * phase)) * (animalType == AnimalType.Boar ? 0.03f : 0.045f);
+            visualModel.localPosition = new Vector3(0f, bob * move, 0f);
+            float pitch = rabbit ? -Mathf.Sin(phase) * 10f * move : 0f;
+            visualModel.localRotation = Quaternion.Euler(pitch, 0f, Mathf.Sin(phase) * 1.5f * move);
+
+            if (neckPivot != null)
+            {
+                // Grazing when standing: the head goes down for a while, then up to look around
+                float grazeCycle = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Sin(grazeTimer * 0.45f + GetInstanceID() * 0.37f) * 1.6f));
+                float grazeAngle = (animalType == AnimalType.Deer ? 58f : (animalType == AnimalType.Boar ? 22f : 18f)) * grazeCycle;
+                float walkNod = Mathf.Sin(2f * phase) * 4f;
+                neckPivot.localRotation = neckRest * Quaternion.Euler(Mathf.Lerp(grazeAngle, walkNod, move), 0f, 0f);
+            }
+
+            if (tailPivot != null)
+            {
+                tailPivot.localRotation = tailRest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 7f + GetInstanceID()) * 15f * (0.4f + move), 0f);
             }
         }
 

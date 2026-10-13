@@ -12,11 +12,20 @@ namespace BattleOfAges.Utils
         {
             HeroPlayer,
             KnightGuard,
-            Villager
+            Villager,
+            Bandit,
+            Goblin,
+            Warlord
         }
 
         public static GameObject CreateHumanoidModel(HumanType type, string name = "HumanoidModel")
         {
+            // Prefer the rigged, animated FBX characters; fall back to the procedural primitive build.
+            GameObject rigged = RiggedCharacterBuilder.TryCreate(type, name);
+            if (rigged != null) return rigged;
+            if (type == HumanType.Bandit || type == HumanType.Goblin) type = HumanType.Villager;
+            else if (type == HumanType.Warlord) type = HumanType.KnightGuard;
+
             GameObject root = new GameObject(name);
 
             CharacterPalette palette = CharacterPalette.For(type);

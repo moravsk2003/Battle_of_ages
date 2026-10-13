@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.AI;
 using BattleOfAges.Combat;
@@ -5,8 +6,10 @@ using BattleOfAges.Combat;
 namespace BattleOfAges.Utils
 {
     /// <summary>
-    /// Procedural 3D Model and Prefab Builder for Wildlife (Deer, Boar, Rabbit).
-    /// Generates stylized low-poly animal anatomy with realistic proportions.
+    /// Procedural wildlife (Deer, Boar, Rabbit) built as a small joint hierarchy that PeacefulAnimalAI animates:
+    /// VisualModel / LegPivot_0..3 (hip / shoulder) / Knee_0..3, NeckPivot / Head, TailPivot.
+    /// Leg order: 0 front-left, 1 front-right, 2 hind-left, 3 hind-right. Animals face +Z.
+    /// Flat-coloured low-poly materials match the rigged character style.
     /// </summary>
     public static class AnimalModelBuilder
     {
@@ -49,137 +52,173 @@ namespace BattleOfAges.Utils
             return root;
         }
 
+        // ------------------------------------------------------------------ species
+
         private static void BuildDeerVisuals(Transform root)
         {
-            Material deerFur = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.68f, 0.42f, 0.22f), 0f, 0.25f);
-            Material bellyFur = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Foliage, new Color(0.92f, 0.86f, 0.74f), 0f, 0.18f);
-            Material antlerMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, new Color(0.35f, 0.25f, 0.18f), 0f, 0.20f);
-            Material darkMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Dark, new Color(0.10f, 0.08f, 0.06f), 0f, 0.12f);
+            Material coat = Fur(new Color(0.58f, 0.38f, 0.22f));
+            Material belly = Fur(new Color(0.88f, 0.80f, 0.66f));
+            Material dark = Fur(new Color(0.09f, 0.07f, 0.06f), 0.35f);
+            Material antler = Fur(new Color(0.62f, 0.54f, 0.42f), 0.2f);
 
-            // 1. Torso
-            GameObject body = CreatePart(PrimitiveType.Capsule, "Body", root, new Vector3(0f, 1.05f, 0f), new Vector3(0.58f, 0.75f, 0.58f), Quaternion.Euler(90f, 0f, 0f), deerFur);
+            // Barrel-shaped body: chest, belly and haunch volumes
+            Part(PrimitiveType.Capsule, "Body", root, new Vector3(0f, 1.05f, 0f), new Vector3(0.50f, 0.62f, 0.48f), Quaternion.Euler(90f, 0f, 0f), coat);
+            Part(PrimitiveType.Sphere, "Chest", root, new Vector3(0f, 1.08f, 0.40f), new Vector3(0.48f, 0.54f, 0.50f), Quaternion.identity, coat);
+            Part(PrimitiveType.Sphere, "Haunch", root, new Vector3(0f, 1.08f, -0.44f), new Vector3(0.46f, 0.50f, 0.46f), Quaternion.identity, coat);
+            Part(PrimitiveType.Capsule, "Belly", root, new Vector3(0f, 0.90f, 0f), new Vector3(0.34f, 0.48f, 0.30f), Quaternion.Euler(90f, 0f, 0f), belly);
 
-            // 2. Neck & Head
-            GameObject neck = CreatePart(PrimitiveType.Cylinder, "Neck", root, new Vector3(0f, 1.45f, 0.62f), new Vector3(0.24f, 0.42f, 0.24f), Quaternion.Euler(38f, 0f, 0f), deerFur);
-            GameObject head = CreatePart(PrimitiveType.Sphere, "Head", root, new Vector3(0f, 1.78f, 0.95f), new Vector3(0.34f, 0.32f, 0.48f), Quaternion.identity, deerFur);
-            GameObject muzzle = CreatePart(PrimitiveType.Cube, "Muzzle", root, new Vector3(0f, 1.68f, 1.20f), new Vector3(0.20f, 0.16f, 0.25f), Quaternion.identity, bellyFur);
-            GameObject nose = CreatePart(PrimitiveType.Sphere, "Nose", root, new Vector3(0f, 1.72f, 1.34f), new Vector3(0.10f, 0.08f, 0.08f), Quaternion.identity, darkMat);
+            float[] legLen = { 0.98f, 0.98f, 1.0f, 1.0f }; // = joint height, so hooves touch the ground
+            BuildLegs(root, new Vector3(0.16f, 0.98f, 0.42f), new Vector3(0.15f, 0.98f, -0.46f), legLen, 0.085f, coat, dark, hindHock: true);
 
-            // 3. Antlers (Majestic branching antlers)
-            for (int i = -1; i <= 1; i += 2)
+            Transform neck = Joint("NeckPivot", root, new Vector3(0f, 1.22f, 0.52f), Quaternion.Euler(-42f, 0f, 0f));
+            Part(PrimitiveType.Capsule, "Neck", neck, new Vector3(0f, 0f, 0.26f), new Vector3(0.20f, 0.32f, 0.22f), Quaternion.Euler(90f, 0f, 0f), coat);
+            Transform head = Joint("Head", neck, new Vector3(0f, 0.02f, 0.56f), Quaternion.Euler(52f, 0f, 0f));
+            Part(PrimitiveType.Sphere, "Skull", head, new Vector3(0f, 0.04f, 0.02f), new Vector3(0.22f, 0.22f, 0.28f), Quaternion.identity, coat);
+            Part(PrimitiveType.Capsule, "Muzzle", head, new Vector3(0f, -0.03f, 0.20f), new Vector3(0.13f, 0.14f, 0.12f), Quaternion.Euler(90f, 0f, 0f), coat);
+            Part(PrimitiveType.Sphere, "Nose", head, new Vector3(0f, -0.02f, 0.33f), new Vector3(0.07f, 0.06f, 0.05f), Quaternion.identity, dark);
+            Part(PrimitiveType.Sphere, "Chin", head, new Vector3(0f, -0.08f, 0.16f), new Vector3(0.10f, 0.06f, 0.14f), Quaternion.identity, belly);
+            foreach (int s in new[] { -1, 1 })
             {
-                CreatePart(PrimitiveType.Cylinder, $"AntlerMain_{i}", root, new Vector3(i * 0.18f, 2.05f, 0.92f), new Vector3(0.045f, 0.35f, 0.045f), Quaternion.Euler(20f, i * 25f, i * 35f), antlerMat);
-                CreatePart(PrimitiveType.Cylinder, $"AntlerBranch1_{i}", root, new Vector3(i * 0.28f, 2.22f, 0.98f), new Vector3(0.035f, 0.22f, 0.035f), Quaternion.Euler(45f, i * 40f, i * 15f), antlerMat);
-                CreatePart(PrimitiveType.Cylinder, $"AntlerBranch2_{i}", root, new Vector3(i * 0.35f, 2.38f, 0.88f), new Vector3(0.030f, 0.18f, 0.030f), Quaternion.Euler(-10f, i * 20f, i * 50f), antlerMat);
+                Part(PrimitiveType.Sphere, "Eye" + s, head, new Vector3(s * 0.095f, 0.07f, 0.09f), Vector3.one * 0.04f, dark);
+                Part(PrimitiveType.Capsule, "Ear" + s, head, new Vector3(s * 0.13f, 0.14f, -0.04f), new Vector3(0.07f, 0.12f, 0.035f), Quaternion.Euler(0f, 0f, s * -55f), coat);
+                // Antlers: main beam with two tines
+                Transform beam = Joint("Antler" + s, head, new Vector3(s * 0.07f, 0.15f, -0.02f), Quaternion.Euler(-18f, 0f, s * -28f));
+                Part(PrimitiveType.Capsule, "Beam", beam, new Vector3(0f, 0.17f, 0f), new Vector3(0.035f, 0.18f, 0.035f), Quaternion.identity, antler);
+                Part(PrimitiveType.Capsule, "Tine1", beam, new Vector3(0f, 0.17f, 0.06f), new Vector3(0.025f, 0.09f, 0.025f), Quaternion.Euler(55f, 0f, 0f), antler);
+                Part(PrimitiveType.Capsule, "Tine2", beam, new Vector3(s * 0.04f, 0.32f, 0.03f), new Vector3(0.022f, 0.08f, 0.022f), Quaternion.Euler(35f, 0f, s * -30f), antler);
             }
 
-            // 4. Ears
-            for (int i = -1; i <= 1; i += 2)
-            {
-                CreatePart(PrimitiveType.Capsule, $"Ear_{i}", root, new Vector3(i * 0.22f, 1.90f, 0.80f), new Vector3(0.08f, 0.18f, 0.06f), Quaternion.Euler(30f, i * 45f, i * 45f), deerFur);
-            }
-
-            // 5. 4 Slender Legs
-            Vector3[] legOffsets = new Vector3[]
-            {
-                new Vector3(-0.24f, 0.52f, 0.55f),
-                new Vector3(0.24f, 0.52f, 0.55f),
-                new Vector3(-0.24f, 0.52f, -0.55f),
-                new Vector3(0.24f, 0.52f, -0.55f)
-            };
-
-            for (int i = 0; i < 4; i++)
-            {
-                CreatePart(PrimitiveType.Cylinder, $"Leg_{i}", root, legOffsets[i], new Vector3(0.12f, 0.52f, 0.12f), Quaternion.identity, deerFur);
-                CreatePart(PrimitiveType.Cube, $"Hoof_{i}", root, legOffsets[i] - new Vector3(0, 0.48f, 0), new Vector3(0.13f, 0.08f, 0.15f), Quaternion.identity, darkMat);
-            }
-
-            // 6. Tail
-            CreatePart(PrimitiveType.Sphere, "Tail", root, new Vector3(0f, 1.15f, -0.72f), new Vector3(0.12f, 0.18f, 0.12f), Quaternion.Euler(-30f, 0, 0), bellyFur);
+            Transform tail = Joint("TailPivot", root, new Vector3(0f, 1.18f, -0.72f), Quaternion.Euler(-35f, 0f, 0f));
+            Part(PrimitiveType.Capsule, "Tail", tail, new Vector3(0f, 0f, -0.08f), new Vector3(0.08f, 0.09f, 0.06f), Quaternion.Euler(90f, 0f, 0f), belly);
         }
 
         private static void BuildBoarVisuals(Transform root)
         {
-            Material boarFur = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, new Color(0.25f, 0.18f, 0.12f), 0f, 0.20f);
-            Material snoutMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.38f, 0.26f, 0.20f), 0f, 0.22f);
-            Material tuskMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.95f, 0.93f, 0.85f), 0.2f, 0.35f);
-            Material darkMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Dark, new Color(0.08f, 0.06f, 0.05f), 0f, 0.10f);
+            Material hide = Fur(new Color(0.24f, 0.17f, 0.12f));
+            Material bristle = Fur(new Color(0.11f, 0.08f, 0.06f));
+            Material snoutMat = Fur(new Color(0.46f, 0.32f, 0.26f), 0.3f);
+            Material tusk = Fur(new Color(0.94f, 0.90f, 0.80f), 0.4f);
+            Material dark = Fur(new Color(0.07f, 0.05f, 0.04f), 0.3f);
 
-            // 1. Heavy Stocky Body
-            GameObject body = CreatePart(PrimitiveType.Capsule, "Body", root, new Vector3(0f, 0.80f, 0f), new Vector3(0.75f, 0.78f, 0.75f), Quaternion.Euler(90f, 0f, 0f), boarFur);
+            // Heavy wedge body: big shoulder hump tapering to the rump
+            Part(PrimitiveType.Capsule, "Body", root, new Vector3(0f, 0.68f, -0.02f), new Vector3(0.62f, 0.62f, 0.60f), Quaternion.Euler(90f, 0f, 0f), hide);
+            Part(PrimitiveType.Sphere, "Shoulders", root, new Vector3(0f, 0.76f, 0.30f), new Vector3(0.64f, 0.70f, 0.62f), Quaternion.identity, hide);
+            Part(PrimitiveType.Sphere, "Rump", root, new Vector3(0f, 0.66f, -0.42f), new Vector3(0.54f, 0.54f, 0.48f), Quaternion.identity, hide);
+            Part(PrimitiveType.Capsule, "Mane", root, new Vector3(0f, 1.02f, 0.12f), new Vector3(0.14f, 0.42f, 0.16f), Quaternion.Euler(80f, 0f, 0f), bristle);
 
-            // 2. Powerful Wedge Head & Snout
-            GameObject head = CreatePart(PrimitiveType.Cube, "Head", root, new Vector3(0f, 0.88f, 0.72f), new Vector3(0.55f, 0.55f, 0.65f), Quaternion.Euler(15f, 0f, 0f), boarFur);
-            GameObject snout = CreatePart(PrimitiveType.Cylinder, "Snout", root, new Vector3(0f, 0.72f, 1.12f), new Vector3(0.26f, 0.12f, 0.26f), Quaternion.Euler(90f, 0f, 0f), snoutMat);
+            float[] legLen = { 0.50f, 0.50f, 0.50f, 0.50f };
+            BuildLegs(root, new Vector3(0.20f, 0.50f, 0.34f), new Vector3(0.19f, 0.50f, -0.42f), legLen, 0.14f, hide, dark, hindHock: false);
 
-            // 3. Curved Tusks
-            for (int i = -1; i <= 1; i += 2)
+            Transform neck = Joint("NeckPivot", root, new Vector3(0f, 0.80f, 0.56f), Quaternion.Euler(14f, 0f, 0f));
+            Transform head = Joint("Head", neck, new Vector3(0f, 0f, 0.10f), Quaternion.identity);
+            Part(PrimitiveType.Sphere, "Skull", head, new Vector3(0f, 0.02f, 0.12f), new Vector3(0.38f, 0.38f, 0.46f), Quaternion.identity, hide);
+            Part(PrimitiveType.Capsule, "SnoutBridge", head, new Vector3(0f, -0.04f, 0.34f), new Vector3(0.22f, 0.18f, 0.20f), Quaternion.Euler(90f, 0f, 0f), hide);
+            Part(PrimitiveType.Cylinder, "SnoutDisc", head, new Vector3(0f, -0.06f, 0.52f), new Vector3(0.16f, 0.03f, 0.14f), Quaternion.Euler(90f, 0f, 0f), snoutMat);
+            foreach (int s in new[] { -1, 1 })
             {
-                CreatePart(PrimitiveType.Cylinder, $"Tusk_{i}", root, new Vector3(i * 0.24f, 0.78f, 1.05f), new Vector3(0.05f, 0.16f, 0.05f), Quaternion.Euler(-35f, i * 20f, i * 40f), tuskMat);
+                Part(PrimitiveType.Sphere, "Eye" + s, head, new Vector3(s * 0.13f, 0.08f, 0.26f), Vector3.one * 0.045f, dark);
+                Part(PrimitiveType.Capsule, "Ear" + s, head, new Vector3(s * 0.15f, 0.20f, 0.02f), new Vector3(0.09f, 0.10f, 0.04f), Quaternion.Euler(-20f, 0f, s * -35f), bristle);
+                Part(PrimitiveType.Capsule, "Tusk" + s, head, new Vector3(s * 0.10f, -0.06f, 0.44f), new Vector3(0.035f, 0.08f, 0.035f), Quaternion.Euler(-30f, 0f, s * -30f), tusk);
             }
 
-            // 4. Bristle Spine Ridge
-            GameObject ridge = CreatePart(PrimitiveType.Cube, "BristleRidge", root, new Vector3(0f, 1.18f, 0.1f), new Vector3(0.12f, 0.18f, 0.95f), Quaternion.identity, darkMat);
-
-            // 5. 4 Short Strong Legs
-            Vector3[] legOffsets = new Vector3[]
-            {
-                new Vector3(-0.32f, 0.36f, 0.50f),
-                new Vector3(0.32f, 0.36f, 0.50f),
-                new Vector3(-0.32f, 0.36f, -0.50f),
-                new Vector3(0.32f, 0.36f, -0.50f)
-            };
-
-            for (int i = 0; i < 4; i++)
-            {
-                CreatePart(PrimitiveType.Cylinder, $"Leg_{i}", root, legOffsets[i], new Vector3(0.18f, 0.36f, 0.18f), Quaternion.identity, boarFur);
-            }
+            Transform tail = Joint("TailPivot", root, new Vector3(0f, 0.78f, -0.66f), Quaternion.Euler(30f, 0f, 0f));
+            Part(PrimitiveType.Capsule, "Tail", tail, new Vector3(0f, -0.1f, 0f), new Vector3(0.04f, 0.1f, 0.04f), Quaternion.identity, bristle);
         }
 
         private static void BuildRabbitVisuals(Transform root)
         {
-            Material furMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Cloth, new Color(0.88f, 0.85f, 0.80f), 0f, 0.15f);
-            Material earInner = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.95f, 0.65f, 0.65f), 0f, 0.18f);
-            Material eyeMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Dark, new Color(0.12f, 0.08f, 0.08f), 0.5f, 0.6f);
+            Material fur = Fur(new Color(0.62f, 0.52f, 0.42f));
+            Material white = Fur(new Color(0.92f, 0.90f, 0.86f));
+            Material inner = Fur(new Color(0.92f, 0.66f, 0.64f));
+            Material dark = Fur(new Color(0.08f, 0.06f, 0.06f), 0.5f);
 
-            // 1. Compact Furry Body
-            GameObject body = CreatePart(PrimitiveType.Sphere, "Body", root, new Vector3(0f, 0.32f, 0f), new Vector3(0.42f, 0.36f, 0.52f), Quaternion.identity, furMat);
+            Part(PrimitiveType.Sphere, "Body", root, new Vector3(0f, 0.30f, -0.04f), new Vector3(0.34f, 0.32f, 0.46f), Quaternion.Euler(-12f, 0f, 0f), fur);
+            Part(PrimitiveType.Sphere, "Haunch", root, new Vector3(0f, 0.26f, -0.16f), new Vector3(0.36f, 0.30f, 0.32f), Quaternion.identity, fur);
+            Part(PrimitiveType.Sphere, "Chest", root, new Vector3(0f, 0.30f, 0.12f), new Vector3(0.24f, 0.24f, 0.22f), Quaternion.identity, white);
 
-            // 2. Head
-            GameObject head = CreatePart(PrimitiveType.Sphere, "Head", root, new Vector3(0f, 0.48f, 0.32f), new Vector3(0.30f, 0.28f, 0.32f), Quaternion.identity, furMat);
+            float[] legLen = { 0.20f, 0.20f, 0.17f, 0.17f };
+            BuildLegs(root, new Vector3(0.07f, 0.20f, 0.12f), new Vector3(0.11f, 0.17f, -0.18f), legLen, 0.06f, fur, white, hindHock: true, hindFootLength: 0.16f);
 
-            // 3. Long Upright Ears
-            for (int i = -1; i <= 1; i += 2)
+            Transform neck = Joint("NeckPivot", root, new Vector3(0f, 0.38f, 0.16f), Quaternion.identity);
+            Transform head = Joint("Head", neck, new Vector3(0f, 0.08f, 0.06f), Quaternion.identity);
+            Part(PrimitiveType.Sphere, "Skull", head, Vector3.zero, new Vector3(0.20f, 0.19f, 0.22f), Quaternion.identity, fur);
+            Part(PrimitiveType.Sphere, "Cheeks", head, new Vector3(0f, -0.04f, 0.07f), new Vector3(0.15f, 0.10f, 0.12f), Quaternion.identity, white);
+            Part(PrimitiveType.Sphere, "Nose", head, new Vector3(0f, -0.01f, 0.115f), Vector3.one * 0.03f, inner);
+            foreach (int s in new[] { -1, 1 })
             {
-                CreatePart(PrimitiveType.Capsule, $"Ear_{i}", root, new Vector3(i * 0.10f, 0.72f, 0.28f), new Vector3(0.07f, 0.26f, 0.04f), Quaternion.Euler(-10f, i * 15f, i * 12f), furMat);
-                CreatePart(PrimitiveType.Capsule, $"EarInner_{i}", root, new Vector3(i * 0.10f, 0.72f, 0.30f), new Vector3(0.04f, 0.20f, 0.02f), Quaternion.Euler(-10f, i * 15f, i * 12f), earInner);
+                Part(PrimitiveType.Sphere, "Eye" + s, head, new Vector3(s * 0.075f, 0.03f, 0.05f), Vector3.one * 0.035f, dark);
+                Transform ear = Joint("Ear" + s, head, new Vector3(s * 0.04f, 0.08f, -0.03f), Quaternion.Euler(-12f, 0f, s * -10f));
+                Part(PrimitiveType.Capsule, "Outer", ear, new Vector3(0f, 0.11f, 0f), new Vector3(0.06f, 0.12f, 0.03f), Quaternion.identity, fur);
+                Part(PrimitiveType.Capsule, "Inner", ear, new Vector3(0f, 0.11f, 0.008f), new Vector3(0.035f, 0.09f, 0.02f), Quaternion.identity, inner);
             }
 
-            // 4. Eyes & Pink Nose
-            for (int i = -1; i <= 1; i += 2)
-            {
-                CreatePart(PrimitiveType.Sphere, $"Eye_{i}", root, new Vector3(i * 0.14f, 0.52f, 0.42f), new Vector3(0.06f, 0.06f, 0.06f), Quaternion.identity, eyeMat);
-            }
-            CreatePart(PrimitiveType.Sphere, "Nose", root, new Vector3(0f, 0.44f, 0.48f), new Vector3(0.04f, 0.04f, 0.04f), Quaternion.identity, earInner);
+            Transform tail = Joint("TailPivot", root, new Vector3(0f, 0.30f, -0.30f), Quaternion.identity);
+            Part(PrimitiveType.Sphere, "Tail", tail, new Vector3(0f, 0f, -0.02f), Vector3.one * 0.09f, white);
+        }
 
-            // 5. Fluffy Tail
-            CreatePart(PrimitiveType.Sphere, "Tail", root, new Vector3(0f, 0.36f, -0.30f), new Vector3(0.14f, 0.14f, 0.14f), Quaternion.identity, furMat);
+        // ------------------------------------------------------------------ anatomy helpers
 
-            // 6. Paws
-            Vector3[] paws = new Vector3[]
+        /// <summary>
+        /// Four two-segment legs. front/hind give the right-hand shoulder/hip joint position (mirrored for the left).
+        /// Each leg: LegPivot_i (swings) / upper segment / Knee_i (bends) / lower segment / hoof.
+        /// </summary>
+        private static void BuildLegs(Transform root, Vector3 front, Vector3 hind, float[] lengths, float thickness,
+                                      Material upperMat, Material hoofMat, bool hindHock, float hindFootLength = 0f)
+        {
+            Vector3[] hips =
             {
-                new Vector3(-0.14f, 0.10f, 0.20f),
-                new Vector3(0.14f, 0.10f, 0.20f),
-                new Vector3(-0.16f, 0.12f, -0.15f),
-                new Vector3(0.16f, 0.12f, -0.15f)
+                new Vector3(-front.x, front.y, front.z), new Vector3(front.x, front.y, front.z),
+                new Vector3(-hind.x, hind.y, hind.z), new Vector3(hind.x, hind.y, hind.z)
             };
+
             for (int i = 0; i < 4; i++)
             {
-                CreatePart(PrimitiveType.Sphere, $"Paw_{i}", root, paws[i], new Vector3(0.12f, 0.10f, 0.18f), Quaternion.identity, furMat);
+                bool isHind = i >= 2;
+                float len = lengths[i];
+                float upper = len * (isHind ? 0.5f : 0.48f), lower = len - upper;
+
+                Transform pivot = Joint("LegPivot_" + i, root, hips[i], Quaternion.identity);
+                // Thigh / upper arm: thicker, slightly angled (hind thighs slope back, like a hock)
+                float thighTilt = isHind && hindHock ? 14f : 0f;
+                Part(PrimitiveType.Capsule, "Upper", pivot, new Vector3(0f, -upper * 0.5f, -Mathf.Sin(thighTilt * Mathf.Deg2Rad) * upper * 0.5f),
+                     new Vector3(thickness * 1.5f, upper * 0.62f, thickness * 1.6f), Quaternion.Euler(-thighTilt, 0f, 0f), upperMat);
+
+                Vector3 kneePos = new Vector3(0f, -upper, -Mathf.Sin(thighTilt * Mathf.Deg2Rad) * upper);
+                Transform knee = Joint("Knee_" + i, pivot, kneePos, Quaternion.identity);
+                Part(PrimitiveType.Capsule, "Lower", knee, new Vector3(0f, -lower * 0.5f, 0f), new Vector3(thickness, lower * 0.56f, thickness), Quaternion.identity, upperMat);
+                Part(PrimitiveType.Capsule, "Hoof", knee, new Vector3(0f, -lower + thickness * 0.35f, isHind && hindFootLength > 0f ? hindFootLength * 0.3f : 0.01f),
+                     new Vector3(thickness * 1.15f, thickness * 0.7f, (isHind && hindFootLength > 0f ? hindFootLength : thickness * 1.5f)), Quaternion.Euler(90f, 0f, 0f), hoofMat);
             }
         }
 
-        private static GameObject CreatePart(PrimitiveType type, string name, Transform parent, Vector3 localPosition, Vector3 localScale, Quaternion localRotation, Material material)
+        private static readonly Dictionary<string, Material> FurCache = new Dictionary<string, Material>();
+
+        /// <summary>Flat-coloured matte material (same look as the rigged characters' materials).</summary>
+        private static Material Fur(Color color, float smoothness = 0.12f)
+        {
+            string key = ColorUtility.ToHtmlStringRGB(color) + smoothness;
+            if (FurCache.TryGetValue(key, out Material m) && m != null) return m;
+            m = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "MAT_Fur_" + key, enableInstancing = true };
+            m.SetColor("_BaseColor", color);
+            m.SetFloat("_Smoothness", smoothness);
+            m.SetFloat("_Metallic", 0f);
+            FurCache[key] = m;
+            return m;
+        }
+
+        private static Transform Joint(string name, Transform parent, Vector3 localPosition, Quaternion localRotation)
+        {
+            GameObject j = new GameObject(name);
+            j.transform.SetParent(parent, false);
+            j.transform.localPosition = localPosition;
+            j.transform.localRotation = localRotation;
+            return j.transform;
+        }
+
+        private static GameObject Part(PrimitiveType type, string name, Transform parent, Vector3 localPosition, Vector3 localScale, Material material) =>
+            Part(type, name, parent, localPosition, localScale, Quaternion.identity, material);
+
+        private static GameObject Part(PrimitiveType type, string name, Transform parent, Vector3 localPosition, Vector3 localScale, Quaternion localRotation, Material material)
         {
             GameObject part = GameObject.CreatePrimitive(type);
             part.name = name;
@@ -187,15 +226,15 @@ namespace BattleOfAges.Utils
             part.transform.localPosition = localPosition;
             part.transform.localScale = localScale;
             part.transform.localRotation = localRotation;
-            part.GetComponent<MeshRenderer>().sharedMaterial = material;
-
+            MeshRenderer mr = part.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = material;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             Collider col = part.GetComponent<Collider>();
             if (col != null)
             {
                 if (Application.isPlaying) Object.Destroy(col);
                 else Object.DestroyImmediate(col);
             }
-
             return part;
         }
     }

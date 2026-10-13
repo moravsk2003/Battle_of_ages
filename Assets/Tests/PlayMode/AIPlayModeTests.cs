@@ -125,15 +125,17 @@ namespace BattleOfAges.PlayModeTests
 
             // Procedural animation must actually drive the visual model while the boar moves/grazes.
             Transform visual = boar.transform.Find("VisualModel");
-            Transform head = visual.Find("Head");
-            Quaternion initialHeadRot = head.localRotation;
+            Transform head = visual.Find("NeckPivot");                 // jointed rig: the neck carries the head
+            Transform leg = visual.Find("LegPivot_0");
+            Quaternion initialHeadRot = head.localRotation, initialLegRot = leg.localRotation;
             bool animated = false;
             float end = Time.time + 10f;
             while (Time.time < end && !animated)
             {
                 animated = visual.localRotation != Quaternion.identity
                            || visual.localPosition.sqrMagnitude > 1e-6f
-                           || head.localRotation != initialHeadRot;
+                           || head.localRotation != initialHeadRot
+                           || leg.localRotation != initialLegRot;
                 yield return null;
             }
             Assert.IsTrue(animated, "Animal procedural animation never ran.");

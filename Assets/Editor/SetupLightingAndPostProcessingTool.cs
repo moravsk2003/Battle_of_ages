@@ -173,6 +173,22 @@ namespace BattleOfAges.EditorTools
                 EditorUtility.SetDirty(urpAsset);
             }
 
+            // Sky reflections for metal (helmets, swords, armour). Nothing is baked in this project, so without a
+            // probe metallic surfaces reflect black. A realtime probe that renders only the sky, once on Awake.
+            GameObject probeObj = GameObject.Find("SkyReflectionProbe") ?? new GameObject("SkyReflectionProbe");
+            probeObj.transform.position = new Vector3(0f, 40f, 0f);
+            ReflectionProbe probe = probeObj.GetComponent<ReflectionProbe>();
+            if (probe == null) probe = probeObj.AddComponent<ReflectionProbe>(); // not "??": Unity fake-null
+            probe.mode = ReflectionProbeMode.Realtime;
+            probe.refreshMode = ReflectionProbeRefreshMode.OnAwake;
+            probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.AllFacesAtOnce;
+            probe.clearFlags = ReflectionProbeClearFlags.Skybox;
+            probe.cullingMask = 0;
+            probe.size = new Vector3(6000f, 3000f, 6000f);
+            probe.resolution = 128;
+            probe.importance = 0;
+            probe.boxProjection = false;
+
             // Shaders only created from code (Shader.Find) must be in the build.
             EnsureAlwaysIncluded("Custom/GrassBlades");
             EnsureAlwaysIncluded("Custom/StylizedTerrain");
