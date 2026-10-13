@@ -23,7 +23,11 @@ namespace BattleOfAges.AI
         [SerializeField] private float safeDistance = 28.0f;
         [SerializeField] private float wanderRadius = 18.0f;
 
+        private const float HerdAlertRadius = 22.0f;
+        private static readonly Collider[] overlapBuffer = new Collider[64];
+
         private Vector3 spawnOrigin;
+        private Transform cachedPlayer;
         private Transform detectedThreat;
         private Transform visualModel;
         private Transform headTransform;
@@ -41,10 +45,20 @@ namespace BattleOfAges.AI
 
         protected override void Awake()
         {
-            base.Awake();
             spawnOrigin = transform.position;
+            base.Awake();
             CacheVisualNodes();
             ConfigureAnimalStats();
+        }
+
+        protected override void Start()
+        {
+            base.Start();
+
+            // Spawners create the animal at the world origin and move it afterwards,
+            // so the home point is re-captured here and the first wander target re-picked.
+            spawnOrigin = transform.position;
+            if (CurrentStateType == AIStateType.Wander) ChangeState(AIStateType.Wander);
         }
 
         public void InitializeAnimal(AnimalType type)
@@ -101,13 +115,18 @@ namespace BattleOfAges.AI
 
         public Transform FindThreatNearby()
         {
-            GameObject player = GameObject.Find("Player");
-            if (player != null)
+            if (cachedPlayer == null)
             {
-                float dist = Vector3.Distance(transform.position, player.transform.position);
+                GameObject player = GameObject.Find("Player");
+                if (player != null) cachedPlayer = player.transform;
+            }
+
+            if (cachedPlayer != null)
+            {
+                float dist = Vector3.Distance(transform.position, cachedPlayer.position);
                 if (dist <= threatDetectionRadius)
                 {
-                    return player.transform;
+                    return cachedPlayer;
                 }
             }
             return null;
@@ -166,10 +185,10 @@ namespace BattleOfAges.AI
         public void AlertNearbyHerd(Transform threat)
         {
             if (threat == null) return;
-            Collider[] herdHits = Physics.OverlapSphere(transform.position, 22.0f);
-            for (int i = 0; i < herdHits.Length; i++)
+            int count = Physics.OverlapSphereNonAlloc(transform.position, HerdAlertRadius, overlapBuffer);
+            for (int i = 0; i < count; i++)
             {
-                PeacefulAnimalAI herdAnimal = herdHits[i].GetComponentInParent<PeacefulAnimalAI>();
+                PeacefulAnimalAI herdAnimal = overlapBuffer[i].GetComponentInParent<PeacefulAnimalAI>();
                 if (herdAnimal != null && herdAnimal != this && herdAnimal.CurrentStateType != AIStateType.Flee)
                 {
                     herdAnimal.SetDetectedThreat(threat);
@@ -248,8 +267,9 @@ namespace BattleOfAges.AI
             }
 
             wanderTimer += deltaTime;
-            float dist = Vector3.Distance(animal.transform.position, animal.Destination);
-            if (dist <= 1.2f || wanderTimer >= maxWanderDuration)
+            // HasDestination is cleared by the movement code on (horizontal) arrival; a 3D distance
+            // check here could never succeed on slopes where pivot and terrain height differ.
+            if (!animal.HasDestination || wanderTimer >= maxWanderDuration)
             {
                 animal.ChangeState(AIStateType.Idle);
             }
@@ -279,7 +299,7 @@ namespace BattleOfAges.AI
             PeacefulAnimalAI animal = controller as PeacefulAnimalAI;
             if (animal == null) return;
 
-            Transform threat = animal.DetectedThreat ?? animal.FindThreatNearby();
+            Transform threat = ResolveThreat(animal);
             if (threat == null)
             {
                 animal.ChangeState(AIStateType.Idle);
@@ -307,7 +327,7 @@ namespace BattleOfAges.AI
             PeacefulAnimalAI animal = controller as PeacefulAnimalAI;
             if (animal == null) return;
 
-            Transform threat = animal.DetectedThreat ?? animal.FindThreatNearby();
+            Transform threat = ResolveThreat(animal);
             if (threat == null) return;
 
             Vector3 fleeDir = (animal.transform.position - threat.position).normalized;
@@ -319,6 +339,14 @@ namespace BattleOfAges.AI
             fleeTarget.y = RtsUnit.GetTerrainHeight(fleeTarget);
 
             animal.SetMoveDestination(fleeTarget);
+        }
+
+        // Explicit == null instead of '??': the C# null-coalescing operator bypasses Unity's
+        // destroyed-object check and would return a destroyed Transform.
+        private static Transform ResolveThreat(PeacefulAnimalAI animal)
+        {
+            Transform threat = animal.DetectedThreat;
+            return threat != null ? threat : animal.FindThreatNearby();
         }
 
         public void Exit(AIBaseController controller) { }

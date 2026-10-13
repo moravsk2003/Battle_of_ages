@@ -69,6 +69,65 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void HostileMob_RetreatHealing_DoesNotDependOnTickRate()
+        {
+            HealthComponent hp = mobObj.GetComponent<HealthComponent>();
+            int lowHp = Mathf.RoundToInt(hp.MaxHealth * 0.1f);
+
+            // One second of healing in 20 small AI ticks (close-range LOD)...
+            hp.TakeDamage(hp.MaxHealth - lowHp);
+            mobAI.ChangeState(AIStateType.Retreat);
+            for (int i = 0; i < 20; i++) mobAI.TickAI(0.05f);
+            int healedFastTicks = hp.CurrentHealth - lowHp;
+
+            // ...must equal one second of healing in a single large tick (distant LOD).
+            hp.InitializeHealth(hp.MaxHealth);
+            hp.TakeDamage(hp.MaxHealth - lowHp);
+            mobAI.ChangeState(AIStateType.Retreat);
+            mobAI.TickAI(1.0f);
+            int healedSlowTick = hp.CurrentHealth - lowHp;
+
+            Assert.AreEqual(Mathf.FloorToInt(mobAI.RetreatHealPerSecond), healedSlowTick);
+            Assert.AreEqual(healedSlowTick, healedFastTicks, 1, "Healing rate must not depend on the AI tick interval.");
+        }
+
+        [Test]
+        public void HostileMob_EnteringRetreat_ClearsCombatTarget()
+        {
+            mobAI.SetTarget(playerHp);
+            mobAI.ChangeState(AIStateType.Retreat);
+
+            Assert.IsNull(mobAI.CurrentCombatTarget, "A retreating mob must drop its target so allies can recruit it later.");
+        }
+
+        [Test]
+        public void HostileMob_InitializeMob_AppliesWarlordStats()
+        {
+            mobAI.InitializeMob(HostileMobType.WarlordGuard);
+
+            Assert.AreEqual(HostileMobType.WarlordGuard, mobAI.MobType);
+            Assert.AreEqual(250, mobObj.GetComponent<HealthComponent>().MaxHealth);
+        }
+
+        [Test]
+        public void HostileMob_AssaultOrder_IgnoresLeashRange()
+        {
+            playerObj.transform.position = mobObj.transform.position + new Vector3(100f, 0f, 0f);
+
+            // Regular aggro: target far beyond the leash is dropped.
+            mobAI.SetTarget(playerHp);
+            mobAI.ChangeState(AIStateType.Chase);
+            mobAI.TickAI(0.05f);
+            Assert.AreEqual(AIStateType.Wander, mobAI.CurrentStateType);
+
+            // Leader's assault order: the mob keeps marching towards the target.
+            mobAI.OrderAttack(playerHp);
+            mobAI.TickAI(0.05f);
+            Assert.AreEqual(AIStateType.Chase, mobAI.CurrentStateType, "Ordered assault must not be cancelled by the leash range.");
+            Assert.AreSame(playerHp, mobAI.CurrentCombatTarget);
+        }
+
+        [Test]
         public void PeacefulAnimal_AlertNearbyHerd_PropagatesFleeState()
         {
             GameObject deer1Obj = new GameObject("Deer_1");

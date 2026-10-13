@@ -73,6 +73,7 @@ namespace BattleOfAges.Utils
             leaderObj.transform.position = campCenter + new Vector3(0f, 0f, 1.5f);
             leaderObj.transform.position = new Vector3(leaderObj.transform.position.x, RtsUnit.GetTerrainHeight(leaderObj.transform.position), leaderObj.transform.position.z);
             leaderObj.transform.SetParent(root.transform);
+            leaderObj.GetComponent<HostileMobAI>().SetGuardOrigin(leaderObj.transform.position);
 
             HostileSettlementLeader leaderComp = leaderObj.GetComponent<HostileSettlementLeader>();
 
@@ -95,7 +96,11 @@ namespace BattleOfAges.Utils
                 mobObj.transform.SetParent(root.transform);
 
                 HostileMobAI mobAI = mobObj.GetComponent<HostileMobAI>();
-                if (mobAI != null) squad.Add(mobAI);
+                if (mobAI != null)
+                {
+                    mobAI.SetGuardOrigin(spawnPos);
+                    squad.Add(mobAI);
+                }
             }
 
             if (leaderComp != null)
@@ -182,23 +187,19 @@ namespace BattleOfAges.Utils
             charCtrl.radius = 0.5f;
             charCtrl.center = new Vector3(0f, charCtrl.height * 0.5f, 0f);
 
-            HealthComponent hp = root.AddComponent<HealthComponent>();
-            int maxHp = (type == HostileMobType.WarlordGuard) ? 350 : (type == HostileMobType.Bandit ? 140 : 80);
-            hp.InitializeHealth(maxHp);
+            root.AddComponent<HealthComponent>();
+            root.AddComponent<CombatUnit>();
 
-            CombatUnit combat = root.AddComponent<CombatUnit>();
-            int rawDmg = (type == HostileMobType.WarlordGuard) ? 35 : (type == HostileMobType.Bandit ? 18 : 12);
-            combat.InitializeCombatStats(rawDmg, 1.4f, 2.5f);
-
+            // HP / damage / speed come from HostileMobAI.InitializeMob (single source of truth).
+            // The leader's HostileMobAI is auto-added by [RequireComponent] on HostileSettlementLeader.
             if (type == HostileMobType.WarlordGuard)
             {
                 root.AddComponent<HostileSettlementLeader>();
             }
-            else
-            {
-                HostileMobAI mobAI = root.AddComponent<HostileMobAI>();
-                mobAI.InitializeMob(type);
-            }
+
+            HostileMobAI mobAI = root.GetComponent<HostileMobAI>();
+            if (mobAI == null) mobAI = root.AddComponent<HostileMobAI>();
+            mobAI.InitializeMob(type);
 
             HumanoidModelBuilder.HumanType humanType = (type == HostileMobType.WarlordGuard)
                 ? HumanoidModelBuilder.HumanType.KnightGuard

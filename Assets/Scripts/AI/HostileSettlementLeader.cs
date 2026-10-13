@@ -26,6 +26,7 @@ namespace BattleOfAges.AI
         [SerializeField] private SquadCommand currentSquadCommand = SquadCommand.DefendCamp;
         [SerializeField] private float assaultCheckInterval = 30.0f; // Every 30s considers launching a raid
         [SerializeField] private float casualtyRetreatThreshold = 0.5f; // Retreat if > 50% squad lost
+        [SerializeField] private float assaultRadius = 80.0f; // Only raid a player who is within this distance of the camp
 
         private HostileMobAI leaderMobAI;
         private Vector3 campCenterPosition;
@@ -38,11 +39,12 @@ namespace BattleOfAges.AI
         private void Awake()
         {
             leaderMobAI = GetComponent<HostileMobAI>();
-            campCenterPosition = transform.position;
         }
 
         private void Start()
         {
+            // Captured in Start: spawners position the leader only after AddComponent (Awake).
+            campCenterPosition = transform.position;
             initialSquadSize = squadMembers.Count;
             if (leaderMobAI != null && leaderMobAI.Health != null)
             {
@@ -109,6 +111,12 @@ namespace BattleOfAges.AI
 
         public void ConsiderAssault()
         {
+            // A dead warlord can no longer command the squad.
+            if (leaderMobAI != null && leaderMobAI.Health != null && !leaderMobAI.Health.IsAlive) return;
+
+            HealthComponent playerHp = (leaderMobAI != null) ? leaderMobAI.GetPlayerHealth() : null;
+            if (playerHp == null || Vector3.Distance(campCenterPosition, playerHp.transform.position) > assaultRadius) return;
+
             if (squadMembers.Count >= Mathf.Max(2, initialSquadSize / 2))
             {
                 OrderAssaultOnPlayerBase();
@@ -117,27 +125,24 @@ namespace BattleOfAges.AI
 
         public void OrderAssaultOnPlayerBase()
         {
-            currentSquadCommand = SquadCommand.AssaultPlayerBase;
+            // Without a living target the Chase state would immediately fall back to Wander,
+            // so there is nothing to assault.
+            HealthComponent playerHp = (leaderMobAI != null) ? leaderMobAI.GetPlayerHealth() : null;
+            if (playerHp == null || !playerHp.IsAlive) return;
 
-            GameObject player = GameObject.Find("Player");
-            Vector3 targetPos = (player != null) ? player.transform.position : Vector3.zero;
+            currentSquadCommand = SquadCommand.AssaultPlayerBase;
 
             Debug.Log($"[Hostile Leader] {gameObject.name} наказує загону ШТУРМУВАТИ базу гравця! Загін: {squadMembers.Count} бійців.");
 
             for (int i = 0; i < squadMembers.Count; i++)
             {
                 if (squadMembers[i] == null) continue;
-
-                Vector2 offset = Random.insideUnitCircle * 4.0f;
-                Vector3 dest = targetPos + new Vector3(offset.x, 0, offset.y);
-                squadMembers[i].SetMoveDestination(dest);
-                squadMembers[i].ChangeState(AIStateType.Chase);
+                squadMembers[i].OrderAttack(playerHp);
             }
 
             if (leaderMobAI != null)
             {
-                leaderMobAI.SetMoveDestination(targetPos);
-                leaderMobAI.ChangeState(AIStateType.Chase);
+                leaderMobAI.OrderAttack(playerHp);
             }
         }
 

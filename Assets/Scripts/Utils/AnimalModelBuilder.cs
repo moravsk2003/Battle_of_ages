@@ -42,6 +42,10 @@ namespace BattleOfAges.Utils
                     break;
             }
 
+            // Applies per-type stats and caches the VisualModel/Head nodes, which did not exist yet
+            // when the AI's Awake ran (otherwise every animal behaved as a Deer and was never animated).
+            ai.InitializeAnimal(type);
+
             return root;
         }
 

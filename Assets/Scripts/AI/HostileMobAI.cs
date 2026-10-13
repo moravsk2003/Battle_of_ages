@@ -23,40 +23,76 @@ namespace BattleOfAges.AI
         [SerializeField] private float aggroRadius = 18.0f;
         [SerializeField] private float attackRange = 2.5f;
         [SerializeField] private float retreatHealthPercent = 0.20f; // Retreat at <= 20% HP
+        [SerializeField] private float retreatHealPerSecond = 12.0f;
+
+        private const float AllyAlertRadius = 22.0f;
+        private static readonly Collider[] overlapBuffer = new Collider[64];
 
         private Vector3 guardOrigin;
+        private bool guardOriginLocked;
         private HealthComponent currentCombatTarget;
+        private HealthComponent cachedPlayerHealth;
+        private bool isOnAssaultOrder;
 
         public HostileMobType MobType => mobType;
         public float AggroRadius => aggroRadius;
         public float AttackRange => attackRange;
         public float RetreatHealthPercent => retreatHealthPercent;
-        public Vector3 GuardOrigin => guardOrigin;
+        public float RetreatHealPerSecond => retreatHealPerSecond;
+        public Vector3 GuardOrigin => guardOriginLocked ? guardOrigin : transform.position;
         public HealthComponent CurrentCombatTarget => currentCombatTarget;
+        public bool IsOnAssaultOrder => isOnAssaultOrder;
 
         protected override void Awake()
         {
             base.Awake();
-            guardOrigin = transform.position;
 
             if (combatUnit == null) combatUnit = gameObject.AddComponent<CombatUnit>();
 
-            int hp = (mobType == HostileMobType.WarlordGuard) ? 200 : 100;
-            int dmg = (mobType == HostileMobType.WarlordGuard) ? 25 : 15;
-            healthComponent.InitializeHealth(hp);
-            combatUnit.InitializeCombatStats(dmg, 1.8f, attackRange);
+            ApplyMobStats();
+        }
 
-            moveSpeed = (mobType == HostileMobType.Goblin) ? 5.5f : 4.8f;
+        protected override void Start()
+        {
+            base.Start();
+
+            // Spawners create the mob at the world origin and move it afterwards,
+            // so the guard post is captured here rather than in Awake.
+            if (!guardOriginLocked)
+            {
+                SetGuardOrigin(transform.position);
+            }
         }
 
         public void InitializeMob(HostileMobType type)
         {
             mobType = type;
-            int hp = (mobType == HostileMobType.WarlordGuard) ? 250 : (mobType == HostileMobType.Bandit ? 140 : 80);
-            int dmg = (mobType == HostileMobType.WarlordGuard) ? 30 : (mobType == HostileMobType.Bandit ? 18 : 12);
-            if (healthComponent != null) healthComponent.InitializeHealth(hp);
-            if (combatUnit != null) combatUnit.InitializeCombatStats(dmg, 1.6f, attackRange);
-            moveSpeed = (mobType == HostileMobType.Goblin) ? 5.5f : 4.6f;
+            ApplyMobStats();
+        }
+
+        public void SetGuardOrigin(Vector3 origin)
+        {
+            guardOrigin = origin;
+            guardOriginLocked = true;
+
+            // Re-pick the patrol point that may have been chosen around the old (pre-spawn) position.
+            if (CurrentStateType == AIStateType.Wander) ChangeState(AIStateType.Wander);
+        }
+
+        /// <summary>Single source of truth for per-type mob stats.</summary>
+        private void ApplyMobStats()
+        {
+            int hp;
+            int dmg;
+            switch (mobType)
+            {
+                case HostileMobType.WarlordGuard: hp = 250; dmg = 30; moveSpeed = 4.6f; break;
+                case HostileMobType.Goblin:       hp = 80;  dmg = 12; moveSpeed = 5.5f; break;
+                default:                          hp = 140; dmg = 18; moveSpeed = 4.6f; break;
+            }
+
+            if (Health != null) Health.InitializeHealth(hp);
+            if (Combat != null) Combat.InitializeCombatStats(dmg, 1.6f, attackRange);
         }
 
         protected override void RegisterStates()
@@ -77,19 +113,34 @@ namespace BattleOfAges.AI
             {
                 AlertNearbyAllies(target);
             }
+            else
+            {
+                isOnAssaultOrder = false;
+            }
+        }
+
+        /// <summary>
+        /// Ordered attack (e.g. from a settlement leader): pursues the target beyond the normal leash range.
+        /// </summary>
+        public void OrderAttack(HealthComponent target)
+        {
+            if (target == null || !target.IsAlive || !Health.IsAlive) return;
+            currentCombatTarget = target;
+            isOnAssaultOrder = true;
+            ChangeState(AIStateType.Chase);
         }
 
         public void AlertNearbyAllies(HealthComponent target)
         {
-            Collider[] allies = Physics.OverlapSphere(transform.position, 22.0f);
-            for (int i = 0; i < allies.Length; i++)
+            int count = Physics.OverlapSphereNonAlloc(transform.position, AllyAlertRadius, overlapBuffer);
+            for (int i = 0; i < count; i++)
             {
-                HostileMobAI allyMob = allies[i].GetComponentInParent<HostileMobAI>();
-                if (allyMob != null && allyMob != this && allyMob.CurrentCombatTarget == null)
-                {
-                    allyMob.currentCombatTarget = target;
-                    allyMob.ChangeState(AIStateType.Chase);
-                }
+                HostileMobAI allyMob = overlapBuffer[i].GetComponentInParent<HostileMobAI>();
+                if (allyMob == null || allyMob == this || allyMob.CurrentCombatTarget != null) continue;
+                if (!allyMob.Health.IsAlive || allyMob.CurrentStateType == AIStateType.Retreat) continue;
+
+                allyMob.currentCombatTarget = target;
+                allyMob.ChangeState(AIStateType.Chase);
             }
         }
 
@@ -117,25 +168,21 @@ namespace BattleOfAges.AI
             }
 
             // 2. Medium Priority: Player Character
-            GameObject player = GameObject.Find("Player");
-            if (player != null)
+            HealthComponent playerHp = GetPlayerHealth();
+            if (playerHp != null && playerHp.IsAlive)
             {
-                HealthComponent playerHp = player.GetComponent<HealthComponent>();
-                if (playerHp != null && playerHp.IsAlive)
+                float dist = Vector3.Distance(transform.position, playerHp.transform.position);
+                if (dist <= aggroRadius)
                 {
-                    float dist = Vector3.Distance(transform.position, player.transform.position);
-                    if (dist <= aggroRadius)
-                    {
-                        return playerHp;
-                    }
+                    return playerHp;
                 }
             }
 
             // 3. Low Priority: Player Walls / Fortifications blocking path
-            Collider[] hits = Physics.OverlapSphere(transform.position, aggroRadius * 0.75f);
-            for (int i = 0; i < hits.Length; i++)
+            int count = Physics.OverlapSphereNonAlloc(transform.position, aggroRadius * 0.75f, overlapBuffer);
+            for (int i = 0; i < count; i++)
             {
-                Building.BuildingNode bNode = hits[i].GetComponentInParent<Building.BuildingNode>();
+                Building.BuildingNode bNode = overlapBuffer[i].GetComponentInParent<Building.BuildingNode>();
                 if (bNode != null)
                 {
                     HealthComponent bHp = bNode.GetComponent<HealthComponent>();
@@ -147,6 +194,17 @@ namespace BattleOfAges.AI
             }
 
             return null;
+        }
+
+        /// <summary>Cached lookup of the player's health (avoids GameObject.Find on every AI tick).</summary>
+        public HealthComponent GetPlayerHealth()
+        {
+            if (cachedPlayerHealth == null)
+            {
+                GameObject player = GameObject.Find("Player");
+                if (player != null) cachedPlayerHealth = player.GetComponent<HealthComponent>();
+            }
+            return cachedPlayerHealth;
         }
     }
 
@@ -207,7 +265,7 @@ namespace BattleOfAges.AI
             HostileMobAI mob = controller as HostileMobAI;
             if (mob == null) return;
 
-            // Check retreat condition (<= 25% HP)
+            // Check retreat condition (<= RetreatHealthPercent HP)
             if (mob.Health.CurrentHealth <= mob.Health.MaxHealth * mob.RetreatHealthPercent)
             {
                 mob.ChangeState(AIStateType.Retreat);
@@ -222,7 +280,7 @@ namespace BattleOfAges.AI
             }
 
             float dist = Vector3.Distance(mob.transform.position, mob.CurrentCombatTarget.transform.position);
-            if (dist > mob.AggroRadius * 1.6f)
+            if (!mob.IsOnAssaultOrder && dist > mob.AggroRadius * 1.6f)
             {
                 // Lost target
                 mob.SetTarget(null);
@@ -247,12 +305,8 @@ namespace BattleOfAges.AI
     public class MobAttackState : IAIState
     {
         public AIStateType StateType => AIStateType.Attack;
-        private float strafeTimer = 0f;
 
-        public void Enter(AIBaseController controller)
-        {
-            strafeTimer = 0f;
-        }
+        public void Enter(AIBaseController controller) { }
 
         public void UpdateState(AIBaseController controller, float deltaTime)
         {
@@ -296,7 +350,6 @@ namespace BattleOfAges.AI
             else
             {
                 // Combat Strafe: Move laterally around target during attack cooldown
-                strafeTimer += deltaTime;
                 Vector3 strafePos = mob.GetFlankingDestination(mob.CurrentCombatTarget.transform.position, mob.AttackRange * 0.95f);
                 mob.SetMoveDestination(strafePos);
             }
@@ -308,12 +361,17 @@ namespace BattleOfAges.AI
     public class MobRetreatState : IAIState
     {
         public AIStateType StateType => AIStateType.Retreat;
+        private float healAccumulator;
 
         public void Enter(AIBaseController controller)
         {
             HostileMobAI mob = controller as HostileMobAI;
             if (mob == null) return;
+
+            // Drop the old target so allies can recruit this mob again once it has recovered.
+            mob.SetTarget(null);
             mob.SetMoveDestination(mob.GuardOrigin);
+            healAccumulator = 0f;
         }
 
         public void UpdateState(AIBaseController controller, float deltaTime)
@@ -324,7 +382,14 @@ namespace BattleOfAges.AI
             float distToCamp = Vector3.Distance(mob.transform.position, mob.GuardOrigin);
             if (distToCamp <= 4.0f)
             {
-                mob.Health.Heal(Mathf.CeilToInt(12 * deltaTime));
+                // Accumulate fractional healing so the rate does not depend on the AI tick interval.
+                healAccumulator += mob.RetreatHealPerSecond * deltaTime;
+                int wholeHeal = Mathf.FloorToInt(healAccumulator);
+                if (wholeHeal > 0)
+                {
+                    healAccumulator -= wholeHeal;
+                    mob.Health.Heal(wholeHeal);
+                }
                 if (mob.Health.CurrentHealth >= mob.Health.MaxHealth * 0.80f)
                 {
                     mob.ChangeState(AIStateType.Wander);
