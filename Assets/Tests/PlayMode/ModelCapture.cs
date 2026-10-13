@@ -70,6 +70,7 @@ namespace BattleOfAges.PlayModeTests
                 k.GetComponentInChildren<FootIK>().IKEnabled = i == 1;
                 slopeKnights.Add(k);
             }
+            FootIK.LodViewerOverride = slopeKnights[1].transform; // the slope view checks foot IK; keep it solving there
             List<GameObject> villagerAttackers = Row(HumanoidModelBuilder.HumanType.Villager, villagerAttack, Vector3.back);
             List<GameObject> dying = Row(HumanoidModelBuilder.HumanType.Bandit, death, Vector3.back);
 
@@ -167,6 +168,7 @@ namespace BattleOfAges.PlayModeTests
                 capture.Shoot(i - from, views[i].Item1, pos, target);
                 yield return null;
             }
+            FootIK.LodViewerOverride = null;
             capture.Finish();
         }
 

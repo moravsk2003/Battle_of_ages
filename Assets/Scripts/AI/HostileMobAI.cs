@@ -26,7 +26,7 @@ namespace BattleOfAges.AI
         [SerializeField] private float retreatHealPerSecond = 12.0f;
 
         private const float AllyAlertRadius = 22.0f;
-        private static readonly Collider[] overlapBuffer = new Collider[64];
+        private static readonly int[] gridBuffer = new int[64];
 
         private Vector3 guardOrigin;
         private bool guardOriginLocked;
@@ -132,10 +132,10 @@ namespace BattleOfAges.AI
 
         public void AlertNearbyAllies(HealthComponent target)
         {
-            int count = Physics.OverlapSphereNonAlloc(transform.position, AllyAlertRadius, overlapBuffer);
+            int count = UnitSpatialGrid.Query(transform.position, AllyAlertRadius, UnitSpatialGrid.TeamHostile, gridBuffer, GridId);
             for (int i = 0; i < count; i++)
             {
-                HostileMobAI allyMob = overlapBuffer[i].GetComponentInParent<HostileMobAI>();
+                HostileMobAI allyMob = UnitSpatialGrid.Owner(gridBuffer[i]) as HostileMobAI;
                 if (allyMob == null || allyMob == this || allyMob.CurrentCombatTarget != null) continue;
                 if (!allyMob.Health.IsAlive || allyMob.CurrentStateType == AIStateType.Retreat) continue;
 
@@ -156,11 +156,11 @@ namespace BattleOfAges.AI
 
         public HealthComponent FindNearestTarget()
         {
-            // 1. High Priority: Vulnerable Player Villagers / Gatherers
-            RtsUnit nearestUnit = UnitRegistry.FindNearestUnit(transform.position, aggroRadius);
-            if (nearestUnit != null)
+            // 1. High Priority: Vulnerable Player Villagers / Gatherers / soldiers (spatial grid: constant cost per query)
+            int nearest = UnitSpatialGrid.FindNearest(transform.position, aggroRadius, UnitSpatialGrid.TeamPlayer);
+            if (nearest >= 0)
             {
-                HealthComponent unitHp = nearestUnit.GetComponent<HealthComponent>();
+                HealthComponent unitHp = UnitSpatialGrid.Health(nearest);
                 if (unitHp != null && unitHp.IsAlive)
                 {
                     return unitHp;
@@ -179,17 +179,16 @@ namespace BattleOfAges.AI
             }
 
             // 3. Low Priority: Player Walls / Fortifications blocking path
-            int count = Physics.OverlapSphereNonAlloc(transform.position, aggroRadius * 0.75f, overlapBuffer);
-            for (int i = 0; i < count; i++)
+            float wallRange = aggroRadius * 0.75f;
+            var buildings = Building.BuildingNode.Active;
+            for (int i = 0; i < buildings.Count; i++)
             {
-                Building.BuildingNode bNode = overlapBuffer[i].GetComponentInParent<Building.BuildingNode>();
-                if (bNode != null)
+                Building.BuildingNode bNode = buildings[i];
+                if (bNode == null || (bNode.transform.position - transform.position).sqrMagnitude > wallRange * wallRange) continue;
+                HealthComponent bHp = bNode.GetComponent<HealthComponent>();
+                if (bHp != null && bHp.IsAlive)
                 {
-                    HealthComponent bHp = bNode.GetComponent<HealthComponent>();
-                    if (bHp != null && bHp.IsAlive)
-                    {
-                        return bHp;
-                    }
+                    return bHp;
                 }
             }
 

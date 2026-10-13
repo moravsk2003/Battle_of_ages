@@ -14,6 +14,7 @@ Shader "Custom/CharacterSurface"
         _DetailStrength ("Detail Strength", Range(0, 2)) = 1
         _ObjectSpace ("Use Object Space (primitives)", Float) = 0
         _UseVertexColor ("Multiply By Vertex Color", Float) = 0
+        _VertexSurface ("Per-Vertex Surface (colour, uv2 = pattern, metallic, smoothness)", Float) = 0
     }
 
     SubShader
@@ -25,7 +26,7 @@ Shader "Custom/CharacterSurface"
 
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseColor;
-            float _Metallic, _Smoothness, _Pattern, _PatternScale, _DetailStrength, _ObjectSpace, _UseVertexColor;
+            float _Metallic, _Smoothness, _Pattern, _PatternScale, _DetailStrength, _ObjectSpace, _UseVertexColor, _VertexSurface;
         CBUFFER_END
 
         float hash31(float3 p) { p = frac(p * 0.3183099 + 0.1); p *= 17.0; return frac(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -105,7 +106,7 @@ Shader "Custom/CharacterSurface"
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float3 uv3 : TEXCOORD3; float4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float3 uv2 : TEXCOORD2; float3 uv3 : TEXCOORD3; float4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
@@ -113,6 +114,7 @@ Shader "Custom/CharacterSurface"
                 float3 normalWS : TEXCOORD1;
                 float3 restPos : TEXCOORD2;
                 float fogFactor : TEXCOORD3;
+                float3 surface : TEXCOORD4; // pattern, metallic, smoothness
                 float4 color : COLOR;
             };
 
@@ -126,6 +128,7 @@ Shader "Custom/CharacterSurface"
                 o.restPos = RestPosition(input.uv3, input.positionOS.xyz);
                 o.fogFactor = ComputeFogFactor(o.positionCS.z);
                 o.color = input.color;
+                o.surface = _VertexSurface > 0.5 ? input.uv2 : float3(_Pattern, _Metallic, _Smoothness);
                 return o;
             }
 
@@ -133,13 +136,14 @@ Shader "Custom/CharacterSurface"
             {
                 float3 n = normalize(i.normalWS);
                 float detail = (1.0 - smoothstep(4.0, 25.0, distance(_WorldSpaceCameraPos.xyz, i.positionWS))) * _DetailStrength;
-                float4 pat = PatternSample(i.restPos, _Pattern);
+                float pattern = floor(i.surface.x + 0.5);
+                float4 pat = PatternSample(i.restPos, pattern);
 
                 // Micro relief: gradient of the pattern height (rest space ~ world orientation for upright characters)
                 float e = 0.0025;
-                float hx = PatternSample(i.restPos + float3(e, 0, 0), _Pattern).y;
-                float hy = PatternSample(i.restPos + float3(0, e, 0), _Pattern).y;
-                float hz = PatternSample(i.restPos + float3(0, 0, e), _Pattern).y;
+                float hx = PatternSample(i.restPos + float3(e, 0, 0), pattern).y;
+                float hy = PatternSample(i.restPos + float3(0, e, 0), pattern).y;
+                float hz = PatternSample(i.restPos + float3(0, 0, e), pattern).y;
                 float3 grad = float3(hx - pat.y, hy - pat.y, hz - pat.y) / e;
                 grad = TransformObjectToWorldDir(grad);
                 grad -= n * dot(grad, n);
@@ -157,10 +161,10 @@ Shader "Custom/CharacterSurface"
                 inputData.shadowMask = half4(1, 1, 1, 1);
 
                 SurfaceData s = (SurfaceData)0;
-                float3 tint = _UseVertexColor > 0.5 ? i.color.rgb : float3(1, 1, 1);
+                float3 tint = (_UseVertexColor > 0.5 || _VertexSurface > 0.5) ? i.color.rgb : float3(1, 1, 1);
                 s.albedo = _BaseColor.rgb * tint * lerp(1.0, pat.x, saturate(detail + 0.35));
-                s.metallic = _Metallic;
-                s.smoothness = saturate(_Smoothness * pat.z);
+                s.metallic = i.surface.y;
+                s.smoothness = saturate(i.surface.z * pat.z);
                 s.occlusion = pat.w;
                 s.alpha = 1.0;
                 s.normalTS = half3(0, 0, 1);
@@ -168,7 +172,7 @@ Shader "Custom/CharacterSurface"
                 half4 color = UniversalFragmentPBR(inputData, s);
 
                 // Skin: soft wrap light so faces are not harshly shadowed (cheap subsurface)
-                if (_Pattern < 0.5)
+                if (pattern < 0.5)
                 {
                     Light l = GetMainLight(inputData.shadowCoord);
                     float wrap = saturate((dot(n, l.direction) + 0.45) / 1.45) - saturate(dot(n, l.direction));

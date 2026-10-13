@@ -75,21 +75,37 @@ namespace BattleOfAges.AI
             }
         }
 
+        private int gridId = -1;
+        private float settleTimer;
+
+        /// <summary>Team in UnitSpatialGrid (raiders by default; animals are neutral).</summary>
+        protected virtual int GridTeam => UnitSpatialGrid.TeamHostile;
+        public int GridId => gridId;
+
         protected virtual void Awake()
         {
             characterController = GetComponent<CharacterController>();
             healthComponent = GetComponent<HealthComponent>();
             combatUnit = GetComponent<CombatUnit>();
+            UnitCorpse.AttachTo(gameObject);
             if (states.Count == 0) RegisterStates();
+        }
+
+        protected virtual void OnEnable()
+        {
+            if (gridId < 0) gridId = UnitSpatialGrid.Register(this, Health, GridTeam, CharacterCtrl != null ? CharacterCtrl.radius : 0.5f);
+        }
+
+        protected virtual void OnDisable()
+        {
+            UnitSpatialGrid.Unregister(gridId);
+            gridId = -1;
         }
 
         protected virtual void Start()
         {
-            // Spawners add the CharacterController and only then move the object into place. With
-            // Physics.autoSyncTransforms off, the first CharacterController.Move() would use the stale
-            // physics position and snap the unit back to where it was created (the world origin).
-            Physics.SyncTransforms();
-
+            // Movement is kinematic (GroundMotor), so there is no CharacterController.Move that could snap back to a stale
+            // physics position; the old per-unit Physics.SyncTransforms() made spawning 1000 units quadratic.
             FindPlayerViewer();
             if (states.Count == 0) RegisterStates();
         }
@@ -190,13 +206,14 @@ namespace BattleOfAges.AI
 
         protected virtual void ExecuteMovement()
         {
+            float radius = characterController != null ? characterController.radius : 0.5f;
             if (!hasDestination)
             {
                 ResetStuckDetection();
-                if (characterController != null && !characterController.isGrounded)
-                {
-                    characterController.Move(Vector3.down * 9.81f * Time.deltaTime);
-                }
+                // Idle: only get out of the way of overlapping neighbours; re-seat on the ground a few times a second.
+                GroundMotor.Move(transform, gridId, Vector3.zero, radius, Time.deltaTime);
+                settleTimer -= Time.deltaTime;
+                if (settleTimer <= 0f) { settleTimer = 0.3f; GroundMotor.Settle(transform); }
                 return;
             }
 
@@ -221,13 +238,7 @@ namespace BattleOfAges.AI
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
                 }
 
-                Vector3 velocity = moveDir * moveSpeed;
-                velocity.y = -9.81f;
-
-                if (characterController != null)
-                {
-                    characterController.Move(velocity * Time.deltaTime);
-                }
+                GroundMotor.Move(transform, gridId, moveDir * moveSpeed, radius, Time.deltaTime);
             }
             else
             {

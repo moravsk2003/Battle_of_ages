@@ -24,6 +24,7 @@ namespace BattleOfAges.Utils
         private float attackTimer;      // seconds left in the upper-body swing
         private float attackLength = 0.9f;
         private float upperWeight;
+        private float sentSpeed = -1f;
         private const int UpperBodyLayer = 1;
 
         /// <summary>When set (e.g. for screenshots), overrides the measured speed.</summary>
@@ -70,15 +71,16 @@ namespace BattleOfAges.Utils
             if (measured > 30f) measured = 0f; // teleports / respawns are not movement
 
             smoothedSpeed = Mathf.Lerp(smoothedSpeed, measured, 1f - Mathf.Exp(-10f * dt));
-            animator.SetFloat(SpeedId, SpeedOverride ?? smoothedSpeed);
+            float speed = SpeedOverride ?? smoothedSpeed;
+            if (Mathf.Abs(speed - sentSpeed) > 0.02f || (speed == 0f && sentSpeed != 0f)) { animator.SetFloat(SpeedId, speed); sentSpeed = speed; } // 1000 units: only on change
 
             // Upper-body swing layer: quick blend in, hold for the clip, blend out over the follow-through.
             if (animator.layerCount > UpperBodyLayer)
             {
                 attackTimer -= dt;
                 float target = attackTimer > 0.18f ? 1f : 0f;
-                upperWeight = Mathf.MoveTowards(upperWeight, target, dt * (target > upperWeight ? 12f : 5f));
-                animator.SetLayerWeight(UpperBodyLayer, upperWeight);
+                float weight = Mathf.MoveTowards(upperWeight, target, dt * (target > upperWeight ? 12f : 5f));
+                if (weight != upperWeight) { upperWeight = weight; animator.SetLayerWeight(UpperBodyLayer, upperWeight); }
             }
         }
 

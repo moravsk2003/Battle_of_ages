@@ -38,7 +38,7 @@ namespace BattleOfAges.Combat
             OnTakeDamage?.Invoke(damage);
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
 
-            Debug.Log($"[Combat] {gameObject.name} отримав {damage} урону. Залишилось ХП: {currentHealth}/{maxHealth}");
+            // (No per-hit Debug.Log: in a 100 vs 100 battle hundreds of hits per second each cost a stack trace.)
 
             if (currentHealth <= 0)
             {

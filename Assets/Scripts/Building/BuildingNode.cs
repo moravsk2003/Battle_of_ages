@@ -19,6 +19,14 @@ namespace BattleOfAges.Building
 
         public BuildingType Type => buildingType;
 
+        private static readonly System.Collections.Generic.List<BuildingNode> active = new System.Collections.Generic.List<BuildingNode>();
+
+        /// <summary>Placed buildings (raiders look for walls to attack here instead of physics overlap queries).</summary>
+        public static System.Collections.Generic.IReadOnlyList<BuildingNode> Active => active;
+
+        private void OnEnable() { if (!active.Contains(this)) active.Add(this); }
+        private void OnDisable() => active.Remove(this);
+
         private void Awake()
         {
             Combat.HealthComponent hp = GetComponent<Combat.HealthComponent>();

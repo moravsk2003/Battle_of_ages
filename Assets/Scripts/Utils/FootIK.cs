@@ -22,6 +22,15 @@ namespace BattleOfAges.Utils
         private bool hasWritten;
         private static readonly RaycastHit[] Hits = new RaycastHit[8];
 
+        // LOD: feet are only solved for characters on screen and near the camera (2 raycasts per frame each).
+        private const float IKDistance = 30f;
+        private Renderer bodyRenderer;
+        private float lodTimer;
+        private bool lodActive = true;
+
+        /// <summary>Viewer for the distance LOD instead of Camera.main (preview / capture cameras).</summary>
+        public static Transform LodViewerOverride;
+
         /// <summary>When false (e.g. for comparisons), feet keep the raw animation pose.</summary>
         public bool IKEnabled = true;
 
@@ -30,11 +39,23 @@ namespace BattleOfAges.Utils
             hips = Find("Hips");
             upperL = Find("UpperLeg.L"); lowerL = Find("LowerLeg.L"); footL = Find("Foot.L");
             upperR = Find("UpperLeg.R"); lowerR = Find("LowerLeg.R"); footR = Find("Foot.R");
+            bodyRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
+            lodTimer = Random.value * 0.5f;
         }
 
         private void LateUpdate()
         {
             if (!IKEnabled || hips == null || footL == null || footR == null) return;
+            lodTimer -= Time.deltaTime;
+            if (lodTimer <= 0f)
+            {
+                lodTimer = 0.5f;
+                Transform viewer = LodViewerOverride != null ? LodViewerOverride : (Camera.main != null ? Camera.main.transform : null);
+                lodActive = (LodViewerOverride != null || bodyRenderer == null || bodyRenderer.isVisible) &&
+                            (viewer == null || (viewer.position - transform.position).sqrMagnitude < IKDistance * IKDistance);
+                if (!lodActive) { offsetL = offsetR = hipOffset = 0f; hasWritten = false; }
+            }
+            if (!lodActive) return;
             if (owner == null)
             {
                 CharacterController cc = GetComponentInParent<CharacterController>();

@@ -61,6 +61,7 @@ namespace BattleOfAges.Utils
                 smr.updateWhenOffscreen = false;
             }
 
+            if (!BakeCharacter(root, model.transform)) MergeAttachments(root, model.transform);
             model.AddComponent<FootIK>();
             root.AddComponent<CharacterAnimationDriver>();
             return root;
@@ -510,6 +511,262 @@ namespace BattleOfAges.Utils
             Collider c = p.GetComponent<Collider>();
             if (Application.isPlaying) Object.Destroy(c); else Object.DestroyImmediate(c);
             return p;
+        }
+
+        private static readonly Dictionary<string, (Mesh mesh, Material[] materials)> MergedGear = new Dictionary<string, (Mesh, Material[])>();
+        private static readonly System.Text.StringBuilder GearKey = new System.Text.StringBuilder(512);
+
+        /// <summary>
+        /// Draw-call budget for big battles: all rigid attachments (weapon, shield, helmet, outfit, brows / beard) that
+        /// hang from the same bone are merged into one mesh with one submesh per material, cached and shared by every
+        /// character with the same gear (~13 renderers per character become ~5). A LODGroup then shows the full gear up
+        /// close, only the body at a distance (~40 px tall) and nothing for tiny specks; gear casts no shadows.
+        /// </summary>
+        private static void MergeAttachments(GameObject root, Transform model)
+        {
+            var byParent = new Dictionary<Transform, List<MeshRenderer>>();
+            foreach (MeshRenderer mr in model.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                MeshFilter mf = mr.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null || mr.transform.childCount > 0) continue;
+                Transform parent = mr.transform.parent;
+                if (!byParent.TryGetValue(parent, out List<MeshRenderer> list)) byParent[parent] = list = new List<MeshRenderer>();
+                list.Add(mr);
+            }
+
+            var gearRenderers = new List<Renderer>();
+            foreach (var pair in byParent)
+            {
+                Transform parent = pair.Key;
+                List<MeshRenderer> parts = pair.Value;
+                Matrix4x4 toParent = parent.worldToLocalMatrix;
+
+                GearKey.Clear();
+                GearKey.Append(parent.name);
+                foreach (MeshRenderer mr in parts)
+                {
+                    Matrix4x4 m = toParent * mr.transform.localToWorldMatrix;
+                    GearKey.Append('|').Append(mr.GetComponent<MeshFilter>().sharedMesh.GetInstanceID()).Append(':').Append(mr.sharedMaterial != null ? mr.sharedMaterial.GetInstanceID() : 0);
+                    for (int i = 0; i < 12; i++) GearKey.Append(',').Append(Mathf.RoundToInt(m[i] * 1000f));
+                }
+                string key = GearKey.ToString();
+
+                if (!MergedGear.TryGetValue(key, out var merged) || merged.mesh == null)
+                {
+                    var materials = new List<Material>();
+                    var perMaterial = new List<List<CombineInstance>>();
+                    foreach (MeshRenderer mr in parts)
+                    {
+                        int mi = materials.IndexOf(mr.sharedMaterial);
+                        if (mi < 0) { mi = materials.Count; materials.Add(mr.sharedMaterial); perMaterial.Add(new List<CombineInstance>()); }
+                        perMaterial[mi].Add(new CombineInstance { mesh = mr.GetComponent<MeshFilter>().sharedMesh, transform = toParent * mr.transform.localToWorldMatrix });
+                    }
+                    var subMeshes = new CombineInstance[materials.Count];
+                    for (int i = 0; i < materials.Count; i++)
+                    {
+                        var sub = new Mesh();
+                        sub.CombineMeshes(perMaterial[i].ToArray(), true, true);
+                        subMeshes[i] = new CombineInstance { mesh = sub, transform = Matrix4x4.identity };
+                    }
+                    Mesh mesh = new Mesh { name = "Gear_" + parent.name };
+                    mesh.CombineMeshes(subMeshes, false, false);
+                    mesh.RecalculateBounds();
+                    foreach (CombineInstance c in subMeshes) { if (Application.isPlaying) Object.Destroy(c.mesh); else Object.DestroyImmediate(c.mesh); }
+                    merged = (mesh, materials.ToArray());
+                    MergedGear[key] = merged;
+                }
+
+                GameObject gear = new GameObject("Gear");
+                gear.transform.SetParent(parent, false);
+                gear.AddComponent<MeshFilter>().sharedMesh = merged.mesh;
+                MeshRenderer renderer = gear.AddComponent<MeshRenderer>();
+                renderer.sharedMaterials = merged.materials;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                gearRenderers.Add(renderer);
+
+                foreach (MeshRenderer mr in parts)
+                {
+                    mr.enabled = false;
+                    if (Application.isPlaying) Object.Destroy(mr.gameObject); else Object.DestroyImmediate(mr.gameObject);
+                }
+            }
+
+            var body = new List<Renderer>(model.GetComponentsInChildren<SkinnedMeshRenderer>(true));
+            var all = new List<Renderer>(body);
+            all.AddRange(gearRenderers);
+            LODGroup lod = root.AddComponent<LODGroup>();
+            lod.SetLODs(new[]
+            {
+                new LOD(0.045f, all.ToArray()),   // full gear while taller than ~4.5% of the screen
+                new LOD(0.006f, body.ToArray()),  // body only for distant troops
+            });
+            lod.RecalculateBounds();
+        }
+
+        private static readonly Dictionary<string, Mesh> BakedCharacters = new Dictionary<string, Mesh>();
+        private static Material uberMaterial;
+
+        /// <summary>
+        /// Draw-call budget for 1000-unit battles: the whole character (body submeshes + every rigid attachment) becomes
+        /// ONE skinned mesh drawn with ONE shared material. Colour, surface pattern, metallic and smoothness of each part
+        /// move into the vertices (Custom/CharacterSurface _VertexSurface); attachments are skinned rigidly to their bone.
+        /// Meshes are cached per body + gear + materials, so identically equipped soldiers share one mesh.
+        /// Returns false (nothing changed) when the body mesh is not readable.
+        /// </summary>
+        private static bool BakeCharacter(GameObject root, Transform model)
+        {
+            SkinnedMeshRenderer body = model.GetComponentInChildren<SkinnedMeshRenderer>(true);
+            if (body == null || body.sharedMesh == null || !body.sharedMesh.isReadable) return false;
+            Shader shader = Shader.Find("Custom/CharacterSurface");
+            if (shader == null) return false;
+
+            Mesh src = body.sharedMesh;
+            Transform[] bones = body.bones;
+            Matrix4x4[] bindposes = src.bindposes;
+            Material[] bodyMats = body.sharedMaterials;
+            var parts = new List<MeshRenderer>();
+            foreach (MeshRenderer mr in model.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                MeshFilter mf = mr.GetComponent<MeshFilter>();
+                if (mf != null && mf.sharedMesh != null && mf.sharedMesh.isReadable) parts.Add(mr);
+            }
+
+            // Each part rides on its nearest ancestor bone
+            var partBone = new int[parts.Count];
+            var partToBone = new Matrix4x4[parts.Count];
+            for (int i = 0; i < parts.Count; i++)
+            {
+                int b = -1;
+                for (Transform t = parts[i].transform.parent; t != null && b < 0; t = t.parent) b = System.Array.IndexOf(bones, t);
+                partBone[i] = Mathf.Max(b, 0);
+                partToBone[i] = bones[partBone[i]].worldToLocalMatrix * parts[i].transform.localToWorldMatrix;
+            }
+
+            GearKey.Clear();
+            GearKey.Append(src.GetInstanceID());
+            foreach (Material m in bodyMats) GearKey.Append('/').Append(m != null ? m.GetInstanceID() : 0);
+            for (int i = 0; i < parts.Count; i++)
+            {
+                GearKey.Append('|').Append(partBone[i]).Append(':').Append(parts[i].GetComponent<MeshFilter>().sharedMesh.GetInstanceID())
+                       .Append(':').Append(parts[i].sharedMaterial != null ? parts[i].sharedMaterial.GetInstanceID() : 0);
+                for (int k = 0; k < 12; k++) GearKey.Append(',').Append(Mathf.RoundToInt(partToBone[i][k] * 1000f));
+            }
+            string key = GearKey.ToString();
+
+            if (!BakedCharacters.TryGetValue(key, out Mesh mesh) || mesh == null)
+            {
+                bool linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
+                var verts = new List<Vector3>(); var normals = new List<Vector3>(); var colors = new List<Color>();
+                var surface = new List<Vector3>(); var rest = new List<Vector3>(); var weights = new List<BoneWeight>(); var tris = new List<int>();
+
+                // Body: same vertices and weights, per-submesh surface
+                src.GetVertices(verts); src.GetNormals(normals);
+                var srcRest = new List<Vector3>(); src.GetUVs(3, srcRest);
+                if (srcRest.Count != verts.Count) srcRest = new List<Vector3>(verts);
+                rest.AddRange(srcRest);
+                weights.AddRange(src.boneWeights);
+                var vColor = new Color[verts.Count]; var vSurf = new Vector3[verts.Count];
+                for (int s = 0; s < src.subMeshCount; s++)
+                {
+                    SurfaceOf(s < bodyMats.Length ? bodyMats[s] : null, out Color c, out Vector3 surf, out float scale);
+                    int[] sub = src.GetTriangles(s);
+                    foreach (int v in sub) { vColor[v] = linear ? c.linear : c; vSurf[v] = surf; }
+                    tris.AddRange(sub);
+                }
+                colors.AddRange(vColor); surface.AddRange(vSurf);
+
+                // Attachments: into mesh space through the bone's bind pose, rigidly weighted to that bone
+                Matrix4x4 restFrame = root.transform.worldToLocalMatrix; // rest positions in metres, like the body's
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    Mesh pm = parts[i].GetComponent<MeshFilter>().sharedMesh;
+                    Matrix4x4 toMesh = bindposes[partBone[i]].inverse * partToBone[i];
+                    Matrix4x4 toMeshN = toMesh.inverse.transpose;
+                    Matrix4x4 toRest = restFrame * parts[i].transform.localToWorldMatrix;
+                    SurfaceOf(parts[i].sharedMaterial, out Color c, out Vector3 surf, out float scale);
+                    if (linear) c = c.linear;
+                    int baseIndex = verts.Count;
+                    Vector3[] pv = pm.vertices, pn = pm.normals;
+                    for (int v = 0; v < pv.Length; v++)
+                    {
+                        verts.Add(toMesh.MultiplyPoint3x4(pv[v]));
+                        normals.Add(pn.Length == pv.Length ? toMeshN.MultiplyVector(pn[v]).normalized : Vector3.up);
+                        colors.Add(c); surface.Add(surf);
+                        rest.Add(toRest.MultiplyPoint3x4(pv[v]) * scale);
+                        weights.Add(new BoneWeight { boneIndex0 = partBone[i], weight0 = 1f });
+                    }
+                    bool flip = toMesh.determinant < 0f; // mirrored parts keep their faces outward
+                    for (int s = 0; s < pm.subMeshCount; s++)
+                    {
+                        int[] pt = pm.GetTriangles(s);
+                        for (int t = 0; t < pt.Length; t += 3)
+                        {
+                            tris.Add(baseIndex + pt[t]);
+                            tris.Add(baseIndex + (flip ? pt[t + 2] : pt[t + 1]));
+                            tris.Add(baseIndex + (flip ? pt[t + 1] : pt[t + 2]));
+                        }
+                    }
+                }
+
+                mesh = new Mesh { name = "Character_" + src.name, indexFormat = verts.Count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16 };
+                mesh.SetVertices(verts); mesh.SetNormals(normals); mesh.SetColors(colors);
+                mesh.SetUVs(2, surface); mesh.SetUVs(3, rest);
+                mesh.SetTriangles(tris, 0);
+                mesh.boneWeights = weights.ToArray();
+                mesh.bindposes = bindposes;
+                mesh.RecalculateBounds();
+                BakedCharacters[key] = mesh;
+            }
+
+            if (uberMaterial == null)
+            {
+                uberMaterial = new Material(shader) { name = "MAT_CharacterBaked", enableInstancing = true };
+                uberMaterial.SetColor("_BaseColor", Color.white);
+                uberMaterial.SetFloat("_VertexSurface", 1f);
+                uberMaterial.SetFloat("_ObjectSpace", 0f);
+            }
+
+            Bounds bounds = body.localBounds;
+            bounds.Expand(0.6f); // weapon / shield reach beyond the body
+            body.sharedMesh = mesh;
+            body.sharedMaterials = new[] { uberMaterial };
+            body.localBounds = bounds;
+            body.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+
+            foreach (MeshRenderer mr in parts)
+            {
+                mr.enabled = false;
+                if (Application.isPlaying) Object.Destroy(mr.gameObject); else Object.DestroyImmediate(mr.gameObject);
+            }
+
+            LODGroup lod = root.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(0.006f, new Renderer[] { body }) }); // culled when a speck on screen
+            lod.RecalculateBounds();
+            return true;
+        }
+
+        /// <summary>Colour + (pattern, metallic, smoothness) of a part's material; pattern scale for its rest coordinates.</summary>
+        private static void SurfaceOf(Material m, out Color color, out Vector3 surface, out float patternScale)
+        {
+            color = Color.gray; surface = new Vector3(1f, 0f, 0.3f); patternScale = 1f;
+            if (m == null) return;
+            if (m.HasProperty("_BaseColor")) color = m.GetColor("_BaseColor");
+            float metallic = m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0f;
+            float smoothness = m.HasProperty("_Smoothness") ? m.GetFloat("_Smoothness") : 0.3f;
+            float pattern;
+            if (m.HasProperty("_Pattern") && m.shader != null && m.shader.name == "Custom/CharacterSurface")
+            {
+                pattern = m.GetFloat("_Pattern");
+                if (m.HasProperty("_PatternScale")) patternScale = m.GetFloat("_PatternScale");
+            }
+            else
+            {
+                // ProceduralVisualMaterials ("MAT_<Surface>_...") on URP Lit: nearest procedural pattern
+                string n = m.name;
+                pattern = n.StartsWith("MAT_Gold") || n.StartsWith("MAT_Metal") ? 3f
+                        : n.StartsWith("MAT_Leather") || n.StartsWith("MAT_Wood") ? 2f : 1f;
+            }
+            surface = new Vector3(pattern, metallic, smoothness);
         }
 
         private static Transform FindDeep(Transform root, string name)

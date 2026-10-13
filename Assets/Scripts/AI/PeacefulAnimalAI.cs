@@ -53,6 +53,8 @@ namespace BattleOfAges.AI
         public Vector3 SpawnOrigin => spawnOrigin;
         public Transform DetectedThreat => detectedThreat;
 
+        protected override int GridTeam => UnitSpatialGrid.TeamNeutral;
+
         protected override void Awake()
         {
             spawnOrigin = transform.position;
