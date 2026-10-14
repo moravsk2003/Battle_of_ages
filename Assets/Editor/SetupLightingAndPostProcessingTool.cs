@@ -47,7 +47,7 @@ namespace BattleOfAges.EditorTools
             // 2. Setup Environment Ambient & Fog
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.58f, 0.74f, 0.94f) * 0.9f;   // Sky blue
-            RenderSettings.ambientEquatorColor = new Color(0.48f, 0.62f, 0.38f) * 0.85f; // Steppe foliage bounce
+            RenderSettings.ambientEquatorColor = new Color(0.54f, 0.565f, 0.52f) * 0.85f; // Horizon: a hint of steppe bounce (saturated green tinted shaded walls)
             RenderSettings.ambientGroundColor = new Color(0.28f, 0.24f, 0.16f) * 0.8f;  // Warm earth bounce
             RenderSettings.ambientIntensity = 1.0f;
 
