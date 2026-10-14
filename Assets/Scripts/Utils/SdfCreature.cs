@@ -90,6 +90,7 @@ namespace BattleOfAges.Utils
         private readonly List<Rigid> rigids = new List<Rigid>();
 
         private float inflate; // set per build: distant meshes are slightly inflated
+        private bool cutCarves = true; // set per build: distant meshes keep the carve colours but not the cuts
         private List<Vector3> bodySurfaces; // per body vertex, when any shape carries a surface
 
         /// <summary>
@@ -100,7 +101,7 @@ namespace BattleOfAges.Utils
 
         public PaintFunc Paint;
         public float AmbientOcclusion = 0.5f;
-        /// <summary>Reach of the baked occlusion (1 = animal scale, up to ~11 cm; smaller for hand-sized props). Static builds only.</summary>
+        /// <summary>Reach of the baked occlusion (1 = deer / boar scale, up to ~11 cm; smaller for small animals and hand-sized props).</summary>
         public float OcclusionScale = 1f;
         public float SkinSigma = 0.05f;
 
@@ -187,7 +188,7 @@ namespace BattleOfAges.Utils
         public SkinnedMeshRenderer Apply(string speciesKey, float cellSize) => CreateRenderer("Skin", GetMesh(speciesKey, cellSize, true));
 
         /// <summary>
-        /// As Apply, plus a distant mesh (cell lodCellSize; no hair or eyes, slightly inflated so thin legs survive the
+        /// As Apply, plus a distant mesh (cell lodCellSize; no hair or carved cuts, slightly inflated so thin legs survive the
         /// coarse grid) and a LODGroup on the visual root: full mesh above lodScreenHeight, culled below cullScreenHeight.
         /// Returns both renderers (full, distant).
         /// </summary>
@@ -281,7 +282,8 @@ namespace BattleOfAges.Utils
             void V(Vector3 v) { F(v.x); F(v.y); F(v.z); }
             void C(Color c) { F(c.r); F(c.g); F(c.b); F(c.a); }
             F(AlgorithmVersion); F(h); F(AmbientOcclusion); F(SkinSigma);
-            if (!detail) { F(3); F(LodInflate); } // only for distant meshes: full meshes keep their signature
+            if (!detail) { F(3); F(LodInflate); F(6); } // only for distant meshes (inflated, carves not cut, eyes kept): full meshes keep their signature
+            if (OcclusionScale != 1f) { F(4); F(OcclusionScale); } // only when used: older species keep their signature
             foreach (List<Shape> list in new[] { unions, carves })
             {
                 foreach (Shape s in list)
@@ -337,6 +339,7 @@ namespace BattleOfAges.Utils
         {
             var timer = System.Diagnostics.Stopwatch.StartNew();
             inflate = detail ? 0f : h * LodInflate;
+            cutCarves = detail; // sockets, nostrils and ear cups would punch holes through the coarse grid
 
             // ---- grid over the shapes (narrow band: blocks far from the surface are filled without evaluation)
             Bounds bounds = new Bounds(unions[0].BC, Vector3.zero);
@@ -441,7 +444,6 @@ namespace BattleOfAges.Utils
             foreach (Rigid r in rigids)
             {
                 var w = new BoneWeight { boneIndex0 = r.Bone, weight0 = 1f };
-                if (r.Sphere && !detail) continue; // eyes are not seen from afar
                 if (r.Sphere) AddSphere(r.Points[0], r.Radii[0], r.Color, w, verts, normals, colors, weights, glossTris);
                 else if (r.Matte) AddTube(r.Points, r.Radii, r.Color, r.TipColor, w, verts, normals, colors, weights, matteTris);
                 else AddTube(r.Points, r.Radii, r.Color, r.Color * 0.8f, w, verts, normals, colors, weights, glossTris);
@@ -482,7 +484,7 @@ namespace BattleOfAges.Utils
                 if ((p - s.BC).magnitude - s.BR > d + s.K) continue;
                 d = SmoothMin(d, Distance(s, p), s.K);
             }
-            for (int i = 0; i < carves.Count; i++)
+            for (int i = 0; i < (cutCarves ? carves.Count : 0); i++)
             {
                 Shape s = carves[i];
                 if ((p - s.BC).magnitude - s.BR > s.K - d) continue;

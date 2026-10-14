@@ -232,13 +232,13 @@ namespace BattleOfAges.AI
                 // Grazing when standing: the head goes down for a while, then up to look around
                 float grazeCycle = grazeOverride >= 0f ? grazeOverride
                     : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(Mathf.Sin(grazeTimer * 0.45f + GetInstanceID() * 0.37f) * 1.6f));
-                float grazeAngle = (animalType == AnimalType.Deer ? 85f : (animalType == AnimalType.Boar ? 22f : 18f)) * grazeCycle;
+                float grazeAngle = (animalType == AnimalType.Deer ? 85f : (animalType == AnimalType.Boar ? 22f : 30f)) * grazeCycle;
                 float walkNod = Mathf.Sin(2f * phase) * 4f;
                 float sniff = animalType == AnimalType.Boar ? Mathf.Sin(Time.time * 11f) * Mathf.Max(0f, Mathf.Sin(Time.time * 0.7f + GetInstanceID())) * 2.5f * (1f - move) : 0f;
                 neckPivot.localRotation = neckRest * Quaternion.Euler(Mathf.Lerp(grazeAngle + sniff, walkNod, move), 0f, 0f);
-                // The deer's long neck alone does not bring the muzzle to the grass: the head tips down as well
-                if (animalType == AnimalType.Deer && headTransform != null)
-                    headTransform.localRotation = headRest * Quaternion.Euler(22f * grazeCycle * (1f - move), 0f, 0f);
+                // The neck alone does not bring the muzzle to the grass: the head tips down as well (deer, hare)
+                if (animalType != AnimalType.Boar && headTransform != null)
+                    headTransform.localRotation = headRest * Quaternion.Euler((animalType == AnimalType.Deer ? 22f : 26f) * grazeCycle * (1f - move), 0f, 0f);
             }
 
             if (tailPivot != null)
