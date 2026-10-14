@@ -26,6 +26,8 @@ namespace BattleOfAges.Utils
             public Color Color;
             public bool HasColor;
             public float Paintable;
+            public Vector3 Surface; // (pattern, metallic, smoothness) for static props, see SurfaceBrush
+            public bool HasSurface;
             public int Bone;
             public Vector3 BC;
             public float BR;
@@ -88,9 +90,18 @@ namespace BattleOfAges.Utils
         private readonly List<Rigid> rigids = new List<Rigid>();
 
         private float inflate; // set per build: distant meshes are slightly inflated
+        private List<Vector3> bodySurfaces; // per body vertex, when any shape carries a surface
+
+        /// <summary>
+        /// Surface (CharacterSurface pattern, metallic, smoothness) given to the shapes declared from now on; blended
+        /// between shapes like their colours and returned by BuildStatic (props: one material, surface per vertex).
+        /// </summary>
+        public Vector3? SurfaceBrush;
 
         public PaintFunc Paint;
         public float AmbientOcclusion = 0.5f;
+        /// <summary>Reach of the baked occlusion (1 = animal scale, up to ~11 cm; smaller for hand-sized props). Static builds only.</summary>
+        public float OcclusionScale = 1f;
         public float SkinSigma = 0.05f;
 
         public SdfCreature(Transform visualRoot)
@@ -242,6 +253,24 @@ namespace BattleOfAges.Utils
         public static void ClearCache() => Cache.Clear();
 
         /// <summary>
+        /// Sculpts the declared shapes into plain static geometry (body only: no hair, rigid parts, skinning or cache)
+        /// for props, appended to the lists in visual-root space. Colours come out linear when the project is;
+        /// surfaces are the blended SurfaceBrush values (pattern, metallic, smoothness).
+        /// </summary>
+        public void BuildStatic(float cellSize, List<Vector3> verts, List<Vector3> normals, List<Color> colors, List<Vector3> surfaces, List<int> tris)
+        {
+            bodySurfaces = new List<Vector3>();
+            Mesh mesh = Build(cellSize, true).Mesh;
+            int start = verts.Count, count = bodySurfaces.Count;
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var c = new List<Color>();
+            mesh.GetVertices(v); mesh.GetNormals(n); mesh.GetColors(c);
+            for (int i = 0; i < count; i++) { verts.Add(v[i]); normals.Add(n[i]); colors.Add(c[i]); surfaces.Add(bodySurfaces[i]); }
+            foreach (int i in mesh.GetTriangles(0)) tris.Add(start + i);
+            bodySurfaces = null;
+            if (Application.isPlaying) UnityEngine.Object.Destroy(mesh); else UnityEngine.Object.DestroyImmediate(mesh);
+        }
+
+        /// <summary>
         /// Hash of everything that shapes the mesh: declarations, cell size and samples of the paint / density / length
         /// callbacks, so a baked mesh is never used after the species code changed.
         /// </summary>
@@ -384,8 +413,9 @@ namespace BattleOfAges.Utils
             {
                 Vector3 p = verts[i];
                 Vector3 nrm = Gradient(p, h * 0.5f).normalized;
-                Color c = ShapeColor(p, out float paint);
+                Color c = ShapeColor(p, out float paint, out Vector3 surface);
                 paintable[i] = paint;
+                bodySurfaces?.Add(surface);
                 if (Paint != null) c = Paint(p, nrm, c, paint);
                 float ao = Occlusion(p, nrm);
                 c *= Mathf.Lerp(1f - AmbientOcclusion, 1f, ao);
@@ -516,16 +546,17 @@ namespace BattleOfAges.Utils
             float occ = 0f, sca = 1f;
             for (int i = 0; i < 5; i++)
             {
-                float hr = 0.012f + 0.1f * i / 4f;
+                float hr = (0.012f + 0.1f * i / 4f) * OcclusionScale;
                 occ += (hr - Field(p + n * hr)) * sca;
                 sca *= 0.75f;
             }
-            return Mathf.Clamp01(1f - 3.2f * occ);
+            return Mathf.Clamp01(1f - 3.2f * occ / OcclusionScale);
         }
 
-        private Color ShapeColor(Vector3 p, out float paint)
+        private Color ShapeColor(Vector3 p, out float paint, out Vector3 surface)
         {
             Color col = Color.clear; float wSum = 0f, pSum = 0f;
+            Vector3 sSum = Vector3.zero; float sw = 0f;
             float dMin = float.MaxValue;
             var d = new float[unions.Count + carves.Count];
             for (int i = 0; i < unions.Count; i++) { d[i] = Distance(unions[i], p); dMin = Mathf.Min(dMin, d[i]); }
@@ -539,8 +570,10 @@ namespace BattleOfAges.Utils
                 col += s.Color * w;
                 pSum += s.Paintable * w;
                 wSum += w;
+                if (s.HasSurface) { sSum += s.Surface * w; sw += w; }
             }
             paint = pSum / wSum;
+            surface = sw > 0f ? sSum / sw : Vector3.zero;
             return col / wSum;
         }
 
@@ -731,6 +764,7 @@ namespace BattleOfAges.Utils
             var s = new Shape
             {
                 Ellipsoid = true, Carve = carve, R = radii, K = blend, Color = color, HasColor = color.a > 0f, Paintable = paintable,
+                Surface = SurfaceBrush ?? Vector3.zero, HasSurface = SurfaceBrush.HasValue,
                 Bone = BoneIndex(bone), BC = c, BR = Mathf.Max(radii.x, Mathf.Max(radii.y, radii.z)),
                 ToLocal = Matrix4x4.TRS(c, rot, Vector3.one).inverse
             };
@@ -746,6 +780,7 @@ namespace BattleOfAges.Utils
             var s = new Shape
             {
                 Ellipsoid = false, Carve = carve, K = blend, Color = color, HasColor = color.a > 0f, Paintable = paintable,
+                Surface = SurfaceBrush ?? Vector3.zero, HasSurface = SurfaceBrush.HasValue,
                 Bone = BoneIndex(bone), BC = mid, BR = Vector3.Distance(ar, br) * 0.5f + Mathf.Max(ra, rb),
                 ToLocal = toLocal, A = toLocal.MultiplyPoint3x4(ar), B = toLocal.MultiplyPoint3x4(br), RA = ra, RB = rb,
                 Fix = Mathf.Min(squash.x, Mathf.Min(squash.y, squash.z))

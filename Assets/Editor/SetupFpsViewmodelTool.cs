@@ -74,7 +74,8 @@ namespace BattleOfAges.EditorTools
                 Undo.DestroyObjectImmediate(viewmodelRoot.gameObject);
             }
 
-            GameObject arms = HumanoidModelBuilder.CreateViewmodelArms();
+            GameObject arms = HumanoidModelBuilder.CreateViewmodelArms("ViewmodelArms", LoadBakedArm);
+            SaveArmAssets(arms);
             arms.transform.SetParent(viewmodelCamera.transform, false);
             arms.AddComponent<FpsViewmodelAnimation>();
             viewmodelRoot = arms.transform;
@@ -98,6 +99,71 @@ namespace BattleOfAges.EditorTools
 
             Debug.Log("[Battle of Ages] FPS viewmodel camera configured. The local body is hidden from the main FPS camera.");
             return setup;
+        }
+
+        /// <summary>Batch mode entry (-executeMethod): opens SampleScene, rebuilds the arms and saves the scene.</summary>
+        public static void ConfigureInSampleScene()
+        {
+            EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity", OpenSceneMode.Single);
+            ConfigureFpsViewmodel();
+        }
+
+        // ------------------------------------------------------------------ baked arm meshes
+
+        // The sculpted fists take a moment to build, and the arms are rebuilt on every script reload: the meshes are
+        // kept as assets named after a hash of the code that shapes them, and only rebuilt when that code changes.
+        private const string ArmFolder = "Assets/Models/Viewmodel";
+        private static string signature;
+
+        private static string Signature()
+        {
+            if (signature != null) return signature;
+            var text = new System.Text.StringBuilder();
+            foreach (string script in new[] { "ViewmodelArmsBuilder", "SdfCreature" })
+                foreach (string guid in AssetDatabase.FindAssets(script + " t:MonoScript"))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (System.IO.Path.GetFileNameWithoutExtension(path) == script) text.Append(System.IO.File.ReadAllText(path).Replace("\r", ""));
+                }
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            {
+                byte[] hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(text.ToString()));
+                signature = System.BitConverter.ToString(hash, 0, 4).Replace("-", "").ToLowerInvariant();
+            }
+            return signature;
+        }
+
+        private static string ArmPath(string key) => $"{ArmFolder}/ViewmodelArm_{key}_{Signature()}.asset";
+
+        private static Mesh LoadBakedArm(string key) => AssetDatabase.LoadAssetAtPath<Mesh>(ArmPath(key));
+
+        private static void SaveArmAssets(GameObject arms)
+        {
+            System.IO.Directory.CreateDirectory(ArmFolder);
+            string matPath = ArmFolder + "/ViewmodelArms.mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            Material source = ViewmodelArmsBuilder.SharedMaterial();
+            if (mat == null)
+            {
+                mat = new Material(source);
+                AssetDatabase.CreateAsset(mat, matPath);
+            }
+            else
+            {
+                mat.shader = source.shader;
+                mat.CopyPropertiesFromMaterial(source); // keep the asset in step with the code
+                EditorUtility.SetDirty(mat);
+            }
+            foreach (MeshRenderer mr in arms.GetComponentsInChildren<MeshRenderer>()) mr.sharedMaterial = mat;
+
+            foreach (MeshFilter mf in arms.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null || AssetDatabase.Contains(mf.sharedMesh)) continue;
+                string key = mf.name == "RightArm" ? "Right" : "Left";
+                foreach (string old in System.IO.Directory.GetFiles(ArmFolder, $"ViewmodelArm_{key}_*.asset")) AssetDatabase.DeleteAsset(old.Replace('\\', '/'));
+                AssetDatabase.CreateAsset(mf.sharedMesh, ArmPath(key));
+            }
+            AssetDatabase.SaveAssets();
         }
     }
 }
