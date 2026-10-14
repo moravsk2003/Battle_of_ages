@@ -3,7 +3,7 @@ Shader "Custom/CharacterSurface"
     // Procedural surface detail for characters without textures. Patterns are evaluated in the mesh's rest pose
     // (vertex positions baked into UV3 in metres by CharacterModelSetupTool), so they stick to the skin while it
     // animates. Primitive attachments (no UV3) use object space instead (_ObjectSpace = 1).
-    // _Pattern: 0 skin, 1 woven cloth, 2 leather, 3 metal, 4 hair, 5 eyes, 6 fur, 7 chain mail.
+    // _Pattern: 0 skin, 1 woven cloth, 2 leather, 3 metal, 4 hair, 5 eyes, 6 fur, 7 chain mail, 8 plaster / stone.
     Properties
     {
         _BaseColor ("Base Color", Color) = (0.7, 0.7, 0.7, 1)
@@ -74,6 +74,12 @@ Shader "Custom/CharacterSurface"
                 return float4(lerp(0.7, 1.15, strands) * lerp(0.85, 1.05, clumps), strands, lerp(0.8, 1.4, strands), lerp(0.8, 1.0, clumps));
             }
             if (pattern < 5.5) return float4(1, 0, 1.6, 1); // eyes: glossy
+            if (pattern > 7.5) // plaster / stone: soft blotches, fine grit and pits, no directional lines
+            {
+                float grit = noise3D(p * 140.0 + 1.7);
+                float pits = smoothstep(0.78, 0.92, noise3D(p * 55.0 + 9.2));
+                return float4(lerp(0.88, 1.06, n1) * lerp(0.95, 1.04, n2) * lerp(0.94, 1.03, grit) * (1.0 - pits * 0.18), grit * 0.35 - pits * 0.6, lerp(0.8, 1.1, n2), 1.0 - pits * 0.25);
+            }
             if (pattern > 6.5) // chain mail: staggered rows of rings in the plane facing the (rest) normal
             {
                 float2 q = abs(nrm.x) > abs(nrm.z) ? p.zy : p.xy;

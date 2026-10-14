@@ -21,6 +21,80 @@ namespace BattleOfAges.Utils
             return l;
         }
 
+        /// <summary>Flat convex polygon (fan from the first point), facing away from inside; colour per vertex position.</summary>
+        public void Polygon(IList<Vector3> pts, Vector3 inside, Vector3 surface, Func<Vector3, Color> color)
+        {
+            Vector3 centroid = Vector3.zero;
+            foreach (Vector3 q in pts) centroid += q;
+            centroid /= pts.Count;
+            Vector3 n = Vector3.zero;
+            for (int i = 0; i < pts.Count; i++) n += Vector3.Cross(pts[i] - centroid, pts[(i + 1) % pts.Count] - centroid);
+            bool flip = Vector3.Dot(n, centroid - inside) < 0f;
+            n = (flip ? -n : n).normalized;
+            int start = V.Count;
+            foreach (Vector3 q in pts) { V.Add(q); N.Add(n); C.Add(Lin(color(q))); S.Add(surface); }
+            for (int i = 1; i < pts.Count - 1; i++) Tri(start, start + i, start + i + 1, flip);
+        }
+
+        /// <summary>
+        /// Flat-shaded box with chamfered edges and corners (beams, planks, stones) in the frame m, centred, of the given
+        /// size. jitter roughens it (stones: corner points moved by up to jitter, consistently, so it stays closed);
+        /// color(local point) per vertex.
+        /// </summary>
+        public void Box(Matrix4x4 m, Vector3 size, float chamfer, Vector3 surface, Func<Vector3, Color> color, float jitter = 0f, int seed = 0)
+        {
+            Vector3 h = size * 0.5f;
+            Matrix4x4 inv = m.inverse;
+            float c = Mathf.Min(chamfer, Mathf.Min(h.x, Mathf.Min(h.y, h.z)) * 0.9f);
+            Vector3 J(Vector3 p)
+            {
+                if (jitter <= 0f) return p;
+                Vector3 k = p * 7.3f + Vector3.one * (seed * 1.618f);
+                return p + new Vector3(SdfCreature.Noise(k) - 0.5f, SdfCreature.Noise(k + Vector3.one * 17.1f) - 0.5f, SdfCreature.Noise(k + Vector3.one * 31.7f) - 0.5f) * (2f * jitter);
+            }
+            // Point on the face of axis ax (sign s), the other two coordinates at their inset (chamfered) extent with signs b, d
+            Vector3 F(int ax, float s, float b, float d)
+            {
+                var p = new Vector3();
+                p[ax] = s * h[ax];
+                p[(ax + 1) % 3] = b * (h[(ax + 1) % 3] - c);
+                p[(ax + 2) % 3] = d * (h[(ax + 2) % 3] - c);
+                return p;
+            }
+            void Face(params Vector3[] local)
+            {
+                var w = new Vector3[local.Length];
+                for (int i = 0; i < local.Length; i++) w[i] = m.MultiplyPoint3x4(J(local[i]));
+                Polygon(w, m.MultiplyPoint3x4(Vector3.zero), surface, q => color(inv.MultiplyPoint3x4(q)));
+            }
+            float[] sg = { -1f, 1f };
+            for (int ax = 0; ax < 3; ax++)
+                foreach (float s in sg)
+                {
+                    Face(F(ax, s, -1, -1), F(ax, s, 1, -1), F(ax, s, 1, 1), F(ax, s, -1, 1));
+                    if (c <= 0f) continue;
+                    // Chamfer strip between this face and the next axis' faces
+                    int a2 = (ax + 1) % 3;
+                    foreach (float s2 in sg)
+                    {
+                        Vector3 P1(float d) => F(ax, s, s2, d);  // on face ax, toward a2
+                        Vector3 P2(float d)                    // on face a2, toward ax; third axis coordinate d
+                        {
+                            var p = new Vector3();
+                            p[a2] = s2 * h[a2];
+                            p[ax] = s * (h[ax] - c);
+                            int a3 = (ax + 2) % 3;
+                            p[a3] = d * (h[a3] - c);
+                            return p;
+                        }
+                        Face(P1(-1), P1(1), P2(1), P2(-1));
+                    }
+                }
+            if (c > 0f)
+                foreach (float sx in sg) foreach (float sy in sg) foreach (float sz in sg)
+                    Face(F(0, sx, sy, sz), F(1, sy, sz, sx), F(2, sz, sx, sy));
+        }
+
         /// <summary>Rows x columns of points (mesh space); wrap = columns form a closed ring; outward = hint for open sheets.</summary>
         public void Grid(Vector3[,] p, bool wrap, Vector3 surface, Func<int, int, Color> color, Vector3? outward = null, bool inward = false)
         {
@@ -95,6 +169,24 @@ namespace BattleOfAges.Utils
             }
             prof[4].x = 0f;
             Lathe(m, prof, 10, surface, (i, a) => color);
+        }
+
+        private static Material propMaterial;
+
+        /// <summary>
+        /// Shared material of static MeshKit props: colour and surface per vertex, patterns in object space (scaled), so
+        /// nothing stretches whatever the part's size. One material for every prop.
+        /// </summary>
+        public static Material PropMaterial()
+        {
+            if (propMaterial != null) return propMaterial;
+            Shader shader = Shader.Find("Custom/CharacterSurface");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+            propMaterial = new Material(shader) { name = "MAT_Prop", enableInstancing = true };
+            propMaterial.SetColor("_BaseColor", Color.white);
+            propMaterial.SetFloat("_VertexSurface", 1f);
+            propMaterial.SetFloat("_ObjectSpace", 1f);
+            return propMaterial;
         }
 
         public Mesh ToMesh(string name)
