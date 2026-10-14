@@ -144,7 +144,7 @@ namespace BattleOfAges.Utils
 
             // ---- surcoat over the torso: chest, waist, hips; split skirt cut flat at the hem (paintable = cross)
             sdf.SurfaceBrush = ClothS;
-            sdf.Ellipsoid(r.Torso, new Vector3(0f, 1.045f, back + 0.005f), new Vector3(0.195f, 0.165f, 0.132f), Vector3.zero, Surcoat, 0.04f);
+            sdf.Ellipsoid(r.Torso, new Vector3(0f, 1.065f, back + 0.005f), new Vector3(0.195f, 0.185f, 0.134f), Vector3.zero, Surcoat, 0.04f);
             sdf.Ellipsoid(r.Abdomen, new Vector3(0f, 0.875f, back + 0.003f), new Vector3(0.182f, 0.16f, 0.124f), Vector3.zero, Surcoat, 0.04f);
             sdf.Ellipsoid(r.Hips, new Vector3(0f, 0.70f, back), new Vector3(0.212f, 0.12f, 0.134f), Vector3.zero, Surcoat, 0.035f);
             sdf.ClipBelow = 0.335f;
@@ -163,7 +163,7 @@ namespace BattleOfAges.Utils
             sdf.SurfaceBrush = MailS;
             // Shoulder cape (tippet) over the top of the surcoat, and the aventail as a bell from it up into the helm rim:
             // the helm sits on a sloping mail collar instead of a neck
-            sdf.Ellipsoid(r.Torso, new Vector3(0f, 1.228f, back - 0.008f), new Vector3(0.24f, 0.088f, 0.152f), Vector3.zero, Mail, 0.03f, 0f);
+            sdf.Ellipsoid(r.Torso, new Vector3(0f, 1.228f, back - 0.008f), new Vector3(0.24f, 0.088f, 0.13f), Vector3.zero, Mail, 0.045f, 0f);
             sdf.Cone(r.Neck, new Vector3(0f, 1.25f, back - 0.005f), new Vector3(0f, 1.33f, -0.003f), 0.13f, 0.108f, Mail, 0.04f, new Vector3(1f, 1f, 0.88f), 0f);
             for (int s = 0; s < 2; s++)
             {
@@ -232,7 +232,7 @@ namespace BattleOfAges.Utils
                 return c * grime;
             }
             // Mail collar darkening up under the helm rim (the helm is hard-surface: the sculpt's occlusion misses it)
-            if (p.y > 1.2f && new Vector2(p.x, p.z + 0.01f).magnitude < 0.17f)
+            if (p.y > 1.2f && Sq(p.x / 0.125f) + Sq((p.z + 0.004f) / 0.136f) < 1f) // only inside the helm rim, not the mantle front
                 c *= Mathf.Lerp(1f, 0.45f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(1.23f, 1.3f, p.y)));
             // Sabaton lames: dark seams across the top of the foot
             if (p.y < 0.1f && n.y > 0.2f && Mathf.Repeat(p.z * 40f, 1f) < 0.12f && c.b > 0.6f) c *= 0.55f;
