@@ -28,6 +28,8 @@ namespace BattleOfAges.Utils
             public float Paintable;
             public Vector3 Surface; // (pattern, metallic, smoothness) for static props, see SurfaceBrush
             public bool HasSurface;
+            public float ClipY = float.NegativeInfinity; // visual-root height below which the shape is cut flat (see ClipBelow)
+            public int Group; // polygonized separately from other groups (see ShapeGroup)
             public int Bone;
             public Vector3 BC;
             public float BR;
@@ -88,6 +90,7 @@ namespace BattleOfAges.Utils
         private readonly List<Tuft> tufts = new List<Tuft>();
         private readonly List<Fuzz> fuzz = new List<Fuzz>();
         private readonly List<Rigid> rigids = new List<Rigid>();
+        private readonly List<(int bone, MeshKit near, MeshKit far)> kits = new List<(int, MeshKit, MeshKit)>();
 
         private float inflate; // set per build: distant meshes are slightly inflated
         private bool cutCarves = true; // set per build: distant meshes keep the carve colours but not the cuts
@@ -98,6 +101,27 @@ namespace BattleOfAges.Utils
         /// between shapes like their colours and returned by BuildStatic (props: one material, surface per vertex).
         /// </summary>
         public Vector3? SurfaceBrush;
+
+        /// <summary>Shapes declared from now on are cut flat below this visual-root height (hems); null = not cut.</summary>
+        public float? ClipBelow;
+
+        /// <summary>
+        /// Group of the shapes declared from now on. Groups are polygonized separately (no blend, no fusing where they
+        /// touch, occlusion from their own field): limbs that rest against the body in the bind pose.
+        /// </summary>
+        public int ShapeGroup;
+
+        /// <summary>
+        /// Declarations give positions and rotations in visual-root space; the bone only carries the skinning (rigs
+        /// whose bone frames are awkward, e.g. imported FBX skeletons with unit scale and odd axes).
+        /// </summary>
+        public bool RootSpaceCoordinates;
+
+        /// <summary>
+        /// One submesh drawn with one material whose surface (pattern, metallic, smoothness) comes per vertex (uv2,
+        /// from SurfaceBrush and the rigid parts) instead of the coat / hair / gloss submeshes.
+        /// </summary>
+        public bool VertexSurfaces;
 
         public PaintFunc Paint;
         public float AmbientOcclusion = 0.5f;
@@ -175,6 +199,15 @@ namespace BattleOfAges.Utils
             rigids.Add(new Rigid { Bone = BoneIndex(bone), Points = pts, Radii = radii, Color = baseColor, TipColor = tipColor, Matte = true });
         }
 
+        /// <summary>
+        /// Hard-surface part (visual-root space, colours already converted by MeshKit) rigidly skinned to a bone; the
+        /// distant mesh uses the far kit (fewer segments), or none.
+        /// </summary>
+        public void RigidMesh(Transform bone, MeshKit near, MeshKit far)
+        {
+            kits.Add((BoneIndex(bone), near, far));
+        }
+
         // ------------------------------------------------------------------ build / apply
 
         /// <summary>Resources folder of meshes baked in the editor ("Battle of Ages/Bake Creature Meshes").</summary>
@@ -192,10 +225,39 @@ namespace BattleOfAges.Utils
         /// coarse grid) and a LODGroup on the visual root: full mesh above lodScreenHeight, culled below cullScreenHeight.
         /// Returns both renderers (full, distant).
         /// </summary>
-        public SkinnedMeshRenderer[] ApplyWithLod(string speciesKey, float cellSize, float lodCellSize, float lodScreenHeight, float cullScreenHeight)
+        public SkinnedMeshRenderer[] ApplyWithLod(string speciesKey, float cellSize, float lodCellSize, float lodScreenHeight, float cullScreenHeight, bool oneRenderer = false)
         {
-            SkinnedMeshRenderer near = CreateRenderer("Skin", GetMesh(speciesKey, cellSize, true));
-            SkinnedMeshRenderer far = CreateRenderer("SkinLOD1", GetMesh(speciesKey + LodSuffix, lodCellSize, false));
+            return Attach(GetMesh(speciesKey, cellSize, true), GetMesh(speciesKey + LodSuffix, lodCellSize, false), lodScreenHeight, cullScreenHeight, oneRenderer);
+        }
+
+        /// <summary>
+        /// As ApplyWithLod when both meshes were already built or loaded this session, so nothing needs declaring
+        /// (species whose declarations are costly, e.g. hard-surface kits). Returns null otherwise.
+        /// </summary>
+        public SkinnedMeshRenderer[] ApplyCachedWithLod(string speciesKey, float lodScreenHeight, float cullScreenHeight, bool oneRenderer = false)
+        {
+            if (!Cache.TryGetValue(speciesKey, out Cached near) || near.Mesh == null) return null;
+            if (!Cache.TryGetValue(speciesKey + LodSuffix, out Cached far) || far.Mesh == null) return null;
+            return Attach(near, far, lodScreenHeight, cullScreenHeight, oneRenderer);
+        }
+
+        // oneRenderer: a single renderer whose mesh SkinnedMeshLod swaps (crowds), instead of a LODGroup over two
+        private SkinnedMeshRenderer[] Attach(Cached nearMesh, Cached farMesh, float lodScreenHeight, float cullScreenHeight, bool oneRenderer)
+        {
+            if (oneRenderer)
+            {
+                SkinnedMeshRenderer skin = CreateRenderer("Skin", farMesh);
+                Bounds b = skin.localBounds;
+                b.Encapsulate(nearMesh.Mesh.bounds);
+                skin.localBounds = b;
+                SkinnedMeshLod swap = root.gameObject.AddComponent<SkinnedMeshLod>();
+                swap.Target = skin; swap.Near = nearMesh.Mesh; swap.Far = farMesh.Mesh;
+                swap.Size = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+                swap.NearScreenHeight = lodScreenHeight; swap.CullScreenHeight = cullScreenHeight;
+                return new[] { skin };
+            }
+            SkinnedMeshRenderer near = CreateRenderer("Skin", nearMesh);
+            SkinnedMeshRenderer far = CreateRenderer("SkinLOD1", farMesh);
             LODGroup lod = root.gameObject.AddComponent<LODGroup>();
             lod.SetLODs(new[] { new LOD(lodScreenHeight, new Renderer[] { near }), new LOD(cullScreenHeight, new Renderer[] { far }) });
             lod.RecalculateBounds();
@@ -242,6 +304,7 @@ namespace BattleOfAges.Utils
             Bounds b = cached.Mesh.bounds;
             b.Expand(0.3f); // room for the gait
             smr.localBounds = b;
+            if (VertexSurfaces) { smr.sharedMaterial = VertexSurfaceMaterial(); return smr; }
             smr.sharedMaterials = cached.Mesh.subMeshCount > 3
                 ? new[] { Surface("Coat", 6f, 0.16f), Surface("Hair", 4f, 0.22f), Surface("Gloss", 5f, 0.5f), Surface("Matte", 4f, 0.3f) }
                 : new[] { Surface("Coat", 6f, 0.16f), Surface("Hair", 4f, 0.22f), Surface("Gloss", 5f, 0.5f) };
@@ -290,6 +353,8 @@ namespace BattleOfAges.Utils
                 {
                     for (int i = 0; i < 16; i++) F(s.ToLocal[i]);
                     V(s.R); V(s.A); V(s.B); F(s.RA); F(s.RB); F(s.Fix); F(s.K); C(s.Color); F(s.Paintable); F(s.Bone);
+                    if (s.ClipY > float.NegativeInfinity) { F(7); F(s.ClipY); } // only when used: older species keep their signature
+                    if (s.Group != 0) { F(8); F(s.Group); }
                 }
                 F(list.Count);
             }
@@ -315,6 +380,22 @@ namespace BattleOfAges.Utils
                 foreach (Fuzz f in fuzz) F(f.Density(p, n));
             }
             foreach (Fuzz f in fuzz) { F(f.Count); F(f.MinLength); F(f.MaxLength); F(f.Radius); V(f.Flow); F(f.TipLighten); }
+            if (VertexSurfaces) // only when used: older species keep their signature
+            {
+                F(5);
+                foreach (Shape s in unions) V(s.Surface);
+                foreach (Shape s in carves) V(s.Surface);
+            }
+            foreach ((int bone, MeshKit near, MeshKit far) in kits)
+            {
+                F(bone);
+                foreach (MeshKit k in new[] { near, far })
+                {
+                    if (k == null) { F(-1); continue; }
+                    F(k.V.Count); F(k.T.Count);
+                    for (int i = 0; i < k.V.Count; i += 23) { V(k.V[i]); V(k.N[i]); C(k.C[i]); V(k.S[i]); }
+                }
+            }
             return hash.ToString("x8");
         }
 
@@ -332,6 +413,21 @@ namespace BattleOfAges.Utils
             return m;
         }
 
+        /// <summary>Shared material of VertexSurfaces meshes: colour and surface per vertex, patterns in rest space (uv3).</summary>
+        public static Material VertexSurfaceMaterial()
+        {
+            const string key = "VertexSurface";
+            if (Materials.TryGetValue(key, out Material m) && m != null) return m;
+            Shader shader = Shader.Find("Custom/CharacterSurface");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+            m = new Material(shader) { name = "MAT_CreatureVertexSurface", enableInstancing = true };
+            m.SetColor("_BaseColor", Color.white);
+            m.SetFloat("_VertexSurface", 1f);
+            m.SetFloat("_ObjectSpace", 0f);
+            Materials[key] = m;
+            return m;
+        }
+
         /// <summary>Distant meshes grow by this fraction of their cell size (thin legs would break up on the coarse grid).</summary>
         private const float LodInflate = 0.3f;
 
@@ -340,10 +436,132 @@ namespace BattleOfAges.Utils
             var timer = System.Diagnostics.Stopwatch.StartNew();
             inflate = detail ? 0f : h * LodInflate;
             cutCarves = detail; // sockets, nostrils and ear cups would punch holes through the coarse grid
+            if (VertexSurfaces) bodySurfaces = new List<Vector3>();
 
-            // ---- grid over the shapes (narrow band: blocks far from the surface are filled without evaluation)
-            Bounds bounds = new Bounds(unions[0].BC, Vector3.zero);
-            foreach (Shape s in unions) bounds.Encapsulate(new Bounds(s.BC, Vector3.one * (2f * (s.BR + s.K))));
+            // Each group is polygonized on its own (limbs that touch the body in the rest pose must not fuse to it)
+            var groups = new List<int>();
+            foreach (Shape s in unions) if (!groups.Contains(s.Group)) groups.Add(s.Group);
+            var verts = new List<Vector3>();
+            var bodyTris = new List<int>();
+            var normals = new List<Vector3>();
+            var colors = new List<Color>();
+            var weights = new List<BoneWeight>();
+            var paintList = new List<float>();
+            var grids = new System.Text.StringBuilder();
+            foreach (int group in groups)
+            {
+                activeGroup = group;
+                int first = verts.Count;
+                Polygonize(h, verts, bodyTris, grids);
+
+                // ---- body attributes (occlusion from the group's own field)
+                for (int i = first; i < verts.Count; i++)
+                {
+                    Vector3 p = verts[i];
+                    Vector3 nrm = Gradient(p, h * 0.5f).normalized;
+                    Color c = ShapeColor(p, out float paint, out Vector3 surface);
+                    paintList.Add(paint);
+                    bodySurfaces?.Add(surface);
+                    if (Paint != null) c = Paint(p, nrm, c, paint);
+                    float ao = Occlusion(p, nrm);
+                    c *= Mathf.Lerp(1f - AmbientOcclusion, 1f, ao);
+                    c.a = ao;
+                    normals.Add(nrm);
+                    colors.Add(c);
+                    weights.Add(Weights(p));
+                }
+            }
+            activeGroup = -1;
+            int bodyCount = verts.Count;
+            float[] paintable = paintList.ToArray();
+
+            // ---- hair
+            var hairTris = new List<int>();
+            var rng = new System.Random(1234);
+            if (detail)
+            {
+                foreach (StrandLine line in strandLines) BuildStrandLine(line, rng, verts, normals, colors, weights, hairTris);
+                foreach (Tuft t in tufts) BuildTuft(t, rng, verts, normals, colors, weights, hairTris);
+                foreach (Fuzz f in fuzz) BuildFuzz(f, rng, bodyCount, paintable, verts, normals, colors, weights, hairTris);
+            }
+
+            // ---- rigid glossy details
+            var glossTris = new List<int>();
+            var matteTris = new List<int>();
+            foreach (Rigid r in rigids)
+            {
+                var w = new BoneWeight { boneIndex0 = r.Bone, weight0 = 1f };
+                if (r.Sphere) AddSphere(r.Points[0], r.Radii[0], r.Color, w, verts, normals, colors, weights, glossTris);
+                else if (r.Matte) AddTube(r.Points, r.Radii, r.Color, r.TipColor, w, verts, normals, colors, weights, matteTris);
+                else AddTube(r.Points, r.Radii, r.Color, r.Color * 0.8f, w, verts, normals, colors, weights, glossTris);
+            }
+
+            // Colours are authored in sRGB; vertex colours reach the shader untouched, so convert for the linear pipeline.
+            if (QualitySettings.activeColorSpace == ColorSpace.Linear)
+                for (int i = 0; i < colors.Count; i++) { Color c = colors[i]; Color l = c.linear; l.a = c.a; colors[i] = l; }
+
+            // ---- hard-surface parts (MeshKit colours are linear already)
+            var kitTris = new List<int>();
+            var surfaces = VertexSurfaces ? new List<Vector3>(bodySurfaces) : null;
+            if (surfaces != null) while (surfaces.Count < verts.Count) surfaces.Add(new Vector3(1f, 0f, 0.3f)); // hair / rigid
+            foreach ((int bone, MeshKit near, MeshKit far) in kits)
+            {
+                MeshKit k = detail ? near : far;
+                if (k == null) continue;
+                int start = verts.Count;
+                var w = new BoneWeight { boneIndex0 = bone, weight0 = 1f };
+                verts.AddRange(k.V); normals.AddRange(k.N); colors.AddRange(k.C);
+                for (int i = 0; i < k.V.Count; i++) weights.Add(w);
+                surfaces?.AddRange(k.S);
+                foreach (int t in k.T) kitTris.Add(start + t);
+            }
+
+            Mesh mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetColors(colors);
+            mesh.SetUVs(3, verts);
+            if (VertexSurfaces)
+            {
+                // One submesh, one material: the surface rides in uv2
+                mesh.SetUVs(2, surfaces);
+                var all = new List<int>(bodyTris.Count + hairTris.Count + glossTris.Count + matteTris.Count + kitTris.Count);
+                all.AddRange(bodyTris); all.AddRange(hairTris); all.AddRange(glossTris); all.AddRange(matteTris); all.AddRange(kitTris);
+                mesh.SetTriangles(all, 0);
+            }
+            else
+            {
+                glossTris.AddRange(kitTris);
+                mesh.subMeshCount = matteTris.Count > 0 ? 4 : 3;
+                mesh.SetTriangles(bodyTris, 0);
+                mesh.SetTriangles(hairTris, 1);
+                mesh.SetTriangles(glossTris, 2);
+                if (matteTris.Count > 0) mesh.SetTriangles(matteTris, 3);
+            }
+            mesh.boneWeights = weights.ToArray();
+            var bindposes = new Matrix4x4[boneTransforms.Count];
+            for (int b = 0; b < bindposes.Length; b++) bindposes[b] = boneTransforms[b].worldToLocalMatrix * root.localToWorldMatrix;
+            mesh.bindposes = bindposes;
+            mesh.RecalculateBounds();
+            Debug.Log($"[SdfCreature] {root.parent?.name}: {verts.Count} verts, {(bodyTris.Count + hairTris.Count + glossTris.Count + matteTris.Count) / 3} tris " +
+                      $"(body {bodyTris.Count / 3}, hair {hairTris.Count / 3}, rigid {(glossTris.Count + matteTris.Count) / 3}, hard {kitTris.Count / 3}), grid {grids}{timer.ElapsedMilliseconds} ms");
+            return new Cached { Mesh = mesh, BonePaths = bonePaths.ToArray() };
+        }
+
+        private int activeGroup = -1; // shape group being polygonized; -1 = all
+        private bool Active(Shape s) => activeGroup < 0 || s.Group == activeGroup;
+
+        /// <summary>Surface nets over the active group's field (narrow band: blocks far from the surface are filled without evaluation).</summary>
+        private void Polygonize(float h, List<Vector3> verts, List<int> tris, System.Text.StringBuilder grids)
+        {
+            Bounds bounds = new Bounds();
+            bool any = false;
+            foreach (Shape s in unions)
+            {
+                if (!Active(s)) continue;
+                var sb = new Bounds(s.BC, Vector3.one * (2f * (s.BR + s.K)));
+                if (any) bounds.Encapsulate(sb); else { bounds = sb; any = true; }
+            }
             bounds.Expand(h * 6f);
             Vector3 origin = bounds.min;
             int nx = Mathf.CeilToInt(bounds.size.x / h), ny = Mathf.CeilToInt(bounds.size.y / h), nz = Mathf.CeilToInt(bounds.size.z / h);
@@ -363,10 +581,8 @@ namespace BattleOfAges.Utils
                     field[x + sx * (y + sy * z)] = far ? fc : Field(origin + new Vector3(x, y, z) * h);
             }
 
-            // ---- surface nets
             var cellVertex = new int[nx * ny * nz];
             for (int i = 0; i < cellVertex.Length; i++) cellVertex[i] = -1;
-            var verts = new List<Vector3>();
             int[,] edges = { { 0, 1 }, { 2, 3 }, { 4, 5 }, { 6, 7 }, { 0, 2 }, { 1, 3 }, { 4, 6 }, { 5, 7 }, { 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 } };
             var cornerVal = new float[8];
             var cornerPos = new Vector3[8];
@@ -401,77 +617,12 @@ namespace BattleOfAges.Utils
                 cellVertex[x + nx * (y + ny * z)] = verts.Count;
                 verts.Add(p);
             }
-            var bodyTris = new List<int>();
-            for (int z = 1; z < nz; z++) for (int y = 1; y < ny; y++) for (int x = 0; x < nx; x++) Quad(field, cellVertex, bodyTris, x, y, z, 0, sx, sy, nx, ny);
-            for (int z = 1; z < nz; z++) for (int y = 0; y < ny; y++) for (int x = 1; x < nx; x++) Quad(field, cellVertex, bodyTris, x, y, z, 1, sx, sy, nx, ny);
-            for (int z = 0; z < nz; z++) for (int y = 1; y < ny; y++) for (int x = 1; x < nx; x++) Quad(field, cellVertex, bodyTris, x, y, z, 2, sx, sy, nx, ny);
-
-            // ---- body attributes
-            int bodyCount = verts.Count;
-            var normals = new List<Vector3>(bodyCount);
-            var colors = new List<Color>(bodyCount);
-            var weights = new List<BoneWeight>(bodyCount);
-            var paintable = new float[bodyCount];
-            for (int i = 0; i < bodyCount; i++)
-            {
-                Vector3 p = verts[i];
-                Vector3 nrm = Gradient(p, h * 0.5f).normalized;
-                Color c = ShapeColor(p, out float paint, out Vector3 surface);
-                paintable[i] = paint;
-                bodySurfaces?.Add(surface);
-                if (Paint != null) c = Paint(p, nrm, c, paint);
-                float ao = Occlusion(p, nrm);
-                c *= Mathf.Lerp(1f - AmbientOcclusion, 1f, ao);
-                c.a = ao;
-                normals.Add(nrm);
-                colors.Add(c);
-                weights.Add(Weights(p));
-            }
-
-            // ---- hair
-            var hairTris = new List<int>();
-            var rng = new System.Random(1234);
-            if (detail)
-            {
-                foreach (StrandLine line in strandLines) BuildStrandLine(line, rng, verts, normals, colors, weights, hairTris);
-                foreach (Tuft t in tufts) BuildTuft(t, rng, verts, normals, colors, weights, hairTris);
-                foreach (Fuzz f in fuzz) BuildFuzz(f, rng, bodyCount, paintable, verts, normals, colors, weights, hairTris);
-            }
-
-            // ---- rigid glossy details
-            var glossTris = new List<int>();
-            var matteTris = new List<int>();
-            foreach (Rigid r in rigids)
-            {
-                var w = new BoneWeight { boneIndex0 = r.Bone, weight0 = 1f };
-                if (r.Sphere) AddSphere(r.Points[0], r.Radii[0], r.Color, w, verts, normals, colors, weights, glossTris);
-                else if (r.Matte) AddTube(r.Points, r.Radii, r.Color, r.TipColor, w, verts, normals, colors, weights, matteTris);
-                else AddTube(r.Points, r.Radii, r.Color, r.Color * 0.8f, w, verts, normals, colors, weights, glossTris);
-            }
-
-            // Colours are authored in sRGB; vertex colours reach the shader untouched, so convert for the linear pipeline.
-            if (QualitySettings.activeColorSpace == ColorSpace.Linear)
-                for (int i = 0; i < colors.Count; i++) { Color c = colors[i]; Color l = c.linear; l.a = c.a; colors[i] = l; }
-
-            Mesh mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
-            mesh.SetVertices(verts);
-            mesh.SetNormals(normals);
-            mesh.SetColors(colors);
-            mesh.SetUVs(3, verts);
-            mesh.subMeshCount = matteTris.Count > 0 ? 4 : 3;
-            mesh.SetTriangles(bodyTris, 0);
-            mesh.SetTriangles(hairTris, 1);
-            mesh.SetTriangles(glossTris, 2);
-            if (matteTris.Count > 0) mesh.SetTriangles(matteTris, 3);
-            mesh.boneWeights = weights.ToArray();
-            var bindposes = new Matrix4x4[boneTransforms.Count];
-            for (int b = 0; b < bindposes.Length; b++) bindposes[b] = boneTransforms[b].worldToLocalMatrix * root.localToWorldMatrix;
-            mesh.bindposes = bindposes;
-            mesh.RecalculateBounds();
-            Debug.Log($"[SdfCreature] {root.parent?.name}: {verts.Count} verts, {(bodyTris.Count + hairTris.Count + glossTris.Count + matteTris.Count) / 3} tris " +
-                      $"(body {bodyTris.Count / 3}, hair {hairTris.Count / 3}, rigid {(glossTris.Count + matteTris.Count) / 3}), grid {sx}x{sy}x{sz}, {timer.ElapsedMilliseconds} ms");
-            return new Cached { Mesh = mesh, BonePaths = bonePaths.ToArray() };
+            for (int z = 1; z < nz; z++) for (int y = 1; y < ny; y++) for (int x = 0; x < nx; x++) Quad(field, cellVertex, tris, x, y, z, 0, sx, sy, nx, ny);
+            for (int z = 1; z < nz; z++) for (int y = 0; y < ny; y++) for (int x = 1; x < nx; x++) Quad(field, cellVertex, tris, x, y, z, 1, sx, sy, nx, ny);
+            for (int z = 0; z < nz; z++) for (int y = 1; y < ny; y++) for (int x = 1; x < nx; x++) Quad(field, cellVertex, tris, x, y, z, 2, sx, sy, nx, ny);
+            grids.Append(sx).Append('x').Append(sy).Append('x').Append(sz).Append(", ");
         }
+
 
         // ------------------------------------------------------------------ field
 
@@ -481,13 +632,13 @@ namespace BattleOfAges.Utils
             for (int i = 0; i < unions.Count; i++)
             {
                 Shape s = unions[i];
-                if ((p - s.BC).magnitude - s.BR > d + s.K) continue;
+                if (!Active(s) || (p - s.BC).magnitude - s.BR > d + s.K) continue;
                 d = SmoothMin(d, Distance(s, p), s.K);
             }
             for (int i = 0; i < (cutCarves ? carves.Count : 0); i++)
             {
                 Shape s = carves[i];
-                if ((p - s.BC).magnitude - s.BR > s.K - d) continue;
+                if (!Active(s) || (p - s.BC).magnitude - s.BR > s.K - d) continue;
                 d = -SmoothMin(-d, Distance(s, p), s.K);
             }
             return d - inflate;
@@ -501,6 +652,12 @@ namespace BattleOfAges.Utils
         }
 
         private static float Distance(Shape s, Vector3 p)
+        {
+            float d = ShapeDistance(s, p);
+            return s.ClipY > float.NegativeInfinity ? Mathf.Max(d, s.ClipY - p.y) : d;
+        }
+
+        private static float ShapeDistance(Shape s, Vector3 p)
         {
             Vector3 q = s.ToLocal.MultiplyPoint3x4(p);
             if (s.Ellipsoid)
@@ -561,8 +718,8 @@ namespace BattleOfAges.Utils
             Vector3 sSum = Vector3.zero; float sw = 0f;
             float dMin = float.MaxValue;
             var d = new float[unions.Count + carves.Count];
-            for (int i = 0; i < unions.Count; i++) { d[i] = Distance(unions[i], p); dMin = Mathf.Min(dMin, d[i]); }
-            for (int i = 0; i < carves.Count; i++) { d[unions.Count + i] = carves[i].HasColor ? Mathf.Abs(Distance(carves[i], p)) : float.MaxValue; dMin = Mathf.Min(dMin, d[unions.Count + i]); }
+            for (int i = 0; i < unions.Count; i++) { d[i] = Active(unions[i]) ? Distance(unions[i], p) : float.MaxValue; dMin = Mathf.Min(dMin, d[i]); }
+            for (int i = 0; i < carves.Count; i++) { d[unions.Count + i] = carves[i].HasColor && Active(carves[i]) ? Mathf.Abs(Distance(carves[i], p)) : float.MaxValue; dMin = Mathf.Min(dMin, d[unions.Count + i]); }
             for (int i = 0; i < d.Length; i++)
             {
                 if (d[i] == float.MaxValue) continue;
@@ -584,9 +741,10 @@ namespace BattleOfAges.Utils
             var score = new float[boneTransforms.Count];
             float dMin = float.MaxValue;
             var d = new float[unions.Count];
-            for (int i = 0; i < unions.Count; i++) { d[i] = Distance(unions[i], p); dMin = Mathf.Min(dMin, d[i]); }
+            for (int i = 0; i < unions.Count; i++) { d[i] = Active(unions[i]) ? Distance(unions[i], p) : float.MaxValue; dMin = Mathf.Min(dMin, d[i]); }
             for (int i = 0; i < unions.Count; i++)
             {
+                if (d[i] == float.MaxValue) continue;
                 float w = Mathf.Exp(-(d[i] - dMin) / SkinSigma);
                 score[unions[i].Bone] = Mathf.Max(score[unions[i].Bone], w);
             }
@@ -766,7 +924,7 @@ namespace BattleOfAges.Utils
             var s = new Shape
             {
                 Ellipsoid = true, Carve = carve, R = radii, K = blend, Color = color, HasColor = color.a > 0f, Paintable = paintable,
-                Surface = SurfaceBrush ?? Vector3.zero, HasSurface = SurfaceBrush.HasValue,
+                Surface = SurfaceBrush ?? Vector3.zero, HasSurface = SurfaceBrush.HasValue, ClipY = ClipBelow ?? float.NegativeInfinity, Group = ShapeGroup,
                 Bone = BoneIndex(bone), BC = c, BR = Mathf.Max(radii.x, Mathf.Max(radii.y, radii.z)),
                 ToLocal = Matrix4x4.TRS(c, rot, Vector3.one).inverse
             };
@@ -782,7 +940,7 @@ namespace BattleOfAges.Utils
             var s = new Shape
             {
                 Ellipsoid = false, Carve = carve, K = blend, Color = color, HasColor = color.a > 0f, Paintable = paintable,
-                Surface = SurfaceBrush ?? Vector3.zero, HasSurface = SurfaceBrush.HasValue,
+                Surface = SurfaceBrush ?? Vector3.zero, HasSurface = SurfaceBrush.HasValue, ClipY = ClipBelow ?? float.NegativeInfinity, Group = ShapeGroup,
                 Bone = BoneIndex(bone), BC = mid, BR = Vector3.Distance(ar, br) * 0.5f + Mathf.Max(ra, rb),
                 ToLocal = toLocal, A = toLocal.MultiplyPoint3x4(ar), B = toLocal.MultiplyPoint3x4(br), RA = ra, RB = rb,
                 Fix = Mathf.Min(squash.x, Mathf.Min(squash.y, squash.z))
@@ -790,8 +948,8 @@ namespace BattleOfAges.Utils
             (carve ? carves : unions).Add(s);
         }
 
-        private Matrix4x4 ToRoot(Transform bone) => root.worldToLocalMatrix * bone.localToWorldMatrix;
-        private Quaternion RootRotation(Transform bone) => Quaternion.Inverse(root.rotation) * bone.rotation;
+        private Matrix4x4 ToRoot(Transform bone) => RootSpaceCoordinates ? Matrix4x4.identity : root.worldToLocalMatrix * bone.localToWorldMatrix;
+        private Quaternion RootRotation(Transform bone) => RootSpaceCoordinates ? Quaternion.identity : Quaternion.Inverse(root.rotation) * bone.rotation;
 
         private int BoneIndex(Transform bone)
         {

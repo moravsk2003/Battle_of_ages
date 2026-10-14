@@ -54,6 +54,7 @@ namespace BattleOfAges.PlayModeTests
             cam.transform.position = position;
             cam.transform.LookAt(lookAt);
             cam.targetTexture = rt;
+            BattleOfAges.Utils.SkinnedMeshLod.RefreshAll(cam); // crowd LOD meshes as seen from this camera
             if (grass != null) grass.SubmitFor(cam);
             cam.Render();
 

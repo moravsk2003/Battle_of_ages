@@ -81,7 +81,7 @@ namespace BattleOfAges.Utils
 
         public static Mesh BuildRight()
         {
-            var kit = new Kit();
+            var kit = new MeshKit();
             Vector3 grip = SwordRot * Vector3.up;
             Vector3 f = Vector3.ProjectOnPlane(SwordPos.normalized, grip).normalized;
             Vector3 d = Vector3.Cross(grip, f); // back of the right hand faces out (+X)
@@ -91,7 +91,7 @@ namespace BattleOfAges.Utils
             return kit.ToMesh("ViewmodelArm_Right");
         }
 
-        private static void Sword(Kit kit, Matrix4x4 m)
+        private static void Sword(MeshKit kit, Matrix4x4 m)
         {
             // ---- blade: bevelled edges, flats and a fuller fading out before the point (rows along +Y)
             var ys = new List<float> { 0.094f, 0.102f };
@@ -176,7 +176,7 @@ namespace BattleOfAges.Utils
 
         public static Mesh BuildLeft()
         {
-            var kit = new Kit();
+            var kit = new MeshKit();
             Matrix4x4 s = Matrix4x4.TRS(ShieldPos, ShieldRot, Vector3.one);
             float handleDepth = 0.016f;
             Vector3 gripCentre = s.MultiplyPoint3x4(new Vector3(0f, Back(0f) - handleDepth, 0f));
@@ -193,7 +193,7 @@ namespace BattleOfAges.Utils
         private static float Front(float r) => 0.0075f + 0.005f * (1f - Sq(r / ShieldRadius));
         private static float Back(float r) => Front(r) - 0.013f;
 
-        private static void Shield(Kit kit, Matrix4x4 s, float handleDepth)
+        private static void Shield(MeshKit kit, Matrix4x4 s, float handleDepth)
         {
             float R = ShieldRadius;
             Vector3 up = s.MultiplyVector(Vector3.up), side = s.MultiplyVector(Vector3.right);
@@ -323,7 +323,7 @@ namespace BattleOfAges.Utils
         /// <summary>
         /// Sleeve, vambrace with straps and buckle, and glove cuff from the shoulder pivot (origin) to the wrist.
         /// </summary>
-        private static void Arm(Kit kit, Vector3 wrist, bool right)
+        private static void Arm(MeshKit kit, Vector3 wrist, bool right)
         {
             float L = wrist.magnitude;
             Vector3 axis = wrist / L;
@@ -395,7 +395,7 @@ namespace BattleOfAges.Utils
         }
 
         /// <summary>Brass buckle frame lying on a strap (centre, strap normal, strap direction along the arm).</summary>
-        private static void Buckle(Kit kit, Vector3 centre, Vector3 normal, Vector3 along)
+        private static void Buckle(MeshKit kit, Vector3 centre, Vector3 normal, Vector3 along)
         {
             Matrix4x4 m = Matrix4x4.TRS(centre, Quaternion.LookRotation(along, normal), Vector3.one);
             var ring = new Vector3[17, 8];
@@ -420,7 +420,7 @@ namespace BattleOfAges.Utils
         /// f = forearm direction (across the grip), d = back of the hand.
         /// Returns the wrist end (pivot space) where the arm attaches.
         /// </summary>
-        private static Vector3 Fist(Kit kit, Vector3 centre, Vector3 f, Vector3 d, bool right, float gripRadius)
+        private static Vector3 Fist(MeshKit kit, Vector3 centre, Vector3 f, Vector3 d, bool right, float gripRadius)
         {
             var tmp = new GameObject("FistSculpt").transform;
             Transform frame = new GameObject("FistFrame").transform;
@@ -501,112 +501,5 @@ namespace BattleOfAges.Utils
         private static Vector2 V2(float x, float y) => new Vector2(x, y);
         private static float Sq(float x) => x * x;
         private static float SignedPow(float v, float p) => Mathf.Sign(v) * Mathf.Pow(Mathf.Abs(v), p);
-
-        /// <summary>
-        /// Mesh assembly: grids of points with normals averaged from the faces (repeated points = crisp creases),
-        /// oriented outwards automatically; colours are sRGB in, linear out.
-        /// </summary>
-        private sealed class Kit
-        {
-            public readonly List<Vector3> V = new List<Vector3>(), N = new List<Vector3>(), S = new List<Vector3>();
-            public readonly List<Color> C = new List<Color>();
-            public readonly List<int> T = new List<int>();
-
-            private static Color Lin(Color c)
-            {
-                Color l = QualitySettings.activeColorSpace == ColorSpace.Linear ? c.linear : c;
-                l.a = 1f;
-                return l;
-            }
-
-            /// <summary>Rows x columns of points (mesh space); wrap = columns form a closed ring; outward = hint for open sheets.</summary>
-            public void Grid(Vector3[,] p, bool wrap, Vector3 surface, Func<int, int, Color> color, Vector3? outward = null, bool inward = false)
-            {
-                int rows = p.GetLength(0), cols = p.GetLength(1), qc = wrap ? cols : cols - 1;
-                Vector3 centroid = Vector3.zero;
-                foreach (Vector3 q in p) centroid += q;
-                centroid /= p.Length;
-
-                var nrm = new Vector3[rows, cols];
-                float orient = 0f;
-                for (int i = 0; i < rows - 1; i++)
-                for (int j = 0; j < qc; j++)
-                {
-                    int j1 = (j + 1) % cols;
-                    Vector3 a = p[i, j], b = p[i + 1, j], c = p[i + 1, j1], d = p[i, j1];
-                    Vector3 fn = Vector3.Cross(c - a, d - b);
-                    orient += outward.HasValue ? Vector3.Dot(fn, outward.Value) : Vector3.Dot(fn, (a + b + c + d) * 0.25f - centroid);
-                    nrm[i, j] += fn; nrm[i + 1, j] += fn; nrm[i + 1, j1] += fn; nrm[i, j1] += fn;
-                }
-                bool flip = (orient < 0f) != inward; // inward: inner shells seen from inside
-
-                int start = V.Count;
-                for (int i = 0; i < rows; i++)
-                for (int j = 0; j < cols; j++)
-                {
-                    Vector3 n = nrm[i, j].sqrMagnitude > 1e-20f ? nrm[i, j].normalized : (p[i, j] - centroid).normalized;
-                    V.Add(p[i, j]);
-                    N.Add(flip ? -n : n);
-                    C.Add(Lin(color(i, j)));
-                    S.Add(surface);
-                }
-                for (int i = 0; i < rows - 1; i++)
-                for (int j = 0; j < qc; j++)
-                {
-                    int j1 = (j + 1) % cols;
-                    int a = start + i * cols + j, b = start + (i + 1) * cols + j, c = start + (i + 1) * cols + j1, d = start + i * cols + j1;
-                    Tri(a, b, c, flip);
-                    Tri(a, c, d, flip);
-                }
-            }
-
-            private void Tri(int a, int b, int c, bool flip)
-            {
-                if (Vector3.Cross(V[b] - V[a], V[c] - V[a]).sqrMagnitude < 1e-16f) return; // collapsed (crease / pole)
-                T.Add(a);
-                if (flip) { T.Add(c); T.Add(b); } else { T.Add(b); T.Add(c); }
-            }
-
-            /// <summary>Surface of revolution around the frame's Y axis: profile (radius, height), radiusScale(row, angle).</summary>
-            public void Lathe(Matrix4x4 frame, Vector2[] profile, int segments, Vector3 surface, Func<int, float, Color> color, Func<int, float, float> radiusScale = null, bool inward = false)
-            {
-                var p = new Vector3[profile.Length, segments];
-                for (int i = 0; i < profile.Length; i++)
-                for (int j = 0; j < segments; j++)
-                {
-                    float a = j * Mathf.PI * 2f / segments;
-                    float r = profile[i].x * (radiusScale != null ? radiusScale(i, a) : 1f);
-                    p[i, j] = frame.MultiplyPoint3x4(new Vector3(Mathf.Cos(a) * r, profile[i].y, Mathf.Sin(a) * r));
-                }
-                Grid(p, true, surface, (i, j) => color(i, j * Mathf.PI * 2f / segments), null, inward);
-            }
-
-            /// <summary>Rivet head: a low dome on a surface (centre, outward normal).</summary>
-            public void Dome(Vector3 centre, Vector3 normal, float radius, Color color, Vector3 surface)
-            {
-                Matrix4x4 m = Matrix4x4.TRS(centre - normal * radius * 0.3f, Quaternion.FromToRotation(Vector3.up, normal), Vector3.one);
-                var prof = new Vector2[5];
-                for (int k = 0; k < 5; k++)
-                {
-                    float a = k * Mathf.PI * 0.5f / 4f;
-                    prof[k] = new Vector2(radius * Mathf.Cos(a), radius * 0.75f * Mathf.Sin(a));
-                }
-                prof[4].x = 0f;
-                Lathe(m, prof, 10, surface, (i, a) => color);
-            }
-
-            public Mesh ToMesh(string name)
-            {
-                var mesh = new Mesh { name = name, indexFormat = V.Count > 65000 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16 };
-                mesh.SetVertices(V);
-                mesh.SetNormals(N);
-                mesh.SetColors(C);
-                mesh.SetUVs(2, S);
-                mesh.SetTriangles(T, 0);
-                mesh.RecalculateBounds();
-                Debug.Log($"[Viewmodel] {name}: {V.Count} verts, {T.Count / 3} tris");
-                return mesh;
-            }
-        }
     }
 }

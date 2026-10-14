@@ -49,6 +49,14 @@ namespace BattleOfAges.Utils
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
 
+            // The knight guard has its own sculpted body and gear on this skeleton
+            if (type == HumanoidModelBuilder.HumanType.KnightGuard && KnightModelBuilder.Build(root, model.transform))
+            {
+                model.AddComponent<FootIK>();
+                root.AddComponent<CharacterAnimationDriver>();
+                return root;
+            }
+
             ApplyLook(model, type);
             AttachEquipment(model.transform, type);
             AttachHelmet(model.transform, type);

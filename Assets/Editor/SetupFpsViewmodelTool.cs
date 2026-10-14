@@ -119,7 +119,7 @@ namespace BattleOfAges.EditorTools
         {
             if (signature != null) return signature;
             var text = new System.Text.StringBuilder();
-            foreach (string script in new[] { "ViewmodelArmsBuilder", "SdfCreature" })
+            foreach (string script in new[] { "ViewmodelArmsBuilder", "MeshKit", "SdfCreature" })
                 foreach (string guid in AssetDatabase.FindAssets(script + " t:MonoScript"))
                 {
                     string path = AssetDatabase.GUIDToAssetPath(guid);

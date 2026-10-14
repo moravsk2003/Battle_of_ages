@@ -244,7 +244,7 @@ namespace BattleOfAges.PlayModeTests
         /// Freezes each character of the row at phase start + i * 25 %. "Attack" plays on the upper-body layer over the
         /// locomotion of the given speed (0 = standing), like in game.
         /// </summary>
-        private static void Pose(List<GameObject> row, string state, float speed, float start = 0f)
+        internal static void Pose(List<GameObject> row, string state, float speed, float start = 0f)
         {
             for (int i = 0; i < row.Count; i++)
             {

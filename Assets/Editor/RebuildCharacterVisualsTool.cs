@@ -18,7 +18,13 @@ namespace BattleOfAges.EditorTools
         private const string ScenePath = "Assets/Scenes/SampleScene.unity";
 
         [MenuItem("Battle of Ages/Rebuild Character Visuals (keep units)")]
-        public static void Rebuild()
+        public static void Rebuild() => Rebuild(false);
+
+        /// <summary>Only the knight guards (e.g. after the knight model changed; batch: -executeMethod ...RebuildKnights).</summary>
+        [MenuItem("Battle of Ages/Rebuild Knight Visuals (keep units)")]
+        public static void RebuildKnights() => Rebuild(true);
+
+        private static void Rebuild(bool knightsOnly)
         {
             if (EditorSceneManager.GetActiveScene().path != ScenePath)
             {
@@ -28,7 +34,7 @@ namespace BattleOfAges.EditorTools
             int rebuilt = 0;
 
             GameObject player = GameObject.Find("Player");
-            if (player != null)
+            if (player != null && !knightsOnly)
             {
                 Transform old = player.transform.Find("Hero3DModel");
                 if (old != null) Object.DestroyImmediate(old.gameObject);
@@ -59,6 +65,7 @@ namespace BattleOfAges.EditorTools
                 var type = (n.Contains("Knight") || n.Contains("Commander") || n.Contains("Guard"))
                     ? HumanoidModelBuilder.HumanType.KnightGuard
                     : HumanoidModelBuilder.HumanType.Villager;
+                if (knightsOnly && type != HumanoidModelBuilder.HumanType.KnightGuard) continue;
 
                 Object.DestroyImmediate(old.gameObject);
                 GameObject model = HumanoidModelBuilder.CreateHumanoidModel(type, "VisualModel");

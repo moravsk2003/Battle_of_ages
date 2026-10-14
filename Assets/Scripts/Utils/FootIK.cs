@@ -24,7 +24,7 @@ namespace BattleOfAges.Utils
 
         // LOD: feet are only solved for characters on screen and near the camera (2 raycasts per frame each).
         private const float IKDistance = 30f;
-        private Renderer bodyRenderer;
+        private SkinnedMeshRenderer[] bodyRenderers; // any LOD level visible counts
         private float lodTimer;
         private bool lodActive = true;
 
@@ -39,8 +39,15 @@ namespace BattleOfAges.Utils
             hips = Find("Hips");
             upperL = Find("UpperLeg.L"); lowerL = Find("LowerLeg.L"); footL = Find("Foot.L");
             upperR = Find("UpperLeg.R"); lowerR = Find("LowerLeg.R"); footR = Find("Foot.R");
-            bodyRenderer = GetComponentInChildren<SkinnedMeshRenderer>();
+            bodyRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
             lodTimer = Random.value * 0.5f;
+        }
+
+        private bool AnyVisible()
+        {
+            if (bodyRenderers == null || bodyRenderers.Length == 0) return true;
+            foreach (SkinnedMeshRenderer r in bodyRenderers) if (r != null && r.isVisible) return true;
+            return false;
         }
 
         private void LateUpdate()
@@ -51,7 +58,7 @@ namespace BattleOfAges.Utils
             {
                 lodTimer = 0.5f;
                 Transform viewer = LodViewerOverride != null ? LodViewerOverride : (Camera.main != null ? Camera.main.transform : null);
-                lodActive = (LodViewerOverride != null || bodyRenderer == null || bodyRenderer.isVisible) &&
+                lodActive = (LodViewerOverride != null || AnyVisible()) &&
                             (viewer == null || (viewer.position - transform.position).sqrMagnitude < IKDistance * IKDistance);
                 if (!lodActive) { offsetL = offsetR = hipOffset = 0f; hasWritten = false; }
             }

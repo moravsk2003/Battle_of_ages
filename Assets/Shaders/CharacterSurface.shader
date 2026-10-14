@@ -3,7 +3,7 @@ Shader "Custom/CharacterSurface"
     // Procedural surface detail for characters without textures. Patterns are evaluated in the mesh's rest pose
     // (vertex positions baked into UV3 in metres by CharacterModelSetupTool), so they stick to the skin while it
     // animates. Primitive attachments (no UV3) use object space instead (_ObjectSpace = 1).
-    // _Pattern: 0 skin, 1 woven cloth, 2 leather, 3 metal, 4 hair, 5 eyes, 6 fur.
+    // _Pattern: 0 skin, 1 woven cloth, 2 leather, 3 metal, 4 hair, 5 eyes, 6 fur, 7 chain mail.
     Properties
     {
         _BaseColor ("Base Color", Color) = (0.7, 0.7, 0.7, 1)
@@ -39,7 +39,7 @@ Shader "Custom/CharacterSurface"
         }
 
         // Returns albedo multiplier (x), height for micro relief (y), smoothness multiplier (z), occlusion (w).
-        float4 PatternSample(float3 p, float pattern)
+        float4 PatternSample(float3 p, float pattern, float3 nrm)
         {
             float n1 = noise3D(p * 6.0), n2 = noise3D(p * 23.0 + 7.1), n3 = noise3D(p * 70.0 + 3.3);
             if (pattern < 0.5) // skin: soft mottling, pores up close
@@ -74,6 +74,18 @@ Shader "Custom/CharacterSurface"
                 return float4(lerp(0.7, 1.15, strands) * lerp(0.85, 1.05, clumps), strands, lerp(0.8, 1.4, strands), lerp(0.8, 1.0, clumps));
             }
             if (pattern < 5.5) return float4(1, 0, 1.6, 1); // eyes: glossy
+            if (pattern > 6.5) // chain mail: staggered rows of rings in the plane facing the (rest) normal
+            {
+                float2 q = abs(nrm.x) > abs(nrm.z) ? p.zy : p.xy;
+                float2 g = q / float2(0.0105, 0.0085);
+                g.x += 0.5 * fmod(floor(g.y) + 1000.0, 2.0);
+                float2 c = frac(g) - 0.5;
+                float d = length(c * float2(1.0, 0.82));
+                float ring = smoothstep(0.16, 0.27, d) * (1.0 - smoothstep(0.40, 0.55, d));
+                float fade = saturate(1.5 - 1.5 * max(fwidth(g.x), fwidth(g.y)));
+                ring = lerp(0.62, ring, fade);
+                return float4(lerp(0.45, 1.12, ring) * lerp(0.9, 1.05, n2), ring * 0.8, lerp(0.55, 1.15, ring), lerp(0.7, 1.0, ring));
+            }
             // fur: fine strands lying along the body (rest Z), clumps and soft tone variation
             float strands = noise3D(p * float3(260.0, 260.0, 26.0));
             float clump = noise3D(p * float3(40.0, 40.0, 9.0));
@@ -137,13 +149,14 @@ Shader "Custom/CharacterSurface"
                 float3 n = normalize(i.normalWS);
                 float detail = (1.0 - smoothstep(4.0, 25.0, distance(_WorldSpaceCameraPos.xyz, i.positionWS))) * _DetailStrength;
                 float pattern = floor(i.surface.x + 0.5);
-                float4 pat = PatternSample(i.restPos, pattern);
+                float3 restN = TransformWorldToObjectDir(n);
+                float4 pat = PatternSample(i.restPos, pattern, restN);
 
                 // Micro relief: gradient of the pattern height (rest space ~ world orientation for upright characters)
                 float e = 0.0025;
-                float hx = PatternSample(i.restPos + float3(e, 0, 0), pattern).y;
-                float hy = PatternSample(i.restPos + float3(0, e, 0), pattern).y;
-                float hz = PatternSample(i.restPos + float3(0, 0, e), pattern).y;
+                float hx = PatternSample(i.restPos + float3(e, 0, 0), pattern, restN).y;
+                float hy = PatternSample(i.restPos + float3(0, e, 0), pattern, restN).y;
+                float hz = PatternSample(i.restPos + float3(0, 0, e), pattern, restN).y;
                 float3 grad = float3(hx - pat.y, hy - pat.y, hz - pat.y) / e;
                 grad = TransformObjectToWorldDir(grad);
                 grad -= n * dot(grad, n);
