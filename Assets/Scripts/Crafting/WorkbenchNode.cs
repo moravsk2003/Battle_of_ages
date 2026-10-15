@@ -221,7 +221,7 @@ namespace BattleOfAges.Crafting
             else if (item.Type == ItemType.Armor)
             {
                 int bonusHp = Mathf.RoundToInt(ItemStatCalculator.CalculateArmorDefense(item.Level) * 10f);
-                if (hp != null) hp.InitializeHealth(100 + bonusHp);
+                if (hp != null) { hp.ArmorLevel = item.Level; hp.SetMaxHealthKeepDamage(100 + bonusHp); }
                 bestUnit.gameObject.name = $"Armored_Guard_Lvl{item.Level}";
             }
 

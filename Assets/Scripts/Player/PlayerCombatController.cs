@@ -41,6 +41,7 @@ namespace BattleOfAges.Player
             if (type == BattleOfAges.Crafting.ItemType.Sword)
             {
                 EquippedSwordLevel = level;
+                EquippedBowLevel = 0;
                 int dmg = 50 + Mathf.RoundToInt(BattleOfAges.Crafting.ItemStatCalculator.CalculateSwordDamage(level));
                 combatUnit.InitializeCombatStats(dmg, 1.4f, attackRange);
                 Debug.Log($"[PlayerCombat] ⚔️ Гравець екіпірував Меч (Рівень {level})! Новий урон: {dmg}");
@@ -50,12 +51,14 @@ namespace BattleOfAges.Player
                 EquippedArmorLevel = level;
                 int bonusHp = Mathf.RoundToInt(BattleOfAges.Crafting.ItemStatCalculator.CalculateArmorDefense(level) * 15f);
                 int totalHp = 500 + bonusHp;
-                healthComponent.InitializeHealth(totalHp);
-                Debug.Log($"[PlayerCombat] 🛡️ Гравець екіпірував Броню (Рівень {level})! Новий запас здоров'я: {totalHp} HP");
+                healthComponent.ArmorLevel = level;
+                healthComponent.SetMaxHealthKeepDamage(totalHp);
+                Debug.Log($"[PlayerCombat] 🛡️ Гравець екіпірував Броню (Рівень {level})! Здоров'я: {totalHp} HP, поглинання {level * 10}%");
             }
             else if (type == BattleOfAges.Crafting.ItemType.Bow)
             {
                 EquippedBowLevel = level;
+                EquippedSwordLevel = 0;
                 int dmg = 40 + level * 15;
                 combatUnit.InitializeCombatStats(dmg, 1.2f, 12.0f);
                 Debug.Log($"[PlayerCombat] 🏹 Гравець екіпірував Лук (Рівень {level})! Дальність: 12м, Урон: {dmg}");
@@ -130,7 +133,9 @@ namespace BattleOfAges.Player
                 ? new Ray(fpsCamera.transform.position, fpsCamera.transform.forward)
                 : new Ray(transform.position + Vector3.up * 1.5f, transform.forward);
 
-            if (Physics.SphereCast(ray, 0.4f, out RaycastHit hit, attackRange))
+            // The bow reaches further than the fist/sword: use the combat unit's current range.
+            float reach = Mathf.Max(attackRange, combatUnit.AttackRange);
+            if (Physics.SphereCast(ray, 0.4f, out RaycastHit hit, reach))
             {
                 HealthComponent targetHp = hit.collider.GetComponentInParent<HealthComponent>();
                 if (targetHp != null && targetHp != healthComponent && targetHp.IsAlive)

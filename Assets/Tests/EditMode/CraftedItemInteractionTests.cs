@@ -95,6 +95,24 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void Workbench_ClaimArmor_ReducesIncomingDamageAndDoesNotHeal()
+        {
+            HealthComponent hp = playerObj.GetComponent<HealthComponent>();
+            hp.InitializeHealth(500);
+            hp.TakeDamage(100);
+
+            workbench.Queue.AssignWorker();
+            workbench.Queue.EnqueueItem(ItemType.Armor, 3);
+            workbench.Queue.Tick(10.0f);
+            workbench.ClaimItemToPlayer(0);
+
+            Assert.AreEqual(hp.MaxHealth - 100, hp.CurrentHealth, "Putting armor on must not heal the damage already taken.");
+            int before = hp.CurrentHealth;
+            hp.TakeDamage(100);
+            Assert.AreEqual(70, before - hp.CurrentHealth, "Level 3 armor should take 30% off a hit.");
+        }
+
+        [Test]
         public void Workbench_ClaimItemToPlayer_EquipsAxeAndIncreasesToolLevel()
         {
             workbench.Queue.AssignWorker();

@@ -13,6 +13,8 @@ namespace BattleOfAges.Combat
         public int MaxHealth => maxHealth;
         public int CurrentHealth => currentHealth;
         public bool IsAlive => currentHealth > 0;
+        /// <summary>Worn armor level (0 = none): each level takes 10% off every incoming hit.</summary>
+        public int ArmorLevel { get; set; }
 
         public event Action<int, int> OnHealthChanged; // (current, max)
         public event Action<int> OnTakeDamage;        // (damageAmount)
@@ -30,9 +32,19 @@ namespace BattleOfAges.Combat
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
         }
 
+        /// <summary>Changes max health without healing: the damage already taken stays taken.</summary>
+        public void SetMaxHealthKeepDamage(int health)
+        {
+            int missing = maxHealth - currentHealth;
+            maxHealth = Mathf.Max(1, health);
+            if (currentHealth > 0) currentHealth = Mathf.Clamp(maxHealth - missing, 1, maxHealth);
+            OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        }
+
         public void TakeDamage(int damage)
         {
             if (!IsAlive || damage <= 0) return;
+            damage = BattleOfAges.Crafting.ItemStatCalculator.CalculateEffectiveDamageAgainstArmorLevel(damage, ArmorLevel);
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             OnTakeDamage?.Invoke(damage);

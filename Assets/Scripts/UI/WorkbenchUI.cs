@@ -347,10 +347,10 @@ namespace BattleOfAges.UI
                         statDesc = $"+{ItemStatCalculator.CalculateSwordDamage(selectedLevel):F1} Урону";
                         break;
                     case ItemType.Bow:
-                        statDesc = $"+{20f + selectedLevel * 5f:F1} Дальнього урону";
+                        statDesc = $"{40 + selectedLevel * 15} урону, 12 м";
                         break;
                     case ItemType.Armor:
-                        statDesc = $"+{ItemStatCalculator.CalculateArmorDefense(selectedLevel):F1} Захисту";
+                        statDesc = $"-{selectedLevel * 10}% урону, +{Mathf.RoundToInt(ItemStatCalculator.CalculateArmorDefense(selectedLevel) * 15f)} HP";
                         break;
                     case ItemType.Axe:
                         statDesc = $"+{ItemStatCalculator.CalculateToolEfficiency(selectedLevel):F2}x Рубки дерева";
