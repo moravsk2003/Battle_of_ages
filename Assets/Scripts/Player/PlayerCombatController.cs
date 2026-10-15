@@ -19,63 +19,64 @@ namespace BattleOfAges.Player
         private Camera fpsCamera;
         private FpsViewmodelAnimation viewmodelAnimation;
 
-        public int EquippedSwordLevel { get; private set; } = 0;
-        public int EquippedArmorLevel { get; private set; } = 0;
-        public int EquippedBowLevel { get; private set; } = 0;
+        // Unarmed player: the worn gear (Equipment) scales these
+        public const int BaseHealth = 500, BaseDamage = 40;
+        public const float BaseCooldown = 1.8f;
+
+        private BattleOfAges.Crafting.Equipment gear;
+        private bool gearReady;
+
+        public BattleOfAges.Crafting.Equipment Gear
+        {
+            get
+            {
+                if (gear == null) gear = GetComponent<BattleOfAges.Crafting.Equipment>();
+                if (gear == null) gear = gameObject.AddComponent<BattleOfAges.Crafting.Equipment>();
+                if (!gearReady)
+                {
+                    gearReady = true;
+                    if (healthComponent == null) healthComponent = GetComponent<HealthComponent>();
+                    if (healthComponent != null) healthComponent.InitializeHealth(BaseHealth);
+                    gear.SetBaseStats(BaseHealth, BaseDamage, BaseCooldown, attackRange);
+                }
+                return gear;
+            }
+        }
+
+        public int EquippedSwordLevel => Gear.LevelOf(BattleOfAges.Crafting.ItemType.Sword);
+        public int EquippedArmorLevel => Gear.LevelOf(BattleOfAges.Crafting.ItemType.Armor);
+        public int EquippedBowLevel => Gear.LevelOf(BattleOfAges.Crafting.ItemType.Bow);
 
         private void Awake()
         {
             healthComponent = GetComponent<HealthComponent>();
             combatUnit = GetComponent<CombatUnit>();
 
-            // Configure Player stats: 500 HP, 50 Damage, 2.0s cooldown
-            if (healthComponent != null) healthComponent.InitializeHealth(500);
-            if (combatUnit != null) combatUnit.InitializeCombatStats(50, 1.8f, attackRange);
+            // Starting kit: the sword and shield the first-person arms are drawn with
+            BattleOfAges.Crafting.Equipment g = Gear;
+            if (g[BattleOfAges.Crafting.EquipSlot.Weapon].IsEmpty) g.Equip(new BattleOfAges.Crafting.Item(BattleOfAges.Crafting.ItemType.Sword, 1));
+            if (g[BattleOfAges.Crafting.EquipSlot.Shield].IsEmpty) g.Equip(new BattleOfAges.Crafting.Item(BattleOfAges.Crafting.ItemType.Shield, 1));
         }
 
-        public void EquipItem(BattleOfAges.Crafting.ItemType type, int level)
+        /// <summary>Wears the item (no store involved); returns what was worn in that slot.</summary>
+        public BattleOfAges.Crafting.Item EquipItem(BattleOfAges.Crafting.ItemType type, int level)
         {
             if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
-            if (healthComponent == null) healthComponent = GetComponent<HealthComponent>();
-
-            if (type == BattleOfAges.Crafting.ItemType.Sword)
-            {
-                EquippedSwordLevel = level;
-                EquippedBowLevel = 0;
-                int dmg = 50 + Mathf.RoundToInt(BattleOfAges.Crafting.ItemStatCalculator.CalculateSwordDamage(level));
-                combatUnit.InitializeCombatStats(dmg, 1.4f, attackRange);
-                Debug.Log($"[PlayerCombat] ⚔️ Гравець екіпірував Меч (Рівень {level})! Новий урон: {dmg}");
-            }
-            else if (type == BattleOfAges.Crafting.ItemType.Armor)
-            {
-                EquippedArmorLevel = level;
-                int bonusHp = Mathf.RoundToInt(BattleOfAges.Crafting.ItemStatCalculator.CalculateArmorDefense(level) * 15f);
-                int totalHp = 500 + bonusHp;
-                healthComponent.ArmorLevel = level;
-                healthComponent.SetMaxHealthKeepDamage(totalHp);
-                Debug.Log($"[PlayerCombat] 🛡️ Гравець екіпірував Броню (Рівень {level})! Здоров'я: {totalHp} HP, поглинання {level * 10}%");
-            }
-            else if (type == BattleOfAges.Crafting.ItemType.Bow)
-            {
-                EquippedBowLevel = level;
-                EquippedSwordLevel = 0;
-                int dmg = 40 + level * 15;
-                combatUnit.InitializeCombatStats(dmg, 1.2f, 12.0f);
-                Debug.Log($"[PlayerCombat] 🏹 Гравець екіпірував Лук (Рівень {level})! Дальність: 12м, Урон: {dmg}");
-            }
-            else if (type == BattleOfAges.Crafting.ItemType.Axe || type == BattleOfAges.Crafting.ItemType.Pickaxe)
-            {
-                PlayerResourceHarvester harvester = GetComponent<PlayerResourceHarvester>();
-                if (harvester != null)
-                {
-                    harvester.EquipHarvestTool(type, level);
-                }
-            }
+            return Gear.Equip(new BattleOfAges.Crafting.Item(type, level));
         }
 
         private void Start()
         {
             EnsureCameraReference();
+
+            // The first-person fists hold the worn weapon and shield
+            FpsViewmodelSetup viewmodel = FindFirstObjectByType<FpsViewmodelSetup>();
+            if (viewmodel != null && viewmodel.ViewmodelRoot != null)
+            {
+                FpsViewmodelGear held = viewmodel.ViewmodelRoot.GetComponent<FpsViewmodelGear>();
+                if (held == null) held = viewmodel.ViewmodelRoot.gameObject.AddComponent<FpsViewmodelGear>();
+                held.Bind(Gear);
+            }
         }
 
         private void EnsureCameraReference()
@@ -111,6 +112,7 @@ namespace BattleOfAges.Player
         private bool IsAnyUIOpen()
         {
             return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
+                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible ||
                    (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
                    (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
                    (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused());

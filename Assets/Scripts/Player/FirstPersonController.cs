@@ -98,6 +98,7 @@ namespace BattleOfAges.Player
         private bool IsAnyUIOpen()
         {
             return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
+                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible ||
                    (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
                    (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
                    (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused());

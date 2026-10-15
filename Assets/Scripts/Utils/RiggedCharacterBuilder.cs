@@ -52,14 +52,21 @@ namespace BattleOfAges.Utils
             // The knight guard has its own sculpted body and gear on this skeleton
             if (type == HumanoidModelBuilder.HumanType.KnightGuard && KnightModelBuilder.Build(root, model.transform))
             {
+                root.AddComponent<CharacterGear>().Type = type; // sculpted armour: the gear only changes stats
                 model.AddComponent<FootIK>();
                 root.AddComponent<CharacterAnimationDriver>();
                 return root;
             }
 
+            // Weapon, shield and helmet are worn gear (Equipment -> CharacterGear) when the character can be baked
+            // into one mesh; otherwise the role's fixed props are attached as before. The warlord's horned helm is
+            // part of his outfit either way.
+            SkinnedMeshRenderer bodyRenderer = model.GetComponentInChildren<SkinnedMeshRenderer>(true);
+            bool gearMesh = bodyRenderer != null && bodyRenderer.sharedMesh != null && bodyRenderer.sharedMesh.isReadable && Shader.Find("Custom/CharacterSurface") != null;
+            bool warlord = type == HumanoidModelBuilder.HumanType.Warlord;
             ApplyLook(model, type);
-            AttachEquipment(model.transform, type);
-            AttachHelmet(model.transform, type);
+            if (!gearMesh) AttachEquipment(model.transform, type);
+            if (!gearMesh || warlord) AttachHelmet(model.transform, type);
             AttachOutfit(model.transform, type);
             if (!knight) AttachFaceDetails(model.transform, type, lib);
 
@@ -69,7 +76,20 @@ namespace BattleOfAges.Utils
                 smr.updateWhenOffscreen = false;
             }
 
-            if (!BakeCharacter(root, model.transform)) MergeAttachments(root, model.transform);
+            if (gearMesh && BakeCharacter(root, model.transform))
+            {
+                CharacterGear gear = root.AddComponent<CharacterGear>();
+                gear.Type = type;
+                gear.Body = bodyRenderer;
+                gear.BaseMesh = bodyRenderer.sharedMesh;
+                gear.FixedHelmet = warlord;
+                gear.KnightRig = knight;
+            }
+            else
+            {
+                MergeAttachments(root, model.transform);
+                root.AddComponent<CharacterGear>().Type = type;
+            }
             model.AddComponent<FootIK>();
             root.AddComponent<CharacterAnimationDriver>();
             return root;

@@ -87,7 +87,6 @@ namespace BattleOfAges.Utils
             Vector3 d = Vector3.Cross(grip, f); // back of the right hand faces out (+X)
             Vector3 wrist = Fist(kit, SwordPos, f, d, true, 0.0165f);
             Arm(kit, wrist, true);
-            Sword(kit, Matrix4x4.TRS(SwordPos, SwordRot, Vector3.one));
             return kit.ToMesh("ViewmodelArm_Right");
         }
 
@@ -186,7 +185,6 @@ namespace BattleOfAges.Utils
             Vector3 d = Vector3.Cross(f, grip); // back of the left hand faces up
             Vector3 wrist = Fist(kit, gripCentre, f, d, false, 0.0105f);
             Arm(kit, wrist, false);
-            Shield(kit, s, handleDepth);
             return kit.ToMesh("ViewmodelArm_Left");
         }
 
@@ -468,6 +466,129 @@ namespace BattleOfAges.Utils
             Vector3 wrist = frame.TransformPoint(P(0f, 0.004f, -0.122f));
             if (Application.isPlaying) UnityEngine.Object.Destroy(tmp.gameObject); else UnityEngine.Object.DestroyImmediate(tmp.gameObject);
             return wrist;
+        }
+
+        // ------------------------------------------------------------------ held gear (built per worn item)
+
+        /// <summary>The worn weapon in the right fist (right pivot space), finished for its level.</summary>
+        public static Mesh BuildWeapon(BattleOfAges.Crafting.ItemType type, int level)
+        {
+            var kit = new MeshKit();
+            Matrix4x4 m = Matrix4x4.TRS(SwordPos, SwordRot, Vector3.one);
+            switch (type)
+            {
+                case BattleOfAges.Crafting.ItemType.Axe: HeldAxe(kit, m, false); break;
+                case BattleOfAges.Crafting.ItemType.Pickaxe: HeldAxe(kit, m, true); break;
+                case BattleOfAges.Crafting.ItemType.Bow: HeldBow(kit, m, level); break;
+                default: Sword(kit, m); break;
+            }
+            Refinish(kit, level);
+            return kit.ToMesh($"ViewmodelWeapon_{type}_{level}");
+        }
+
+        /// <summary>The worn shield on the left fist (left pivot space), finished for its level.</summary>
+        public static Mesh BuildShield(int level)
+        {
+            var kit = new MeshKit();
+            Shield(kit, Matrix4x4.TRS(ShieldPos, ShieldRot, Vector3.one), 0.016f);
+            Refinish(kit, level);
+            return kit.ToMesh($"ViewmodelShield_{level}");
+        }
+
+        /// <summary>
+        /// Re-finishes the steel / brass / iron parts for an item level (the shading of the original colours is kept):
+        /// I bronze, II iron, III steel with brass, IV blued steel with silver, V bright steel with gold.
+        /// </summary>
+        private static void Refinish(MeshKit kit, int level)
+        {
+            GearMeshBuilder.LevelMetals(level, out Color main, out Vector3 mainS, out Color trim, out Vector3 trimS);
+            bool linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
+            Color Lin(Color c) => linear ? c.linear : c;
+            float Sum(Color c) => c.r + c.g + c.b;
+            Color steel = Lin(Steel), brass = Lin(Brass), iron = Lin(Iron);
+            Color mainL = Lin(main), trimL = Lin(trim);
+            if (level == 3) { trimL = brass; trimS = BrassS; }
+            for (int i = 0; i < kit.V.Count; i++)
+            {
+                Vector3 s = kit.S[i];
+                Color c = kit.C[i];
+                if (s == SteelS) { kit.C[i] = mainL * (Sum(c) / Sum(steel)); kit.S[i] = mainS; }
+                else if (s == BrassS) { kit.C[i] = trimL * (Sum(c) / Sum(brass)); kit.S[i] = trimS; }
+                else if (s == IronS && level >= 3) { kit.C[i] = (level == 3 ? mainL * 0.7f : trimL) * (Sum(c) / Sum(iron)); kit.S[i] = level == 3 ? mainS : trimS; }
+                kit.C[i] = new Color(kit.C[i].r, kit.C[i].g, kit.C[i].b, 1f);
+            }
+        }
+
+        private static void HeldAxe(MeshKit kit, Matrix4x4 m, bool pick)
+        {
+            // Haft through the fist along +Y; the head reaches towards the screen centre (-X) so its face is seen
+            var haft = new List<Vector2> { V2(0f, -0.13f), V2(0.0135f, -0.128f), V2(0.0145f, -0.11f) };
+            for (float y = -0.08f; y < 0.5f; y += 0.06f) haft.Add(V2(0.0145f - y * 0.004f, y));
+            haft.Add(V2(0.0125f, 0.52f)); haft.Add(V2(0f, 0.525f));
+            kit.Lathe(m, haft.ToArray(), 16, WoodS, (i, a) => Wood * (0.85f + 0.2f * Mathf.Sin(a * 3f + i)));
+            if (pick)
+            {
+                const int N = 13;
+                var bar = new Vector3[N, 4];
+                for (int i = 0; i < N; i++)
+                {
+                    float s = -1f + 2f * i / (N - 1);
+                    float x = s * 0.17f, y = 0.47f - s * s * 0.045f, h = Mathf.Lerp(0.014f, 0.0025f, Mathf.Abs(s));
+                    bar[i, 0] = m.MultiplyPoint3x4(new Vector3(x, y + h, h)); bar[i, 1] = m.MultiplyPoint3x4(new Vector3(x, y + h, -h));
+                    bar[i, 2] = m.MultiplyPoint3x4(new Vector3(x, y - h, -h)); bar[i, 3] = m.MultiplyPoint3x4(new Vector3(x, y - h, h));
+                }
+                kit.Grid(bar, true, SteelS, (i, j) => Steel * (j == 0 ? 1.05f : 0.9f));
+            }
+            else
+            {
+                var outline = new[] { new Vector3(-0.012f, 0.50f, 0f), new Vector3(-0.07f, 0.49f, 0f), new Vector3(-0.125f, 0.535f, 0f), new Vector3(-0.135f, 0.43f, 0f), new Vector3(-0.07f, 0.405f, 0f), new Vector3(-0.012f, 0.42f, 0f) };
+                var head = new Vector3[2, outline.Length];
+                for (int j = 0; j < outline.Length; j++)
+                {
+                    float th = Mathf.Lerp(0.009f, 0.0015f, Mathf.InverseLerp(-0.03f, -0.13f, outline[j].x));
+                    head[0, j] = m.MultiplyPoint3x4(outline[j] + new Vector3(0f, 0f, th));
+                    head[1, j] = m.MultiplyPoint3x4(outline[j] - new Vector3(0f, 0f, th));
+                }
+                kit.Grid(head, true, SteelS, (i, j) => Steel * (j == 2 || j == 3 ? 1.1f : 0.92f));
+                var front = new Vector3[outline.Length];
+                var back = new Vector3[outline.Length];
+                for (int j = 0; j < outline.Length; j++) { front[j] = head[0, j]; back[j] = head[1, j]; }
+                kit.Polygon(front, m.MultiplyPoint3x4(new Vector3(-0.07f, 0.47f, -1f)), SteelS, _ => Steel * 0.95f);
+                kit.Polygon(back, m.MultiplyPoint3x4(new Vector3(-0.07f, 0.47f, 1f)), SteelS, _ => Steel * 0.95f);
+            }
+            kit.Box(m * Matrix4x4.Translate(new Vector3(0f, pick ? 0.47f : 0.46f, 0f)), new Vector3(0.036f, 0.07f, 0.032f), 0.005f, BrassS, _ => Brass);
+        }
+
+        private static void HeldBow(MeshKit kit, Matrix4x4 m, int level)
+        {
+            // Upright through the fist, limbs bending forward (+Z), string on the near side
+            const int N = 21;
+            var limb = new Vector3[N, 8];
+            for (int i = 0; i < N; i++)
+            {
+                float s = -1f + 2f * i / (N - 1);
+                float y = s * 0.55f;
+                float z = (1f - s * s) * 0.07f - (level >= 3 ? 0.035f * Mathf.Pow(Mathf.Abs(s), 6f) : 0f);
+                float half = Mathf.Lerp(0.014f, 0.005f, Mathf.Abs(s));
+                for (int j = 0; j < 8; j++)
+                {
+                    float a = j * Mathf.PI * 2f / 8f;
+                    limb[i, j] = m.MultiplyPoint3x4(new Vector3(Mathf.Cos(a) * half, y, z + Mathf.Sin(a) * half * 0.7f));
+                }
+            }
+            kit.Grid(limb, true, WoodS, (i, j) => Mathf.Abs(i - N / 2) <= 1 ? DarkLeather : Wood * (0.9f + 0.1f * (j % 2)));
+            Vector3 top = m.MultiplyPoint3x4(new Vector3(0f, 0.55f, level >= 3 ? -0.035f : 0f)), bottom = m.MultiplyPoint3x4(new Vector3(0f, -0.55f, level >= 3 ? -0.035f : 0f));
+            var str = new Vector3[2, 4];
+            Vector3 dir = (top - bottom).normalized, u = Vector3.Cross(dir, Vector3.right).normalized, w = Vector3.Cross(dir, u);
+            for (int j = 0; j < 4; j++)
+            {
+                Vector3 off = (u * Mathf.Cos(j * Mathf.PI * 0.5f) + w * Mathf.Sin(j * Mathf.PI * 0.5f)) * 0.0012f;
+                str[0, j] = bottom + off; str[1, j] = top + off;
+            }
+            kit.Grid(str, true, ClothS, (i, j) => Thread);
+            if (level >= 3)
+                foreach (float s in new[] { -1f, 1f })
+                    kit.Box(m * Matrix4x4.Translate(new Vector3(0f, s * 0.53f, -0.03f)), new Vector3(0.016f, 0.04f, 0.022f), 0.003f, SteelS, _ => Steel);
         }
 
         // ------------------------------------------------------------------ helpers

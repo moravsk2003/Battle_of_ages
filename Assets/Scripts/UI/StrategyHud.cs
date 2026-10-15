@@ -41,6 +41,7 @@ namespace BattleOfAges.UI
 
         private void Start()
         {
+            active = this;
             canvas = UiTheme.CreateCanvas("StrategyHUD", 5);
             canvas.transform.SetParent(transform, false);
             root = (RectTransform)canvas.transform;
@@ -337,6 +338,15 @@ namespace BattleOfAges.UI
         }
 
         // ------------------------------------------------------------------ toasts
+
+        private static StrategyHud active;
+
+        /// <summary>Shows a short message in the toast column (crafted items, trophies...). No-op without a HUD.</summary>
+        public static void Notify(string message)
+        {
+            if (active == null || active.toastColumn == null) return;
+            active.Toast("msg:" + message, 1, n => n > 1 ? message + "  ×" + n : message);
+        }
 
         private void Toast(string key, int amount, System.Func<int, string> text)
         {

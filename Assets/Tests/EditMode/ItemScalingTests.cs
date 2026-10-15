@@ -85,10 +85,10 @@ namespace BattleOfAges.Tests
         public void RequiredOreTiers_ScaleWithLevel()
         {
             Assert.AreEqual(0, ItemStatCalculator.CalculateRequiredOreTier(1), "Level 1 requires Tier 0 ore.");
-            Assert.AreEqual(5, ItemStatCalculator.CalculateRequiredOreTier(2), "Level 2 requires Tier 5 ore.");
-            Assert.AreEqual(10, ItemStatCalculator.CalculateRequiredOreTier(3), "Level 3 requires Tier 10 ore.");
-            Assert.AreEqual(15, ItemStatCalculator.CalculateRequiredOreTier(4), "Level 4 requires Tier 15 ore.");
-            Assert.AreEqual(20, ItemStatCalculator.CalculateRequiredOreTier(5), "Level 5 requires Tier 20 ore.");
+            Assert.AreEqual(1, ItemStatCalculator.CalculateRequiredOreTier(2), "Level 2 requires Tier 1 ore.");
+            Assert.AreEqual(2, ItemStatCalculator.CalculateRequiredOreTier(3), "Level 3 requires Tier 2 ore.");
+            Assert.AreEqual(3, ItemStatCalculator.CalculateRequiredOreTier(4), "Level 4 requires Tier 3 ore.");
+            Assert.AreEqual(4, ItemStatCalculator.CalculateRequiredOreTier(5), "Level 5 requires Tier 4 ore.");
         }
     }
 }

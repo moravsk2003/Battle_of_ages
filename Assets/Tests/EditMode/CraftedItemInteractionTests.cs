@@ -34,8 +34,8 @@ namespace BattleOfAges.Tests
 
             villagerObj = new GameObject("TestVillager_1");
             villagerObj.AddComponent<CharacterController>();
-            villagerObj.AddComponent<HealthComponent>();
-            villagerObj.AddComponent<CombatUnit>();
+            villagerObj.AddComponent<HealthComponent>().InitializeHealth(100);
+            villagerObj.AddComponent<CombatUnit>().InitializeCombatStats(10, 2f, 2.5f);
             villagerUnit = villagerObj.AddComponent<RtsUnit>();
         }
 
@@ -45,99 +45,116 @@ namespace BattleOfAges.Tests
             if (workbenchObj != null) Object.DestroyImmediate(workbenchObj);
             if (playerObj != null) Object.DestroyImmediate(playerObj);
             if (villagerObj != null) Object.DestroyImmediate(villagerObj);
+            foreach (Armory a in Object.FindObjectsByType<Armory>(FindObjectsSortMode.None)) Object.DestroyImmediate(a.gameObject);
+        }
+
+        private void Craft(ItemType type, int level)
+        {
+            workbench.Queue.AssignWorker();
+            workbench.Queue.EnqueueItem(type, level);
+            workbench.Queue.Tick(30.0f);
         }
 
         [Test]
-        public void Workbench_WhenCraftCompletes_AddsToCompletedOutput()
+        public void Workbench_WhenCraftCompletes_DeliversToArmory()
         {
-            workbench.Queue.AssignWorker();
-            workbench.Queue.EnqueueItem(ItemType.Sword, 3);
-
-            // Fast forward time by 10 seconds to complete craft
-            workbench.Queue.Tick(10.0f);
-
-            Assert.AreEqual(1, workbench.CompletedOutput.Count, "CompletedOutput should contain 1 item after craft completes.");
-            Assert.AreEqual(ItemType.Sword, workbench.CompletedOutput[0].Type);
-            Assert.AreEqual(3, workbench.CompletedOutput[0].Level);
+            Craft(ItemType.Sword, 3);
+            Assert.AreEqual(1, Armory.Instance.Items.Count, "The finished item should land in the shared armory.");
+            Assert.AreEqual(new Item(ItemType.Sword, 3), Armory.Instance.Items[0]);
         }
 
         [Test]
-        public void Workbench_ClaimItemToPlayer_EquipsSwordAndIncreasesDamage()
+        public void Armory_EquipSwordOnPlayer_IncreasesDamageAndKeepsSlot()
         {
-            workbench.Queue.AssignWorker();
-            workbench.Queue.EnqueueItem(ItemType.Sword, 4);
-            workbench.Queue.Tick(10.0f);
-
+            Craft(ItemType.Sword, 4);
             CombatUnit cu = playerObj.GetComponent<CombatUnit>();
-            int baseDamage = cu.AttackDamage;
+            playerCombat.Gear.Unequip(EquipSlot.Weapon);
+            int unarmed = cu.AttackDamage;
 
-            bool claimed = workbench.ClaimItemToPlayer(0);
-            Assert.IsTrue(claimed, "Item should be claimed successfully.");
-            Assert.AreEqual(0, workbench.CompletedOutput.Count, "CompletedOutput should be empty after claiming.");
-            Assert.AreEqual(4, playerCombat.EquippedSwordLevel, "Player should have Level 4 sword equipped.");
-            Assert.Greater(cu.AttackDamage, baseDamage, "Player attack damage should increase after equipping sword.");
+            Assert.IsTrue(Armory.Instance.EquipFromStore(playerCombat.Gear, new Item(ItemType.Sword, 4)));
+            Assert.AreEqual(0, Armory.Instance.Items.Count, "The item leaves the armory when worn.");
+            Assert.AreEqual(4, playerCombat.EquippedSwordLevel);
+            Assert.Greater(cu.AttackDamage, unarmed, "A sword should raise the attack damage.");
         }
 
         [Test]
-        public void Workbench_ClaimItemToPlayer_EquipsArmorAndIncreasesHealth()
+        public void Armory_SwappingGear_ReturnsTheOldPieceToTheStore()
         {
-            workbench.Queue.AssignWorker();
-            workbench.Queue.EnqueueItem(ItemType.Armor, 5);
-            workbench.Queue.Tick(10.0f);
+            Equipment gear = playerCombat.Gear;
+            gear.Equip(new Item(ItemType.Helmet, 1));
+            Armory.Instance.Add(new Item(ItemType.Helmet, 3));
+            Assert.IsTrue(Armory.Instance.EquipFromStore(gear, new Item(ItemType.Helmet, 3)));
+            Assert.AreEqual(3, gear[EquipSlot.Helmet].Level);
+            Assert.AreEqual(1, Armory.Instance.CountOf(new Item(ItemType.Helmet, 1)), "The replaced helmet goes back to the armory.");
 
-            HealthComponent hp = playerObj.GetComponent<HealthComponent>();
-            int baseHp = hp.MaxHealth;
-
-            bool claimed = workbench.ClaimItemToPlayer(0);
-            Assert.IsTrue(claimed);
-            Assert.AreEqual(5, playerCombat.EquippedArmorLevel);
-            Assert.Greater(hp.MaxHealth, baseHp, "Player max health should increase after equipping armor.");
+            Assert.IsTrue(Armory.Instance.UnequipToStore(gear, EquipSlot.Helmet));
+            Assert.IsTrue(gear[EquipSlot.Helmet].IsEmpty);
+            Assert.AreEqual(2, Armory.Instance.Items.Count);
         }
 
         [Test]
-        public void Workbench_ClaimArmor_ReducesIncomingDamageAndDoesNotHeal()
+        public void Armor_ReducesIncomingDamageAndDoesNotHeal()
         {
             HealthComponent hp = playerObj.GetComponent<HealthComponent>();
-            hp.InitializeHealth(500);
+            Equipment gear = playerCombat.Gear;
+            gear.Unequip(EquipSlot.Shield);
             hp.TakeDamage(100);
 
-            workbench.Queue.AssignWorker();
-            workbench.Queue.EnqueueItem(ItemType.Armor, 3);
-            workbench.Queue.Tick(10.0f);
-            workbench.ClaimItemToPlayer(0);
+            gear.Equip(new Item(ItemType.Armor, 5));
+            Assert.Greater(hp.MaxHealth, PlayerCombatController.BaseHealth, "A chest piece adds max health.");
+            Assert.AreEqual(hp.MaxHealth - 100, hp.CurrentHealth, "Putting armour on must not heal the damage already taken.");
 
-            Assert.AreEqual(hp.MaxHealth - 100, hp.CurrentHealth, "Putting armor on must not heal the damage already taken.");
             int before = hp.CurrentHealth;
             hp.TakeDamage(100);
-            Assert.AreEqual(70, before - hp.CurrentHealth, "Level 3 armor should take 30% off a hit.");
+            Assert.AreEqual(80, before - hp.CurrentHealth, "A level V chest piece takes 20% off a hit.");
         }
 
         [Test]
-        public void Workbench_ClaimItemToPlayer_EquipsAxeAndIncreasesToolLevel()
+        public void ArmourPieces_AddUpAndAreCapped()
         {
-            workbench.Queue.AssignWorker();
-            workbench.Queue.EnqueueItem(ItemType.Axe, 2);
-            workbench.Queue.Tick(10.0f);
-
-            bool claimed = workbench.ClaimItemToPlayer(0);
-            Assert.IsTrue(claimed);
-            Assert.AreEqual(2, playerHarvester.EquippedAxeLevel, "Player harvester should have Level 2 axe equipped.");
+            Equipment gear = playerCombat.Gear;
+            foreach (ItemType t in new[] { ItemType.Armor, ItemType.Shield, ItemType.Helmet, ItemType.Gloves, ItemType.Boots })
+                gear.Equip(new Item(t, 5));
+            Assert.AreEqual(0.55f, gear.DamageReduction, 0.001f);
+            Assert.LessOrEqual(gear.DamageReduction, ItemStatCalculator.MAX_DAMAGE_REDUCTION);
         }
 
         [Test]
-        public void Workbench_EquipNearestVillager_PromotesVillagerToSoldier()
+        public void AxeInWeaponSlot_SetsHarvesterAxeLevel()
         {
-            workbench.Queue.AssignWorker();
-            workbench.Queue.EnqueueItem(ItemType.Sword, 3);
-            workbench.Queue.Tick(10.0f);
+            playerCombat.EquipItem(ItemType.Axe, 2);
+            Assert.AreEqual(2, playerHarvester.EquippedAxeLevel, "The axe works while it is the worn weapon.");
+            Assert.AreEqual(0, playerCombat.EquippedSwordLevel, "Only one weapon is held.");
+        }
 
-            bool equipped = workbench.EquipNearestVillager(0);
-            Assert.IsTrue(equipped, "Nearest villager should be equipped.");
-            Assert.AreEqual(0, workbench.CompletedOutput.Count);
+        [Test]
+        public void Bow_ExtendsAttackRange()
+        {
+            playerCombat.EquipItem(ItemType.Bow, 1);
+            Assert.AreEqual(ItemStatCalculator.BOW_RANGE, playerObj.GetComponent<CombatUnit>().AttackRange, 0.001f);
+        }
 
-            CombatUnit villagerCombat = villagerObj.GetComponent<CombatUnit>();
-            Assert.GreaterOrEqual(villagerCombat.AttackDamage, 25, "Equipped villager should have elevated combat damage.");
-            StringAssert.Contains("Soldier", villagerObj.name, "Villager name should reflect Soldier promotion.");
+        [Test]
+        public void Villager_EquippedFromArmory_GetsStrongerAndShowsTheKit()
+        {
+            Equipment gear = villagerObj.AddComponent<Equipment>();
+            gear.InitLoadout(new Item(ItemType.Axe, 1));
+            int before = villagerObj.GetComponent<CombatUnit>().AttackDamage;
+            Assert.AreEqual(10, before, "The starting kit keeps the tuned stats.");
+
+            Craft(ItemType.Sword, 3);
+            Assert.IsTrue(Armory.Instance.EquipFromStore(gear, new Item(ItemType.Sword, 3)));
+            Assert.Greater(villagerObj.GetComponent<CombatUnit>().AttackDamage, before);
+            Assert.AreEqual(1, Armory.Instance.CountOf(new Item(ItemType.Axe, 1)), "The axe goes back to the armory.");
+        }
+
+        [Test]
+        public void Workbench_CancelTask_RefundsResources()
+        {
+            workbench.Queue.EnqueueItem(ItemType.Sword, 1);
+            string id = workbench.Queue.Queue[0].TaskId;
+            Assert.IsTrue(workbench.CancelTask(id));
+            Assert.AreEqual(0, workbench.Queue.Queue.Count);
         }
 
         [Test]

@@ -69,7 +69,16 @@ namespace BattleOfAges.PlayModeTests
                     if (bench != null) WorkbenchUI.EnsureInstance().OpenUI(bench);
                     return Wait(0.3f);
                 }),
-                ("pause", () => { WorkbenchUI.Instance?.CloseUI(); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
+                ("equipment", () =>
+                {
+                    WorkbenchUI.Instance?.CloseUI();
+                    foreach (var it in new[] { new Item(ItemType.Sword, 3), new Item(ItemType.Sword, 3), new Item(ItemType.Bow, 2), new Item(ItemType.Axe, 1), new Item(ItemType.Helmet, 4),
+                                               new Item(ItemType.Armor, 2), new Item(ItemType.Gloves, 5), new Item(ItemType.Boots, 1), new Item(ItemType.Shield, 3), new Item(ItemType.Pickaxe, 2) })
+                        Armory.Instance.Add(it);
+                    EquipmentUI.Instance.OpenDefault();
+                    return Wait(0.3f);
+                }),
+                ("pause", () => { EquipmentUI.Instance.Close(); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
                 ("settings", () => { PauseMenuController.Instance?.OpenSettings(); return Wait(0.3f); }),
             };
 

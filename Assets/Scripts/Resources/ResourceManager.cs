@@ -121,5 +121,25 @@ namespace BattleOfAges.Resources
             OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
             return true;
         }
+
+        /// <summary>Ore of this tier or any higher one.</summary>
+        public int GetOreCountAtLeast(int minTier)
+        {
+            int n = 0;
+            foreach (var pair in oreTierCounts) if (pair.Key >= minTier) n += pair.Value;
+            return n;
+        }
+
+        /// <summary>Consumes ore of at least minTier, the lowest qualifying tiers first (better ore is kept).</summary>
+        public bool ConsumeOreAtLeast(int minTier, int amount)
+        {
+            if (GetOreCountAtLeast(minTier) < amount) return false;
+            for (int t = Mathf.Max(0, minTier); t < OreTierHelper.MAX_TIERS && amount > 0; t++)
+            {
+                int take = Mathf.Min(amount, GetOreTierCount(t));
+                if (take > 0) { ConsumeOre(t, take); amount -= take; }
+            }
+            return true;
+        }
     }
 }

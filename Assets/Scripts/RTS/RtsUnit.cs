@@ -62,6 +62,17 @@ namespace BattleOfAges.RTS
             SnapToTerrain();
             lastPos = transform.position;
             isWorker = GetComponent<NpcResourceGatherer>() != null;
+            if (!isPlayerControlled) EnsureStartingKit();
+        }
+
+        /// <summary>Own units get the kit their model is drawn with (knight: steel set, villager: axe).</summary>
+        private void EnsureStartingKit()
+        {
+            if (GetComponent<BattleOfAges.Crafting.Equipment>() != null) return;
+            var visual = GetComponentInChildren<BattleOfAges.Utils.CharacterGear>(true);
+            var type = visual != null ? visual.Type
+                : name.Contains("Knight") ? BattleOfAges.Utils.HumanoidModelBuilder.HumanType.KnightGuard : BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Villager;
+            gameObject.AddComponent<BattleOfAges.Crafting.Equipment>().InitLoadout(BattleOfAges.Crafting.StartingKits.For(type));
         }
 
         private void SetupSelectionIndicatorVisuals()

@@ -80,6 +80,7 @@ namespace BattleOfAges.UI
                 {
                     statusText.text = "Боєць / Охоронець селища";
                 }
+                statusText.text += GearSummary(unit);
             }
             else
             {
@@ -116,6 +117,16 @@ namespace BattleOfAges.UI
             {
                 commander.DeselectAll();
             }
+        }
+
+        private static string GearSummary(RtsUnit unit)
+        {
+            var gear = unit.GetComponent<BattleOfAges.Crafting.Equipment>();
+            if (gear == null) return "";
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var slot in BattleOfAges.Crafting.ItemTypeNames.Slots)
+                if (!gear[slot].IsEmpty) parts.Add(gear[slot].ToString());
+            return parts.Count == 0 ? "\nБез спорядження" : "\n" + string.Join(" · ", parts);
         }
 
         private string GetDirectiveName(GatherDirective directive)
@@ -182,11 +193,30 @@ namespace BattleOfAges.UI
             CreateDirectiveButton(bar, UiTheme.Icon.Ore, "Руда", () => IssueDirectiveToSelected(GatherDirective.OrePebblesOnly));
             CreateDirectiveButton(bar, UiTheme.Icon.House, "Шахта", () => IssueDirectiveToSelected(GatherDirective.HaulOreFromMineToChest));
             CreateDirectiveButton(bar, UiTheme.Icon.Worker, "Авто", () => IssueDirectiveToSelected(GatherDirective.Auto));
+            CreateGearButton(bar);
 
             RectTransform close = UiTheme.Rect(rect, "DeselectBtn", new Vector2(1f, 1f), new Vector2(14f, 14f), new Vector2(38f, 38f));
             UiTheme.PanelImage(close, UiTheme.ButtonSprite, new Color(1f, 0.72f, 0.68f));
             close.gameObject.AddComponent<Button>().onClick.AddListener(DeselectAll);
             UiTheme.Label(close, "Text", "×", 26, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+        }
+
+        private void CreateGearButton(Transform parent)
+        {
+            var go = new GameObject("GearBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite, new Color(1f, 0.92f, 0.75f));
+            Button btn = go.AddComponent<Button>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
+            cb.colorMultiplier = 1.25f;
+            btn.colors = cb;
+            btn.onClick.AddListener(() => EquipmentUI.Instance.OpenDefault());
+            RectTransform icon = UiTheme.Rect(go.transform, "Icon", new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(42f, 42f));
+            Image img = icon.gameObject.AddComponent<Image>();
+            img.sprite = UiTheme.ItemSprite(BattleOfAges.Crafting.ItemType.Helmet, 3); img.preserveAspect = true; img.raycastTarget = false;
+            RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
+            UiTheme.Label(txt, "Text", "Спорядж. [C]", 16, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
         }
 
         private void CreateDirectiveButton(Transform parent, UiTheme.Icon icon, string label, UnityEngine.Events.UnityAction onClick)

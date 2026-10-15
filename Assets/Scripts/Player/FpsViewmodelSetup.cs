@@ -30,6 +30,7 @@ namespace BattleOfAges.Player
         [SerializeField, Min(0.1f)] private float viewmodelFarClip = 3f;
 
         public Camera ViewmodelCamera => viewmodelCamera;
+        public Transform ViewmodelRoot => viewmodelRoot;
 
         private void Awake()
         {

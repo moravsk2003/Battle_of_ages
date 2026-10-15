@@ -15,22 +15,18 @@ namespace BattleOfAges.Player
         [SerializeField] private float harvestRange = 6.0f;
         [SerializeField] private float proximityRadius = 5.0f;
 
-        public int EquippedAxeLevel { get; private set; } = 0;
-        public int EquippedPickaxeLevel { get; private set; } = 0;
+        private BattleOfAges.Crafting.Equipment gear;
 
-        public void EquipHarvestTool(BattleOfAges.Crafting.ItemType type, int level)
+        // Tools work while they are in the weapon slot
+        public int EquippedAxeLevel => Gear != null ? Gear.LevelOf(BattleOfAges.Crafting.ItemType.Axe) : 0;
+        public int EquippedPickaxeLevel => Gear != null ? Gear.LevelOf(BattleOfAges.Crafting.ItemType.Pickaxe) : 0;
+
+        private BattleOfAges.Crafting.Equipment Gear
         {
-            if (type == BattleOfAges.Crafting.ItemType.Axe)
+            get
             {
-                EquippedAxeLevel = level;
-                float eff = BattleOfAges.Crafting.ItemStatCalculator.CalculateToolEfficiency(level);
-                Debug.Log($"[PlayerHarvester] 🪓 Гравець екіпірував Сокиру (Рівень {level})! Швидкість рубки дерева: {eff:F2}x");
-            }
-            else if (type == BattleOfAges.Crafting.ItemType.Pickaxe)
-            {
-                EquippedPickaxeLevel = level;
-                float eff = BattleOfAges.Crafting.ItemStatCalculator.CalculateToolEfficiency(level);
-                Debug.Log($"[PlayerHarvester] ⛏️ Гравець екіпірував Кайло (Рівень {level})! Ефективність видобутку: {eff:F2}x");
+                if (gear == null) gear = GetComponent<BattleOfAges.Crafting.Equipment>();
+                return gear;
             }
         }
 
@@ -68,6 +64,7 @@ namespace BattleOfAges.Player
                 (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
                 (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
                 (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) ||
+                EquipmentUI.IsVisible ||
                 (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()))
             {
                 if (resourceUI != null) resourceUI.HideTreePrompt();
@@ -271,14 +268,14 @@ namespace BattleOfAges.Player
 
                 if (EquippedAxeLevel > 0)
                 {
-                    chopStr += $" [Сокира Lv.{EquippedAxeLevel}]";
+                    chopStr += $" [Сокира {BattleOfAges.Crafting.ItemTypeNames.Roman(EquippedAxeLevel)}]";
                 }
 
                 resourceUI.ShowTreePrompt($"{branchStr}\n{chopStr}");
             }
             else if (activeTreeTarget.CurrentState == TreeState.WoodPile)
             {
-                string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира Lv.{EquippedAxeLevel}]" : "";
+                string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира {BattleOfAges.Crafting.ItemTypeNames.Roman(EquippedAxeLevel)}]" : "";
                 resourceUI.ShowTreePrompt($"🪓 [Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} Деревини){axeStr}");
             }
         }

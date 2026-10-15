@@ -73,6 +73,7 @@ namespace BattleOfAges.Tests
         {
             HealthComponent hp = mobObj.GetComponent<HealthComponent>();
             int lowHp = Mathf.RoundToInt(hp.MaxHealth * 0.1f);
+            hp.DamageReduction = 0f; // the bandit's leather would soften the hits that set the health up
 
             // One second of healing in 20 small AI ticks (close-range LOD)...
             hp.TakeDamage(hp.MaxHealth - lowHp);

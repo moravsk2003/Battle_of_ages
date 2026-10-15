@@ -138,7 +138,8 @@ namespace BattleOfAges.UI
         {
             return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
                    (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
-                   (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen);
+                   (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
+                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible;
         }
 
         private void CloseAllModalUIs()
@@ -146,6 +147,8 @@ namespace BattleOfAges.UI
             if (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) InventoryUI.Instance.CloseInventory();
             if (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) NpcGatherCommandUI.Instance.CloseMenu();
             if (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) BuildMenuUI.Instance.CloseMenu();
+            if (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) WorkbenchUI.Instance.CloseUI();
+            if (EquipmentUI.IsVisible) EquipmentUI.Instance.Close();
         }
 
         private void CheckForRebindKeyPress()

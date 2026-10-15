@@ -260,6 +260,182 @@ namespace BattleOfAges.UI
             return img;
         }
 
+        /// <summary>Themed button (bronze-rimmed) with a label; returns the Button.</summary>
+        public static Button TextButton(Transform parent, string name, string text, Vector2 anchor, Vector2 offset, Vector2 size, UnityEngine.Events.UnityAction onClick, int fontSize = 18)
+        {
+            RectTransform rt = Rect(parent, name, anchor, offset, size);
+            PanelImage(rt, ButtonSprite);
+            Button b = rt.gameObject.AddComponent<Button>();
+            ColorBlock cb = b.colors;
+            cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
+            cb.disabledColor = new Color(0.55f, 0.55f, 0.55f, 0.8f); cb.colorMultiplier = 1.25f;
+            b.colors = cb;
+            if (onClick != null) b.onClick.AddListener(onClick);
+            Label(rt, "Text", text, fontSize, TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
+            return b;
+        }
+
+        // ------------------------------------------------------------------ items
+
+        /// <summary>Rarity-style colour of an item level (I grey, II green, III blue, IV violet, V gold).</summary>
+        public static Color LevelColor(int level)
+        {
+            switch (level)
+            {
+                case 1: return new Color(0.80f, 0.76f, 0.68f);
+                case 2: return new Color(0.50f, 0.82f, 0.42f);
+                case 3: return new Color(0.42f, 0.66f, 1.00f);
+                case 4: return new Color(0.76f, 0.50f, 1.00f);
+                default: return new Color(1.00f, 0.74f, 0.28f);
+            }
+        }
+
+        private static readonly Dictionary<int, Sprite> ItemIcons = new Dictionary<int, Sprite>();
+
+        /// <summary>Icon of an item; the metal / leather / wood follows its level like the model does.</summary>
+        public static Sprite ItemSprite(BattleOfAges.Crafting.ItemType type, int level)
+        {
+            int key = (int)type * 8 + Mathf.Clamp(level, 1, 5);
+            if (ItemIcons.TryGetValue(key, out Sprite s) && s != null) return s;
+            s = RenderIcon("UI_Item_" + type + level, p => ShadeItem(type, Mathf.Clamp(level, 1, 5), p));
+            ItemIcons[key] = s;
+            return s;
+        }
+
+        private static Sprite RenderIcon(string name, Func<Vector2, Color> shade)
+        {
+            const int N = 64;
+            var tex = new Texture2D(N, N, TextureFormat.RGBA32, true) { wrapMode = TextureWrapMode.Clamp, name = name };
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++)
+            {
+                Color acc = Color.clear;
+                for (int sy = 0; sy < 3; sy++)
+                for (int sx = 0; sx < 3; sx++)
+                {
+                    Vector2 p = new Vector2((x + (sx + 0.5f) / 3f) / N * 2f - 1f, (y + (sy + 0.5f) / 3f) / N * 2f - 1f);
+                    Color c = shade(p);
+                    acc += new Color(c.r * c.a, c.g * c.a, c.b * c.a, c.a);
+                }
+                acc /= 9f;
+                px[x + y * N] = acc.a > 0f ? new Color(acc.r / acc.a, acc.g / acc.a, acc.b / acc.a, acc.a) : Color.clear;
+            }
+            tex.SetPixels(px);
+            tex.Apply(true);
+            return Sprite.Create(tex, new Rect(0, 0, N, N), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        private static Color ShadeItem(BattleOfAges.Crafting.ItemType type, int level, Vector2 p)
+        {
+            Color result = Color.clear;
+            void Layer(float d, Color fill)
+            {
+                if (d < 0.07f) result = Over(result, new Color(0.08f, 0.06f, 0.04f, 1f));
+                if (d < 0f) result = Over(result, fill);
+            }
+            // Finishes by level (same steps as the models)
+            Color[] metals = { new Color(0.80f, 0.56f, 0.30f), new Color(0.60f, 0.62f, 0.64f), new Color(0.84f, 0.87f, 0.92f), new Color(0.34f, 0.42f, 0.62f), new Color(0.93f, 0.93f, 0.96f) };
+            Color[] armour = { new Color(0.58f, 0.38f, 0.21f), new Color(0.60f, 0.62f, 0.64f), new Color(0.84f, 0.87f, 0.92f), new Color(0.34f, 0.42f, 0.62f), new Color(0.93f, 0.93f, 0.96f) };
+            Color gold = new Color(0.98f, 0.76f, 0.30f);
+            Color metal = metals[level - 1], arm = armour[level - 1];
+            Color trim = level >= 5 ? gold : level == 4 ? new Color(0.85f, 0.87f, 0.9f) : level == 1 ? new Color(0.36f, 0.22f, 0.12f) : new Color(0.42f, 0.43f, 0.46f);
+            Color wood = level <= 1 ? new Color(0.70f, 0.50f, 0.28f) : level == 2 ? new Color(0.58f, 0.38f, 0.21f) : new Color(0.45f, 0.28f, 0.15f);
+            Color leather = new Color(0.36f, 0.22f, 0.12f);
+            float shine = Mathf.Clamp01(0.5f + 0.5f * (p.x - p.y) * 0.6f); // light from the top left
+            Color Lit(Color c) => Color.Lerp(c * 0.82f, Color.Lerp(c, Color.white, 0.25f), shine);
+
+            switch (type)
+            {
+                case BattleOfAges.Crafting.ItemType.Sword:
+                {
+                    Vector2 a = new Vector2(-0.42f, -0.42f), b = new Vector2(0.72f, 0.72f);
+                    Layer(Segment(p, new Vector2(-0.8f, -0.8f), new Vector2(-0.48f, -0.48f)) - 0.08f, leather);
+                    Layer((p - new Vector2(-0.82f, -0.82f)).magnitude - 0.13f, trim);
+                    Layer(Segment(p, a, b) - 0.1f * Mathf.Clamp01(1.15f - Vector2.Dot(p - a, (b - a).normalized) / 1.6f), Lit(metal));
+                    Layer(Segment(p, a + new Vector2(-0.26f, 0.26f), a + new Vector2(0.26f, -0.26f)) - 0.08f, trim);
+                    break;
+                }
+                case BattleOfAges.Crafting.ItemType.Bow:
+                {
+                    Vector2 c = new Vector2(-0.9f, 0f);
+                    float ang = Mathf.Atan2(p.y - c.y, p.x - c.x);
+                    float arc = Mathf.Abs((p - c).magnitude - 1.25f) - 0.09f;
+                    if (Mathf.Abs(ang) > 0.82f) arc = 9f;
+                    Vector2 top = c + new Vector2(Mathf.Cos(0.82f), Mathf.Sin(0.82f)) * 1.25f, bot = new Vector2(top.x, -top.y);
+                    Layer(Segment(p, top, bot) - 0.025f, new Color(0.9f, 0.86f, 0.72f));
+                    Layer(arc, Lit(wood));
+                    Layer(Box(p - new Vector2(0.35f, 0f), new Vector2(0.09f, 0.16f)), leather);
+                    if (level >= 3) { Layer((p - top).magnitude - 0.1f, trim); Layer((p - bot).magnitude - 0.1f, trim); }
+                    break;
+                }
+                case BattleOfAges.Crafting.ItemType.Axe:
+                    Layer(Segment(p, new Vector2(-0.6f, -0.8f), new Vector2(0.3f, 0.75f)) - 0.08f, Lit(wood));
+                    Layer(Poly(Rotate(p - new Vector2(0.28f, 0.45f), 0.52f), new[] { new Vector2(-0.05f, 0.18f), new Vector2(0.55f, 0.38f), new Vector2(0.62f, -0.36f), new Vector2(-0.05f, -0.16f) }), Lit(metal));
+                    break;
+                case BattleOfAges.Crafting.ItemType.Pickaxe:
+                    Layer(Segment(p, new Vector2(-0.55f, -0.85f), new Vector2(0.25f, 0.62f)) - 0.08f, Lit(wood));
+                    for (int i = 0; i < 16; i++)
+                    {
+                        float s = -1f + 2f * i / 15f;
+                        Vector2 q = new Vector2(0.25f, 0.62f) + Rotate(new Vector2(s * 0.75f, -s * s * 0.22f), -0.5f);
+                        Layer((p - q).magnitude - Mathf.Lerp(0.13f, 0.04f, Mathf.Abs(s)), Lit(metal));
+                    }
+                    break;
+                case BattleOfAges.Crafting.ItemType.Shield:
+                {
+                    float d = p.magnitude;
+                    Layer(d - 0.86f, level <= 2 ? trim * (level == 1 ? 1.4f : 1f) : (level >= 5 ? gold : trim));
+                    Color face = level <= 2 ? wood : Lit(arm);
+                    if (level <= 2 && Mathf.Abs(Mathf.Repeat(p.x + 0.12f, 0.24f) - 0.12f) < 0.015f) face *= 0.65f;
+                    Layer(d - 0.74f, face);
+                    if (level >= 3) { Layer(Mathf.Min(Mathf.Abs(p.x + p.y), Mathf.Abs(p.x - p.y)) * 0.7071f - 0.05f + Mathf.Max(0f, d - 0.72f) * 9f, level >= 5 ? gold : trim); }
+                    Layer(d - 0.22f, level >= 5 ? gold : Lit(metal));
+                    break;
+                }
+                case BattleOfAges.Crafting.ItemType.Helmet:
+                {
+                    float dome = Mathf.Max((p - new Vector2(0f, -0.15f)).magnitude - 0.72f, -(p.y + 0.3f));
+                    Layer(dome, Lit(arm));
+                    Layer(Box(p - new Vector2(0f, -0.28f), new Vector2(0.76f, 0.1f)), trim);
+                    if (level >= 2) Layer(Box(p - new Vector2(0f, -0.52f), new Vector2(0.07f, 0.24f)), trim);
+                    if (level >= 3) Layer(Box(p - new Vector2(0f, 0.32f), new Vector2(0.05f, 0.25f)), level >= 5 ? gold : trim);
+                    break;
+                }
+                case BattleOfAges.Crafting.ItemType.Armor:
+                {
+                    float body = Poly(p, new[] { new Vector2(-0.82f, 0.55f), new Vector2(-0.3f, 0.75f), new Vector2(0.3f, 0.75f), new Vector2(0.82f, 0.55f), new Vector2(0.6f, -0.1f), new Vector2(0.5f, -0.82f), new Vector2(-0.5f, -0.82f), new Vector2(-0.6f, -0.1f) });
+                    float neck = (p - new Vector2(0f, 0.85f)).magnitude - 0.3f;
+                    Color main = level == 2 ? (Mathf.Repeat((p.x * 9f + Mathf.Floor(p.y * 9f) * 0.5f), 1f) < 0.5f ? arm : arm * 0.75f) : Lit(arm);
+                    Layer(Mathf.Max(body, -neck), main);
+                    Layer(Mathf.Max(Box(p - new Vector2(0f, -0.55f), new Vector2(0.56f, 0.09f)), body), leather);
+                    if (level >= 3) Layer(Mathf.Max(Box(p - new Vector2(0f, 0.12f), new Vector2(0.03f, 0.38f)), body), Color.Lerp(arm, Color.white, 0.35f));
+                    if (level >= 4) Layer(Mathf.Max(Mathf.Abs(body + 0.04f) - 0.03f, -neck), level >= 5 ? gold : trim);
+                    break;
+                }
+                case BattleOfAges.Crafting.ItemType.Gloves:
+                {
+                    Color g = level == 2 ? arm * 0.92f : Lit(arm);
+                    Layer(Box(p - new Vector2(0.05f, 0.18f), new Vector2(0.42f, 0.5f)) - 0.12f, g);
+                    Layer(Segment(p, new Vector2(-0.42f, 0f), new Vector2(-0.62f, 0.32f)) - 0.13f, g);
+                    Layer(Box(p - new Vector2(0.05f, -0.62f), new Vector2(0.48f, 0.18f)), level >= 5 ? gold : trim);
+                    for (int i = 0; i < 3; i++) Layer(Box(p - new Vector2(-0.15f + i * 0.22f, 0.62f), new Vector2(0.008f, 0.12f)) - 0.004f, g * 0.6f);
+                    break;
+                }
+                default: // boots
+                {
+                    Color b = level <= 2 ? leather * 1.3f : Lit(arm);
+                    Layer(Box(p - new Vector2(-0.12f, 0.2f), new Vector2(0.3f, 0.58f)) - 0.05f, b);
+                    Layer(Box(p - new Vector2(0.18f, -0.52f), new Vector2(0.6f, 0.2f)) - 0.08f, b);
+                    Layer(Box(p - new Vector2(0.15f, -0.78f), new Vector2(0.66f, 0.06f)), new Color(0.16f, 0.1f, 0.06f));
+                    Layer(Box(p - new Vector2(-0.12f, 0.72f), new Vector2(0.36f, 0.08f)), level >= 5 ? gold : trim);
+                    if (level >= 2) Layer(Box(p - new Vector2(-0.12f, 0.18f), new Vector2(0.24f, 0.4f)) + 0.01f, level == 2 ? metal : Color.Lerp(arm, Color.white, 0.15f));
+                    break;
+                }
+            }
+            return result;
+        }
+
         // ------------------------------------------------------------------ restyling of older UI
 
         /// <summary>Removes emoji and pictographs the UI font cannot draw (they show as boxes), keeping text punctuation.</summary>

@@ -107,6 +107,55 @@ namespace BattleOfAges.Crafting
             return false;
         }
 
+        public IReadOnlyList<RtsUnit> Workers => assignedWorkers;
+
+        /// <summary>Calls the nearest villager who is not at the bench yet (falls back to any own unit).</summary>
+        public RtsUnit AssignNearestFreeWorker()
+        {
+            assignedWorkers.RemoveAll(w => w == null);
+            RtsUnit best = null;
+            float bestScore = float.MaxValue;
+            foreach (RtsUnit u in FindObjectsByType<RtsUnit>(FindObjectsSortMode.None))
+            {
+                if (u == null || assignedWorkers.Contains(u) || u.GetComponent<BattleOfAges.Player.FirstPersonController>() != null) continue;
+                float score = Vector3.Distance(transform.position, u.transform.position) + (u.GetComponent<NpcResourceGatherer>() != null ? 0f : 1000f);
+                if (score < bestScore) { bestScore = score; best = u; }
+            }
+            return best != null && AssignWorker(best) ? best : null;
+        }
+
+        /// <summary>Sends the last called worker away from the bench.</summary>
+        public bool UnassignLastWorker()
+        {
+            assignedWorkers.RemoveAll(w => w == null);
+            if (assignedWorkers.Count > 0) return UnassignWorker(assignedWorkers[assignedWorkers.Count - 1]);
+            return craftingQueue.UnassignWorker();
+        }
+
+        /// <summary>Removes a queued task and gives its wood and ore back.</summary>
+        public bool CancelTask(string taskId)
+        {
+            CraftingTask task = null;
+            foreach (CraftingTask t in Queue.Queue) if (t.TaskId == taskId) { task = t; break; }
+            if (task == null || !Queue.CancelTask(taskId)) return false;
+            ResourceManager rm = ResourceManager.Instance;
+            if (rm != null)
+            {
+                rm.AddResource(ResourceType.Wood, ItemStatCalculator.CalculateWoodCost(task.Type, task.Level));
+                rm.AddOre(ItemStatCalculator.CalculateRequiredOreTier(task.Level), ItemStatCalculator.CalculateOreCost(task.Type, task.Level));
+            }
+            return true;
+        }
+
+        /// <summary>Whether the stock covers the item (wood, and ore of the required tier or better).</summary>
+        public static bool CanAfford(ItemType type, int level)
+        {
+            ResourceManager rm = ResourceManager.Instance;
+            if (rm == null) return true;
+            return rm.WoodCount >= ItemStatCalculator.CalculateWoodCost(type, level)
+                && rm.GetOreCountAtLeast(ItemStatCalculator.CalculateRequiredOreTier(level)) >= ItemStatCalculator.CalculateOreCost(type, level);
+        }
+
         public Vector3 GetWorkerSlotPosition(int slotIndex)
         {
             Vector3 offset = Vector3.forward * 1.8f;
@@ -132,14 +181,14 @@ namespace BattleOfAges.Crafting
             ResourceManager rm = ResourceManager.Instance;
             if (rm != null)
             {
-                if (rm.WoodCount < woodCost || rm.GetOreTierCount(oreTier) < oreCost)
+                if (rm.WoodCount < woodCost || rm.GetOreCountAtLeast(oreTier) < oreCost)
                 {
-                    Debug.Log($"[Workbench] Недостатньо ресурсів для створення {type} Lvl {level}! Потрібно: {woodCost} Дерева, {oreCost} Руди Lvl {oreTier}.");
+                    Debug.Log($"[Workbench] Недостатньо ресурсів для створення {type} Lvl {level}! Потрібно: {woodCost} Дерева, {oreCost} руди рів. {oreTier}+.");
                     return false;
                 }
 
                 rm.ConsumeResource(ResourceType.Wood, woodCost);
-                rm.ConsumeOre(oreTier, oreCost);
+                rm.ConsumeOreAtLeast(oreTier, oreCost);
             }
 
             craftingQueue.EnqueueItem(type, level);
@@ -147,87 +196,16 @@ namespace BattleOfAges.Crafting
             return true;
         }
 
-        private readonly List<CraftingTask> completedOutput = new List<CraftingTask>();
-        public IReadOnlyList<CraftingTask> CompletedOutput => completedOutput;
-        public event System.Action OnOutputChanged;
+        /// <summary>Finished items crafted by this workbench (they go straight to the shared Armory).</summary>
+        public event System.Action<Item> OnItemCrafted;
 
         private void HandleTaskCompleted(CraftingTask task)
         {
-            if (task != null)
-            {
-                completedOutput.Add(task);
-                OnOutputChanged?.Invoke();
-            }
-
-            Debug.Log($"[Workbench] ⚔️ Крафт завершено! Виготовлено: {task.Type} (Рівень {task.Level}). Додано до складу готових виробів.");
-        }
-
-        public bool ClaimItemToPlayer(int index)
-        {
-            if (index < 0 || index >= completedOutput.Count) return false;
-            CraftingTask item = completedOutput[index];
-            completedOutput.RemoveAt(index);
-
-            BattleOfAges.Player.PlayerCombatController playerCombat = FindFirstObjectByType<BattleOfAges.Player.PlayerCombatController>();
-            if (playerCombat != null)
-            {
-                playerCombat.EquipItem(item.Type, item.Level);
-            }
-
-            OnOutputChanged?.Invoke();
-            Debug.Log($"[Workbench] 📦 Гравець забрав {item.Type} (Рівень {item.Level}) зі складу верстака!");
-            return true;
-        }
-
-        public bool EquipNearestVillager(int index)
-        {
-            if (index < 0 || index >= completedOutput.Count) return false;
-            CraftingTask item = completedOutput[index];
-
-            RtsUnit[] allUnits = FindObjectsByType<RtsUnit>(FindObjectsSortMode.None);
-            RtsUnit bestUnit = null;
-            float bestDst = 45.0f;
-
-            for (int i = 0; i < allUnits.Length; i++)
-            {
-                RtsUnit unit = allUnits[i];
-                if (unit == null || unit.GetComponent<BattleOfAges.Player.FirstPersonController>() != null) continue;
-
-                float dst = Vector3.Distance(transform.position, unit.transform.position);
-                if (dst < bestDst)
-                {
-                    bestDst = dst;
-                    bestUnit = unit;
-                }
-            }
-
-            if (bestUnit == null)
-            {
-                Debug.LogWarning("[Workbench] Не знайдено вільних селян поблизу для екіпірування!");
-                return false;
-            }
-
-            completedOutput.RemoveAt(index);
-
-            BattleOfAges.Combat.HealthComponent hp = bestUnit.GetComponent<BattleOfAges.Combat.HealthComponent>();
-            BattleOfAges.Combat.CombatUnit cu = bestUnit.GetComponent<BattleOfAges.Combat.CombatUnit>();
-
-            if (item.Type == ItemType.Sword || item.Type == ItemType.Bow)
-            {
-                int dmg = 15 + Mathf.RoundToInt(ItemStatCalculator.CalculateSwordDamage(item.Level));
-                if (cu != null) cu.InitializeCombatStats(dmg, 1.5f, item.Type == ItemType.Bow ? 10f : 2.5f);
-                bestUnit.gameObject.name = $"Soldier_{item.Type}_Lvl{item.Level}";
-            }
-            else if (item.Type == ItemType.Armor)
-            {
-                int bonusHp = Mathf.RoundToInt(ItemStatCalculator.CalculateArmorDefense(item.Level) * 10f);
-                if (hp != null) { hp.ArmorLevel = item.Level; hp.SetMaxHealthKeepDamage(100 + bonusHp); }
-                bestUnit.gameObject.name = $"Armored_Guard_Lvl{item.Level}";
-            }
-
-            OnOutputChanged?.Invoke();
-            Debug.Log($"[Workbench] 🛡️ Селянин {bestUnit.name} успішно екіпірований {item.Type} (Рівень {item.Level})!");
-            return true;
+            if (task == null) return;
+            var item = new Item(task.Type, task.Level);
+            Armory.Instance.Add(item);
+            OnItemCrafted?.Invoke(item);
+            BattleOfAges.UI.StrategyHud.Notify("Виготовлено: " + item);
         }
 
         public static GameObject CreateWorkbenchPrefab(string name = "Workbench")
