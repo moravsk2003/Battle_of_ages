@@ -69,12 +69,12 @@ namespace BattleOfAges.UI
             if (count == 1 && selected[0] != null)
             {
                 RtsUnit unit = selected[0];
-                titleText.text = $"👤 ОБРАНИЙ NPC: {unit.gameObject.name}";
+                titleText.text = unit.gameObject.name.Replace("NPC_Villager_", "Робітник ").Replace("_", " ");
 
                 NpcResourceGatherer gatherer = unit.GetComponent<NpcResourceGatherer>();
                 if (gatherer != null)
                 {
-                    statusText.text = $"Наказ: [{GetDirectiveName(gatherer.CurrentDirective)}] | Стан: {GetStateName(gatherer.CurrentState)}";
+                    statusText.text = $"{GetDirectiveName(gatherer.CurrentDirective)}  ·  {GetStateName(gatherer.CurrentState)}";
                 }
                 else
                 {
@@ -83,8 +83,8 @@ namespace BattleOfAges.UI
             }
             else
             {
-                titleText.text = $"👥 ОБРАНО ГРУПУ: {count} NPC";
-                statusText.text = "Оберіть індивідуальний наказ для виділеної групи:";
+                titleText.text = $"Обрано: {count}";
+                statusText.text = "Наказ для всієї групи";
             }
         }
 
@@ -122,11 +122,11 @@ namespace BattleOfAges.UI
         {
             switch (directive)
             {
-                case GatherDirective.WoodGatherBranchesOnly: return "🪵 Збір гілок";
-                case GatherDirective.WoodChopTreesOnly: return "🪓 Рубання дерев";
-                case GatherDirective.OrePebblesOnly: return "🪨 Збір камінчиків";
-                case GatherDirective.HaulOreFromMineToChest: return "⛏️ Шахта";
-                default: return "🔄 Автономний";
+                case GatherDirective.WoodGatherBranchesOnly: return "Збір гілок";
+                case GatherDirective.WoodChopTreesOnly: return "Рубання дерев";
+                case GatherDirective.OrePebblesOnly: return "Збір камінчиків";
+                case GatherDirective.HaulOreFromMineToChest: return "Шахта";
+                default: return "Самостійно";
             }
         }
 
@@ -155,132 +155,54 @@ namespace BattleOfAges.UI
             if (scaler == null) scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+            if (gameObject.GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+            if (gameObject.GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
 
-            if (gameObject.GetComponent<GraphicRaycaster>() == null)
-            {
-                gameObject.AddComponent<GraphicRaycaster>();
-            }
+            // Command panel: selection summary on the left, the order buttons on the right
+            RectTransform rect = UiTheme.Rect(transform, "SelectedUnitPanel", new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(1040f, 128f));
+            panelObj = rect.gameObject;
+            UiTheme.PanelImage(rect);
 
-            Font font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
+            RectTransform info = UiTheme.Rect(rect, "Info", new Vector2(0f, 0.5f), new Vector2(22f, 0f), new Vector2(330f, 100f));
+            UiTheme.IconImage(info, UiTheme.Icon.Worker, new Vector2(0f, 0.5f), new Vector2(0f, 0f), 64f);
+            RectTransform titleRect = UiTheme.Rect(info, "Title", new Vector2(0f, 1f), new Vector2(76f, -8f), new Vector2(254f, 36f));
+            titleText = UiTheme.Label(titleRect, "Text", "", 23, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            RectTransform statusRect = UiTheme.Rect(info, "Status", new Vector2(0f, 0f), new Vector2(76f, 8f), new Vector2(254f, 50f));
+            statusText = UiTheme.Label(statusRect, "Text", "", 17, TextAnchor.UpperLeft, UiTheme.InkDim);
+            statusText.horizontalOverflow = HorizontalWrapMode.Wrap;
 
-            panelObj = new GameObject("SelectedUnitPanel", typeof(RectTransform));
-            panelObj.transform.SetParent(transform, false);
+            RectTransform bar = UiTheme.Rect(rect, "DirectivesBar", new Vector2(1f, 0.5f), new Vector2(-24f, -6f), new Vector2(640f, 84f));
+            HorizontalLayoutGroup layout = bar.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 10f;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = true;
+            CreateDirectiveButton(bar, UiTheme.Icon.Wood, "Гілки", () => IssueDirectiveToSelected(GatherDirective.WoodGatherBranchesOnly));
+            CreateDirectiveButton(bar, UiTheme.Icon.Hammer, "Рубати", () => IssueDirectiveToSelected(GatherDirective.WoodChopTreesOnly));
+            CreateDirectiveButton(bar, UiTheme.Icon.Ore, "Руда", () => IssueDirectiveToSelected(GatherDirective.OrePebblesOnly));
+            CreateDirectiveButton(bar, UiTheme.Icon.House, "Шахта", () => IssueDirectiveToSelected(GatherDirective.HaulOreFromMineToChest));
+            CreateDirectiveButton(bar, UiTheme.Icon.Worker, "Авто", () => IssueDirectiveToSelected(GatherDirective.Auto));
 
-            RectTransform rect = panelObj.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0f);
-            rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, 25f);
-            rect.sizeDelta = new Vector2(920f, 130f);
-
-            Image bg = panelObj.AddComponent<Image>();
-            bg.color = new Color(0.06f, 0.10f, 0.18f, 0.94f);
-
-            // Title
-            GameObject titleObj = new GameObject("TitleText", typeof(RectTransform));
-            titleObj.transform.SetParent(panelObj.transform, false);
-            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0f, 0.68f);
-            titleRect.anchorMax = new Vector2(0.75f, 0.95f);
-            titleRect.offsetMin = new Vector2(20f, 0f);
-
-            titleText = titleObj.AddComponent<Text>();
-            titleText.font = font;
-            titleText.fontSize = 20;
-            titleText.fontStyle = FontStyle.Bold;
-            titleText.color = new Color(0.3f, 0.95f, 1.0f);
-            titleText.text = "👤 ОБРАНИЙ NPC";
-
-            // Status
-            GameObject statusObj = new GameObject("StatusText", typeof(RectTransform));
-            statusObj.transform.SetParent(panelObj.transform, false);
-            RectTransform statusRect = statusObj.GetComponent<RectTransform>();
-            statusRect.anchorMin = new Vector2(0f, 0.45f);
-            statusRect.anchorMax = new Vector2(0.75f, 0.68f);
-            statusRect.offsetMin = new Vector2(20f, 0f);
-
-            statusText = statusObj.AddComponent<Text>();
-            statusText.font = font;
-            statusText.fontSize = 16;
-            statusText.color = new Color(0.85f, 0.92f, 0.98f);
-            statusText.text = "Стан робітника";
-
-            // Deselect button
-            GameObject deselectBtnObj = new GameObject("DeselectBtn", typeof(RectTransform));
-            deselectBtnObj.transform.SetParent(panelObj.transform, false);
-            RectTransform deselectRect = deselectBtnObj.GetComponent<RectTransform>();
-            deselectRect.anchorMin = new Vector2(0.82f, 0.52f);
-            deselectRect.anchorMax = new Vector2(0.98f, 0.92f);
-
-            Image deselectBg = deselectBtnObj.AddComponent<Image>();
-            deselectBg.color = new Color(0.40f, 0.12f, 0.12f, 0.9f);
-            Button deselectBtn = deselectBtnObj.AddComponent<Button>();
-            deselectBtn.onClick.AddListener(DeselectAll);
-
-            GameObject desTxtObj = new GameObject("Text", typeof(RectTransform));
-            desTxtObj.transform.SetParent(deselectBtnObj.transform, false);
-            RectTransform desTxtRect = desTxtObj.GetComponent<RectTransform>();
-            desTxtRect.anchorMin = Vector2.zero;
-            desTxtRect.anchorMax = Vector2.one;
-
-            Text desTxt = desTxtObj.AddComponent<Text>();
-            desTxt.font = font;
-            desTxt.fontSize = 15;
-            desTxt.fontStyle = FontStyle.Bold;
-            desTxt.alignment = TextAnchor.MiddleCenter;
-            desTxt.color = Color.white;
-            desTxt.text = "✖ Скинути";
-
-            // Directives Buttons Bar
-            GameObject barObj = new GameObject("DirectivesBar", typeof(RectTransform));
-            barObj.transform.SetParent(panelObj.transform, false);
-            RectTransform barRect = barObj.GetComponent<RectTransform>();
-            barRect.anchorMin = new Vector2(0f, 0.05f);
-            barRect.anchorMax = new Vector2(1f, 0.44f);
-            barRect.offsetMin = new Vector2(15f, 5f);
-            barRect.offsetMax = new Vector2(-15f, -2f);
-
-            HorizontalLayoutGroup layout = barObj.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8f;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-
-            CreateDirectiveButton(barObj.transform, font, "🪵 Гілки", () => IssueDirectiveToSelected(GatherDirective.WoodGatherBranchesOnly));
-            CreateDirectiveButton(barObj.transform, font, "🪓 Рубати", () => IssueDirectiveToSelected(GatherDirective.WoodChopTreesOnly));
-            CreateDirectiveButton(barObj.transform, font, "🪨 Руда", () => IssueDirectiveToSelected(GatherDirective.OrePebblesOnly));
-            CreateDirectiveButton(barObj.transform, font, "⛏️ Шахта", () => IssueDirectiveToSelected(GatherDirective.HaulOreFromMineToChest));
-            CreateDirectiveButton(barObj.transform, font, "🔄 Авто", () => IssueDirectiveToSelected(GatherDirective.Auto));
+            RectTransform close = UiTheme.Rect(rect, "DeselectBtn", new Vector2(1f, 1f), new Vector2(14f, 14f), new Vector2(38f, 38f));
+            UiTheme.PanelImage(close, UiTheme.ButtonSprite, new Color(1f, 0.72f, 0.68f));
+            close.gameObject.AddComponent<Button>().onClick.AddListener(DeselectAll);
+            UiTheme.Label(close, "Text", "×", 26, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
         }
 
-        private void CreateDirectiveButton(Transform parent, Font font, string label, UnityEngine.Events.UnityAction onClick)
+        private void CreateDirectiveButton(Transform parent, UiTheme.Icon icon, string label, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject btnObj = new GameObject("DirectiveBtn", typeof(RectTransform));
-            btnObj.transform.SetParent(parent, false);
-
-            Image bg = btnObj.AddComponent<Image>();
-            bg.color = new Color(0.14f, 0.22f, 0.35f, 0.95f);
-
-            Button btn = btnObj.AddComponent<Button>();
+            var go = new GameObject("DirectiveBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite);
+            Button btn = go.AddComponent<Button>();
             ColorBlock cb = btn.colors;
-            cb.normalColor = new Color(0.14f, 0.22f, 0.35f, 0.95f);
-            cb.highlightedColor = new Color(0.25f, 0.42f, 0.65f, 1.0f);
-            cb.pressedColor = new Color(0.12f, 0.55f, 0.85f, 1.0f);
+            cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
+            cb.colorMultiplier = 1.25f;
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
-
-            GameObject txtObj = new GameObject("Text", typeof(RectTransform));
-            txtObj.transform.SetParent(btnObj.transform, false);
-            RectTransform txtRect = txtObj.GetComponent<RectTransform>();
-            txtRect.anchorMin = Vector2.zero;
-            txtRect.anchorMax = Vector2.one;
-
-            Text txt = txtObj.AddComponent<Text>();
-            txt.font = font;
-            txt.fontSize = 15;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.color = Color.white;
-            txt.text = label;
+            UiTheme.IconImage(go.transform, icon, new Vector2(0.5f, 1f), new Vector2(0f, -8f), 38f);
+            RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
+            UiTheme.Label(txt, "Text", label, 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
         }
     }
 }

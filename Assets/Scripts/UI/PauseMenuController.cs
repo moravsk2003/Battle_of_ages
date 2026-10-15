@@ -298,7 +298,13 @@ namespace BattleOfAges.UI
             Image headerBg = headerObj.AddComponent<Image>();
             headerBg.color = new Color(0.12f, 0.20f, 0.35f, 0.98f);
 
-            Text headerTxt = headerObj.AddComponent<Text>();
+            // A GameObject holds one Graphic: the title text goes on a child of the header background
+            GameObject headerTxtObj = new GameObject("Text", typeof(RectTransform));
+            headerTxtObj.transform.SetParent(headerObj.transform, false);
+            RectTransform headerTxtRect = headerTxtObj.GetComponent<RectTransform>();
+            headerTxtRect.anchorMin = Vector2.zero; headerTxtRect.anchorMax = Vector2.one;
+            headerTxtRect.offsetMin = headerTxtRect.offsetMax = Vector2.zero;
+            Text headerTxt = headerTxtObj.AddComponent<Text>();
             headerTxt.font = font;
             headerTxt.fontSize = 18;
             headerTxt.fontStyle = FontStyle.Bold;

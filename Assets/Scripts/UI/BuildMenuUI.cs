@@ -163,7 +163,7 @@ namespace BattleOfAges.UI
             panelRect.anchorMin = new Vector2(0.5f, 0f);
             panelRect.anchorMax = new Vector2(0.5f, 0f);
             panelRect.pivot = new Vector2(0.5f, 0f);
-            panelRect.anchoredPosition = new Vector2(0f, 20f);
+            panelRect.anchoredPosition = new Vector2(0f, 160f); // above the unit command panel
             panelRect.sizeDelta = new Vector2(580f, 500f);
 
             Image panelBg = menuPanelObj.AddComponent<Image>();
@@ -324,7 +324,7 @@ namespace BattleOfAges.UI
             costTxt.alignment = TextAnchor.MiddleLeft;
             costTxt.color = new Color(0.85f, 0.80f, 0.55f);
 
-            string shortTierName = def.OreTierRequired == 0 ? "Руда Lvl 0" : $"Руда Lvl {def.OreTierRequired}";
+            string shortTierName = def.OreTierRequired == 0 ? "Руда рів. 0" : $"Руда рів. {def.OreTierRequired}";
             costTxt.text = $"Ціна: 🪵 {def.WoodCost} Дерево  +  🪨 {def.OreCost} {shortTierName}  |  {def.Description}";
         }
     }

@@ -237,7 +237,7 @@ namespace BattleOfAges.UI
                 bTxt.fontStyle = FontStyle.Bold;
                 bTxt.alignment = TextAnchor.MiddleCenter;
                 bTxt.color = tierCol;
-                bTxt.text = $"Lvl {tierLevel}";
+                bTxt.text = $"Рів. {tierLevel}";
 
                 GameObject nameObj = new GameObject("NameText", typeof(RectTransform));
                 nameObj.transform.SetParent(slotObj.transform, false);
@@ -421,7 +421,7 @@ namespace BattleOfAges.UI
             wBTxt.fontStyle = FontStyle.Bold;
             wBTxt.alignment = TextAnchor.MiddleCenter;
             wBTxt.color = new Color(1.0f, 0.92f, 0.55f);
-            wBTxt.text = "WOOD";
+            wBTxt.text = "Дерево";
 
             GameObject wNameObj = new GameObject("NameText", typeof(RectTransform));
             wNameObj.transform.SetParent(woodSlotObj.transform, false);
@@ -437,7 +437,7 @@ namespace BattleOfAges.UI
             woodNameText.fontStyle = FontStyle.Bold;
             woodNameText.alignment = TextAnchor.MiddleLeft;
             woodNameText.color = new Color(0.98f, 0.88f, 0.45f);
-            woodNameText.text = "Wood Logs";
+            woodNameText.text = "Колоди";
 
             GameObject wQtyObj = new GameObject("QtyText", typeof(RectTransform));
             wQtyObj.transform.SetParent(woodSlotObj.transform, false);

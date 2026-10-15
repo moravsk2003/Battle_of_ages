@@ -6,7 +6,7 @@ namespace BattleOfAges.Utils
     /// <summary>
     /// Distance LOD for crowds of skinned characters with ONE renderer: swaps its shared mesh between a near and a far
     /// mesh (same bones) and hides it when it is a speck, by height on screen like a LODGroup. A LODGroup would need a
-    /// renderer per level, doubling the per-character renderer cost in 1000-unit battles. Seen from Camera.main (or
+    /// renderer per level, doubling the per-character renderer cost in 1000-unit battles. Seen from ViewCamera (or
     /// ViewerOverride); a slice of all characters is re-evaluated each frame, capture tools call RefreshAll.
     /// </summary>
     [DisallowMultipleComponent]
@@ -75,7 +75,7 @@ namespace BattleOfAges.Utils
         /// <summary>Picks the mesh now (after the fields were set on a new component).</summary>
         public void Apply() => Refresh(Viewer());
 
-        private static Camera Viewer() => ViewerOverride != null ? ViewerOverride : Camera.main;
+        private static Camera Viewer() => ViewerOverride != null ? ViewerOverride : ViewCamera.Current;
 
         private void Refresh(Camera cam)
         {

@@ -238,7 +238,7 @@ namespace BattleOfAges.Player
         private void UpdateChestPromptUI()
         {
             if (resourceUI == null || activeChestTarget == null) return;
-            resourceUI.ShowTreePrompt("📦 [Press E or F] Open Storage Chest (Склад Ресурсів)");
+            resourceUI.ShowTreePrompt("[E] Відкрити скриню-склад");
         }
 
         private void HandleChestInput()

@@ -12,6 +12,12 @@ namespace BattleOfAges.Crafting
         Pickaxe   // Кайло
     }
 
+    public static class ItemTypeNames
+    {
+        /// <summary>Ukrainian display name of an item type.</summary>
+        public static string Display(ItemType t) => t == ItemType.Sword ? "Меч" : t == ItemType.Bow ? "Лук" : t == ItemType.Armor ? "Броня" : t == ItemType.Axe ? "Сокира" : "Кайло";
+    }
+
     [System.Serializable]
     public struct ItemDefinition
     {

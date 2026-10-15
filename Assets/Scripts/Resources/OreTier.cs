@@ -29,16 +29,16 @@ namespace BattleOfAges.Resources
 
         public static string GetTierName(int tier)
         {
-            if (tier == 0) return "Common Stone Ore (Lvl 0)";
-            if (tier == 1) return "Copper/Iron Ore (Lvl 1)";
-            if (tier == 2) return "Silver/Gold Ore (Lvl 2)";
-            if (tier == 3) return "Platinum Ore (Lvl 3)";
-            if (tier == 4) return "Mithril Ore (Lvl 4)";
-            if (tier == 5) return "Adamantite Ore (Lvl 5)";
-            if (tier >= 90) return $"Godly Celestial Ore (Lvl {tier})";
-            if (tier >= 50) return $"Mythic Dragon Ore (Lvl {tier})";
-            if (tier >= 20) return $"Ancient Relic Ore (Lvl {tier})";
-            return $"Rare Ore (Lvl {tier})";
+            if (tier == 0) return "Камінна руда (рів. 0)";
+            if (tier == 1) return "Мідно-залізна руда (рів. 1)";
+            if (tier == 2) return "Срібно-золота руда (рів. 2)";
+            if (tier == 3) return "Платинова руда (рів. 3)";
+            if (tier == 4) return "Мітрилова руда (рів. 4)";
+            if (tier == 5) return "Адамантитова руда (рів. 5)";
+            if (tier >= 90) return $"Небесна руда (рів. {tier})";
+            if (tier >= 50) return $"Драконова руда (рів. {tier})";
+            if (tier >= 20) return $"Давня реліктова руда (рів. {tier})";
+            return $"Рідкісна руда (рів. {tier})";
         }
 
         public static Color GetTierColor(int tier)

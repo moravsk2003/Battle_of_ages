@@ -147,7 +147,7 @@ namespace BattleOfAges.UI
             {
                 if (currentTaskText != null)
                 {
-                    currentTaskText.text = $"🔨 Виготовляється: <b>{active.Type} (Рівень {active.Level})</b>\n" +
+                    currentTaskText.text = $"🔨 Виготовляється: <b>{BattleOfAges.Crafting.ItemTypeNames.Display(active.Type)} (рівень {active.Level})</b>\n" +
                                            $"Час: {active.ProgressSeconds:F1}s / {active.TargetDurationSeconds:F1}s | У черзі: {activeWorkbench.Queue.Queue.Count}";
                 }
 
@@ -257,7 +257,7 @@ namespace BattleOfAges.UI
                 lbl.fontStyle = FontStyle.Bold;
                 lbl.alignment = TextAnchor.MiddleLeft;
                 lbl.color = new Color(1.0f, 0.88f, 0.4f);
-                lbl.text = $"✨ {item.Type}\n(Рівень {item.Level})";
+                lbl.text = $"✨ {BattleOfAges.Crafting.ItemTypeNames.Display(item.Type)}\n(рівень {item.Level})";
 
                 // Claim Button
                 GameObject claimBtnObj = new GameObject("ClaimBtn", typeof(RectTransform));
@@ -360,8 +360,8 @@ namespace BattleOfAges.UI
                         break;
                 }
 
-                recipeTexts[i].text = $"<b>{type} (Lvl {selectedLevel})</b>  |  {statDesc}\n" +
-                                      $"<color=#a0b0c8>Ціна: 🪵 {wood} Дерева  |  🪙 {ore} Руди Lvl {oreTier}</color>";
+                recipeTexts[i].text = $"<b>{BattleOfAges.Crafting.ItemTypeNames.Display(type)} (рів. {selectedLevel})</b>  |  {statDesc}\n" +
+                                      $"<color=#a0b0c8>Ціна: {wood} дерева  ·  {ore} руди рів. {oreTier}</color>";
             }
         }
 
