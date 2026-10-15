@@ -101,7 +101,7 @@ namespace BattleOfAges.Utils
                 {
                     material.EnableKeyword("_NORMALMAP");
                     material.SetTexture("_BumpMap", normalTex);
-                    material.SetFloat("_BumpScale", surface == Surface.Bark || surface == Surface.Stone || surface == Surface.Wood ? 1.35f : 0.8f);
+                    material.SetFloat("_BumpScale", surface == Surface.Stone ? 1.35f : surface == Surface.Wood || surface == Surface.Bark ? 0.45f : 0.8f);
                 }
                 material.SetFloat("_Metallic", metallic);
                 material.SetFloat("_Smoothness", smoothness);
@@ -163,12 +163,12 @@ namespace BattleOfAges.Utils
                             height += grain;
                             break;
                         case Surface.Wood:
-                            float woodRing = Mathf.Sin(v * Mathf.PI * 18f + nLarge * 8f + u * 2f) * 0.14f;
+                            float woodRing = Mathf.Sin(v * Mathf.PI * 18f + nLarge * 8f + u * 2f) * 0.045f + (nFine - 0.5f) * 0.05f; // subtle grain: stretched over big primitives strong rings read as zebra stripes
                             shade += woodRing;
-                            height += woodRing * 1.5f;
+                            height += woodRing * 0.6f;
                             break;
                         case Surface.Bark:
-                            float furrow = Mathf.Abs(Mathf.Sin(v * Mathf.PI * 10f + nLarge * 6f)) * 0.25f;
+                            float furrow = Mathf.Abs(Mathf.Sin(v * Mathf.PI * 10f + nLarge * 6f)) * 0.12f;
                             shade -= furrow * 0.5f;
                             height += furrow * 2.0f;
                             break;
