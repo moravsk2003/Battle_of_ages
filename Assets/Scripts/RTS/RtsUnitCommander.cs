@@ -88,9 +88,13 @@ namespace BattleOfAges.RTS
             HandleMovementInput();
         }
 
+        /// <summary>Clicks on HUD / window buttons belong to the UI, not to the map.</summary>
+        private static bool PointerOverUi() =>
+            UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+
         private void HandleSelectionInput()
         {
-            if (UniversalInput.GetMouseButtonDown(0))
+            if (UniversalInput.GetMouseButtonDown(0) && !PointerOverUi())
             {
                 startMousePos = UniversalInput.GetMousePosition();
                 isDraggingSelection = true;
@@ -180,7 +184,7 @@ namespace BattleOfAges.RTS
 
         private void HandleMovementInput()
         {
-            if (UniversalInput.GetMouseButtonDown(1) && selectedUnits.Count > 0)
+            if (UniversalInput.GetMouseButtonDown(1) && selectedUnits.Count > 0 && !PointerOverUi())
             {
                 int count = selectedUnits.Count;
                 Vector3 mousePos = UniversalInput.GetMousePosition();
@@ -330,11 +334,19 @@ namespace BattleOfAges.RTS
 
         private void SelectUnit(RtsUnit unit)
         {
+            // Workers inside a mine are out of sight; they come out with the mine's button
+            if (unit != null && unit.TryGetComponent(out NpcResourceGatherer g) && g.IsInsideMine) return;
             if (unit != null && !selectedUnits.Contains(unit))
             {
                 selectedUnits.Add(unit);
                 unit.SetSelected(true);
             }
+        }
+
+        /// <summary>Drops one unit from the selection (it went into a building).</summary>
+        public void Deselect(RtsUnit unit)
+        {
+            if (unit != null && selectedUnits.Remove(unit)) unit.SetSelected(false);
         }
 
         public void DeselectAll()

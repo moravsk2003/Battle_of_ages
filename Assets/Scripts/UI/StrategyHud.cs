@@ -35,6 +35,7 @@ namespace BattleOfAges.UI
         private const float MinimapHalfSize = 90f, MinimapPx = 280f;
         private readonly List<Image> dots = new List<Image>();
         private readonly List<(RectTransform bar, RectTransform fill)> unitBars = new List<(RectTransform, RectTransform)>();
+        private readonly Dictionary<MineNode, (RectTransform rt, Text text, Button button)> mineLabels = new Dictionary<MineNode, (RectTransform, Text, Button)>();
 
         private int lastWood = -1, lastOre = -1, lastWorkers = -1, lastBuildings = -1;
         private readonly List<(RectTransform rt, Text text, CanvasGroup group, float born, string key, int amount)> toasts = new List<(RectTransform, Text, CanvasGroup, float, string, int)>();
@@ -206,6 +207,7 @@ namespace BattleOfAges.UI
                 }
                 lastWood = wood; lastOre = ore; lastWorkers = workers; lastBuildings = buildings;
             }
+            UpdateMineLabels(map);
             UpdateToasts();
         }
 
@@ -330,6 +332,56 @@ namespace BattleOfAges.UI
                     fl.GetComponent<Image>().color = Color.Lerp(UiTheme.Bad, UiTheme.Good, frac);
                 }
             HideUnitBars(used);
+        }
+
+        // ------------------------------------------------------------------ mine labels
+
+        /// <summary>
+        /// Over every mine: workers inside and the ore waiting for haulers, with a button that sends one worker out (map
+        /// view; in first person the label shows within 30 m, without the button).
+        /// </summary>
+        private void UpdateMineLabels(bool map)
+        {
+            Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+            foreach (MineNode mine in MineNode.ActiveMines)
+            {
+                if (mine == null) continue;
+                if (!mineLabels.TryGetValue(mine, out var label)) mineLabels[mine] = label = MineLabel(mine);
+                bool show = cam != null && mine.gameObject.activeInHierarchy && !mine.name.StartsWith("BuildGhost");
+                Vector3 sp = show ? cam.WorldToScreenPoint(mine.transform.position + Vector3.up * 4.6f) : Vector3.zero;
+                show &= sp.z > 0f && (map || sp.z < 30f);
+                if (label.rt.gameObject.activeSelf != show) label.rt.gameObject.SetActive(show);
+                if (!show) continue;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(root, sp, null, out Vector2 local);
+                label.rt.anchoredPosition = local;
+                string tiers = mine.OreOfTier(2) > 0 || mine.OreOfTier(1) > 0
+                    ? $"  <size=15><color=#c9b89a>{(mine.OreOfTier(2) > 0 ? "II·" + mine.OreOfTier(2) + "  " : "")}{(mine.OreOfTier(1) > 0 ? "I·" + mine.OreOfTier(1) : "")}</color></size>" : "";
+                label.text.text = $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>\n" +
+                                  $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
+                bool canRelease = map && mine.AssignedWorkerCount > 0;
+                if (label.button.gameObject.activeSelf != canRelease) label.button.gameObject.SetActive(canRelease);
+            }
+            if (mineLabels.Count > MineNode.ActiveMines.Count + 4) PruneMineLabels();
+        }
+
+        private (RectTransform, Text, Button) MineLabel(MineNode mine)
+        {
+            RectTransform rt = UiTheme.Rect(root, "MineLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 56f));
+            rt.pivot = new Vector2(0.5f, 0f);
+            UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f)).raycastTarget = false;
+            RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
+            Text text = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+            text.supportRichText = true;
+            Button b = UiTheme.TextButton(rt, "Release", "Вивести", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(84f, 38f), () => mine.ReleaseOneWorker(), 15);
+            rt.SetAsFirstSibling(); // under the windows and toasts
+            return (rt, text, b);
+        }
+
+        private void PruneMineLabels()
+        {
+            var gone = new List<MineNode>();
+            foreach (var pair in mineLabels) if (pair.Key == null) { Destroy(pair.Value.rt.gameObject); gone.Add(pair.Key); }
+            foreach (MineNode m in gone) mineLabels.Remove(m);
         }
 
         private void HideUnitBars(int from)

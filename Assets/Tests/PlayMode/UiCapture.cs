@@ -45,6 +45,19 @@ namespace BattleOfAges.PlayModeTests
             {
                 ("fp_hud", () => Wait(0.3f)),
                 ("rts_overview", () => { modes?.SetGameMode(GameMode.RtsMap); return Wait(0.6f); }),
+                ("mine_label", () =>
+                {
+                    Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+                    if (cam != null && Physics.Raycast(cam.ViewportPointToRay(new Vector3(0.42f, 0.42f, 0f)), out RaycastHit hit, 500f))
+                    {
+                        GameObject m = BattleOfAges.Building.MineNode.CreateMinePrefab("CaptureMine");
+                        m.transform.position = hit.point;
+                        var node = m.GetComponent<BattleOfAges.Building.MineNode>();
+                        for (int k = 0; k < 4; k++) node.AssignWorker();
+                        node.Produce(37);
+                    }
+                    return Wait(0.4f);
+                }),
                 ("rts_selection", () =>
                 {
                     int n = 0;

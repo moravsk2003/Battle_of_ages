@@ -6,7 +6,8 @@ using BattleOfAges.Utils;
 namespace BattleOfAges.Building
 {
     /// <summary>
-    /// Ore Mine building component. Holds up to 10 workers, each generating 1 ore per second into an output buffer.
+    /// Ore Mine building component. Holds up to 10 workers, each generating 1 ore per second (tier 0..2, rolled like a
+    /// pebble) into an output buffer that haulers carry to the storage chest; the HUD label shows it and lets workers out.
     /// Supports worker assignment and hauling to storage chests.
     /// </summary>
     [DisallowMultipleComponent]
@@ -22,14 +23,21 @@ namespace BattleOfAges.Building
 
         [Header("Mine Production Settings")]
         [SerializeField] private int assignedWorkerCount = 0;
-        [SerializeField] private int accumulatedOreCount = 0;
         [SerializeField] private int maxAccumulatedOre = 500;
 
+        /// <summary>Highest ore tier a mine yields; each mined piece rolls its tier like a pebble (10% I, 1% II).</summary>
+        public const int MAX_MINED_TIER = 2;
+
         private float productionTimer = 0f;
+        private readonly int[] oreByTier = new int[MAX_MINED_TIER + 1];
+        private readonly List<NpcResourceGatherer> workers = new List<NpcResourceGatherer>(MAX_WORKERS);
 
         public int AssignedWorkerCount => assignedWorkerCount;
-        public int AccumulatedOreCount => accumulatedOreCount;
+        public int MaxAccumulatedOre => maxAccumulatedOre;
+        public int AccumulatedOreCount { get { int n = 0; foreach (int c in oreByTier) n += c; return n; } }
+        public int OreOfTier(int tier) => tier >= 0 && tier <= MAX_MINED_TIER ? oreByTier[tier] : 0;
         public bool IsFullWorkers => assignedWorkerCount >= MAX_WORKERS;
+        public IReadOnlyList<NpcResourceGatherer> Workers => workers;
 
         private void OnEnable()
         {
@@ -59,34 +67,63 @@ namespace BattleOfAges.Building
             if (productionTimer >= 1.0f)
             {
                 productionTimer = 0f;
-
-                // Each worker produces 1 ore per second
-                int produced = assignedWorkerCount * 1;
-                accumulatedOreCount = Mathf.Min(accumulatedOreCount + produced, maxAccumulatedOre);
+                Produce(assignedWorkerCount); // each worker produces 1 ore per second
             }
         }
 
-        public bool AssignWorker()
+        /// <summary>Adds mined ore to the buffer (up to its capacity), each piece with a rolled tier.</summary>
+        public void Produce(int pieces)
+        {
+            for (int i = 0; i < pieces && AccumulatedOreCount < maxAccumulatedOre; i++)
+                oreByTier[Mathf.Min(BattleOfAges.Resources.OreTierHelper.DeterminePebbleOreTier(), MAX_MINED_TIER)]++;
+        }
+
+        public bool AssignWorker(NpcResourceGatherer worker = null)
         {
             if (assignedWorkerCount >= MAX_WORKERS) return false;
+            if (worker != null)
+            {
+                if (workers.Contains(worker)) return true;
+                workers.Add(worker);
+            }
             assignedWorkerCount++;
-            Debug.Log($"[Mine] Worker assigned to mine at {transform.position}. Workers: {assignedWorkerCount}/{MAX_WORKERS}");
             return true;
         }
 
-        public bool UnassignWorker()
+        /// <summary>A worker who is not inside (still walking here) does not change the count.</summary>
+        public bool UnassignWorker(NpcResourceGatherer worker = null)
         {
+            if (worker != null && !workers.Remove(worker)) return false;
             if (assignedWorkerCount <= 0) return false;
             assignedWorkerCount--;
             return true;
         }
 
-        public int TakeOre(int maxAmount)
+        /// <summary>Sends the last worker who went in back out (the mine label's button).</summary>
+        public bool ReleaseOneWorker()
         {
-            if (accumulatedOreCount <= 0) return 0;
-            int taken = Mathf.Min(accumulatedOreCount, maxAmount);
-            accumulatedOreCount -= taken;
-            return taken;
+            for (int i = workers.Count - 1; i >= 0; i--)
+            {
+                NpcResourceGatherer w = workers[i];
+                if (w == null) { workers.RemoveAt(i); assignedWorkerCount = Mathf.Max(0, assignedWorkerCount - 1); continue; }
+                w.LeaveMine();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Takes up to maxAmount ore of one tier, the best tier first so rare ore is not left behind.</summary>
+        public int TakeOre(int maxAmount, out int tier)
+        {
+            for (tier = MAX_MINED_TIER; tier >= 0; tier--)
+            {
+                if (oreByTier[tier] <= 0) continue;
+                int taken = Mathf.Min(oreByTier[tier], maxAmount);
+                oreByTier[tier] -= taken;
+                return taken;
+            }
+            tier = 0;
+            return 0;
         }
 
         public Vector3 GetOutputDepositPosition()

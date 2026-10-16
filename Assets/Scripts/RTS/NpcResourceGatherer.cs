@@ -107,7 +107,7 @@ namespace BattleOfAges.RTS
             currentDirective = newDirective;
             if (assignedMine != null)
             {
-                assignedMine.UnassignWorker();
+                assignedMine.UnassignWorker(this);
                 assignedMine = null;
                 SetRenderersActive(true);
             }
@@ -122,13 +122,34 @@ namespace BattleOfAges.RTS
             Debug.Log($"[NPC Worker] {gameObject.name} directive changed to: {newDirective}");
         }
 
+        public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
+
+        /// <summary>Comes out of the mine at its entrance and goes back to the current directive.</summary>
+        public void LeaveMine()
+        {
+            if (assignedMine != null)
+            {
+                Vector3 exit = assignedMine.GetOutputDepositPosition() + Random.insideUnitSphere.normalized * 0.8f;
+                exit.y = RtsUnit.GetTerrainHeight(exit);
+                assignedMine.UnassignWorker(this);
+                assignedMine = null;
+                CharacterController cc = GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                transform.position = exit;
+                if (cc != null) cc.enabled = true;
+                if (rtsUnit != null) rtsUnit.IssueMoveCommand(exit);
+            }
+            SetRenderersActive(true);
+            currentState = GathererState.FindingResource;
+        }
+
         public void AssignToWorkInMine(MineNode mine)
         {
             if (mine == null) return;
 
             if (assignedMine != null && assignedMine != mine)
             {
-                assignedMine.UnassignWorker();
+                assignedMine.UnassignWorker(this);
             }
 
             assignedMine = mine;
@@ -174,7 +195,7 @@ namespace BattleOfAges.RTS
         {
             if (assignedMine != null)
             {
-                assignedMine.UnassignWorker();
+                assignedMine.UnassignWorker(this);
                 assignedMine = null;
                 SetRenderersActive(true);
             }
@@ -189,22 +210,8 @@ namespace BattleOfAges.RTS
 
         private void Update()
         {
-            // If worker is working inside Mine, stay hidden inside until re-assigned or selected
-            if (currentState == GathererState.WorkingInsideMine)
-            {
-                if (rtsUnit != null && rtsUnit.IsSelected)
-                {
-                    // Player selected worker inside mine to command them out
-                    if (assignedMine != null)
-                    {
-                        assignedMine.UnassignWorker();
-                        assignedMine = null;
-                    }
-                    SetRenderersActive(true);
-                    currentState = GathererState.FindingResource;
-                }
-                return;
-            }
+            // Inside a mine the worker stays hidden until the mine's "Вивести" button sends them out (LeaveMine)
+            if (currentState == GathererState.WorkingInsideMine) return;
 
             // Always process MovingToMineToWork so selected units complete their journey into the Mine
             if (currentState == GathererState.MovingToMineToWork)
@@ -268,11 +275,12 @@ namespace BattleOfAges.RTS
 
             if (sqrDst <= 3.8f * 3.8f)
             {
-                if (!assignedMine.IsFullWorkers && assignedMine.AssignWorker())
+                if (!assignedMine.IsFullWorkers && assignedMine.AssignWorker(this))
                 {
                     currentState = GathererState.WorkingInsideMine;
                     if (rtsUnit != null)
                     {
+                        FindFirstObjectByType<RtsUnitCommander>()?.Deselect(rtsUnit);
                         rtsUnit.SetSelected(false);
                         rtsUnit.IssueMoveCommand(transform.position);
                     }
@@ -461,11 +469,11 @@ namespace BattleOfAges.RTS
             if (sqrDst <= 3.0f * 3.0f)
             {
                 // Arrived at Mine output: pick up ore from buffer
-                int takenOre = targetMine.TakeOre(3);
+                int takenOre = targetMine.TakeOre(3, out int takenTier);
                 if (takenOre > 0)
                 {
                     carriedOreAmount = takenOre;
-                    carriedOreTier = 0; // Standard ore from Mine
+                    carriedOreTier = takenTier; // mines yield tiers 0..2 like pebbles
                     currentState = GathererState.DeliveringToChest;
                     Debug.Log($"[NPC Worker] {gameObject.name} picked up {takenOre} Ore from Mine!");
                 }
