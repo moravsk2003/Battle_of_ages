@@ -12,7 +12,6 @@ namespace BattleOfAges.RTS
         [SerializeField] private GameObject selectionIndicator;
 
         [Header("Movement Configuration")]
-        [SerializeField] private float moveSpeed = 5.0f;
         [SerializeField] private float rotationSpeed = 10.0f;
 
         private CharacterController characterController;
@@ -33,6 +32,9 @@ namespace BattleOfAges.RTS
         private Vector3 steerDir, steerDesired;
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
         private BattleOfAges.Combat.HealthComponent health;
+        private BattleOfAges.Combat.CombatUnit combat;
+        /// <summary>CharacterSpeed formula: Global x modifier x strength (workers without a CombatUnit use the defaults).</summary>
+        private float MoveSpeed => combat != null ? combat.MoveSpeed : BattleOfAges.Combat.CharacterSpeed.Of(null);
         private bool touchingSolidNearTarget;
 
         public bool IsSelected { get; private set; }
@@ -41,6 +43,7 @@ namespace BattleOfAges.RTS
         {
             isPlayerControlled = GetComponent<BattleOfAges.Player.FirstPersonController>() != null;
             health = GetComponent<BattleOfAges.Combat.HealthComponent>();
+            combat = GetComponent<BattleOfAges.Combat.CombatUnit>();
             if (!isPlayerControlled) BattleOfAges.Combat.UnitCorpse.AttachTo(gameObject);
             engageTimer = Random.value * EngageInterval; // stagger the searches across frames
             characterController = GetComponent<CharacterController>();
@@ -245,12 +248,12 @@ namespace BattleOfAges.RTS
                 }
 
                 // 3. Movement: the hero uses CharacterController physics, units the kinematic ground motor
-                Vector3 moveVelocity = moveDir * moveSpeed;
+                Vector3 moveVelocity = moveDir * MoveSpeed;
                 moveVelocity.y = -9.81f;
 
                 if (!isPlayerControlled)
                 {
-                    GroundMotor.Move(transform, gridId, moveDir * moveSpeed, radius, Time.deltaTime);
+                    GroundMotor.Move(transform, gridId, moveDir * MoveSpeed, radius, Time.deltaTime);
                 }
                 else if (characterController != null)
                 {
@@ -258,7 +261,7 @@ namespace BattleOfAges.RTS
                 }
                 else
                 {
-                    Vector3 nextPos = Vector3.MoveTowards(currentPos, destPos, moveSpeed * Time.deltaTime);
+                    Vector3 nextPos = Vector3.MoveTowards(currentPos, destPos, MoveSpeed * Time.deltaTime);
                     nextPos.y = GetTerrainHeight(nextPos);
                     transform.position = nextPos;
                 }
@@ -289,7 +292,8 @@ namespace BattleOfAges.RTS
             bool centerBlocked = centerHit && IsValidObstacle(hitCenter);
             // Walked right up to a solid prop next to the destination (tree being chopped, chest, building): arrived.
             // The CharacterController used to stop the unit here; kinematic movement must do it explicitly.
-            touchingSolidNearTarget = !isPlayerControlled && centerHit && hitCenter.distance < 0.35f && IsSolid(hitCenter)
+            // (the window covers the distance walked until the next probe, so faster units cannot step past it)
+            touchingSolidNearTarget = !isPlayerControlled && centerHit && hitCenter.distance < 0.35f + MoveSpeed * SteerInterval && IsSolid(hitCenter)
                                       && Vector3.Distance(currentPos, targetPosition) < 4f;
             bool leftBlocked = leftHit && IsValidObstacle(hitLeft);
             bool rightBlocked = rightHit && IsValidObstacle(hitRight);
@@ -315,7 +319,7 @@ namespace BattleOfAges.RTS
 
             // Anti-Stuck Detector: If unit gets pressed against a building wall or obstacle, force lateral crawl & un-stick nudge
             float movedDist = Vector3.Distance(currentPos, lastPos);
-            if (movedDist < 0.20f * elapsed * moveSpeed)
+            if (movedDist < 0.20f * elapsed * MoveSpeed)
             {
                 stuckTimer += elapsed;
                 if (stuckTimer > 0.25f)

@@ -252,27 +252,7 @@ namespace BattleOfAges.Building
                 rm.ConsumeOre(def.OreTierRequired, def.OreCost);
             }
 
-            GameObject building = null;
-            if (currentBuildingType == BuildingType.WorkerHouse)
-            {
-                building = BuildingNode.CreateWorkerHousePrefab("WorkerHouse");
-            }
-            else if (currentBuildingType == BuildingType.StorageChest)
-            {
-                building = StorageChestNode.CreateStorageChestPrefab("StorageChest");
-            }
-            else if (currentBuildingType == BuildingType.Mine)
-            {
-                building = MineNode.CreateMinePrefab("Mine");
-            }
-            else if (currentBuildingType == BuildingType.Workbench)
-            {
-                building = BattleOfAges.Crafting.WorkbenchNode.CreateWorkbenchPrefab("Workbench");
-            }
-            else if (currentBuildingType == BuildingType.CastleWall)
-            {
-                building = BuildingNode.CreateCastleWallPrefab("CastleWall");
-            }
+            GameObject building = CreateBuilding(currentBuildingType);
 
             if (building != null)
             {
@@ -288,6 +268,20 @@ namespace BattleOfAges.Building
             if (!CanAfford(def))
             {
                 CancelPlacement();
+            }
+        }
+
+        /// <summary>A finished building of the type (not yet placed; OnBuilt not called). Also used to rebuild a save.</summary>
+        public static GameObject CreateBuilding(BuildingType type)
+        {
+            switch (type)
+            {
+                case BuildingType.WorkerHouse: return BuildingNode.CreateWorkerHousePrefab("WorkerHouse");
+                case BuildingType.StorageChest: return StorageChestNode.CreateStorageChestPrefab("StorageChest");
+                case BuildingType.Mine: return MineNode.CreateMinePrefab("Mine");
+                case BuildingType.Workbench: return BattleOfAges.Crafting.WorkbenchNode.CreateWorkbenchPrefab("Workbench");
+                case BuildingType.CastleWall: return BuildingNode.CreateCastleWallPrefab("CastleWall");
+                default: return null;
             }
         }
 

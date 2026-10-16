@@ -243,6 +243,7 @@ namespace BattleOfAges.World
                 }
 
                 activeTrees.Add(tree);
+                BattleOfAges.SaveLoad.WorldPersistence.RegisterTree(tree.GetComponent<ResourceNodeTree>(), ChunkCoord.x + "," + ChunkCoord.y + ":" + i);
             }
 
             // Ore Pebbles
@@ -289,7 +290,7 @@ namespace BattleOfAges.World
                     animal.transform.SetParent(transform, false);
                     animal.transform.position = new Vector3(worldX, y, worldZ);
                     animal.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-                    activeEntities.Add(animal);
+                    if (BattleOfAges.SaveLoad.WorldPersistence.RegisterAnimal(animal)) activeEntities.Add(animal);
                 }
             }
 
@@ -304,6 +305,7 @@ namespace BattleOfAges.World
                 {
                     GameObject camp = Utils.HostileCampBuilder.CreateHostileCamp(new Vector3(campX, campY, campZ), $"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
                     camp.transform.SetParent(transform);
+                    BattleOfAges.SaveLoad.WorldPersistence.RegisterCamp(camp);
                     activeEntities.Add(camp);
                 }
             }
@@ -322,6 +324,7 @@ namespace BattleOfAges.World
             {
                 if (activeTrees[i] != null)
                 {
+                    BattleOfAges.SaveLoad.WorldPersistence.RecordTree(activeTrees[i].GetComponent<ResourceNodeTree>());
                     if (pool != null) pool.ReturnTree(activeTrees[i]);
                     else Destroy(activeTrees[i]);
                 }
@@ -342,6 +345,7 @@ namespace BattleOfAges.World
             {
                 if (activeEntities[i] != null)
                 {
+                    if (activeEntities[i].name.StartsWith("HostileCamp_")) BattleOfAges.SaveLoad.WorldPersistence.RecordCamp(activeEntities[i]);
                     Destroy(activeEntities[i]);
                 }
             }

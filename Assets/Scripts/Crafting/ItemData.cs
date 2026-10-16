@@ -19,20 +19,21 @@ namespace BattleOfAges.Crafting
     /// <summary>Where an item is worn. Weapon holds the sword, bow, axe or pickaxe; Armor is the chest piece.</summary>
     public enum EquipSlot { Weapon, Shield, Helmet, Chest, Gloves, Boots }
 
-    /// <summary>A crafted item: type + level 1..5. Level 0 = nothing (an empty slot).</summary>
+    /// <summary>An item: type + level (0..5; level 0 is the hero's plain starting sword). default(Item) = an empty slot.</summary>
     [Serializable]
     public struct Item : IEquatable<Item>
     {
         public ItemType Type;
         public int Level;
+        public bool Present;
 
-        public Item(ItemType type, int level) { Type = type; Level = level; }
-        public static readonly Item None = new Item(ItemType.Sword, 0);
-        public bool IsEmpty => Level <= 0;
+        public Item(ItemType type, int level) { Type = type; Level = Mathf.Clamp(level, 0, ItemStatCalculator.MAX_LEVEL); Present = true; }
+        public static readonly Item None = default;
+        public bool IsEmpty => !Present;
         public EquipSlot Slot => ItemTypeNames.SlotOf(Type);
-        public bool Equals(Item o) => Type == o.Type && Level == o.Level;
+        public bool Equals(Item o) => Present == o.Present && (!Present || (Type == o.Type && Level == o.Level));
         public override bool Equals(object o) => o is Item i && Equals(i);
-        public override int GetHashCode() => (int)Type * 16 + Level;
+        public override int GetHashCode() => Present ? (int)Type * 16 + Level + 1 : 0;
         public override string ToString() => IsEmpty ? "—" : ItemTypeNames.Display(Type) + " " + ItemTypeNames.Roman(Level);
     }
 
@@ -90,7 +91,7 @@ namespace BattleOfAges.Crafting
 
         public static string Roman(int level)
         {
-            switch (level) { case 1: return "I"; case 2: return "II"; case 3: return "III"; case 4: return "IV"; case 5: return "V"; default: return ""; }
+            switch (level) { case 0: return "0"; case 1: return "I"; case 2: return "II"; case 3: return "III"; case 4: return "IV"; case 5: return "V"; default: return ""; }
         }
 
         /// <summary>What a level is made of (the look on the model follows it).</summary>
@@ -98,8 +99,9 @@ namespace BattleOfAges.Crafting
         {
             bool wood = t == ItemType.Bow || t == ItemType.Shield;
             string stem;
-            switch (ItemStatCalculator.ClampLevel(level))
+            switch (Mathf.Clamp(level, 0, ItemStatCalculator.MAX_LEVEL))
             {
+                case 0: stem = "Звичайн"; break; // the hero's plain iron sword
                 case 1: stem = wood ? "Прост" : t == ItemType.Armor || t == ItemType.Helmet || t == ItemType.Gloves || t == ItemType.Boots ? "Шкірян" : "Бронзов"; break;
                 case 2: stem = "Залізн"; break;
                 case 3: stem = "Сталев"; break;
@@ -232,6 +234,7 @@ namespace BattleOfAges.Crafting
 
         // ------------------------------------------------------------------ equipment effects (Equipment component)
 
+        public const float SWORD_DAMAGE_PER_LEVEL = 0.2f;
         public const float BOW_RANGE = 12f;
         public const float MAX_DAMAGE_REDUCTION = 0.6f;
 
@@ -242,7 +245,7 @@ namespace BattleOfAges.Crafting
             int l = ClampLevel(item.Level);
             switch (item.Type)
             {
-                case ItemType.Sword: return 1.3f + 0.1f * l;    // +40% .. +80%
+                case ItemType.Sword: return 1f + SWORD_DAMAGE_PER_LEVEL * Mathf.Clamp(item.Level, 0, MAX_LEVEL); // +20% per level: 0 = x1, V = x2
                 case ItemType.Bow: return 1.1f + 0.1f * l;      // +20% .. +60%, at range
                 case ItemType.Axe: return 1.15f + 0.05f * l;    // +20% .. +40%
                 case ItemType.Pickaxe: return 1.1f + 0.05f * l; // +15% .. +35%

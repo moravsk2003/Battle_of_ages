@@ -354,8 +354,15 @@ namespace BattleOfAges.UI
                 if (!show) continue;
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(root, sp, null, out Vector2 local);
                 label.rt.anchoredPosition = local;
-                string tiers = mine.OreOfTier(2) > 0 || mine.OreOfTier(1) > 0
-                    ? $"  <size=15><color=#c9b89a>{(mine.OreOfTier(2) > 0 ? "II·" + mine.OreOfTier(2) + "  " : "")}{(mine.OreOfTier(1) > 0 ? "I·" + mine.OreOfTier(1) : "")}</color></size>" : "";
+                // the two best tiers above the common ore ("III·1  I·7")
+                string tiers = "";
+                for (int t = mine.HighestTierInStock, shown = 0; t >= 1 && shown < 2; t--)
+                {
+                    int n = mine.OreOfTier(t);
+                    if (n <= 0) continue;
+                    tiers += (shown++ == 0 ? "  " : " ") + (t < Roman.Length ? Roman[t] : t.ToString()) + "·" + n;
+                }
+                if (tiers.Length > 0) tiers = "<size=15><color=#c9b89a>" + tiers + "</color></size>";
                 label.text.text = $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>\n" +
                                   $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
                 bool canRelease = map && mine.AssignedWorkerCount > 0;

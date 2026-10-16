@@ -63,7 +63,9 @@ namespace BattleOfAges.AI
         public CombatUnit Combat => combatUnit != null ? combatUnit : (combatUnit = GetComponent<CombatUnit>());
         public AIStateType CurrentStateType => currentState != null ? currentState.StateType : AIStateType.Idle;
         public IReadOnlyDictionary<AIStateType, IAIState> States => states;
-        public float MoveSpeed => moveSpeed;
+        public float MoveSpeed => CurrentMoveSpeed;
+        /// <summary>Speed used for movement; characters follow CharacterSpeed (HostileMobAI), wildlife its own value.</summary>
+        protected virtual float CurrentMoveSpeed => moveSpeed;
         public Vector3 Destination => destination;
         public bool HasDestination => hasDestination;
 
@@ -238,7 +240,7 @@ namespace BattleOfAges.AI
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
                 }
 
-                GroundMotor.Move(transform, gridId, moveDir * moveSpeed, radius, Time.deltaTime);
+                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed, radius, Time.deltaTime);
             }
             else
             {
@@ -344,7 +346,7 @@ namespace BattleOfAges.AI
             {
                 Vector3 delta = currentPos - lastProgressPos;
                 delta.y = 0f;
-                bool blocked = delta.magnitude < moveSpeed * stuckTimer * stuckProgressRatio;
+                bool blocked = delta.magnitude < CurrentMoveSpeed * stuckTimer * stuckProgressRatio;
                 ResetStuckDetection();
 
                 if (blocked)

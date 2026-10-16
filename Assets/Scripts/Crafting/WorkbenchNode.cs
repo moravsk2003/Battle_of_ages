@@ -109,6 +109,13 @@ namespace BattleOfAges.Crafting
 
         public IReadOnlyList<RtsUnit> Workers => assignedWorkers;
 
+        /// <summary>Restores a saved queue (resources were paid when it was queued).</summary>
+        public void LoadQueue(IEnumerable<(ItemType type, int level, float progress)> tasks)
+        {
+            Queue.ClearQueue();
+            foreach (var t in tasks) Queue.EnqueueItem(t.type, t.level).ProgressSeconds = t.progress;
+        }
+
         /// <summary>Calls the nearest villager who is not at the bench yet (falls back to any own unit).</summary>
         public RtsUnit AssignNearestFreeWorker()
         {

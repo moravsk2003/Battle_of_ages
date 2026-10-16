@@ -282,6 +282,7 @@ namespace BattleOfAges.UI
         {
             switch (level)
             {
+                case 0: return new Color(0.62f, 0.60f, 0.56f);
                 case 1: return new Color(0.80f, 0.76f, 0.68f);
                 case 2: return new Color(0.50f, 0.82f, 0.42f);
                 case 3: return new Color(0.42f, 0.66f, 1.00f);
@@ -295,9 +296,9 @@ namespace BattleOfAges.UI
         /// <summary>Icon of an item; the metal / leather / wood follows its level like the model does.</summary>
         public static Sprite ItemSprite(BattleOfAges.Crafting.ItemType type, int level)
         {
-            int key = (int)type * 8 + Mathf.Clamp(level, 1, 5);
+            int key = (int)type * 8 + Mathf.Clamp(level, 0, 5);
             if (ItemIcons.TryGetValue(key, out Sprite s) && s != null) return s;
-            s = RenderIcon("UI_Item_" + type + level, p => ShadeItem(type, Mathf.Clamp(level, 1, 5), p));
+            s = RenderIcon("UI_Item_" + type + level, p => ShadeItem(type, Mathf.Clamp(level, 0, 5), p));
             ItemIcons[key] = s;
             return s;
         }
@@ -338,8 +339,8 @@ namespace BattleOfAges.UI
             Color[] metals = { new Color(0.80f, 0.56f, 0.30f), new Color(0.60f, 0.62f, 0.64f), new Color(0.84f, 0.87f, 0.92f), new Color(0.34f, 0.42f, 0.62f), new Color(0.93f, 0.93f, 0.96f) };
             Color[] armour = { new Color(0.58f, 0.38f, 0.21f), new Color(0.60f, 0.62f, 0.64f), new Color(0.84f, 0.87f, 0.92f), new Color(0.34f, 0.42f, 0.62f), new Color(0.93f, 0.93f, 0.96f) };
             Color gold = new Color(0.98f, 0.76f, 0.30f);
-            Color metal = metals[level - 1], arm = armour[level - 1];
-            Color trim = level >= 5 ? gold : level == 4 ? new Color(0.85f, 0.87f, 0.9f) : level == 1 ? new Color(0.36f, 0.22f, 0.12f) : new Color(0.42f, 0.43f, 0.46f);
+            Color metal = level == 0 ? new Color(0.56f, 0.56f, 0.58f) : metals[level - 1], arm = armour[Mathf.Max(1, level) - 1];
+            Color trim = level >= 5 ? gold : level == 4 ? new Color(0.85f, 0.87f, 0.9f) : level <= 1 ? new Color(0.36f, 0.22f, 0.12f) : new Color(0.42f, 0.43f, 0.46f);
             Color wood = level <= 1 ? new Color(0.70f, 0.50f, 0.28f) : level == 2 ? new Color(0.58f, 0.38f, 0.21f) : new Color(0.45f, 0.28f, 0.15f);
             Color leather = new Color(0.36f, 0.22f, 0.12f);
             float shine = Mathf.Clamp01(0.5f + 0.5f * (p.x - p.y) * 0.6f); // light from the top left

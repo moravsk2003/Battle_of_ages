@@ -32,6 +32,8 @@ namespace BattleOfAges.Crafting
 
         public Item this[EquipSlot slot] => Slots[(int)slot];
         public int BaseHealth { get { EnsureBase(); return Mathf.RoundToInt(baseHealth); } }
+        /// <summary>Strength: the unit's own damage before the weapon (also sets its speed, see CharacterSpeed).</summary>
+        public float Strength { get { EnsureBase(); return baseDamage; } }
         public int BaseDamage { get { EnsureBase(); return Mathf.RoundToInt(baseDamage); } }
 
         private Item[] Slots
@@ -111,6 +113,17 @@ namespace BattleOfAges.Crafting
             Apply();
         }
 
+        /// <summary>All six slots (weapon, shield, helmet, chest, gloves, boots), for saving.</summary>
+        public Item[] SlotsCopy() => (Item[])Slots.Clone();
+
+        /// <summary>Puts on exactly these slots (a loaded save); stats follow from the base as usual.</summary>
+        public void LoadSlots(Item[] items)
+        {
+            EnsureBase();
+            for (int s = 0; s < 6; s++) Slots[s] = items != null && s < items.Length ? items[s] : Item.None;
+            Apply();
+        }
+
         /// <summary>Wears the item; returns what was in that slot before (Item.None if it was empty).</summary>
         public Item Equip(Item item)
         {
@@ -157,7 +170,11 @@ namespace BattleOfAges.Crafting
                 health.SetMaxHealthKeepDamage(MaxHealth);
                 health.DamageReduction = DamageReduction;
             }
-            if (combat != null) combat.InitializeCombatStats(Damage, Cooldown, Range);
+            if (combat != null)
+            {
+                combat.Strength = baseDamage; // the characteristic; damage = strength x weapon
+                combat.InitializeCombatStats(Damage, Cooldown, Range);
+            }
             BattleOfAges.Utils.CharacterGear gear = GetComponentInChildren<BattleOfAges.Utils.CharacterGear>(true);
             if (gear != null) gear.Show(this);
             Changed?.Invoke();
@@ -221,7 +238,7 @@ namespace BattleOfAges.Crafting
                 case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.KnightGuard:
                     return new[] { I(ItemType.Sword, 3), I(ItemType.Shield, 3), I(ItemType.Helmet, 3), I(ItemType.Armor, 3), I(ItemType.Gloves, 2), I(ItemType.Boots, 2) };
                 case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.HeroPlayer:
-                    return new[] { I(ItemType.Sword, 1), I(ItemType.Shield, 1) };
+                    return new[] { I(ItemType.Sword, 0), I(ItemType.Shield, 1) };
                 case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Bandit:
                     return new[] { I(ItemType.Sword, 1), I(ItemType.Armor, 1) };
                 case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Goblin:

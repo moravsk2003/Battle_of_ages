@@ -17,7 +17,18 @@ namespace BattleOfAges.Building
 
         [SerializeField] private BuildingType buildingType = BuildingType.WorkerHouse;
 
-        public BuildingType Type => buildingType;
+        /// <summary>The building's type; mines, workbenches and chests built before the type was set are recognised by their component.</summary>
+        public BuildingType Type
+        {
+            get
+            {
+                if (buildingType != BuildingType.WorkerHouse) return buildingType;
+                if (GetComponent<MineNode>() != null) return BuildingType.Mine;
+                if (GetComponent<BattleOfAges.Crafting.WorkbenchNode>() != null) return BuildingType.Workbench;
+                if (GetComponent<BattleOfAges.Resources.StorageChestNode>() != null) return BuildingType.StorageChest;
+                return buildingType;
+            }
+        }
 
         private static readonly System.Collections.Generic.List<BuildingNode> active = new System.Collections.Generic.List<BuildingNode>();
 
@@ -63,7 +74,7 @@ namespace BattleOfAges.Building
 
         public void OnBuilt()
         {
-            BuildingDefinition def = BuildingData.GetDefinition(buildingType);
+            BuildingDefinition def = BuildingData.GetDefinition(Type); // (a mine or workbench used to spawn a house's worker)
 
             Combat.HealthComponent hp = GetComponent<Combat.HealthComponent>();
             if (hp != null && def.MaxHealth > 0)
@@ -85,8 +96,13 @@ namespace BattleOfAges.Building
             spawnPos.y = RtsUnit.GetTerrainHeight(spawnPos);
 
             int workerNumber = WorkerRegistry.WorkerCount + 1;
-            string npcName = $"NPC_Villager_{workerNumber}";
+            while (GameObject.Find($"NPC_Villager_{workerNumber}") != null) workerNumber++; // names stay unique after deaths
+            CreateWorkerNpc(spawnPos, $"NPC_Villager_{workerNumber}");
+        }
 
+        /// <summary>A villager worker (gatherer) at the position; also used when a save is loaded.</summary>
+        public static GameObject CreateWorkerNpc(Vector3 spawnPos, string npcName)
+        {
             GameObject npcObj = new GameObject(npcName);
             npcObj.transform.position = spawnPos;
 
@@ -138,6 +154,7 @@ namespace BattleOfAges.Building
             unitComp.SetSelectionIndicator(indicator);
 
             Debug.Log($"[Building] Spawned worker: {npcName} at {spawnPos}");
+            return npcObj;
         }
 
         public static GameObject CreateWorkerHousePrefab(string name = "WorkerHouse")

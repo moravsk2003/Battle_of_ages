@@ -19,6 +19,15 @@ namespace BattleOfAges.Combat
         public int AttackDamage => attackDamage;
         public float AttackCooldown => attackCooldown;
         public float AttackRange => attackRange;
+
+        [SerializeField] private float strength;
+        /// <summary>Strength characteristic: the damage before the weapon (Equipment sets it; without gear = AttackDamage).</summary>
+        public float Strength { get => strength > 0f ? strength : attackDamage; set => strength = value; }
+        [SerializeField] private float speedModifier = CharacterSpeed.DefaultModifier;
+        /// <summary>Speed characteristic (5 for everyone, 2 for the hero), see CharacterSpeed.</summary>
+        public float SpeedModifier { get => speedModifier; set => speedModifier = value; }
+        /// <summary>Global x SpeedModifier x strength (attack damage).</summary>
+        public float MoveSpeed => CharacterSpeed.Of(this);
         public bool CanAttack => Time.time >= nextAttackTime;
 
         /// <summary>Raised when an attack swing starts (rigged characters play their attack clip).</summary>

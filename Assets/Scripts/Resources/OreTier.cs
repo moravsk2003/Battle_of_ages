@@ -27,6 +27,18 @@ namespace BattleOfAges.Resources
             return currentTier;
         }
 
+        /// <summary>
+        /// Tier of a piece mined in a Mine: 80% tier 0, 18% tier 1, then like a pebble each further tier is ten times rarer
+        /// (1.8% tier 2, 0.18% tier 3 ...) up to tier 99.
+        /// </summary>
+        public static int DetermineMineOreTier()
+        {
+            if (Random.value >= 0.2f) return 0;
+            int tier = 1;
+            while (tier < MAX_TIERS - 1 && Random.Range(1, 11) == 1) tier++;
+            return tier;
+        }
+
         public static string GetTierName(int tier)
         {
             if (tier == 0) return "Камінна руда (рів. 0)";

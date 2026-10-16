@@ -64,6 +64,8 @@ namespace BattleOfAges.AI
             }
         }
 
+        protected override float CurrentMoveSpeed => Combat != null ? Combat.MoveSpeed : moveSpeed;
+
         public void InitializeMob(HostileMobType type)
         {
             mobType = type;
@@ -86,9 +88,9 @@ namespace BattleOfAges.AI
             int dmg;
             switch (mobType)
             {
-                case HostileMobType.WarlordGuard: hp = 250; dmg = 30; moveSpeed = 4.6f; break;
-                case HostileMobType.Goblin:       hp = 80;  dmg = 12; moveSpeed = 5.5f; break;
-                default:                          hp = 140; dmg = 18; moveSpeed = 4.6f; break;
+                case HostileMobType.WarlordGuard: hp = 250; dmg = 30; break; // speed: CharacterSpeed (damage x modifier)
+                case HostileMobType.Goblin:       hp = 80;  dmg = 12; break;
+                default:                          hp = 140; dmg = 18; break;
             }
 
             if (Health != null) Health.InitializeHealth(hp);

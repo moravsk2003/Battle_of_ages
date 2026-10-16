@@ -6,8 +6,8 @@ using BattleOfAges.Utils;
 namespace BattleOfAges.Building
 {
     /// <summary>
-    /// Ore Mine building component. Holds up to 10 workers, each generating 1 ore per second (tier 0..2, rolled like a
-    /// pebble) into an output buffer that haulers carry to the storage chest; the HUD label shows it and lets workers out.
+    /// Ore Mine building component. Holds up to 10 workers, each generating 1 ore per second (tier 0..99: 80% tier 0,
+    /// 18% tier I, then ten times rarer per tier) into an output buffer that haulers carry to the storage chest; the HUD label shows it and lets workers out.
     /// Supports worker assignment and hauling to storage chests.
     /// </summary>
     [DisallowMultipleComponent]
@@ -25,8 +25,8 @@ namespace BattleOfAges.Building
         [SerializeField] private int assignedWorkerCount = 0;
         [SerializeField] private int maxAccumulatedOre = 500;
 
-        /// <summary>Highest ore tier a mine yields; each mined piece rolls its tier like a pebble (10% I, 1% II).</summary>
-        public const int MAX_MINED_TIER = 2;
+        /// <summary>Mines yield every ore tier (0..99): 80% tier 0, 18% tier I, each further tier ten times rarer.</summary>
+        public const int MAX_MINED_TIER = BattleOfAges.Resources.OreTierHelper.MAX_TIERS - 1;
 
         private float productionTimer = 0f;
         private readonly int[] oreByTier = new int[MAX_MINED_TIER + 1];
@@ -34,7 +34,10 @@ namespace BattleOfAges.Building
 
         public int AssignedWorkerCount => assignedWorkerCount;
         public int MaxAccumulatedOre => maxAccumulatedOre;
-        public int AccumulatedOreCount { get { int n = 0; foreach (int c in oreByTier) n += c; return n; } }
+        private int accumulatedOre;
+        public int AccumulatedOreCount => accumulatedOre;
+        /// <summary>Best tier waiting in the buffer (-1 when empty).</summary>
+        public int HighestTierInStock { get { for (int t = MAX_MINED_TIER; t >= 0; t--) if (oreByTier[t] > 0) return t; return -1; } }
         public int OreOfTier(int tier) => tier >= 0 && tier <= MAX_MINED_TIER ? oreByTier[tier] : 0;
         public bool IsFullWorkers => assignedWorkerCount >= MAX_WORKERS;
         public IReadOnlyList<NpcResourceGatherer> Workers => workers;
@@ -74,8 +77,11 @@ namespace BattleOfAges.Building
         /// <summary>Adds mined ore to the buffer (up to its capacity), each piece with a rolled tier.</summary>
         public void Produce(int pieces)
         {
-            for (int i = 0; i < pieces && AccumulatedOreCount < maxAccumulatedOre; i++)
-                oreByTier[Mathf.Min(BattleOfAges.Resources.OreTierHelper.DeterminePebbleOreTier(), MAX_MINED_TIER)]++;
+            for (int i = 0; i < pieces && accumulatedOre < maxAccumulatedOre; i++)
+            {
+                oreByTier[Mathf.Min(BattleOfAges.Resources.OreTierHelper.DetermineMineOreTier(), MAX_MINED_TIER)]++;
+                accumulatedOre++;
+            }
         }
 
         public bool AssignWorker(NpcResourceGatherer worker = null)
@@ -112,6 +118,27 @@ namespace BattleOfAges.Building
             return false;
         }
 
+        /// <summary>Ore waiting per tier (tiers that have some), for saving.</summary>
+        public List<KeyValuePair<int, int>> OreStock()
+        {
+            var list = new List<KeyValuePair<int, int>>();
+            for (int t = 0; t <= MAX_MINED_TIER; t++) if (oreByTier[t] > 0) list.Add(new KeyValuePair<int, int>(t, oreByTier[t]));
+            return list;
+        }
+
+        public void SetOreStock(IEnumerable<KeyValuePair<int, int>> stock)
+        {
+            System.Array.Clear(oreByTier, 0, oreByTier.Length);
+            accumulatedOre = 0;
+            if (stock == null) return;
+            foreach (var p in stock)
+            {
+                if (p.Key < 0 || p.Key > MAX_MINED_TIER || p.Value <= 0) continue;
+                oreByTier[p.Key] += p.Value;
+                accumulatedOre += p.Value;
+            }
+        }
+
         /// <summary>Takes up to maxAmount ore of one tier, the best tier first so rare ore is not left behind.</summary>
         public int TakeOre(int maxAmount, out int tier)
         {
@@ -120,6 +147,7 @@ namespace BattleOfAges.Building
                 if (oreByTier[tier] <= 0) continue;
                 int taken = Mathf.Min(oreByTier[tier], maxAmount);
                 oreByTier[tier] -= taken;
+                accumulatedOre -= taken;
                 return taken;
             }
             tier = 0;

@@ -241,6 +241,25 @@ namespace BattleOfAges.Resources
             }
         }
 
+        /// <summary>Id of this tree in the world save ("chunkX,chunkY:index" or a scene path); set where it is placed.</summary>
+        public string PersistentKey { get; set; }
+        public bool IsUntouched => currentState == TreeState.WholeTree && currentWoodRemaining >= maxWoodCapacity;
+
+        /// <summary>Restores a saved state (felled into a wood pile, or a bare stump) without any harvest events.</summary>
+        public void ApplySavedState(TreeState state, int woodRemaining)
+        {
+            ResetTreeState();
+            currentWoodRemaining = Mathf.Clamp(woodRemaining, 0, maxWoodCapacity);
+            if (state == TreeState.WholeTree) return;
+            ConvertToWoodPile();
+            if (state != TreeState.Depleted) return;
+            currentState = TreeState.Depleted;
+            currentWoodRemaining = 0;
+            if (woodPileObj != null) { Destroy(woodPileObj); woodPileObj = null; }
+            Collider col = GetComponent<Collider>();
+            if (col != null) col.enabled = false;
+        }
+
         public void ResetTreeState()
         {
             currentState = TreeState.WholeTree;

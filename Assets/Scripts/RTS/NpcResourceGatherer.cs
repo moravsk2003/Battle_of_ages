@@ -123,6 +123,16 @@ namespace BattleOfAges.RTS
         }
 
         public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
+        public MineNode AssignedMine => assignedMine;
+
+        /// <summary>Puts the worker straight inside the mine (a loaded save).</summary>
+        public void EnterMineNow(MineNode mine)
+        {
+            if (mine == null || !mine.AssignWorker(this)) return;
+            assignedMine = mine;
+            currentState = GathererState.WorkingInsideMine;
+            SetRenderersActive(false);
+        }
 
         /// <summary>Comes out of the mine at its entrance and goes back to the current directive.</summary>
         public void LeaveMine()

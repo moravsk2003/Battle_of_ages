@@ -57,6 +57,8 @@ namespace BattleOfAges.Utils
         /// <summary>Blade / axe head / boss colour and the fittings (guard, pommel) for a weapon level.</summary>
         private static Finish WeaponFinish(int level)
         {
+            if (level <= 0) // the hero's plain starting sword: worn grey iron
+                return new Finish { Main = new Color(0.46f, 0.46f, 0.47f), MainS = MetalS(0.8f, 0.35f), Trim = new Color(0.30f, 0.30f, 0.31f), TrimS = MetalS(0.75f, 0.3f), Dark = DarkLeather, DarkS = LeatherS };
             switch (ItemStatCalculator.ClampLevel(level))
             {
                 case 1: return new Finish { Main = new Color(0.74f, 0.50f, 0.27f), MainS = MetalS(0.9f, 0.55f), Trim = new Color(0.60f, 0.40f, 0.22f), TrimS = MetalS(0.85f, 0.45f), Dark = DarkLeather, DarkS = LeatherS };
@@ -197,7 +199,7 @@ namespace BattleOfAges.Utils
             string key = r.Id + ":" + (int)item.Type + ":" + item.Level + side;
             if (Pieces.TryGetValue(key, out Piece p)) return p;
             var kit = new Kit();
-            int level = ItemStatCalculator.ClampLevel(item.Level);
+            int level = Mathf.Clamp(item.Level, 0, ItemStatCalculator.MAX_LEVEL); // 0 only for the starting sword
             HashSet<int> recolour = null;
             Color recolourColour = Color.white;
             Vector3 recolourSurface = Vector3.zero;

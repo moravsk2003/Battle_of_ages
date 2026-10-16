@@ -18,6 +18,7 @@ namespace BattleOfAges.Player
 
         [Header("Movement Configuration")]
         [SerializeField] private float moveSpeed = 12.0f;
+        private BattleOfAges.Combat.CombatUnit combat;
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float jumpHeight = 1.2f;
 
@@ -120,7 +121,9 @@ namespace BattleOfAges.Player
                 move.Normalize();
             }
 
-            characterController.Move(move * moveSpeed * Time.deltaTime);
+            if (combat == null) combat = GetComponent<BattleOfAges.Combat.CombatUnit>();
+            float speed = combat != null ? combat.MoveSpeed : moveSpeed; // CharacterSpeed formula (hero modifier 2)
+            characterController.Move(move * speed * Time.deltaTime);
 
             if (UniversalInput.IsJumpPressed() && isGrounded)
             {

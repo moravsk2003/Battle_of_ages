@@ -55,11 +55,42 @@ namespace BattleOfAges.UI
             InitializeReferences();
             SetupButtonListeners();
             InitializeSliders();
+            BuildSaveButtons();
 
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (settingsPanel != null) settingsPanel.SetActive(false);
 
             KeybindsManager.OnKeybindsChanged += RefreshKeybindButtonTexts;
+        }
+
+        /// <summary>
+        /// Save / Load / Main menu in the pause column: copies of the Settings button stacked under it, the Quit button
+        /// moved to the bottom (Resume, Settings, Save, Load, Main menu, Quit).
+        /// </summary>
+        private void BuildSaveButtons()
+        {
+            if (resumeButton == null || settingsButton == null) return;
+            var resume = (RectTransform)resumeButton.transform;
+            var settings = (RectTransform)settingsButton.transform;
+            Vector2 step = settings.anchoredPosition - resume.anchoredPosition;
+            if (step.sqrMagnitude < 1f) step = new Vector2(0f, -(settings.rect.height + 12f));
+            Vector2 at = settings.anchoredPosition;
+            AddPauseButton("SaveButton", "Зберегти", at += step, () => SaveSlotsUI.Open(true));
+            AddPauseButton("LoadButton", "Завантажити", at += step, () => SaveSlotsUI.Open(false));
+            AddPauseButton("MainMenuButton", "Головне меню", at += step, BattleOfAges.SaveLoad.SaveSystem.ToMainMenu);
+            if (quitButton != null) ((RectTransform)quitButton.transform).anchoredPosition = at + step;
+        }
+
+        private void AddPauseButton(string name, string text, Vector2 position, UnityEngine.Events.UnityAction onClick)
+        {
+            GameObject copy = Instantiate(settingsButton.gameObject, settingsButton.transform.parent);
+            copy.name = name;
+            ((RectTransform)copy.transform).anchoredPosition = position;
+            Button b = copy.GetComponent<Button>();
+            b.onClick = new Button.ButtonClickedEvent();
+            b.onClick.AddListener(onClick);
+            Text label = copy.GetComponentInChildren<Text>(true);
+            if (label != null) label.text = text;
         }
 
         private void OnDestroy()
@@ -139,7 +170,7 @@ namespace BattleOfAges.UI
             return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
                    (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
                    (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
-                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible;
+                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible || SaveSlotsUI.IsVisible;
         }
 
         private void CloseAllModalUIs()
@@ -149,6 +180,7 @@ namespace BattleOfAges.UI
             if (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) BuildMenuUI.Instance.CloseMenu();
             if (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) WorkbenchUI.Instance.CloseUI();
             if (EquipmentUI.IsVisible) EquipmentUI.Instance.Close();
+            if (SaveSlotsUI.IsVisible) SaveSlotsUI.Close();
         }
 
         private void CheckForRebindKeyPress()

@@ -25,20 +25,33 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
-        public void Produce_RollsTiersUpToTwo_AndStopsAtCapacity()
+        public void Produce_StopsAtCapacity_AndKeepsTierCounts()
         {
             mine.Produce(2000);
             Assert.AreEqual(mine.MaxAccumulatedOre, mine.AccumulatedOreCount, "The buffer holds at most its capacity.");
-            Assert.AreEqual(mine.AccumulatedOreCount, mine.OreOfTier(0) + mine.OreOfTier(1) + mine.OreOfTier(2));
-            Assert.Greater(mine.OreOfTier(0), mine.OreOfTier(1), "Tier 0 is the common ore.");
-            Assert.Greater(mine.OreOfTier(1), 0, "About one piece in ten is tier I (500 pieces).");
+            int sum = 0;
+            for (int t = 0; t <= MineNode.MAX_MINED_TIER; t++) sum += mine.OreOfTier(t);
+            Assert.AreEqual(mine.AccumulatedOreCount, sum);
+        }
+
+        [Test]
+        public void MineOreTier_IsEightyPercentTierZero_EighteenPercentTierOne()
+        {
+            Random.InitState(1234);
+            const int N = 100000;
+            var counts = new int[BattleOfAges.Resources.OreTierHelper.MAX_TIERS];
+            for (int i = 0; i < N; i++) counts[BattleOfAges.Resources.OreTierHelper.DetermineMineOreTier()]++;
+            Assert.AreEqual(0.80f, counts[0] / (float)N, 0.01f);
+            Assert.AreEqual(0.18f, counts[1] / (float)N, 0.01f);
+            Assert.AreEqual(0.018f, counts[2] / (float)N, 0.003f);
+            Assert.Greater(counts[3], 0, "Higher tiers keep going (0.18% tier 3).");
         }
 
         [Test]
         public void TakeOre_TakesTheBestTierFirst()
         {
             mine.Produce(400);
-            int best = mine.OreOfTier(2) > 0 ? 2 : mine.OreOfTier(1) > 0 ? 1 : 0;
+            int best = mine.HighestTierInStock;
             int taken = mine.TakeOre(3, out int tier);
             Assert.AreEqual(best, tier);
             Assert.Greater(taken, 0);

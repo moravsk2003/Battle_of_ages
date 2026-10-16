@@ -29,10 +29,11 @@ namespace BattleOfAges.UI
         private void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
         private void OnDisable() => SceneManager.sceneLoaded -= OnSceneLoaded;
         private void Start() => EnsureHud();
-        private void OnSceneLoaded(Scene s, LoadSceneMode m) { styled.Clear(); lastText.Clear(); EnsureHud(); }
+        private void OnSceneLoaded(Scene s, LoadSceneMode m) { styled.Clear(); lastText.Clear(); EnsureHud(s.name); }
 
-        private static void EnsureHud()
+        private static void EnsureHud(string scene = null)
         {
+            if ((scene ?? SceneManager.GetActiveScene().name) == BattleOfAges.SaveLoad.SaveSystem.MenuScene) return;
             if (FindFirstObjectByType<StrategyHud>() == null) new GameObject("StrategyHud").AddComponent<StrategyHud>();
         }
 

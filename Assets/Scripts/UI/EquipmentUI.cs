@@ -58,6 +58,7 @@ namespace BattleOfAges.UI
             instance = this;
             Build();
             window.SetActive(false);
+            DontDestroyOnLoad(gameObject); // the game may start in the main menu scene
         }
 
         private void OnEnable()
@@ -216,7 +217,8 @@ namespace BattleOfAges.UI
                 $"Здоров'я  <color=#F5CC73>{t.MaxHealth}</color>\n" +
                 $"Урон  <color=#F5CC73>{t.Damage}</color>   ·   удар раз на {t.Cooldown:0.0} с\n" +
                 $"Дальність  <color=#F5CC73>{t.Range:0.#} м</color>\n" +
-                $"Поглинання урону  <color=#F5CC73>{Mathf.RoundToInt(t.DamageReduction * 100f)}%</color>";
+                $"Поглинання урону  <color=#F5CC73>{Mathf.RoundToInt(t.DamageReduction * 100f)}%</color>\n" +
+                $"Сила  <color=#F5CC73>{t.Strength:0.#}</color>   ·   швидкість {SpeedOf(t):0.#} м/с";
 
             for (int i = 0; i < filterButtons.Count; i++)
             {
@@ -224,6 +226,12 @@ namespace BattleOfAges.UI
                 img.color = (i - 1) == filter ? new Color(1f, 0.85f, 0.5f) : Color.white;
             }
             RebuildStore();
+        }
+
+        private static float SpeedOf(Equipment t)
+        {
+            var combat = t.GetComponent<BattleOfAges.Combat.CombatUnit>();
+            return BattleOfAges.Combat.CharacterSpeed.Of(combat);
         }
 
         private static string DisplayName(GameObject go)
@@ -351,7 +359,7 @@ namespace BattleOfAges.UI
             RectTransform st = UiTheme.Rect(doll, "Stats", new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(390f, 150f));
             UiTheme.PanelImage(st, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
             RectTransform stText = UiTheme.Rect(st, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(360f, 130f));
-            stats = UiTheme.Label(stText, "Text", "", 19, TextAnchor.MiddleLeft, UiTheme.Ink);
+            stats = UiTheme.Label(stText, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
             stats.supportRichText = true;
             stats.lineSpacing = 1.15f;
 

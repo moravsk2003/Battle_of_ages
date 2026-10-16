@@ -41,6 +41,36 @@ namespace BattleOfAges.Resources
             }
         }
 
+        /// <summary>Ore stock per tier (only tiers that have ore), for saving.</summary>
+        public List<KeyValuePair<int, int>> OreTiers()
+        {
+            var list = new List<KeyValuePair<int, int>>();
+            foreach (var pair in oreTierCounts) if (pair.Value > 0) list.Add(pair);
+            return list;
+        }
+
+        /// <summary>Replaces the whole stock (a new game: initial values; a loaded game: the saved stock).</summary>
+        public void SetState(int wood, IEnumerable<KeyValuePair<int, int>> ore)
+        {
+            WoodCount = Mathf.Max(0, wood);
+            OreCount = 0;
+            HighestOreTier = 0;
+            for (int i = 0; i < OreTierHelper.MAX_TIERS; i++) oreTierCounts[i] = 0;
+            if (ore != null)
+                foreach (var pair in ore)
+                {
+                    int t = Mathf.Clamp(pair.Key, 0, OreTierHelper.MAX_TIERS - 1);
+                    if (pair.Value <= 0) continue;
+                    oreTierCounts[t] += pair.Value;
+                    OreCount += pair.Value;
+                    if (t > HighestOreTier) HighestOreTier = t;
+                }
+            OnResourceChanged?.Invoke(ResourceType.Wood, WoodCount);
+            OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
+        }
+
+        public void ResetToInitial() => SetState(initialWood, initialOre > 0 ? new[] { new KeyValuePair<int, int>(0, initialOre) } : null);
+
         public void AddResource(ResourceType type, int amount)
         {
             if (amount <= 0) return;

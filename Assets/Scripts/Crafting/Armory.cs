@@ -30,6 +30,12 @@ namespace BattleOfAges.Crafting
             if (instance == this) instance = null;
         }
 
+        public void Clear()
+        {
+            items.Clear();
+            Changed?.Invoke();
+        }
+
         public void Add(Item item)
         {
             if (item.IsEmpty) return;

@@ -19,8 +19,8 @@ namespace BattleOfAges.Player
         private Camera fpsCamera;
         private FpsViewmodelAnimation viewmodelAnimation;
 
-        // Unarmed player: the worn gear (Equipment) scales these
-        public const int BaseHealth = 500, BaseDamage = 40;
+        // Unarmed player (BaseDamage is the hero's strength, 50): the worn gear (Equipment) scales these
+        public const int BaseHealth = 500, BaseDamage = 50;
         public const float BaseCooldown = 1.8f;
 
         private BattleOfAges.Crafting.Equipment gear;
@@ -51,10 +51,11 @@ namespace BattleOfAges.Player
         {
             healthComponent = GetComponent<HealthComponent>();
             combatUnit = GetComponent<CombatUnit>();
+            if (combatUnit != null) combatUnit.SpeedModifier = CharacterSpeed.HeroModifier;
 
-            // Starting kit: the sword and shield the first-person arms are drawn with
+            // Starting kit: a plain level-0 sword and a shield
             BattleOfAges.Crafting.Equipment g = Gear;
-            if (g[BattleOfAges.Crafting.EquipSlot.Weapon].IsEmpty) g.Equip(new BattleOfAges.Crafting.Item(BattleOfAges.Crafting.ItemType.Sword, 1));
+            if (g[BattleOfAges.Crafting.EquipSlot.Weapon].IsEmpty) g.Equip(new BattleOfAges.Crafting.Item(BattleOfAges.Crafting.ItemType.Sword, 0));
             if (g[BattleOfAges.Crafting.EquipSlot.Shield].IsEmpty) g.Equip(new BattleOfAges.Crafting.Item(BattleOfAges.Crafting.ItemType.Shield, 1));
         }
 

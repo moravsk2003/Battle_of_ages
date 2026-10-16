@@ -25,6 +25,13 @@ namespace BattleOfAges.Combat
             currentHealth = maxHealth;
         }
 
+        /// <summary>Sets the current health directly (a loaded save), clamped to 1..max.</summary>
+        public void SetCurrentHealth(int health)
+        {
+            currentHealth = Mathf.Clamp(health, 1, maxHealth);
+            OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        }
+
         public void InitializeHealth(int health)
         {
             maxHealth = Mathf.Max(1, health);

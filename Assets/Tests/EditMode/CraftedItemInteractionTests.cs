@@ -158,6 +158,39 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void Sword_AddsTwentyPercentDamagePerLevel()
+        {
+            Assert.AreEqual(1.0f, ItemStatCalculator.WeaponDamageMultiplier(new Item(ItemType.Sword, 0)), 1e-4f);
+            Assert.AreEqual(1.6f, ItemStatCalculator.WeaponDamageMultiplier(new Item(ItemType.Sword, 3)), 1e-4f);
+            Assert.AreEqual(2.0f, ItemStatCalculator.WeaponDamageMultiplier(new Item(ItemType.Sword, 5)), 1e-4f);
+        }
+
+        [Test]
+        public void LevelZeroSword_IsARealItem_DefaultItemIsEmpty()
+        {
+            Assert.IsFalse(new Item(ItemType.Sword, 0).IsEmpty);
+            Assert.IsTrue(default(Item).IsEmpty);
+            Assert.AreNotEqual(Item.None, new Item(ItemType.Sword, 0));
+        }
+
+        [Test]
+        public void Damage_IsStrengthTimesSword_SpeedFollowsStrengthNotTheSword()
+        {
+            Equipment gear = playerCombat.Gear;
+            CombatUnit cu = playerObj.GetComponent<CombatUnit>();
+            cu.SpeedModifier = CharacterSpeed.HeroModifier;
+            gear.Equip(new Item(ItemType.Sword, 0));
+            Assert.AreEqual(PlayerCombatController.BaseDamage, cu.AttackDamage, "Level 0 sword: damage = strength.");
+            float speed = cu.MoveSpeed;
+            Assert.AreEqual(CharacterSpeed.Global * 2f * 50f, speed, 1e-3f, "Speed = global x modifier 2 x strength 50.");
+
+            gear.Equip(new Item(ItemType.Sword, 5));
+            Assert.AreEqual(PlayerCombatController.BaseDamage * 2, cu.AttackDamage);
+            Assert.AreEqual(speed, cu.MoveSpeed, 1e-3f, "A better sword does not change the speed.");
+            Assert.Greater(speed, CharacterSpeed.Of(null), "The hero is faster than a default unit.");
+        }
+
+        [Test]
         public void CastleWall_HasClimbAssistTrigger()
         {
             GameObject wall = BuildingNode.CreateCastleWallPrefab("TestWall");
