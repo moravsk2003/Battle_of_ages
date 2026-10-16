@@ -99,6 +99,11 @@ namespace BattleOfAges.Building
                 Debug.Log($"[Building] Недостатньо ресурсів для {def.DisplayName}!");
                 return;
             }
+            if (!IsAllowed(type, out string why))
+            {
+                BattleOfAges.UI.StrategyHud.Notify(why);
+                return;
+            }
 
             currentBuildingType = type;
             isPlacing = true;
@@ -137,7 +142,7 @@ namespace BattleOfAges.Building
 
                 BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
                 bool validLoc = CheckLocationValid(pos, def.Size);
-                bool affordable = CanAfford(def);
+                bool affordable = CanAfford(def) && IsAllowed(currentBuildingType, out _);
 
                 Color ghostColor = (validLoc && affordable)
                     ? new Color(0.2f, 0.9f, 0.4f, 0.45f)  // Green
@@ -222,6 +227,13 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
             Vector3 buildPos = (ghostPreview != null) ? ghostPreview.transform.position : transform.position;
 
+            if (!IsAllowed(currentBuildingType, out string notAllowed))
+            {
+                BattleOfAges.UI.StrategyHud.Notify(notAllowed);
+                CancelPlacement();
+                return;
+            }
+
             if (!CheckLocationValid(buildPos, def.Size))
             {
                 Debug.Log($"[Building] Неможливо побудувати тут: занадто близько до іншої будівлі або об'єкта! Потрібен прохід для NPC.");
@@ -271,6 +283,21 @@ namespace BattleOfAges.Building
             }
         }
 
+        /// <summary>Settlement rules: one town hall; a worker house only while the population is under the town hall's cap.</summary>
+        public static bool IsAllowed(BuildingType type, out string reason)
+        {
+            reason = null;
+            if (type == BuildingType.TownHall && TownHall.Current != null) { reason = "Ратуша вже є: її можна покращити"; return false; }
+            if (type == BuildingType.WorkerHouse && !TownHall.HasRoom(BuildingData.GetDefinition(type).NpcSpawnCount))
+            {
+                reason = TownHall.Current == null
+                    ? $"Населення {TownHall.Population}/{TownHall.PopulationCap}: збудуйте Ратушу"
+                    : $"Населення {TownHall.Population}/{TownHall.PopulationCap}: покращте Ратушу";
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>A finished building of the type (not yet placed; OnBuilt not called). Also used to rebuild a save.</summary>
         public static GameObject CreateBuilding(BuildingType type)
         {
@@ -281,6 +308,7 @@ namespace BattleOfAges.Building
                 case BuildingType.Mine: return MineNode.CreateMinePrefab("Mine");
                 case BuildingType.Workbench: return BattleOfAges.Crafting.WorkbenchNode.CreateWorkbenchPrefab("Workbench");
                 case BuildingType.CastleWall: return BuildingNode.CreateCastleWallPrefab("CastleWall");
+                case BuildingType.TownHall: return TownHall.CreatePrefab("TownHall");
                 default: return null;
             }
         }

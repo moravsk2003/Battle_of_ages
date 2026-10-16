@@ -8,7 +8,8 @@ namespace BattleOfAges.Building
         StorageChest,
         Mine,
         Workbench,
-        CastleWall
+        CastleWall,
+        TownHall
     }
 
     /// <summary>
@@ -59,7 +60,7 @@ namespace BattleOfAges.Building
             {
                 Type = BuildingType.Mine,
                 DisplayName = "Шахта",
-                Description = "Видобуває руду (до 10 робітників, 1 руда/сек)",
+                Description = "Видобуває руду (до 10 робітників, 1 руда/с, з кайлом більше)",
                 WoodCost = 4,
                 OreCost = 2,
                 OreTierRequired = 0,
@@ -90,6 +91,18 @@ namespace BattleOfAges.Building
                 NpcSpawnCount = 0,
                 Size = new Vector3(4.0f, 3.5f, 1.2f),
                 MaxHealth = 600
+            },
+            new BuildingDefinition
+            {
+                Type = BuildingType.TownHall,
+                DisplayName = "Ратуша",
+                Description = "Головна будівля: ліміт населення (I-V)",
+                WoodCost = 15,
+                OreCost = 5,
+                OreTierRequired = 0,
+                NpcSpawnCount = 0,
+                Size = new Vector3(5.6f, 5.0f, 5.6f),
+                MaxHealth = 1500
             }
         };
 

@@ -169,7 +169,8 @@ namespace BattleOfAges.UI
             woodText.text = wood.ToString();
             oreText.text = OreSummary(res, ore);
             int workers = WorkerRegistry.WorkerCount;
-            workerText.text = workers.ToString();
+            workerText.text = workers + "/" + TownHall.PopulationCap;
+            workerText.color = workers >= TownHall.PopulationCap ? UiTheme.Bad : UiTheme.Ink;
             armyText.text = Mathf.Max(0, UnitRegistry.ActiveUnits.Count - workers).ToString();
             modeText.text = map ? "Мапа  ·  M — від першої особи" : "Від першої особи  ·  M — мапа";
 
@@ -208,6 +209,7 @@ namespace BattleOfAges.UI
                 lastWood = wood; lastOre = ore; lastWorkers = workers; lastBuildings = buildings;
             }
             UpdateMineLabels(map);
+            UpdateHallLabel(map);
             UpdateToasts();
         }
 
@@ -363,7 +365,7 @@ namespace BattleOfAges.UI
                     tiers += (shown++ == 0 ? "  " : " ") + (t < Roman.Length ? Roman[t] : t.ToString()) + "·" + n;
                 }
                 if (tiers.Length > 0) tiers = "<size=15><color=#c9b89a>" + tiers + "</color></size>";
-                label.text.text = $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>\n" +
+                label.text.text = $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  {mine.OrePerSecond:0.#}/с\n" +
                                   $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
                 bool canRelease = map && mine.AssignedWorkerCount > 0;
                 if (label.button.gameObject.activeSelf != canRelease) label.button.gameObject.SetActive(canRelease);
@@ -371,12 +373,58 @@ namespace BattleOfAges.UI
             if (mineLabels.Count > MineNode.ActiveMines.Count + 4) PruneMineLabels();
         }
 
+        // ------------------------------------------------------------------ town hall label
+
+        private RectTransform hallLabel;
+        private Text hallText;
+        private Button hallButton;
+        private Text hallButtonText;
+
+        /// <summary>Over the town hall: level, population against its cap, and the upgrade with its ore requirement.</summary>
+        private void UpdateHallLabel(bool map)
+        {
+            TownHall hall = TownHall.Current;
+            Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+            bool show = hall != null && cam != null;
+            Vector3 sp = show ? cam.WorldToScreenPoint(hall.transform.position + Vector3.up * 7.5f) : Vector3.zero;
+            show &= sp.z > 0f && (map || sp.z < 40f);
+            if (hallLabel == null)
+            {
+                if (!show) return;
+                hallLabel = UiTheme.Rect(root, "HallLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(400f, 60f));
+                hallLabel.pivot = new Vector2(0.5f, 0f);
+                UiTheme.PanelImage(hallLabel, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f)).raycastTarget = false;
+                RectTransform tr = UiTheme.Rect(hallLabel, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 52f));
+                hallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+                hallText.supportRichText = true;
+                hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => TownHall.Current?.TryUpgrade(), 13);
+                hallButtonText = hallButton.GetComponentInChildren<Text>();
+                hallButtonText.supportRichText = true;
+                hallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                hallLabel.SetAsFirstSibling();
+            }
+            if (hallLabel.gameObject.activeSelf != show) hallLabel.gameObject.SetActive(show);
+            if (!show) return;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(root, sp, null, out Vector2 local);
+            hallLabel.anchoredPosition = local;
+            int pop = TownHall.Population, cap = TownHall.PopulationCap;
+            hallText.text = $"Ратуша <color=#F5CC73>{BattleOfAges.Crafting.ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
+            bool max = hall.Level >= TownHall.MaxLevel;
+            bool canShowButton = map && !max;
+            if (hallButton.gameObject.activeSelf != canShowButton) hallButton.gameObject.SetActive(canShowButton);
+            if (!canShowButton) return;
+            TownHall.UpgradeCost(hall.Level + 1, out int wood, out int ore, out int tier);
+            bool ok = hall.CanUpgrade(out _);
+            hallButtonText.text = $"Покращити до {BattleOfAges.Crafting.ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {BattleOfAges.Crafting.ItemTypeNames.Roman(tier)}+</size>";
+            hallButton.interactable = ok;
+        }
+
         private (RectTransform, Text, Button) MineLabel(MineNode mine)
         {
-            RectTransform rt = UiTheme.Rect(root, "MineLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 56f));
+            RectTransform rt = UiTheme.Rect(root, "MineLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 56f));
             rt.pivot = new Vector2(0.5f, 0f);
             UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f)).raycastTarget = false;
-            RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
+            RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(250f, 50f));
             Text text = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             text.supportRichText = true;
             Button b = UiTheme.TextButton(rt, "Release", "Вивести", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(84f, 38f), () => mine.ReleaseOneWorker(), 15);

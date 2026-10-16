@@ -164,7 +164,7 @@ namespace BattleOfAges.UI
             panelRect.anchorMax = new Vector2(0.5f, 0f);
             panelRect.pivot = new Vector2(0.5f, 0f);
             panelRect.anchoredPosition = new Vector2(0f, 160f); // above the unit command panel
-            panelRect.sizeDelta = new Vector2(580f, 500f);
+            panelRect.sizeDelta = new Vector2(580f, 590f); // six buildings
 
             Image panelBg = menuPanelObj.AddComponent<Image>();
             panelBg.color = new Color(0.04f, 0.07f, 0.14f, 0.96f);
@@ -289,10 +289,13 @@ namespace BattleOfAges.UI
             icoTxt.fontSize = 26;
             icoTxt.alignment = TextAnchor.MiddleCenter;
             icoTxt.color = Color.white;
-            icoTxt.text = (def.Type == BuildingType.Mine) ? "⛏️" :
-                          (def.Type == BuildingType.StorageChest) ? "📦" :
-                          (def.Type == BuildingType.Workbench) ? "⚒️" :
-                          (def.Type == BuildingType.CastleWall) ? "🧱" : "🏠";
+            icoTxt.text = ""; // the font has no emoji: a themed icon instead
+            UiTheme.Icon icon = def.Type == BuildingType.Mine ? UiTheme.Icon.Ore
+                              : def.Type == BuildingType.StorageChest ? UiTheme.Icon.Wood
+                              : def.Type == BuildingType.Workbench ? UiTheme.Icon.Hammer
+                              : def.Type == BuildingType.CastleWall ? UiTheme.Icon.Army
+                              : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
+            UiTheme.IconImage(iconObj.transform, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
             GameObject nameObj = new GameObject("NameText", typeof(RectTransform));
             nameObj.transform.SetParent(btnObj.transform, false);

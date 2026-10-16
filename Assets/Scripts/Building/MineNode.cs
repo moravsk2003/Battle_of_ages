@@ -29,6 +29,7 @@ namespace BattleOfAges.Building
         public const int MAX_MINED_TIER = BattleOfAges.Resources.OreTierHelper.MAX_TIERS - 1;
 
         private float productionTimer = 0f;
+        private float productionCarry;
         private readonly int[] oreByTier = new int[MAX_MINED_TIER + 1];
         private readonly List<NpcResourceGatherer> workers = new List<NpcResourceGatherer>(MAX_WORKERS);
 
@@ -41,6 +42,25 @@ namespace BattleOfAges.Building
         public int OreOfTier(int tier) => tier >= 0 && tier <= MAX_MINED_TIER ? oreByTier[tier] : 0;
         public bool IsFullWorkers => assignedWorkerCount >= MAX_WORKERS;
         public IReadOnlyList<NpcResourceGatherer> Workers => workers;
+
+        /// <summary>Ore per second: 1 per worker inside, x(1 + 0.25 x level) for a worker holding a pickaxe.</summary>
+        public float OrePerSecond
+        {
+            get
+            {
+                float rate = 0f;
+                int counted = 0;
+                foreach (NpcResourceGatherer w in workers)
+                {
+                    if (w == null) continue;
+                    counted++;
+                    var gear = w.GetComponent<BattleOfAges.Crafting.Equipment>();
+                    int pick = gear != null ? gear.LevelOf(BattleOfAges.Crafting.ItemType.Pickaxe) : 0;
+                    rate += pick > 0 ? BattleOfAges.Crafting.ItemStatCalculator.CalculateToolEfficiency(pick) : 1f;
+                }
+                return rate + Mathf.Max(0, assignedWorkerCount - counted); // workers without a record (tests, old saves)
+            }
+        }
 
         private void OnEnable()
         {
@@ -70,7 +90,11 @@ namespace BattleOfAges.Building
             if (productionTimer >= 1.0f)
             {
                 productionTimer = 0f;
-                Produce(assignedWorkerCount); // each worker produces 1 ore per second
+                // 1 ore per second per worker, more with a pickaxe; fractions carry over to the next second
+                productionCarry += OrePerSecond;
+                int whole = Mathf.FloorToInt(productionCarry);
+                productionCarry -= whole;
+                Produce(whole);
             }
         }
 

@@ -55,6 +55,8 @@ namespace BattleOfAges.PlayModeTests
                         var node = m.GetComponent<BattleOfAges.Building.MineNode>();
                         for (int k = 0; k < 4; k++) node.AssignWorker();
                         node.Produce(37);
+                        GameObject hall = BattleOfAges.Building.TownHall.CreatePrefab("CaptureHall");
+                        hall.transform.position = hit.point + cam.transform.right * 14f;
                     }
                     return Wait(0.4f);
                 }),

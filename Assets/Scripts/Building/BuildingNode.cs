@@ -18,6 +18,8 @@ namespace BattleOfAges.Building
         [SerializeField] private BuildingType buildingType = BuildingType.WorkerHouse;
 
         /// <summary>The building's type; mines, workbenches and chests built before the type was set are recognised by their component.</summary>
+        public void SetType(BuildingType type) => buildingType = type;
+
         public BuildingType Type
         {
             get
@@ -82,7 +84,7 @@ namespace BattleOfAges.Building
                 hp.InitializeHealth(def.MaxHealth);
             }
 
-            for (int i = 0; i < def.NpcSpawnCount; i++)
+            for (int i = 0; i < def.NpcSpawnCount && TownHall.HasRoom(); i++) // the town hall caps the population
             {
                 SpawnWorkerNpc(i);
             }
@@ -347,6 +349,10 @@ namespace BattleOfAges.Building
             {
                 ghost = CreateCastleWallPrefab("BuildGhost_CastleWall");
             }
+            else if (type == BuildingType.TownHall)
+            {
+                ghost = TownHall.CreatePrefab("BuildGhost_TownHall");
+            }
 
             if (ghost == null) return null;
 
@@ -361,6 +367,9 @@ namespace BattleOfAges.Building
 
             BattleOfAges.Crafting.WorkbenchNode wNode = ghost.GetComponent<BattleOfAges.Crafting.WorkbenchNode>();
             if (wNode != null) DestroyImmediate(wNode);
+
+            TownHall hNode = ghost.GetComponent<TownHall>();
+            if (hNode != null) DestroyImmediate(hNode);
 
             foreach (var col in ghost.GetComponentsInChildren<Collider>())
             {

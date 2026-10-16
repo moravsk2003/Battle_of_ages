@@ -156,6 +156,8 @@ namespace BattleOfAges.SaveLoad
                 s.Health = hp != null ? hp.CurrentHealth : 0;
                 MineNode mine = b.GetComponent<MineNode>();
                 if (mine != null) foreach (var p in mine.OreStock()) s.MineOre.Add(new TierCount(p.Key, p.Value));
+                TownHall hall = b.GetComponent<TownHall>();
+                if (hall != null) s.Level = hall.Level;
                 WorkbenchNode bench = b.GetComponent<WorkbenchNode>();
                 if (bench != null)
                 {
@@ -301,6 +303,8 @@ namespace BattleOfAges.SaveLoad
                     hp.InitializeHealth(BuildingData.GetDefinition((BuildingType)s.Type).MaxHealth);
                     if (s.Health > 0) hp.SetCurrentHealth(s.Health);
                 }
+                TownHall hall = go.GetComponent<TownHall>();
+                if (hall != null && s.Level > 0) hall.Level = s.Level;
                 MineNode mine = go.GetComponent<MineNode>();
                 if (mine != null)
                 {

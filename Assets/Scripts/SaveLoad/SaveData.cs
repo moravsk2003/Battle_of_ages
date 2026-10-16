@@ -55,6 +55,7 @@ namespace BattleOfAges.SaveLoad
         public List<TierCount> MineOre = new List<TierCount>();
         public List<TaskSave> Queue = new List<TaskSave>();
         public int BenchWorkers;
+        public int Level;                // town hall
     }
 
     [Serializable]
