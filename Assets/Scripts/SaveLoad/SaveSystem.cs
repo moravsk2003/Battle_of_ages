@@ -151,7 +151,7 @@ namespace BattleOfAges.SaveLoad
             {
                 if (b == null || b.name.StartsWith("BuildGhost")) continue;
                 buildings.Add(b);
-                var s = new BuildingSave { Type = (int)b.Type, Name = b.name, Position = b.transform.position, Yaw = b.transform.eulerAngles.y };
+                var s = new BuildingSave { Type = (int)b.Type, Name = b.name, Position = b.transform.position, Yaw = b.transform.eulerAngles.y, SceneKey = b.SceneKey };
                 HealthComponent hp = b.GetComponent<HealthComponent>();
                 s.Health = hp != null ? hp.CurrentHealth : 0;
                 MineNode mine = b.GetComponent<MineNode>();
@@ -243,6 +243,10 @@ namespace BattleOfAges.SaveLoad
         // Called by SaveRunner when the game scene has loaded (before any Start).
         internal static void OnGameSceneLoaded(MonoBehaviour runner)
         {
+            // Buildings that come with the scene get a key (name + place) before anything moves them
+            foreach (BuildingNode b in BuildingNode.Active)
+                if (b != null && !b.name.StartsWith("BuildGhost"))
+                    b.SceneKey = b.name + "@" + Vector3Int.RoundToInt(b.transform.position);
             WorldPersistence.Suspended = false;
             sceneStartTime = Time.unscaledTime;
             if (pending != null)
@@ -286,21 +290,37 @@ namespace BattleOfAges.SaveLoad
             Armory.Instance.Clear();
             foreach (Item i in d.Armory) Armory.Instance.Add(i);
 
-            // Buildings: the scene's are replaced by the saved ones
+            // Buildings: the scene's own keep their objects (only their state is restored; those missing from the save
+            // were destroyed), the ones built during play are rebuilt by type
+            var sceneBuildings = new Dictionary<string, BuildingNode>();
             foreach (BuildingNode b in new List<BuildingNode>(BuildingNode.Active))
-                if (b != null && !b.name.StartsWith("BuildGhost")) { b.gameObject.SetActive(false); UnityEngine.Object.Destroy(b.gameObject); }
+            {
+                if (b == null || b.name.StartsWith("BuildGhost")) continue;
+                if (!string.IsNullOrEmpty(b.SceneKey) && !sceneBuildings.ContainsKey(b.SceneKey)) sceneBuildings[b.SceneKey] = b;
+                else { b.gameObject.SetActive(false); UnityEngine.Object.Destroy(b.gameObject); }
+            }
+            var kept = new HashSet<string>();
             var built = new List<GameObject>();
             foreach (BuildingSave s in d.Buildings)
             {
-                GameObject go = BuildingPlacementSystem.CreateBuilding((BuildingType)s.Type);
+                GameObject go;
+                if (!string.IsNullOrEmpty(s.SceneKey) && sceneBuildings.TryGetValue(s.SceneKey, out BuildingNode own))
+                {
+                    go = own.gameObject;
+                    kept.Add(s.SceneKey);
+                }
+                else
+                {
+                    go = BuildingPlacementSystem.CreateBuilding((BuildingType)s.Type);
+                    if (go != null && !string.IsNullOrEmpty(s.Name)) go.name = s.Name;
+                    if (go != null) go.transform.SetPositionAndRotation(s.Position, Quaternion.Euler(0f, s.Yaw, 0f));
+                }
                 built.Add(go);
                 if (go == null) continue;
-                if (!string.IsNullOrEmpty(s.Name)) go.name = s.Name;
-                go.transform.SetPositionAndRotation(s.Position, Quaternion.Euler(0f, s.Yaw, 0f));
                 HealthComponent hp = go.GetComponent<HealthComponent>();
                 if (hp != null)
                 {
-                    hp.InitializeHealth(BuildingData.GetDefinition((BuildingType)s.Type).MaxHealth);
+                    if (!kept.Contains(s.SceneKey ?? "")) hp.InitializeHealth(BuildingData.GetDefinition((BuildingType)s.Type).MaxHealth);
                     if (s.Health > 0) hp.SetCurrentHealth(s.Health);
                 }
                 TownHall hall = go.GetComponent<TownHall>();
@@ -320,6 +340,8 @@ namespace BattleOfAges.SaveLoad
                     bench.LoadQueue(tasks);
                 }
             }
+            foreach (var pair in sceneBuildings)
+                if (!kept.Contains(pair.Key) && pair.Value != null) { pair.Value.gameObject.SetActive(false); UnityEngine.Object.Destroy(pair.Value.gameObject); }
 
             // Units: villagers are rebuilt, the rest are the scene's own units (dead ones are removed)
             var savedNames = new HashSet<string>();

@@ -72,6 +72,17 @@ namespace BattleOfAges.PlayModeTests
 
             res = ResourceManager.Instance;
             hero = Object.FindFirstObjectByType<PlayerCombatController>();
+            // One live mode manager driving this scene's cameras (a persisted manager object used to survive the reload)
+            var modeManagers = Object.FindObjectsByType<BattleOfAges.Managers.GameModeManager>(FindObjectsSortMode.None);
+            Assert.AreEqual(1, modeManagers.Length, "Exactly one GameModeManager after loading.");
+            Assert.AreEqual(1, Object.FindObjectsByType<ResourceManager>(FindObjectsSortMode.None).Length, "Exactly one ResourceManager after loading.");
+            modeManagers[0].SetGameMode(BattleOfAges.Managers.GameMode.FirstPerson);
+            yield return null;
+            Assert.IsNull(Object.FindFirstObjectByType<BattleOfAges.CameraSystem.RtsMapCameraController>(), "In first person the map camera is off.");
+            Assert.IsTrue(hero.GetComponentInChildren<Camera>().enabled, "The first-person camera renders.");
+            int sceneOwned = 0;
+            foreach (BuildingNode b in BuildingNode.Active) if (b != null && !string.IsNullOrEmpty(b.SceneKey)) sceneOwned++;
+            Assert.Greater(sceneOwned, 0, "The scene's own buildings are kept, not rebuilt.");
             Assert.AreEqual(123, res.WoodCount);
             Assert.AreEqual(3, res.GetOreTierCount(2));
             Assert.AreEqual(1, Armory.Instance.CountOf(new Item(ItemType.Helmet, 3)));

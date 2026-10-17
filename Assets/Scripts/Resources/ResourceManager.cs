@@ -24,13 +24,15 @@ namespace BattleOfAges.Resources
 
         private void Awake()
         {
+            // One stock per game scene. Not DontDestroyOnLoad: that moved the whole manager object (with the
+            // GameModeManager on it) out of the scene, so after a reload the old mode manager held dead cameras.
+            // Saves carry the stock across loads now.
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
                 return;
             }
             Instance = this;
-            DontDestroyOnLoad(gameObject);
 
             WoodCount = initialWood;
             OreCount = initialOre;

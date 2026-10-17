@@ -20,6 +20,9 @@ namespace BattleOfAges.Building
         /// <summary>The building's type; mines, workbenches and chests built before the type was set are recognised by their component.</summary>
         public void SetType(BuildingType type) => buildingType = type;
 
+        /// <summary>Set for buildings that come with the scene (name + place at load): a save restores their state instead of rebuilding them.</summary>
+        public string SceneKey { get; set; }
+
         public BuildingType Type
         {
             get

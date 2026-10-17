@@ -48,6 +48,7 @@ namespace BattleOfAges.SaveLoad
     public class BuildingSave
     {
         public int Type;                 // BuildingType
+        public string SceneKey;          // set for buildings that come with the scene
         public string Name;
         public Vector3 Position;
         public float Yaw;
