@@ -206,6 +206,7 @@ namespace BattleOfAges.UI
                 }
             }
 #endif
+#if ENABLE_LEGACY_INPUT_MANAGER
             try
             {
                 foreach (KeyCode k in System.Enum.GetValues(typeof(KeyCode)))
@@ -224,6 +225,7 @@ namespace BattleOfAges.UI
                 }
             }
             catch { }
+#endif
         }
 
         public void TogglePause()

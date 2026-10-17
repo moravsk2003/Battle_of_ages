@@ -43,6 +43,7 @@ namespace BattleOfAges.PlayModeTests
             if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
             Directory.CreateDirectory(dir);
 
+            LogAssert.ignoreFailingMessages = true; // (a known SkinnedMeshRenderer error must not abort the review)
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
             yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);

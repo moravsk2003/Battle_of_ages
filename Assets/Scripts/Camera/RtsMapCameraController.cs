@@ -198,16 +198,7 @@ namespace BattleOfAges.CameraSystem
 
         private bool IsKeyPressed(KeyCode code)
         {
-#if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
-            {
-                if (code == KeyCode.Q && Keyboard.current.qKey.isPressed) return true;
-                if (code == KeyCode.E && Keyboard.current.eKey.isPressed) return true;
-                if (code == KeyCode.R && Keyboard.current.rKey.isPressed) return true;
-                if (code == KeyCode.F && Keyboard.current.fKey.isPressed) return true;
-            }
-#endif
-            try { return Input.GetKey(code); } catch { return false; }
+            return UniversalInput.IsKeyHeld(code);
         }
     }
 }

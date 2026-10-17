@@ -7,7 +7,9 @@ namespace BattleOfAges.InputSystem
 {
     /// <summary>
     /// Unified input wrapper bridging Unity Input System (New) and Legacy Input Manager.
-    /// Safely handles mouse and keyboard delta queries across all Unity Project input settings.
+    /// When the new Input System has the device it answers alone; the legacy manager is only a fallback (no device, or a
+    /// key the new system has no name for) and only compiled when it is enabled, so with "Input System Package (New)"
+    /// nothing calls it (a legacy call there throws, and an exception per frame is far slower than the query itself).
     /// </summary>
     public static class UniversalInput
     {
@@ -17,91 +19,75 @@ namespace BattleOfAges.InputSystem
         public static bool IsShiftHeld()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
-            {
-                return Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed;
-            }
+            Keyboard kb = Keyboard.current;
+            if (kb != null) return kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed;
 #endif
-            try
-            {
-                return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+#else
+            return false;
+#endif
         }
 
         public static bool GetKeyDownEscape()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
-            {
-                return Keyboard.current.escapeKey.wasPressedThisFrame || Keyboard.current.pKey.wasPressedThisFrame;
-            }
+            Keyboard kb = Keyboard.current;
+            if (kb != null) return kb.escapeKey.wasPressedThisFrame || kb.pKey.wasPressedThisFrame;
 #endif
-            try
-            {
-                return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P);
+#else
+            return false;
+#endif
         }
+
+#if ENABLE_INPUT_SYSTEM
+        // KeyCode -> Key, parsed once per key (key.ToString() + Enum.TryParse every frame was garbage for the GC)
+        private static readonly System.Collections.Generic.Dictionary<KeyCode, Key> keyMap = new System.Collections.Generic.Dictionary<KeyCode, Key>();
+
+        private static Key ToInputKey(KeyCode code)
+        {
+            if (keyMap.TryGetValue(code, out Key k)) return k;
+            string name = code.ToString();
+            if (name.StartsWith("Alpha")) name = "Digit" + name.Substring(5);
+            else if (code == KeyCode.Return) name = "Enter";
+            else if (code == KeyCode.LeftControl) name = "LeftCtrl";
+            else if (code == KeyCode.RightControl) name = "RightCtrl";
+            if (!System.Enum.TryParse(name, true, out k)) k = Key.None;
+            keyMap[code] = k;
+            return k;
+        }
+#endif
 
         public static bool IsKeyDown(KeyCode key)
         {
             if (key == KeyCode.None) return false;
-
 #if ENABLE_INPUT_SYSTEM
-            try
-            {
-                if (Keyboard.current != null)
-                {
-                    if (System.Enum.TryParse<Key>(key.ToString(), true, out var inputKey) && inputKey != Key.None)
-                    {
-                        if (Keyboard.current[inputKey].wasPressedThisFrame) return true;
-                    }
-                }
-            }
-            catch { }
+            Keyboard kb = Keyboard.current;
+            Key inputKey = ToInputKey(key);
+            if (kb != null && inputKey != Key.None) return kb[inputKey].wasPressedThisFrame;
 #endif
-            try
-            {
-                return Input.GetKeyDown(key);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(key);
+#else
+            return false;
+#endif
         }
 
         public static bool IsKeyHeld(KeyCode key)
         {
             if (key == KeyCode.None) return false;
-
 #if ENABLE_INPUT_SYSTEM
-            try
-            {
-                if (Keyboard.current != null)
-                {
-                    if (System.Enum.TryParse<Key>(key.ToString(), true, out var inputKey) && inputKey != Key.None)
-                    {
-                        if (Keyboard.current[inputKey].isPressed) return true;
-                    }
-                }
-            }
-            catch { }
+            Keyboard kb = Keyboard.current;
+            Key inputKey = ToInputKey(key);
+            if (kb != null && inputKey != Key.None) return kb[inputKey].isPressed;
 #endif
-            try
-            {
-                return Input.GetKey(key);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKey(key);
+#else
+            return false;
+#endif
         }
 
         public static bool GetKeyDownM()
@@ -111,168 +97,119 @@ namespace BattleOfAges.InputSystem
 
         public static Vector2 GetMoveInput()
         {
-            Vector2 move = Vector2.zero;
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
+            Keyboard kb = Keyboard.current;
+            if (kb != null)
             {
-                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) move.y += 1f;
-                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) move.y -= 1f;
-                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) move.x += 1f;
-                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) move.x -= 1f;
+                Vector2 move = Vector2.zero;
+                if (kb.wKey.isPressed || kb.upArrowKey.isPressed) move.y += 1f;
+                if (kb.sKey.isPressed || kb.downArrowKey.isPressed) move.y -= 1f;
+                if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) move.x += 1f;
+                if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) move.x -= 1f;
+                return move;
             }
 #endif
-            if (move == Vector2.zero)
-            {
-                try
-                {
-                    move.x = Input.GetAxisRaw("Horizontal");
-                    move.y = Input.GetAxisRaw("Vertical");
-                }
-                catch { }
-            }
-            return move;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+#else
+            return Vector2.zero;
+#endif
         }
 
         public static Vector2 GetMouseDelta()
         {
-            Vector2 delta = Vector2.zero;
-
 #if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null)
-            {
-                Vector2 rawDelta = Mouse.current.delta.ReadValue();
-                if (rawDelta.sqrMagnitude > 0.0001f)
-                {
-                    return rawDelta * MOUSE_DELTA_SENSITIVITY;
-                }
-            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null) return mouse.delta.ReadValue() * MOUSE_DELTA_SENSITIVITY;
 #endif
-
-            try
-            {
-                delta.x = Input.GetAxis("Mouse X");
-                delta.y = Input.GetAxis("Mouse Y");
-            }
-            catch
-            {
-                // Fallback safely if legacy input manager is disabled in project settings
-            }
-
-            return delta;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+#else
+            return Vector2.zero;
+#endif
         }
 
         public static bool IsJumpPressed()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
-            {
-                return true;
-            }
+            Keyboard kb = Keyboard.current;
+            if (kb != null) return kb.spaceKey.wasPressedThisFrame;
 #endif
-            try
-            {
-                return Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.Space);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(KeyCode.Space);
+#else
+            return false;
+#endif
         }
+
+#if ENABLE_INPUT_SYSTEM
+        private static UnityEngine.InputSystem.Controls.ButtonControl Button(Mouse mouse, int button) =>
+            button == 0 ? mouse.leftButton : button == 1 ? mouse.rightButton : button == 2 ? mouse.middleButton : null;
+#endif
 
         public static bool GetMouseButtonDown(int button)
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null)
-            {
-                if (button == 0 && Mouse.current.leftButton.wasPressedThisFrame) return true;
-                if (button == 1 && Mouse.current.rightButton.wasPressedThisFrame) return true;
-                if (button == 2 && Mouse.current.middleButton.wasPressedThisFrame) return true;
-            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null) { var b = Button(mouse, button); return b != null && b.wasPressedThisFrame; }
 #endif
-            try
-            {
-                return Input.GetMouseButtonDown(button);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetMouseButtonDown(button);
+#else
+            return false;
+#endif
         }
 
         public static bool GetMouseButton(int button)
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null)
-            {
-                if (button == 0 && Mouse.current.leftButton.isPressed) return true;
-                if (button == 1 && Mouse.current.rightButton.isPressed) return true;
-                if (button == 2 && Mouse.current.middleButton.isPressed) return true;
-            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null) { var b = Button(mouse, button); return b != null && b.isPressed; }
 #endif
-            try
-            {
-                return Input.GetMouseButton(button);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetMouseButton(button);
+#else
+            return false;
+#endif
         }
 
         public static bool GetMouseButtonUp(int button)
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null)
-            {
-                if (button == 0 && Mouse.current.leftButton.wasReleasedThisFrame) return true;
-                if (button == 1 && Mouse.current.rightButton.wasReleasedThisFrame) return true;
-                if (button == 2 && Mouse.current.middleButton.wasReleasedThisFrame) return true;
-            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null) { var b = Button(mouse, button); return b != null && b.wasReleasedThisFrame; }
 #endif
-            try
-            {
-                return Input.GetMouseButtonUp(button);
-            }
-            catch
-            {
-                return false;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetMouseButtonUp(button);
+#else
+            return false;
+#endif
         }
 
         public static Vector3 GetMousePosition()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null)
-            {
-                return Mouse.current.position.ReadValue();
-            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null) return mouse.position.ReadValue();
 #endif
-            try
-            {
-                return Input.mousePosition;
-            }
-            catch
-            {
-                return Vector3.zero;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.mousePosition;
+#else
+            return Vector3.zero;
+#endif
         }
 
         public static float GetScrollWheel()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null)
-            {
-                return Mouse.current.scroll.ReadValue().y * SCROLL_WHEEL_SENSITIVITY;
-            }
+            Mouse mouse = Mouse.current;
+            if (mouse != null) return mouse.scroll.ReadValue().y * SCROLL_WHEEL_SENSITIVITY;
 #endif
-            try
-            {
-                return Input.GetAxis("Mouse ScrollWheel");
-            }
-            catch
-            {
-                return 0f;
-            }
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetAxis("Mouse ScrollWheel");
+#else
+            return 0f;
+#endif
         }
     }
 }
