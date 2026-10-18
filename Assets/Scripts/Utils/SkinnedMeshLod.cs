@@ -92,10 +92,24 @@ namespace BattleOfAges.Utils
             if (wantNear != near || Target.sharedMesh == null)
             {
                 near = wantNear;
-                Target.sharedMesh = near ? Near : Far;
+                SetMesh(Target, near ? Near : Far);
             }
             bool show = h >= CullScreenHeight;
             if (Target.enabled != show) Target.enabled = show;
+        }
+
+        /// <summary>
+        /// Swaps a skinned renderer's mesh so it keeps rendering. A renderer that has been drawn keeps its GPU skinning
+        /// buffers sized for the old mesh, and a swap while it is enabled stops it rendering for good ("does not match
+        /// the expected mesh data size and vertex stride", Unity 6000.3); swapped while disabled, it rebuilds them.
+        /// </summary>
+        public static void SetMesh(SkinnedMeshRenderer renderer, Mesh mesh)
+        {
+            if (renderer.sharedMesh == mesh) return;
+            bool on = renderer.enabled;
+            renderer.enabled = false;
+            renderer.sharedMesh = mesh;
+            renderer.enabled = on;
         }
     }
 }

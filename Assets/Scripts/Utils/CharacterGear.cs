@@ -43,7 +43,7 @@ namespace BattleOfAges.Utils
             string key = Key.ToString();
             if (key == shown && Body.sharedMesh != null) return;
             shown = key;
-            Body.sharedMesh = Worn.Count == 0 ? BaseMesh : GearMeshBuilder.Compose(this, Worn, key);
+            SkinnedMeshLod.SetMesh(Body, Worn.Count == 0 ? BaseMesh : GearMeshBuilder.Compose(this, Worn, key));
         }
     }
 }
