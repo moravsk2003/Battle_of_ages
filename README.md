@@ -74,6 +74,7 @@ Battle_of_ages/
 │   ├── Scenes/             # SampleScene.unity
 │   └── Models/             # FBX моделі персонажів
 ├── docs/
+│   ├── GAME_DESIGN.md      # Дизайн гри: бачення, рішення, етапи (джерело правди)
 │   ├── ARCHITECTURE.md     # Повний архітектурний опис та Mermaid діаграми
 │   └── SYSTEMS_GUIDE.md    # Довідник підсистем та розширення коду
 └── README.md
@@ -99,5 +100,6 @@ Battle_of_ages/
 
 ## 📖 Документація
 
-- [Архитектурний документ (ARCHITECTURE.md)](file:///c:/Users/olesm/Battle_of_ages/docs/ARCHITECTURE.md)
-- [Гайд по розширенню систем (SYSTEMS_GUIDE.md)](file:///c:/Users/olesm/Battle_of_ages/docs/SYSTEMS_GUIDE.md)
+- [Дизайн гри (GAME_DESIGN.md)](docs/GAME_DESIGN.md)
+- [Архитектурний документ (ARCHITECTURE.md)](docs/ARCHITECTURE.md)
+- [Гайд по розширенню систем (SYSTEMS_GUIDE.md)](docs/SYSTEMS_GUIDE.md)
