@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Resources;
 using BattleOfAges.Utils;
+using BattleOfAges.SaveLoad;
 
 namespace BattleOfAges.World
 {
@@ -290,7 +291,7 @@ namespace BattleOfAges.World
                 }
 
                 activeTrees.Add(tree);
-                BattleOfAges.SaveLoad.WorldPersistence.RegisterTree(tree.GetComponent<ResourceNodeTree>(), ChunkCoord.x + "," + ChunkCoord.y + ":" + i);
+                WorldPersistence.RegisterTree(tree.GetComponent<ResourceNodeTree>(), ChunkCoord.x + "," + ChunkCoord.y + ":" + i);
                 yield return null;
             }
 
@@ -339,7 +340,7 @@ namespace BattleOfAges.World
                     animal.transform.SetParent(transform, false);
                     animal.transform.position = new Vector3(worldX, y, worldZ);
                     animal.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-                    if (BattleOfAges.SaveLoad.WorldPersistence.RegisterAnimal(animal)) activeEntities.Add(animal);
+                    if (WorldPersistence.RegisterAnimal(animal)) activeEntities.Add(animal);
                     yield return null;
                 }
             }
@@ -359,7 +360,7 @@ namespace BattleOfAges.World
                     IEnumerator build = Utils.HostileCampBuilder.BuildHostileCamp(camp, new Vector3(campX, campY, campZ));
                     while (build.MoveNext()) yield return null;
                     buildingCamp = null;
-                    BattleOfAges.SaveLoad.WorldPersistence.RegisterCamp(camp);
+                    WorldPersistence.RegisterCamp(camp);
                     activeEntities.Add(camp);
                 }
             }
@@ -385,7 +386,7 @@ namespace BattleOfAges.World
             {
                 if (activeTrees[i] != null)
                 {
-                    BattleOfAges.SaveLoad.WorldPersistence.RecordTree(activeTrees[i].GetComponent<ResourceNodeTree>());
+                    WorldPersistence.RecordTree(activeTrees[i].GetComponent<ResourceNodeTree>());
                     if (pool != null) pool.ReturnTree(activeTrees[i]);
                     else Destroy(activeTrees[i]);
                 }
@@ -406,7 +407,7 @@ namespace BattleOfAges.World
             {
                 if (activeEntities[i] != null)
                 {
-                    if (activeEntities[i].name.StartsWith("HostileCamp_")) BattleOfAges.SaveLoad.WorldPersistence.RecordCamp(activeEntities[i]);
+                    if (activeEntities[i].name.StartsWith("HostileCamp_")) WorldPersistence.RecordCamp(activeEntities[i]);
                     Destroy(activeEntities[i]);
                 }
             }

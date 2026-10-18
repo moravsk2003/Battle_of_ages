@@ -1,4 +1,5 @@
 using UnityEngine;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.RTS
 {
@@ -42,7 +43,7 @@ namespace BattleOfAges.RTS
 
             if (visualModel != null)
             {
-                riggedDriver = visualModel.GetComponent<BattleOfAges.Utils.CharacterAnimationDriver>() != null;
+                riggedDriver = visualModel.GetComponent<CharacterAnimationDriver>() != null;
                 if (animator == null) animator = visualModel.GetComponentInChildren<Animator>();
                 if (legacyAnimation == null) legacyAnimation = visualModel.GetComponentInChildren<Animation>();
 

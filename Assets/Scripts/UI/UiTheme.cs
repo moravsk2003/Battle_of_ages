@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+using BattleOfAges.Crafting;
 
 namespace BattleOfAges.UI
 {
@@ -294,7 +295,7 @@ namespace BattleOfAges.UI
         private static readonly Dictionary<int, Sprite> ItemIcons = new Dictionary<int, Sprite>();
 
         /// <summary>Icon of an item; the metal / leather / wood follows its level like the model does.</summary>
-        public static Sprite ItemSprite(BattleOfAges.Crafting.ItemType type, int level)
+        public static Sprite ItemSprite(ItemType type, int level)
         {
             int key = (int)type * 8 + Mathf.Clamp(level, 0, 5);
             if (ItemIcons.TryGetValue(key, out Sprite s) && s != null) return s;
@@ -327,7 +328,7 @@ namespace BattleOfAges.UI
             return Sprite.Create(tex, new Rect(0, 0, N, N), new Vector2(0.5f, 0.5f), 100f);
         }
 
-        private static Color ShadeItem(BattleOfAges.Crafting.ItemType type, int level, Vector2 p)
+        private static Color ShadeItem(ItemType type, int level, Vector2 p)
         {
             Color result = Color.clear;
             void Layer(float d, Color fill)
@@ -348,7 +349,7 @@ namespace BattleOfAges.UI
 
             switch (type)
             {
-                case BattleOfAges.Crafting.ItemType.Sword:
+                case ItemType.Sword:
                 {
                     Vector2 a = new Vector2(-0.42f, -0.42f), b = new Vector2(0.72f, 0.72f);
                     Layer(Segment(p, new Vector2(-0.8f, -0.8f), new Vector2(-0.48f, -0.48f)) - 0.08f, leather);
@@ -357,7 +358,7 @@ namespace BattleOfAges.UI
                     Layer(Segment(p, a + new Vector2(-0.26f, 0.26f), a + new Vector2(0.26f, -0.26f)) - 0.08f, trim);
                     break;
                 }
-                case BattleOfAges.Crafting.ItemType.Bow:
+                case ItemType.Bow:
                 {
                     Vector2 c = new Vector2(-0.9f, 0f);
                     float ang = Mathf.Atan2(p.y - c.y, p.x - c.x);
@@ -370,11 +371,11 @@ namespace BattleOfAges.UI
                     if (level >= 3) { Layer((p - top).magnitude - 0.1f, trim); Layer((p - bot).magnitude - 0.1f, trim); }
                     break;
                 }
-                case BattleOfAges.Crafting.ItemType.Axe:
+                case ItemType.Axe:
                     Layer(Segment(p, new Vector2(-0.6f, -0.8f), new Vector2(0.3f, 0.75f)) - 0.08f, Lit(wood));
                     Layer(Poly(Rotate(p - new Vector2(0.28f, 0.45f), 0.52f), new[] { new Vector2(-0.05f, 0.18f), new Vector2(0.55f, 0.38f), new Vector2(0.62f, -0.36f), new Vector2(-0.05f, -0.16f) }), Lit(metal));
                     break;
-                case BattleOfAges.Crafting.ItemType.Pickaxe:
+                case ItemType.Pickaxe:
                     Layer(Segment(p, new Vector2(-0.55f, -0.85f), new Vector2(0.25f, 0.62f)) - 0.08f, Lit(wood));
                     for (int i = 0; i < 16; i++)
                     {
@@ -383,7 +384,7 @@ namespace BattleOfAges.UI
                         Layer((p - q).magnitude - Mathf.Lerp(0.13f, 0.04f, Mathf.Abs(s)), Lit(metal));
                     }
                     break;
-                case BattleOfAges.Crafting.ItemType.Shield:
+                case ItemType.Shield:
                 {
                     float d = p.magnitude;
                     Layer(d - 0.86f, level <= 2 ? trim * (level == 1 ? 1.4f : 1f) : (level >= 5 ? gold : trim));
@@ -394,7 +395,7 @@ namespace BattleOfAges.UI
                     Layer(d - 0.22f, level >= 5 ? gold : Lit(metal));
                     break;
                 }
-                case BattleOfAges.Crafting.ItemType.Helmet:
+                case ItemType.Helmet:
                 {
                     float dome = Mathf.Max((p - new Vector2(0f, -0.15f)).magnitude - 0.72f, -(p.y + 0.3f));
                     Layer(dome, Lit(arm));
@@ -403,7 +404,7 @@ namespace BattleOfAges.UI
                     if (level >= 3) Layer(Box(p - new Vector2(0f, 0.32f), new Vector2(0.05f, 0.25f)), level >= 5 ? gold : trim);
                     break;
                 }
-                case BattleOfAges.Crafting.ItemType.Armor:
+                case ItemType.Armor:
                 {
                     float body = Poly(p, new[] { new Vector2(-0.82f, 0.55f), new Vector2(-0.3f, 0.75f), new Vector2(0.3f, 0.75f), new Vector2(0.82f, 0.55f), new Vector2(0.6f, -0.1f), new Vector2(0.5f, -0.82f), new Vector2(-0.5f, -0.82f), new Vector2(-0.6f, -0.1f) });
                     float neck = (p - new Vector2(0f, 0.85f)).magnitude - 0.3f;
@@ -414,7 +415,7 @@ namespace BattleOfAges.UI
                     if (level >= 4) Layer(Mathf.Max(Mathf.Abs(body + 0.04f) - 0.03f, -neck), level >= 5 ? gold : trim);
                     break;
                 }
-                case BattleOfAges.Crafting.ItemType.Gloves:
+                case ItemType.Gloves:
                 {
                     Color g = level == 2 ? arm * 0.92f : Lit(arm);
                     Layer(Box(p - new Vector2(0.05f, 0.18f), new Vector2(0.42f, 0.5f)) - 0.12f, g);

@@ -2,6 +2,7 @@ using UnityEngine;
 using BattleOfAges.Utils;
 using BattleOfAges.Resources;
 using BattleOfAges.World;
+using BattleOfAges.RTS;
 
 namespace BattleOfAges.Utils
 {
@@ -122,7 +123,7 @@ namespace BattleOfAges.Utils
             for (int t = 0; t < campTreePositions.Length; t++)
             {
                 Vector3 pos = campTreePositions[t];
-                pos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(pos);
+                pos.y = RtsUnit.GetTerrainHeight(pos);
                 GameObject tree = SteppeTreeBuilder.CreateSteppeTree($"CampGroveTree_{t + 1}", t);
                 tree.transform.SetParent(treesGroup.transform, false);
                 tree.transform.position = pos;
@@ -173,7 +174,7 @@ namespace BattleOfAges.Utils
             for (int cp = 0; cp < campPebbles.Length; cp++)
             {
                 Vector3 pos = campPebbles[cp];
-                pos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(pos);
+                pos.y = RtsUnit.GetTerrainHeight(pos);
                 GameObject pebble = OrePebbleNode.CreatePebblePrefab($"CampOrePebble_{cp + 1}");
                 pebble.transform.SetParent(pebblesGroup.transform, false);
                 pebble.transform.position = pos;
@@ -257,7 +258,7 @@ namespace BattleOfAges.Utils
             for (int b = 0; b < barrelPos.Length; b++)
             {
                 Vector3 pos = barrelPos[b];
-                pos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(pos) + 0.45f;
+                pos.y = RtsUnit.GetTerrainHeight(pos) + 0.45f;
 
                 GameObject barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 barrel.name = $"SupplyBarrel_{b + 1}";
@@ -268,7 +269,7 @@ namespace BattleOfAges.Utils
             }
 
             Vector3 cratePos = new Vector3(1.4f, 0f, 5.2f);
-            cratePos.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(cratePos) + 0.35f;
+            cratePos.y = RtsUnit.GetTerrainHeight(cratePos) + 0.35f;
             GameObject crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
             crate.name = "SupplyCrate_1";
             crate.transform.SetParent(decoGroup.transform, false);

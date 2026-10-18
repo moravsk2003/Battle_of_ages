@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.RTS;
 using BattleOfAges.InputSystem;
+using BattleOfAges.Crafting;
 
 namespace BattleOfAges.UI
 {
@@ -93,22 +94,8 @@ namespace BattleOfAges.UI
         {
             if (commander == null) return;
 
-            var selected = commander.SelectedUnits;
-            int count = selected.Count;
-            int updated = 0;
-
-            for (int i = 0; i < count; i++)
-            {
-                if (selected[i] == null) continue;
-                NpcResourceGatherer gatherer = selected[i].GetComponent<NpcResourceGatherer>();
-                if (gatherer != null)
-                {
-                    gatherer.SetGatherDirective(directive);
-                    updated++;
-                }
-            }
-
-            Debug.Log($"[SelectedUnitUI] Set directive '{directive}' for {updated} selected NPC(s).");
+            foreach (RtsUnit unit in commander.SelectedUnits)
+                if (unit != null && unit.TryGetComponent(out NpcResourceGatherer gatherer)) gatherer.SetGatherDirective(directive);
         }
 
         private void DeselectAll()
@@ -121,10 +108,10 @@ namespace BattleOfAges.UI
 
         private static string GearSummary(RtsUnit unit)
         {
-            var gear = unit.GetComponent<BattleOfAges.Crafting.Equipment>();
+            var gear = unit.GetComponent<Equipment>();
             if (gear == null) return "";
             var parts = new System.Collections.Generic.List<string>();
-            foreach (var slot in BattleOfAges.Crafting.ItemTypeNames.Slots)
+            foreach (var slot in ItemTypeNames.Slots)
                 if (!gear[slot].IsEmpty) parts.Add(gear[slot].ToString());
             return parts.Count == 0 ? "\nБез спорядження" : "\n" + string.Join(" · ", parts);
         }
@@ -214,7 +201,7 @@ namespace BattleOfAges.UI
             btn.onClick.AddListener(() => EquipmentUI.Instance.OpenDefault());
             RectTransform icon = UiTheme.Rect(go.transform, "Icon", new Vector2(0.5f, 1f), new Vector2(0f, -6f), new Vector2(42f, 42f));
             Image img = icon.gameObject.AddComponent<Image>();
-            img.sprite = UiTheme.ItemSprite(BattleOfAges.Crafting.ItemType.Helmet, 3); img.preserveAspect = true; img.raycastTarget = false;
+            img.sprite = UiTheme.ItemSprite(ItemType.Helmet, 3); img.preserveAspect = true; img.raycastTarget = false;
             RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
             UiTheme.Label(txt, "Text", "Спорядж. [C]", 16, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
         }

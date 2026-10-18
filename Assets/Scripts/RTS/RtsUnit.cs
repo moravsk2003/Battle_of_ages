@@ -1,4 +1,9 @@
 using UnityEngine;
+using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
+using BattleOfAges.Player;
+using BattleOfAges.Utils;
+using BattleOfAges.World;
 
 namespace BattleOfAges.RTS
 {
@@ -31,20 +36,20 @@ namespace BattleOfAges.RTS
         private int gridId = -1;
         private Vector3 steerDir, steerDesired;
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
-        private BattleOfAges.Combat.HealthComponent health;
-        private BattleOfAges.Combat.CombatUnit combat;
+        private HealthComponent health;
+        private CombatUnit combat;
         /// <summary>CharacterSpeed formula: Global x modifier x strength (workers without a CombatUnit use the defaults).</summary>
-        private float MoveSpeed => combat != null ? combat.MoveSpeed : BattleOfAges.Combat.CharacterSpeed.Of(null);
+        private float MoveSpeed => combat != null ? combat.MoveSpeed : CharacterSpeed.Of(null);
         private bool touchingSolidNearTarget;
 
         public bool IsSelected { get; private set; }
 
         private void Awake()
         {
-            isPlayerControlled = GetComponent<BattleOfAges.Player.FirstPersonController>() != null;
-            health = GetComponent<BattleOfAges.Combat.HealthComponent>();
-            combat = GetComponent<BattleOfAges.Combat.CombatUnit>();
-            if (!isPlayerControlled) BattleOfAges.Combat.UnitCorpse.AttachTo(gameObject);
+            isPlayerControlled = GetComponent<FirstPersonController>() != null;
+            health = GetComponent<HealthComponent>();
+            combat = GetComponent<CombatUnit>();
+            if (!isPlayerControlled) UnitCorpse.AttachTo(gameObject);
             engageTimer = Random.value * EngageInterval; // stagger the searches across frames
             characterController = GetComponent<CharacterController>();
             if (characterController != null)
@@ -71,11 +76,11 @@ namespace BattleOfAges.RTS
         /// <summary>Own units get the kit their model is drawn with (knight: steel set, villager: axe).</summary>
         private void EnsureStartingKit()
         {
-            if (GetComponent<BattleOfAges.Crafting.Equipment>() != null) return;
-            var visual = GetComponentInChildren<BattleOfAges.Utils.CharacterGear>(true);
+            if (GetComponent<Equipment>() != null) return;
+            var visual = GetComponentInChildren<CharacterGear>(true);
             var type = visual != null ? visual.Type
-                : name.Contains("Knight") ? BattleOfAges.Utils.HumanoidModelBuilder.HumanType.KnightGuard : BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Villager;
-            gameObject.AddComponent<BattleOfAges.Crafting.Equipment>().InitLoadout(BattleOfAges.Crafting.StartingKits.For(type));
+                : name.Contains("Knight") ? HumanoidModelBuilder.HumanType.KnightGuard : HumanoidModelBuilder.HumanType.Villager;
+            gameObject.AddComponent<Equipment>().InitLoadout(StartingKits.For(type));
         }
 
         private void SetupSelectionIndicatorVisuals()
@@ -112,7 +117,7 @@ namespace BattleOfAges.RTS
         {
             UnitRegistry.Register(this);
             if (gridId < 0)
-                gridId = UnitSpatialGrid.Register(this, GetComponent<BattleOfAges.Combat.HealthComponent>(), UnitSpatialGrid.TeamPlayer,
+                gridId = UnitSpatialGrid.Register(this, GetComponent<HealthComponent>(), UnitSpatialGrid.TeamPlayer,
                                                   characterController != null ? characterController.radius : 0.4f);
         }
 
@@ -123,10 +128,10 @@ namespace BattleOfAges.RTS
             gridId = -1;
         }
 
-        private BattleOfAges.Combat.HealthComponent attackTarget;
-        private BattleOfAges.Combat.CombatUnit combatUnit;
+        private HealthComponent attackTarget;
+        private CombatUnit combatUnit;
 
-        public void IssueAttackCommand(BattleOfAges.Combat.HealthComponent target)
+        public void IssueAttackCommand(HealthComponent target)
         {
             if (target != null)
             {
@@ -138,7 +143,7 @@ namespace BattleOfAges.RTS
         private void Update()
         {
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
-            if (combatUnit == null) combatUnit = GetComponent<BattleOfAges.Combat.CombatUnit>();
+            if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
 
             // Soldiers engage raiders that come near on their own (idle or after a fight), not workers or the hero.
             if (!isPlayerControlled && !isWorker && combatUnit != null && attackTarget == null && !hasTarget)
@@ -367,7 +372,7 @@ namespace BattleOfAges.RTS
             if (name.Contains("SteppeTerrain") || name.Contains("Ground") || name.Contains("Chunk") || name.Contains("Terrain") || name.Contains("SelectionIndicator")) return false;
             // Only the chunk's own ground mesh is terrain; trees and rocks parented to a chunk are obstacles
             // (with kinematic movement nothing else stops a unit from walking through them).
-            if (hit.collider is TerrainCollider || hit.collider.GetComponent<BattleOfAges.World.ProceduralBiomeChunk>() != null) return false;
+            if (hit.collider is TerrainCollider || hit.collider.GetComponent<ProceduralBiomeChunk>() != null) return false;
             return true;
         }
 
@@ -379,9 +384,9 @@ namespace BattleOfAges.RTS
 
         public static float GetTerrainHeight(Vector3 worldPos)
         {
-            if (BattleOfAges.World.InfiniteWorldManager.Instance != null)
+            if (InfiniteWorldManager.Instance != null)
             {
-                return BattleOfAges.World.InfiniteWorldManager.GetSampledTerrainHeight(worldPos.x, worldPos.z);
+                return InfiniteWorldManager.GetSampledTerrainHeight(worldPos.x, worldPos.z);
             }
 
             if (cachedTerrainCollider == null)
@@ -402,7 +407,7 @@ namespace BattleOfAges.RTS
                 }
             }
 
-            return BattleOfAges.World.InfiniteWorldManager.GetSampledTerrainHeight(worldPos.x, worldPos.z);
+            return InfiniteWorldManager.GetSampledTerrainHeight(worldPos.x, worldPos.z);
         }
 
         public void SetSelectionIndicator(GameObject indicator)

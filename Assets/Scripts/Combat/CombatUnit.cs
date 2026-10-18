@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using BattleOfAges.Crafting;
 
 namespace BattleOfAges.Combat
 {
@@ -54,7 +55,7 @@ namespace BattleOfAges.Combat
             if (dst > attackRange + 1.0f) return false;
 
             nextAttackTime = Time.time + attackCooldown;
-            int finalDamage = BattleOfAges.Crafting.ItemStatCalculator.CalculateDamageWithHighGround(
+            int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
             target.TakeDamage(finalDamage);
 

@@ -2,6 +2,7 @@ using UnityEngine;
 using BattleOfAges.Resources;
 using BattleOfAges.UI;
 using BattleOfAges.InputSystem;
+using BattleOfAges.Crafting;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -15,17 +16,17 @@ namespace BattleOfAges.Player
         [SerializeField] private float harvestRange = 6.0f;
         [SerializeField] private float proximityRadius = 5.0f;
 
-        private BattleOfAges.Crafting.Equipment gear;
+        private Equipment gear;
 
         // Tools work while they are in the weapon slot
-        public int EquippedAxeLevel => Gear != null ? Gear.LevelOf(BattleOfAges.Crafting.ItemType.Axe) : 0;
-        public int EquippedPickaxeLevel => Gear != null ? Gear.LevelOf(BattleOfAges.Crafting.ItemType.Pickaxe) : 0;
+        public int EquippedAxeLevel => Gear != null ? Gear.LevelOf(ItemType.Axe) : 0;
+        public int EquippedPickaxeLevel => Gear != null ? Gear.LevelOf(ItemType.Pickaxe) : 0;
 
-        private BattleOfAges.Crafting.Equipment Gear
+        private Equipment Gear
         {
             get
             {
-                if (gear == null) gear = GetComponent<BattleOfAges.Crafting.Equipment>();
+                if (gear == null) gear = GetComponent<Equipment>();
                 return gear;
             }
         }
@@ -36,7 +37,7 @@ namespace BattleOfAges.Player
         private ResourceNodeTree previousTreeTarget;
         private OrePebbleNode activePebbleTarget;
         private StorageChestNode activeChestTarget;
-        private BattleOfAges.Crafting.WorkbenchNode activeWorkbenchTarget;
+        private WorkbenchNode activeWorkbenchTarget;
 
         private void Start()
         {
@@ -60,12 +61,7 @@ namespace BattleOfAges.Player
         {
             EnsureCameraReference();
 
-            if ((NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
-                (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
-                (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
-                (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) ||
-                EquipmentUI.IsVisible ||
-                (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()))
+            if (GameWindows.BlockGameplay)
             {
                 if (resourceUI != null) resourceUI.HideTreePrompt();
                 return;
@@ -116,104 +112,62 @@ namespace BattleOfAges.Player
             activeChestTarget = null;
             activeWorkbenchTarget = null;
 
-            // 1. Raycast / SphereCast Forward from Camera for precise aiming
+            // 1. What the camera aims at (a fat ray), nearest pebble and nearest tree separately
             if (playerCamera != null && playerCamera.enabled)
             {
                 Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
                 int hitCount = Physics.SphereCastNonAlloc(ray, 0.4f, sphereHitsBuffer, harvestRange);
-                
-                float nearestPebbleDst = harvestRange;
-                float nearestTreeDst = harvestRange;
-
+                float nearestPebble = harvestRange, nearestTree = harvestRange;
                 for (int i = 0; i < hitCount; i++)
                 {
                     RaycastHit hit = sphereHitsBuffer[i];
-                    if (hit.collider == null) continue;
-
-                    BattleOfAges.Crafting.WorkbenchNode wb = hit.collider.GetComponentInParent<BattleOfAges.Crafting.WorkbenchNode>();
-                    if (wb != null)
-                    {
-                        activeWorkbenchTarget = wb;
-                        return;
-                    }
-
-                    StorageChestNode chest = hit.collider.GetComponentInParent<StorageChestNode>();
-                    if (chest != null)
-                    {
-                        activeChestTarget = chest;
-                        return;
-                    }
-
-                    OrePebbleNode pebble = hit.collider.GetComponentInParent<OrePebbleNode>();
-                    if (pebble != null && !pebble.IsPickedUp && hit.distance < nearestPebbleDst)
-                    {
-                        nearestPebbleDst = hit.distance;
-                        activePebbleTarget = pebble;
-                    }
-
-                    ResourceNodeTree tree = hit.collider.GetComponentInParent<ResourceNodeTree>();
-                    if (tree != null && tree.CurrentState != TreeState.Depleted && hit.distance < nearestTreeDst)
-                    {
-                        nearestTreeDst = hit.distance;
-                        activeTreeTarget = tree;
-                    }
+                    if (hit.collider != null && Consider(hit.collider, hit.distance, ref nearestPebble, ref nearestTree, false)) return;
                 }
-
-                if (activePebbleTarget != null) return;
-                if (activeTreeTarget != null) return;
+                if (activePebbleTarget != null || activeTreeTarget != null) return;
             }
 
-            // 2. Proximity OverlapSphere Fallback around player feet
+            // 2. Fallback: whatever is around the player's feet; a pebble wins over a tree
             int overlapCount = Physics.OverlapSphereNonAlloc(transform.position, proximityRadius, overlapHitsBuffer);
-            float minDst = proximityRadius;
-
+            float nearest = proximityRadius;
             for (int i = 0; i < overlapCount; i++)
             {
                 Collider col = overlapHitsBuffer[i];
-                if (col == null) continue;
-
-                BattleOfAges.Crafting.WorkbenchNode wb = col.GetComponentInParent<BattleOfAges.Crafting.WorkbenchNode>();
-                if (wb != null)
-                {
-                    activeWorkbenchTarget = wb;
-                    return;
-                }
-
-                StorageChestNode chest = col.GetComponentInParent<StorageChestNode>();
-                if (chest != null)
-                {
-                    activeChestTarget = chest;
-                    return;
-                }
-
-                OrePebbleNode pebble = col.GetComponentInParent<OrePebbleNode>();
-                if (pebble != null && !pebble.IsPickedUp)
-                {
-                    float dst = Vector3.Distance(transform.position, pebble.transform.position);
-                    if (dst < minDst)
-                    {
-                        minDst = dst;
-                        activePebbleTarget = pebble;
-                    }
-                }
-
-                ResourceNodeTree tree = col.GetComponentInParent<ResourceNodeTree>();
-                if (tree != null && tree.CurrentState != TreeState.Depleted && activePebbleTarget == null)
-                {
-                    float dst = Vector3.Distance(transform.position, tree.transform.position);
-                    if (dst < minDst)
-                    {
-                        minDst = dst;
-                        activeTreeTarget = tree;
-                    }
-                }
+                if (col != null && Consider(col, -1f, ref nearest, ref nearest, true)) return;
             }
+        }
+
+        /// <summary>
+        /// Takes col's workbench or chest at once (returns true), or keeps its pebble / tree if nearer than the best so far.
+        /// distance &lt; 0: measure from the player to the object. pebblesFirst: no tree once a pebble was found.
+        /// </summary>
+        private bool Consider(Collider col, float distance, ref float bestPebble, ref float bestTree, bool pebblesFirst)
+        {
+            WorkbenchNode wb = col.GetComponentInParent<WorkbenchNode>();
+            if (wb != null) { activeWorkbenchTarget = wb; return true; }
+
+            StorageChestNode chest = col.GetComponentInParent<StorageChestNode>();
+            if (chest != null) { activeChestTarget = chest; return true; }
+
+            OrePebbleNode pebble = col.GetComponentInParent<OrePebbleNode>();
+            if (pebble != null && !pebble.IsPickedUp)
+            {
+                float d = distance >= 0f ? distance : Vector3.Distance(transform.position, pebble.transform.position);
+                if (d < bestPebble) { bestPebble = d; activePebbleTarget = pebble; }
+            }
+
+            ResourceNodeTree tree = col.GetComponentInParent<ResourceNodeTree>();
+            if (tree != null && tree.CurrentState != TreeState.Depleted && !(pebblesFirst && activePebbleTarget != null))
+            {
+                float d = distance >= 0f ? distance : Vector3.Distance(transform.position, tree.transform.position);
+                if (d < bestTree) { bestTree = d; activeTreeTarget = tree; }
+            }
+            return false;
         }
 
         private void UpdateWorkbenchPromptUI()
         {
             if (resourceUI == null || activeWorkbenchTarget == null) return;
-            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(BattleOfAges.InputSystem.KeyAction.InteractGather));
+            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
             resourceUI.ShowTreePrompt($"⚒️ [Натисніть {keyEStr}] Відкрити Верстак (Крафт зброї/броні)");
         }
 
@@ -255,8 +209,8 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activeTreeTarget == null) return;
 
-            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(BattleOfAges.InputSystem.KeyAction.InteractGather));
-            string keyFStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(BattleOfAges.InputSystem.KeyAction.ChopTree));
+            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
+            string keyFStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.ChopTree));
 
             if (activeTreeTarget.CurrentState == TreeState.WholeTree)
             {
@@ -268,14 +222,14 @@ namespace BattleOfAges.Player
 
                 if (EquippedAxeLevel > 0)
                 {
-                    chopStr += $" [Сокира {BattleOfAges.Crafting.ItemTypeNames.Roman(EquippedAxeLevel)}]";
+                    chopStr += $" [Сокира {ItemTypeNames.Roman(EquippedAxeLevel)}]";
                 }
 
                 resourceUI.ShowTreePrompt($"{branchStr}\n{chopStr}");
             }
             else if (activeTreeTarget.CurrentState == TreeState.WoodPile)
             {
-                string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира {BattleOfAges.Crafting.ItemTypeNames.Roman(EquippedAxeLevel)}]" : "";
+                string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира {ItemTypeNames.Roman(EquippedAxeLevel)}]" : "";
                 resourceUI.ShowTreePrompt($"🪓 [Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} Деревини){axeStr}");
             }
         }
@@ -283,7 +237,7 @@ namespace BattleOfAges.Player
         private void UpdatePebblePromptUI()
         {
             if (resourceUI == null || activePebbleTarget == null) return;
-            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(BattleOfAges.InputSystem.KeyAction.InteractGather));
+            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
             resourceUI.ShowTreePrompt($"🪨 [Натисніть {keyEStr}] Підібрати руду");
         }
 
@@ -306,7 +260,7 @@ namespace BattleOfAges.Player
 
             if (IsKeyFHeld())
             {
-                float axeEff = (EquippedAxeLevel > 0) ? BattleOfAges.Crafting.ItemStatCalculator.CalculateToolEfficiency(EquippedAxeLevel) : 1.0f;
+                float axeEff = (EquippedAxeLevel > 0) ? ItemStatCalculator.CalculateToolEfficiency(EquippedAxeLevel) : 1.0f;
                 TreeState priorState = activeTreeTarget.CurrentState;
                 if (activeTreeTarget.ChopWoodProgress(Time.deltaTime * axeEff))
                 {
@@ -337,10 +291,10 @@ namespace BattleOfAges.Player
             }
         }
 
-        private bool IsKeyEHeld() => KeybindsManager.GetKeyHeld(BattleOfAges.InputSystem.KeyAction.InteractGather);
-        private bool IsKeyEDown() => KeybindsManager.GetKeyDown(BattleOfAges.InputSystem.KeyAction.InteractGather);
-        private bool IsKeyFHeld() => KeybindsManager.GetKeyHeld(BattleOfAges.InputSystem.KeyAction.ChopTree);
-        private bool IsKeyFDown() => KeybindsManager.GetKeyDown(BattleOfAges.InputSystem.KeyAction.ChopTree);
+        private bool IsKeyEHeld() => KeybindsManager.GetKeyHeld(KeyAction.InteractGather);
+        private bool IsKeyEDown() => KeybindsManager.GetKeyDown(KeyAction.InteractGather);
+        private bool IsKeyFHeld() => KeybindsManager.GetKeyHeld(KeyAction.ChopTree);
+        private bool IsKeyFDown() => KeybindsManager.GetKeyDown(KeyAction.ChopTree);
 
         private void OnDrawGizmosSelected()
         {

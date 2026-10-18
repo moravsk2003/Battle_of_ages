@@ -1,6 +1,7 @@
 using UnityEngine;
 using BattleOfAges.Resources;
 using BattleOfAges.Building;
+using BattleOfAges.Combat;
 
 namespace BattleOfAges.RTS
 {
@@ -60,12 +61,12 @@ namespace BattleOfAges.RTS
         public GatherDirective CurrentDirective => currentDirective;
         public GathererState CurrentState => currentState;
 
-        private BattleOfAges.Combat.HealthComponent healthComponent;
+        private HealthComponent healthComponent;
 
         private void Awake()
         {
             rtsUnit = GetComponent<RtsUnit>();
-            healthComponent = GetComponent<BattleOfAges.Combat.HealthComponent>();
+            healthComponent = GetComponent<HealthComponent>();
             if (healthComponent != null)
             {
                 healthComponent.OnTakeDamage += HandleDamageTaken;
@@ -119,7 +120,6 @@ namespace BattleOfAges.RTS
             targetPebble = null;
             targetMine = null;
             currentState = GathererState.FindingResource;
-            Debug.Log($"[NPC Worker] {gameObject.name} directive changed to: {newDirective}");
         }
 
         public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
@@ -166,7 +166,6 @@ namespace BattleOfAges.RTS
             currentState = GathererState.MovingToMineToWork;
             SetRenderersActive(true);
             if (rtsUnit != null) rtsUnit.IssueMoveCommand(mine.GetOutputDepositPosition());
-            Debug.Log($"[NPC Worker] {gameObject.name} assigned to work at Mine {mine.name}!");
         }
 
         public void CommandHarvestTree(ResourceNodeTree tree)
@@ -177,7 +176,6 @@ namespace BattleOfAges.RTS
             targetTree = tree;
             currentState = GathererState.MovingToResource;
             if (rtsUnit != null) rtsUnit.IssueMoveCommand(tree.transform.position);
-            Debug.Log($"[NPC Worker] {gameObject.name} commanded to harvest tree {tree.name}!");
         }
 
         public void CommandHarvestPebble(OrePebbleNode pebble)
@@ -189,7 +187,6 @@ namespace BattleOfAges.RTS
             targetPebble.TargetedBy = this;
             currentState = GathererState.MovingToResource;
             if (rtsUnit != null) rtsUnit.IssueMoveCommand(pebble.transform.position);
-            Debug.Log($"[NPC Worker] {gameObject.name} commanded to harvest pebble {pebble.name}!");
         }
 
         public void CommandDeliverToChest()
@@ -198,7 +195,6 @@ namespace BattleOfAges.RTS
             currentState = GathererState.DeliveringToChest;
             Vector3 chestPos = StorageChestNode.GetNearestChestDepositPosition(transform.position);
             if (rtsUnit != null) rtsUnit.IssueMoveCommand(chestPos);
-            Debug.Log($"[NPC Worker] {gameObject.name} commanded to deliver resources to Storage Chest!");
         }
 
         private void ClearCurrentTargets()
@@ -295,11 +291,9 @@ namespace BattleOfAges.RTS
                         rtsUnit.IssueMoveCommand(transform.position);
                     }
                     SetRenderersActive(false);
-                    Debug.Log($"[NPC Worker] {gameObject.name} entered Mine and is now producing 1 Ore/sec!");
                 }
                 else
                 {
-                    Debug.Log($"[NPC Worker] Mine is full (10/10 workers)! {gameObject.name} cannot enter.");
                     assignedMine = null;
                     currentState = GathererState.FindingResource;
                 }
@@ -485,7 +479,6 @@ namespace BattleOfAges.RTS
                     carriedOreAmount = takenOre;
                     carriedOreTier = takenTier; // mines yield tiers 0..2 like pebbles
                     currentState = GathererState.DeliveringToChest;
-                    Debug.Log($"[NPC Worker] {gameObject.name} picked up {takenOre} Ore from Mine!");
                 }
                 else
                 {
@@ -561,14 +554,12 @@ namespace BattleOfAges.RTS
                     if (carriedWood > 0)
                     {
                         ResourceManager.Instance.AddResource(ResourceType.Wood, carriedWood);
-                        Debug.Log($"[NPC Worker] {gameObject.name} deposited {carriedWood} Wood into Storage Chest!");
                         carriedWood = 0;
                     }
 
                     if (carriedOreAmount > 0 && carriedOreTier >= 0)
                     {
                         ResourceManager.Instance.AddOre(carriedOreTier, carriedOreAmount);
-                        Debug.Log($"[NPC Worker] {gameObject.name} deposited {carriedOreAmount} Ore ({OreTierHelper.GetTierName(carriedOreTier)}) into Storage Chest!");
                         carriedOreAmount = 0;
                         carriedOreTier = -1;
                     }

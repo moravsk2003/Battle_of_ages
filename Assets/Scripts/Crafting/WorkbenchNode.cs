@@ -4,6 +4,8 @@ using BattleOfAges.Building;
 using BattleOfAges.Resources;
 using BattleOfAges.Utils;
 using BattleOfAges.RTS;
+using BattleOfAges.Player;
+using BattleOfAges.UI;
 
 namespace BattleOfAges.Crafting
 {
@@ -90,7 +92,6 @@ namespace BattleOfAges.Crafting
                 Vector3 slotPos = GetWorkerSlotPosition(slotIndex);
                 worker.IssueMoveCommand(slotPos);
 
-                Debug.Log($"[Workbench] Робітник {worker.name} призначений на Верстак (Слот {slotIndex + 1}/4)!");
                 return true;
             }
             return false;
@@ -101,7 +102,6 @@ namespace BattleOfAges.Crafting
             if (worker != null && assignedWorkers.Remove(worker))
             {
                 craftingQueue.UnassignWorker();
-                Debug.Log($"[Workbench] Робітник {worker.name} знятий з Верстака.");
                 return true;
             }
             return false;
@@ -124,7 +124,7 @@ namespace BattleOfAges.Crafting
             float bestScore = float.MaxValue;
             foreach (RtsUnit u in FindObjectsByType<RtsUnit>(FindObjectsSortMode.None))
             {
-                if (u == null || assignedWorkers.Contains(u) || u.GetComponent<BattleOfAges.Player.FirstPersonController>() != null) continue;
+                if (u == null || assignedWorkers.Contains(u) || u.GetComponent<FirstPersonController>() != null) continue;
                 float score = Vector3.Distance(transform.position, u.transform.position) + (u.GetComponent<NpcResourceGatherer>() != null ? 0f : 1000f);
                 if (score < bestScore) { bestScore = score; best = u; }
             }
@@ -199,7 +199,6 @@ namespace BattleOfAges.Crafting
             }
 
             craftingQueue.EnqueueItem(type, level);
-            Debug.Log($"[Workbench] Додано в чергу крафту: {type} Lvl {level}!");
             return true;
         }
 
@@ -212,7 +211,7 @@ namespace BattleOfAges.Crafting
             var item = new Item(task.Type, task.Level);
             Armory.Instance.Add(item);
             OnItemCrafted?.Invoke(item);
-            BattleOfAges.UI.StrategyHud.Notify("Виготовлено: " + item);
+            StrategyHud.Notify("Виготовлено: " + item);
         }
 
         public static GameObject CreateWorkbenchPrefab(string name = "Workbench")

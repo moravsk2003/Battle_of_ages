@@ -198,7 +198,6 @@ namespace BattleOfAges.Utils
             mesh.SetUVs(2, S);
             mesh.SetTriangles(T, 0);
             mesh.RecalculateBounds();
-            Debug.Log($"[MeshKit] {name}: {V.Count} verts, {T.Count / 3} tris");
             return mesh;
         }
     }

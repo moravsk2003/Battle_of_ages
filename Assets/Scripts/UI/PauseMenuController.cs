@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
+using BattleOfAges.SaveLoad;
 
 namespace BattleOfAges.UI
 {
@@ -77,7 +78,7 @@ namespace BattleOfAges.UI
             Vector2 at = settings.anchoredPosition;
             AddPauseButton("SaveButton", "Зберегти", at += step, () => SaveSlotsUI.Open(true));
             AddPauseButton("LoadButton", "Завантажити", at += step, () => SaveSlotsUI.Open(false));
-            AddPauseButton("MainMenuButton", "Головне меню", at += step, BattleOfAges.SaveLoad.SaveSystem.ToMainMenu);
+            AddPauseButton("MainMenuButton", "Головне меню", at += step, SaveSystem.ToMainMenu);
             if (quitButton != null) ((RectTransform)quitButton.transform).anchoredPosition = at + step;
         }
 
@@ -155,32 +156,14 @@ namespace BattleOfAges.UI
 
             if (UniversalInput.GetKeyDownEscape())
             {
-                if (IsAnyModalOpen())
+                if (GameWindows.AnyModalOpen)
                 {
-                    CloseAllModalUIs();
+                    GameWindows.CloseAllModals();
                     return;
                 }
 
                 TogglePause();
             }
-        }
-
-        private bool IsAnyModalOpen()
-        {
-            return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
-                   (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
-                   (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
-                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible || SaveSlotsUI.IsVisible;
-        }
-
-        private void CloseAllModalUIs()
-        {
-            if (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) InventoryUI.Instance.CloseInventory();
-            if (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) NpcGatherCommandUI.Instance.CloseMenu();
-            if (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) BuildMenuUI.Instance.CloseMenu();
-            if (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) WorkbenchUI.Instance.CloseUI();
-            if (EquipmentUI.IsVisible) EquipmentUI.Instance.Close();
-            if (SaveSlotsUI.IsVisible) SaveSlotsUI.Close();
         }
 
         private void CheckForRebindKeyPress()

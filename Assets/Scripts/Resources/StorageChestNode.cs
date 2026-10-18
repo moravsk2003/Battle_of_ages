@@ -1,3 +1,4 @@
+using BattleOfAges.Building;
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Utils;
@@ -78,7 +79,7 @@ namespace BattleOfAges.Resources
         {
             GameObject root = new GameObject(name);
             root.AddComponent<StorageChestNode>();
-            root.AddComponent<BattleOfAges.Building.BuildingNode>(); // a built chest is a building (saved, counted)
+            root.AddComponent<BuildingNode>(); // a built chest is a building (saved, counted)
 
             Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.34f, 0.18f, 0.08f), 0.0f, 0.28f);
             Material darkWoodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.24f, 0.12f, 0.05f), 0.0f, 0.22f);

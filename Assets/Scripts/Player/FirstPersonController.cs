@@ -3,6 +3,7 @@ using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.UI;
 using BattleOfAges.RTS;
+using BattleOfAges.Combat;
 
 namespace BattleOfAges.Player
 {
@@ -18,7 +19,7 @@ namespace BattleOfAges.Player
 
         [Header("Movement Configuration")]
         [SerializeField] private float moveSpeed = 12.0f;
-        private BattleOfAges.Combat.CombatUnit combat;
+        private CombatUnit combat;
         [SerializeField] private float gravity = -9.81f;
         [SerializeField] private float jumpHeight = 1.2f;
 
@@ -90,19 +91,10 @@ namespace BattleOfAges.Player
 
         private void Update()
         {
-            if (!isControlEnabled || IsAnyUIOpen()) return;
+            if (!isControlEnabled || GameWindows.BlockGameplay) return;
 
             HandleMovement();
             HandleMouseLook();
-        }
-
-        private bool IsAnyUIOpen()
-        {
-            return (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
-                   (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen) || EquipmentUI.IsVisible ||
-                   (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
-                   (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen) ||
-                   (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused());
         }
 
         private void HandleMovement()
@@ -121,7 +113,7 @@ namespace BattleOfAges.Player
                 move.Normalize();
             }
 
-            if (combat == null) combat = GetComponent<BattleOfAges.Combat.CombatUnit>();
+            if (combat == null) combat = GetComponent<CombatUnit>();
             float speed = combat != null ? combat.MoveSpeed : moveSpeed; // CharacterSpeed formula (hero modifier 2)
             characterController.Move(move * speed * Time.deltaTime);
 

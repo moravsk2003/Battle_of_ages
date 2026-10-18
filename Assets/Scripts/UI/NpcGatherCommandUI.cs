@@ -62,7 +62,7 @@ namespace BattleOfAges.UI
         private void Update()
         {
             if (Time.frameCount < 2 || Time.time < 0.5f) return;
-            if (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()) return;
+            if (GameWindows.Paused) return;
 
             if (IsOpen)
             {
@@ -80,11 +80,7 @@ namespace BattleOfAges.UI
             }
             else
             {
-                if ((InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) ||
-                    (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen))
-                {
-                    return;
-                }
+                if (GameWindows.InventoryOpen || GameWindows.BuildMenuOpen) return;
 
                 if (IsToggleKeyPressed())
                 {
@@ -129,7 +125,7 @@ namespace BattleOfAges.UI
 
             if ((InventoryUI.Instance == null || !InventoryUI.Instance.IsOpen) &&
                 (BuildMenuUI.Instance == null || !BuildMenuUI.Instance.IsOpen) &&
-                (PauseMenuController.Instance == null || !PauseMenuController.Instance.IsPaused()))
+                !GameWindows.Paused)
             {
                 GameModeManager gmm = FindFirstObjectByType<GameModeManager>();
                 if (gmm == null || gmm.CurrentMode == GameMode.FirstPerson)

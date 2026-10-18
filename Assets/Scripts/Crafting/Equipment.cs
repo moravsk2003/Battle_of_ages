@@ -1,6 +1,9 @@
 using System;
 using UnityEngine;
 using BattleOfAges.Combat;
+using BattleOfAges.AI;
+using BattleOfAges.UI;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Crafting
 {
@@ -175,7 +178,7 @@ namespace BattleOfAges.Crafting
                 combat.Strength = baseDamage; // the characteristic; damage = strength x weapon
                 combat.InitializeCombatStats(Damage, Cooldown, Range);
             }
-            BattleOfAges.Utils.CharacterGear gear = GetComponentInChildren<BattleOfAges.Utils.CharacterGear>(true);
+            CharacterGear gear = GetComponentInChildren<CharacterGear>(true);
             if (gear != null) gear.Show(this);
             Changed?.Invoke();
             AnyChanged?.Invoke(this);
@@ -184,7 +187,7 @@ namespace BattleOfAges.Crafting
         /// <summary>Re-shows the gear on the model (after the model was swapped).</summary>
         public void RefreshVisuals()
         {
-            BattleOfAges.Utils.CharacterGear gear = GetComponentInChildren<BattleOfAges.Utils.CharacterGear>(true);
+            CharacterGear gear = GetComponentInChildren<CharacterGear>(true);
             if (gear != null) gear.Show(this);
         }
 
@@ -217,7 +220,7 @@ namespace BattleOfAges.Crafting
                 if (i.IsEmpty) continue;
                 if (pick-- > 0) continue;
                 Armory.Instance.Add(i);
-                BattleOfAges.UI.StrategyHud.Notify("Трофей: " + i);
+                StrategyHud.Notify("Трофей: " + i);
                 return;
             }
         }
@@ -231,28 +234,28 @@ namespace BattleOfAges.Crafting
     {
         private static Item I(ItemType t, int l) => new Item(t, l);
 
-        public static Item[] For(BattleOfAges.Utils.HumanoidModelBuilder.HumanType type)
+        public static Item[] For(HumanoidModelBuilder.HumanType type)
         {
             switch (type)
             {
-                case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.KnightGuard:
+                case HumanoidModelBuilder.HumanType.KnightGuard:
                     return new[] { I(ItemType.Sword, 3), I(ItemType.Shield, 3), I(ItemType.Helmet, 3), I(ItemType.Armor, 3), I(ItemType.Gloves, 2), I(ItemType.Boots, 2) };
-                case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.HeroPlayer:
+                case HumanoidModelBuilder.HumanType.HeroPlayer:
                     return new[] { I(ItemType.Sword, 0), I(ItemType.Shield, 1) };
-                case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Bandit:
+                case HumanoidModelBuilder.HumanType.Bandit:
                     return new[] { I(ItemType.Sword, 1), I(ItemType.Armor, 1) };
-                case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Goblin:
+                case HumanoidModelBuilder.HumanType.Goblin:
                     return new[] { I(ItemType.Axe, 1) };
-                case BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Warlord:
+                case HumanoidModelBuilder.HumanType.Warlord:
                     return new[] { I(ItemType.Sword, 3), I(ItemType.Shield, 2), I(ItemType.Helmet, 2), I(ItemType.Armor, 2), I(ItemType.Boots, 1) };
                 default: // Villager
                     return new[] { I(ItemType.Axe, 1) };
             }
         }
 
-        public static Item[] For(BattleOfAges.AI.HostileMobType type) => For(
-            type == BattleOfAges.AI.HostileMobType.WarlordGuard ? BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Warlord
-            : type == BattleOfAges.AI.HostileMobType.Goblin ? BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Goblin
-            : BattleOfAges.Utils.HumanoidModelBuilder.HumanType.Bandit);
+        public static Item[] For(HostileMobType type) => For(
+            type == HostileMobType.WarlordGuard ? HumanoidModelBuilder.HumanType.Warlord
+            : type == HostileMobType.Goblin ? HumanoidModelBuilder.HumanType.Goblin
+            : HumanoidModelBuilder.HumanType.Bandit);
     }
 }

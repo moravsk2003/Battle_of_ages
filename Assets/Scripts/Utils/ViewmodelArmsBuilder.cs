@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using BattleOfAges.Crafting;
 
 namespace BattleOfAges.Utils
 {
@@ -471,15 +472,15 @@ namespace BattleOfAges.Utils
         // ------------------------------------------------------------------ held gear (built per worn item)
 
         /// <summary>The worn weapon in the right fist (right pivot space), finished for its level.</summary>
-        public static Mesh BuildWeapon(BattleOfAges.Crafting.ItemType type, int level)
+        public static Mesh BuildWeapon(ItemType type, int level)
         {
             var kit = new MeshKit();
             Matrix4x4 m = Matrix4x4.TRS(SwordPos, SwordRot, Vector3.one);
             switch (type)
             {
-                case BattleOfAges.Crafting.ItemType.Axe: HeldAxe(kit, m, false); break;
-                case BattleOfAges.Crafting.ItemType.Pickaxe: HeldAxe(kit, m, true); break;
-                case BattleOfAges.Crafting.ItemType.Bow: HeldBow(kit, m, level); break;
+                case ItemType.Axe: HeldAxe(kit, m, false); break;
+                case ItemType.Pickaxe: HeldAxe(kit, m, true); break;
+                case ItemType.Bow: HeldBow(kit, m, level); break;
                 default: Sword(kit, m); break;
             }
             Refinish(kit, level);

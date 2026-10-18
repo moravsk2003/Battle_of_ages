@@ -65,7 +65,7 @@ namespace BattleOfAges.UI
                 return;
             }
 
-            if (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()) return;
+            if (GameWindows.Paused) return;
 
             if (IsOpen)
             {
@@ -77,11 +77,7 @@ namespace BattleOfAges.UI
             }
             else
             {
-                if ((NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) ||
-                    (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen))
-                {
-                    return;
-                }
+                if (GameWindows.WorkersOpen || GameWindows.InventoryOpen) return;
 
                 if (IsToggleKeyPressed())
                 {

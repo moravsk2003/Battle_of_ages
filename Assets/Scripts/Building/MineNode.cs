@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using BattleOfAges.Crafting;
+using BattleOfAges.Resources;
 
 namespace BattleOfAges.Building
 {
@@ -26,7 +28,7 @@ namespace BattleOfAges.Building
         [SerializeField] private int maxAccumulatedOre = 500;
 
         /// <summary>Mines yield every ore tier (0..99): 80% tier 0, 18% tier I, each further tier ten times rarer.</summary>
-        public const int MAX_MINED_TIER = BattleOfAges.Resources.OreTierHelper.MAX_TIERS - 1;
+        public const int MAX_MINED_TIER = OreTierHelper.MAX_TIERS - 1;
 
         private float productionTimer = 0f;
         private float productionCarry;
@@ -54,9 +56,9 @@ namespace BattleOfAges.Building
                 {
                     if (w == null) continue;
                     counted++;
-                    var gear = w.GetComponent<BattleOfAges.Crafting.Equipment>();
-                    int pick = gear != null ? gear.LevelOf(BattleOfAges.Crafting.ItemType.Pickaxe) : 0;
-                    rate += pick > 0 ? BattleOfAges.Crafting.ItemStatCalculator.CalculateToolEfficiency(pick) : 1f;
+                    var gear = w.GetComponent<Equipment>();
+                    int pick = gear != null ? gear.LevelOf(ItemType.Pickaxe) : 0;
+                    rate += pick > 0 ? ItemStatCalculator.CalculateToolEfficiency(pick) : 1f;
                 }
                 return rate + Mathf.Max(0, assignedWorkerCount - counted); // workers without a record (tests, old saves)
             }
@@ -103,7 +105,7 @@ namespace BattleOfAges.Building
         {
             for (int i = 0; i < pieces && accumulatedOre < maxAccumulatedOre; i++)
             {
-                oreByTier[Mathf.Min(BattleOfAges.Resources.OreTierHelper.DetermineMineOreTier(), MAX_MINED_TIER)]++;
+                oreByTier[Mathf.Min(OreTierHelper.DetermineMineOreTier(), MAX_MINED_TIER)]++;
                 accumulatedOre++;
             }
         }

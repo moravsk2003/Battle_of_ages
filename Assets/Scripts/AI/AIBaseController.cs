@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Combat;
 using BattleOfAges.RTS;
+using BattleOfAges.World;
 
 namespace BattleOfAges.AI
 {
@@ -321,7 +322,7 @@ namespace BattleOfAges.AI
         {
             if (c is TerrainCollider) return true;
             GameObject go = c.gameObject;
-            return go.GetComponent<BattleOfAges.World.ProceduralBiomeChunk>() != null
+            return go.GetComponent<ProceduralBiomeChunk>() != null
                    || go.name == "SteppeTerrain"
                    || go.name == "Ground";
         }

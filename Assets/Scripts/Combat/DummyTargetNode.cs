@@ -42,7 +42,6 @@ namespace BattleOfAges.Combat
 
         private void HandleDeath()
         {
-            Debug.Log($"[DummyTarget] Манекен {gameObject.name} знищений! Респавн через {respawnDelay}с...");
             StartCoroutine(RespawnRoutine());
         }
 
@@ -65,7 +64,6 @@ namespace BattleOfAges.Combat
             healthComponent.InitializeHealth(maxHp);
 
             SetDummyVisible(true);
-            Debug.Log($"[DummyTarget] Манекен відродився у новій точці: {randomPos}");
         }
 
         private void SetDummyVisible(bool visible)

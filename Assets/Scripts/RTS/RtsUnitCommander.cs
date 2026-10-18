@@ -1,11 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using BattleOfAges.Managers;
 using BattleOfAges.InputSystem;
 using BattleOfAges.CameraSystem;
 using BattleOfAges.UI;
 using BattleOfAges.Building;
 using BattleOfAges.Resources;
+using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
 
 namespace BattleOfAges.RTS
 {
@@ -90,7 +93,7 @@ namespace BattleOfAges.RTS
 
         /// <summary>Clicks on HUD / window buttons belong to the UI, not to the map.</summary>
         private static bool PointerOverUi() =>
-            UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+            EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
         private void HandleSelectionInput()
         {
@@ -144,10 +147,10 @@ namespace BattleOfAges.RTS
                     return;
                 }
 
-                BattleOfAges.Crafting.WorkbenchNode wb = hit.collider.GetComponentInParent<BattleOfAges.Crafting.WorkbenchNode>();
+                WorkbenchNode wb = hit.collider.GetComponentInParent<WorkbenchNode>();
                 if (wb != null)
                 {
-                    BattleOfAges.UI.WorkbenchUI.EnsureInstance().OpenUI(wb);
+                    WorkbenchUI.EnsureInstance().OpenUI(wb);
                     return;
                 }
 
@@ -184,138 +187,74 @@ namespace BattleOfAges.RTS
 
         private void HandleMovementInput()
         {
-            if (UniversalInput.GetMouseButtonDown(1) && selectedUnits.Count > 0 && !PointerOverUi())
+            if (!UniversalInput.GetMouseButtonDown(1) || selectedUnits.Count == 0 || PointerOverUi()) return;
+            Ray ray = mapCamera.ScreenPointToRay(UniversalInput.GetMousePosition());
+            if (!Physics.Raycast(ray, out RaycastHit hit, 1000f)) return;
+
+            // A snapshot: a worker that enters a building leaves the selection while we loop
+            tempUnitsBuffer.Clear();
+            foreach (RtsUnit u in selectedUnits) if (u != null) tempUnitsBuffer.Add(u);
+            OrderUnits(hit, tempUnitsBuffer);
+            tempUnitsBuffer.Clear();
+        }
+
+        /// <summary>Right-click order on what was hit: attack, work in a mine or at a workbench, gather, deliver, or move.</summary>
+        private static void OrderUnits(RaycastHit hit, List<RtsUnit> units)
+        {
+            Collider target = hit.collider;
+
+            HealthComponent enemy = target.GetComponentInParent<HealthComponent>();
+            if (enemy != null && enemy.IsAlive)
             {
-                int count = selectedUnits.Count;
-                Vector3 mousePos = UniversalInput.GetMousePosition();
-                Ray ray = mapCamera.ScreenPointToRay(mousePos);
+                foreach (RtsUnit unit in units) unit.IssueAttackCommand(enemy);
+                return;
+            }
 
-                if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
-                {
-                    // 0. Right-click Enemy Target / Dummy Target
-                    BattleOfAges.Combat.HealthComponent enemyTarget = hit.collider.GetComponentInParent<BattleOfAges.Combat.HealthComponent>();
-                    if (enemyTarget != null && enemyTarget.IsAlive)
-                    {
-                        for (int i = 0; i < count; i++)
-                        {
-                            RtsUnit unit = selectedUnits[i];
-                            if (unit == null) continue;
+            MineNode mine = target.GetComponentInParent<MineNode>();
+            if (mine != null)
+            {
+                ForEachGatherer(units, g => { if (!mine.IsFullWorkers) g.AssignToWorkInMine(mine); });
+                return;
+            }
 
-                            unit.IssueAttackCommand(enemyTarget);
-                        }
-                        return;
-                    }
+            WorkbenchNode workbench = target.GetComponentInParent<WorkbenchNode>();
+            if (workbench != null)
+            {
+                foreach (RtsUnit unit in units) if (!workbench.IsWorkerFull) workbench.AssignWorker(unit);
+                return;
+            }
 
-                    // 1. Right-click Mine
-                    MineNode mine = hit.collider.GetComponentInParent<MineNode>();
-                    if (mine != null)
-                    {
-                        for (int i = 0; i < count; i++)
-                        {
-                            RtsUnit unit = selectedUnits[i];
-                            if (unit == null) continue;
+            ResourceNodeTree tree = target.GetComponentInParent<ResourceNodeTree>();
+            if (tree != null) { ForEachGatherer(units, g => g.CommandHarvestTree(tree)); return; }
 
-                            NpcResourceGatherer gatherer = unit.GetComponent<NpcResourceGatherer>();
-                            if (gatherer != null && !mine.IsFullWorkers)
-                            {
-                                gatherer.AssignToWorkInMine(mine);
-                            }
-                        }
-                        return;
-                    }
+            OrePebbleNode pebble = target.GetComponentInParent<OrePebbleNode>();
+            if (pebble != null) { ForEachGatherer(units, g => g.CommandHarvestPebble(pebble)); return; }
 
-                    // 1.5. Right-click Workbench
-                    BattleOfAges.Crafting.WorkbenchNode workbench = hit.collider.GetComponentInParent<BattleOfAges.Crafting.WorkbenchNode>();
-                    if (workbench != null)
-                    {
-                        for (int i = 0; i < count; i++)
-                        {
-                            RtsUnit unit = selectedUnits[i];
-                            if (unit == null) continue;
-                            if (!workbench.IsWorkerFull)
-                            {
-                                workbench.AssignWorker(unit);
-                            }
-                        }
-                        return;
-                    }
+            if (target.GetComponentInParent<StorageChestNode>() != null) { ForEachGatherer(units, g => g.CommandDeliverToChest()); return; }
 
-                    // 2. Right-click Tree
-                    ResourceNodeTree tree = hit.collider.GetComponentInParent<ResourceNodeTree>();
-                    if (tree != null)
-                    {
-                        for (int i = 0; i < count; i++)
-                        {
-                            RtsUnit unit = selectedUnits[i];
-                            if (unit == null) continue;
+            MoveInFormation(units, hit.point);
+        }
 
-                            NpcResourceGatherer gatherer = unit.GetComponent<NpcResourceGatherer>();
-                            if (gatherer != null)
-                            {
-                                gatherer.CommandHarvestTree(tree);
-                            }
-                        }
-                        return;
-                    }
+        private static void ForEachGatherer(List<RtsUnit> units, System.Action<NpcResourceGatherer> order)
+        {
+            foreach (RtsUnit unit in units)
+                if (unit.TryGetComponent(out NpcResourceGatherer gatherer)) order(gatherer);
+        }
 
-                    // 3. Right-click Ore Pebble
-                    OrePebbleNode pebble = hit.collider.GetComponentInParent<OrePebbleNode>();
-                    if (pebble != null)
-                    {
-                        for (int i = 0; i < count; i++)
-                        {
-                            RtsUnit unit = selectedUnits[i];
-                            if (unit == null) continue;
-
-                            NpcResourceGatherer gatherer = unit.GetComponent<NpcResourceGatherer>();
-                            if (gatherer != null)
-                            {
-                                gatherer.CommandHarvestPebble(pebble);
-                            }
-                        }
-                        return;
-                    }
-
-                    // 4. Right-click Storage Chest
-                    StorageChestNode chest = hit.collider.GetComponentInParent<StorageChestNode>();
-                    if (chest != null)
-                    {
-                        for (int i = 0; i < count; i++)
-                        {
-                            RtsUnit unit = selectedUnits[i];
-                            if (unit == null) continue;
-
-                            NpcResourceGatherer gatherer = unit.GetComponent<NpcResourceGatherer>();
-                            if (gatherer != null)
-                            {
-                                gatherer.CommandDeliverToChest();
-                            }
-                        }
-                        return;
-                    }
-
-                    // 5. Right-click Terrain
-                    Vector3 targetPoint = hit.point;
-                    targetPoint.y = RtsUnit.GetTerrainHeight(targetPoint);
-
-                    int cols = Mathf.CeilToInt(Mathf.Sqrt(count));
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        RtsUnit unit = selectedUnits[i];
-                        if (unit == null) continue;
-
-                        int row = i / cols;
-                        int col = i % cols;
-                        Vector3 offset = (count > 1) 
-                            ? new Vector3((col - cols / 2f) * 2.2f, 0, (row - cols / 2f) * 2.2f) 
-                            : Vector3.zero;
-
-                        Vector3 unitTarget = targetPoint + offset;
-                        unitTarget.y = RtsUnit.GetTerrainHeight(unitTarget);
-                        unit.IssueMoveCommand(unitTarget);
-                    }
-                }
+        /// <summary>Spreads the units over a square grid (2.2 m apart) around the clicked point.</summary>
+        private static void MoveInFormation(List<RtsUnit> units, Vector3 point)
+        {
+            const float spacing = 2.2f;
+            int count = units.Count;
+            int cols = Mathf.CeilToInt(Mathf.Sqrt(count));
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 offset = count > 1
+                    ? new Vector3((i % cols - cols / 2f) * spacing, 0f, (i / cols - cols / 2f) * spacing)
+                    : Vector3.zero;
+                Vector3 target = point + offset;
+                target.y = RtsUnit.GetTerrainHeight(target);
+                units[i].IssueMoveCommand(target);
             }
         }
 

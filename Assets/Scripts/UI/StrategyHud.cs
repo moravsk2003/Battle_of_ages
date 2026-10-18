@@ -7,6 +7,8 @@ using BattleOfAges.Combat;
 using BattleOfAges.Managers;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
+using BattleOfAges.Crafting;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.UI
 {
@@ -233,7 +235,7 @@ namespace BattleOfAges.UI
 
         private void UpdateMinimap()
         {
-            Camera main = BattleOfAges.Utils.ViewCamera.Current;
+            Camera main = ViewCamera.Current;
             if (main == null) return;
             // Centre: where the view looks at the ground
             Vector3 c = main.transform.position;
@@ -305,7 +307,7 @@ namespace BattleOfAges.UI
 
         private void UpdateUnitBars()
         {
-            Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+            Camera cam = ViewCamera.Current;
             var selected = commander != null ? commander.SelectedUnits : null;
             int used = 0;
             if (cam != null && selected != null)
@@ -344,7 +346,7 @@ namespace BattleOfAges.UI
         /// </summary>
         private void UpdateMineLabels(bool map)
         {
-            Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+            Camera cam = ViewCamera.Current;
             foreach (MineNode mine in MineNode.ActiveMines)
             {
                 if (mine == null) continue;
@@ -384,7 +386,7 @@ namespace BattleOfAges.UI
         private void UpdateHallLabel(bool map)
         {
             TownHall hall = TownHall.Current;
-            Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+            Camera cam = ViewCamera.Current;
             bool show = hall != null && cam != null;
             Vector3 sp = show ? cam.WorldToScreenPoint(hall.transform.position + Vector3.up * 7.5f) : Vector3.zero;
             show &= sp.z > 0f && (map || sp.z < 40f);
@@ -408,14 +410,14 @@ namespace BattleOfAges.UI
             RectTransformUtility.ScreenPointToLocalPointInRectangle(root, sp, null, out Vector2 local);
             hallLabel.anchoredPosition = local;
             int pop = TownHall.Population, cap = TownHall.PopulationCap;
-            hallText.text = $"Ратуша <color=#F5CC73>{BattleOfAges.Crafting.ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
+            hallText.text = $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
             bool max = hall.Level >= TownHall.MaxLevel;
             bool canShowButton = map && !max;
             if (hallButton.gameObject.activeSelf != canShowButton) hallButton.gameObject.SetActive(canShowButton);
             if (!canShowButton) return;
             TownHall.UpgradeCost(hall.Level + 1, out int wood, out int ore, out int tier);
             bool ok = hall.CanUpgrade(out _);
-            hallButtonText.text = $"Покращити до {BattleOfAges.Crafting.ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {BattleOfAges.Crafting.ItemTypeNames.Roman(tier)}+</size>";
+            hallButtonText.text = $"Покращити до {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
             hallButton.interactable = ok;
         }
 

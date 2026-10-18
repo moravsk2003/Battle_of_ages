@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using BattleOfAges.SaveLoad;
 
 namespace BattleOfAges.UI
 {
@@ -33,7 +34,7 @@ namespace BattleOfAges.UI
 
         private static void EnsureHud(string scene = null)
         {
-            if ((scene ?? SceneManager.GetActiveScene().name) == BattleOfAges.SaveLoad.SaveSystem.MenuScene) return;
+            if ((scene ?? SceneManager.GetActiveScene().name) == SaveSystem.MenuScene) return;
             if (FindFirstObjectByType<StrategyHud>() == null) new GameObject("StrategyHud").AddComponent<StrategyHud>();
         }
 

@@ -91,7 +91,6 @@ namespace BattleOfAges.RTS
                 if (activeWorkers[index] != null) activeWorkers[index].SetGatherDirective(GatherDirective.Auto);
             }
 
-            Debug.Log($"[WorkerRegistry] Job Distribution applied across {total} workers: Branches={branchesCount}, Chop={chopCount}, Pebbles={pebblesCount}, Haul={haulCount}, Auto={autoCount}");
         }
     }
 }

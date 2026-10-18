@@ -20,7 +20,6 @@ namespace BattleOfAges.Resources
 
             IsPickedUp = true;
             int rolledTier = OreTierHelper.DeterminePebbleOreTier();
-            Debug.Log($"[Pebble Ore Pickup] Picked up Pebble! {OreTierHelper.GetTierName(rolledTier)}");
 
             StartCoroutine(RespawnRoutine(3.0f));
             return rolledTier;
@@ -44,7 +43,6 @@ namespace BattleOfAges.Resources
             IsPickedUp = false;
 
             SetVisualsActive(true);
-            Debug.Log($"[Pebble Ore Respawn] Ore Pebble respawned at new location: {newPos}");
         }
 
         private void SetVisualsActive(bool active)

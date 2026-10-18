@@ -6,6 +6,8 @@ using BattleOfAges.Crafting;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.RTS;
+using BattleOfAges.Combat;
+using BattleOfAges.Player;
 
 namespace BattleOfAges.UI
 {
@@ -109,7 +111,7 @@ namespace BattleOfAges.UI
                     if (u != null) list.Add(GearOf(u.gameObject));
             if (list.Count == 0)
             {
-                var player = FindFirstObjectByType<BattleOfAges.Player.PlayerCombatController>();
+                var player = FindFirstObjectByType<PlayerCombatController>();
                 if (player != null) list.Add(player.Gear);
             }
             Open(list);
@@ -117,7 +119,7 @@ namespace BattleOfAges.UI
 
         private static Equipment GearOf(GameObject go)
         {
-            var player = go.GetComponent<BattleOfAges.Player.PlayerCombatController>();
+            var player = go.GetComponent<PlayerCombatController>();
             if (player != null) return player.Gear;
             Equipment e = go.GetComponent<Equipment>();
             return e != null ? e : go.AddComponent<Equipment>();
@@ -129,8 +131,8 @@ namespace BattleOfAges.UI
             window.SetActive(false);
             tooltip.gameObject.SetActive(false);
             GameModeManager modes = FindFirstObjectByType<GameModeManager>();
-            bool otherModal = (InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) || (WorkbenchUI.Instance != null && WorkbenchUI.Instance.IsOpen)
-                              || (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused());
+            bool otherModal = GameWindows.InventoryOpen || GameWindows.WorkbenchOpen
+                              || GameWindows.Paused;
             if (!otherModal && (modes == null || modes.CurrentMode == GameMode.FirstPerson))
             {
                 Cursor.lockState = CursorLockMode.Locked;
@@ -151,9 +153,9 @@ namespace BattleOfAges.UI
                 if (tooltip.gameObject.activeSelf) PlaceTooltip();
                 return;
             }
-            if (PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused()) return;
-            if ((InventoryUI.Instance != null && InventoryUI.Instance.IsOpen) || (BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen)
-                || (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen)) return;
+            if (GameWindows.Paused) return;
+            if (GameWindows.InventoryOpen || GameWindows.BuildMenuOpen
+                || GameWindows.WorkersOpen) return;
             if (KeybindsManager.GetKeyDown(KeyAction.Equipment)) OpenDefault();
         }
 
@@ -230,13 +232,13 @@ namespace BattleOfAges.UI
 
         private static float SpeedOf(Equipment t)
         {
-            var combat = t.GetComponent<BattleOfAges.Combat.CombatUnit>();
-            return BattleOfAges.Combat.CharacterSpeed.Of(combat);
+            var combat = t.GetComponent<CombatUnit>();
+            return CharacterSpeed.Of(combat);
         }
 
         private static string DisplayName(GameObject go)
         {
-            if (go.GetComponent<BattleOfAges.Player.PlayerCombatController>() != null) return "Герой";
+            if (go.GetComponent<PlayerCombatController>() != null) return "Герой";
             string n = go.name;
             if (n.StartsWith("NPC_Villager_")) return "Робітник " + n.Substring("NPC_Villager_".Length);
             if (n.Contains("Knight")) return "Лицар";

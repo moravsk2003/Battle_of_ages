@@ -1,4 +1,5 @@
 using UnityEngine;
+using BattleOfAges.CameraSystem;
 
 namespace BattleOfAges.Utils
 {
@@ -10,7 +11,7 @@ namespace BattleOfAges.Utils
     {
         private static Camera cached;
         private static int frame = -1;
-        private static BattleOfAges.CameraSystem.RtsMapCameraController map;
+        private static RtsMapCameraController map;
 
         public static Camera Current
         {
@@ -18,7 +19,7 @@ namespace BattleOfAges.Utils
             {
                 if (frame == Time.frameCount && cached != null) return cached;
                 frame = Time.frameCount;
-                if (map == null) map = Object.FindFirstObjectByType<BattleOfAges.CameraSystem.RtsMapCameraController>();
+                if (map == null) map = Object.FindFirstObjectByType<RtsMapCameraController>();
                 Camera mapCam = map != null ? map.GetComponent<Camera>() : null;
                 cached = mapCam != null && mapCam.isActiveAndEnabled ? mapCam : Camera.main;
                 return cached;

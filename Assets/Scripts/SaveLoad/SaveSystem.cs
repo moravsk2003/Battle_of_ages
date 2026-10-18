@@ -11,6 +11,9 @@ using BattleOfAges.Managers;
 using BattleOfAges.Player;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
+using BattleOfAges.CameraSystem;
+using BattleOfAges.InputSystem;
+using BattleOfAges.UI;
 
 namespace BattleOfAges.SaveLoad
 {
@@ -107,13 +110,13 @@ namespace BattleOfAges.SaveLoad
                 File.WriteAllText(tmp, JsonUtility.ToJson(d));
                 if (File.Exists(PathOf(slot))) File.Delete(PathOf(slot));
                 File.Move(tmp, PathOf(slot));
-                BattleOfAges.UI.StrategyHud.Notify(slot == AutoSlot ? "Гру збережено (авто)" : $"Гру збережено: {SlotName(slot)}");
+                StrategyHud.Notify(slot == AutoSlot ? "Гру збережено (авто)" : $"Гру збережено: {SlotName(slot)}");
                 return true;
             }
             catch (Exception e)
             {
                 Debug.LogError("[Save] failed: " + e);
-                BattleOfAges.UI.StrategyHud.Notify("Не вдалося зберегти гру");
+                StrategyHud.Notify("Не вдалося зберегти гру");
                 return false;
             }
         }
@@ -142,7 +145,7 @@ namespace BattleOfAges.SaveLoad
             }
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
             if (modes != null) d.Player.Mode = (int)modes.CurrentMode;
-            var mapCam = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.CameraSystem.RtsMapCameraController>();
+            var mapCam = UnityEngine.Object.FindFirstObjectByType<RtsMapCameraController>();
             if (mapCam != null) { d.Player.HasMapCamera = true; d.Player.MapCameraPosition = mapCam.transform.position; }
 
             // Buildings (index = their place in the list, units refer to it)
@@ -276,7 +279,7 @@ namespace BattleOfAges.SaveLoad
             try { Apply(d); }
             catch (Exception e) { Debug.LogError("[Save] load failed: " + e); }
             WorldPersistence.RegisterSceneTrees();
-            BattleOfAges.UI.StrategyHud.Notify("Гру завантажено");
+            StrategyHud.Notify("Гру завантажено");
         }
 
         private static void Apply(SaveData d)
@@ -383,7 +386,7 @@ namespace BattleOfAges.SaveLoad
                 HealthComponent hp = player.GetComponent<HealthComponent>();
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }
-            var mapCam = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.CameraSystem.RtsMapCameraController>();
+            var mapCam = UnityEngine.Object.FindFirstObjectByType<RtsMapCameraController>();
             if (mapCam != null && d.Player.HasMapCamera) mapCam.transform.position = d.Player.MapCameraPosition;
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
             if (modes != null) modes.SetGameMode((GameMode)d.Player.Mode);
@@ -446,8 +449,8 @@ namespace BattleOfAges.SaveLoad
                 autosaveTimer -= Time.unscaledDeltaTime;
                 if (autosaveTimer <= 0f) { autosaveTimer = SaveSystem.AutosaveSeconds; SaveSystem.Save(SaveSystem.AutoSlot); }
             }
-            if (BattleOfAges.InputSystem.UniversalInput.IsKeyDown(KeyCode.F5)) SaveSystem.Save(SaveSystem.AutoSlot);
-            if (BattleOfAges.InputSystem.UniversalInput.IsKeyDown(KeyCode.F9) && File.Exists(SaveSystem.PathOf(SaveSystem.AutoSlot))) SaveSystem.Load(SaveSystem.AutoSlot);
+            if (UniversalInput.IsKeyDown(KeyCode.F5)) SaveSystem.Save(SaveSystem.AutoSlot);
+            if (UniversalInput.IsKeyDown(KeyCode.F9) && File.Exists(SaveSystem.PathOf(SaveSystem.AutoSlot))) SaveSystem.Load(SaveSystem.AutoSlot);
         }
     }
 }

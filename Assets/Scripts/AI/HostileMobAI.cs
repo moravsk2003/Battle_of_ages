@@ -1,6 +1,7 @@
 using UnityEngine;
 using BattleOfAges.Combat;
 using BattleOfAges.RTS;
+using BattleOfAges.Crafting;
 
 namespace BattleOfAges.AI
 {
@@ -97,10 +98,10 @@ namespace BattleOfAges.AI
             if (Combat != null) Combat.InitializeCombatStats(dmg, 1.6f, attackRange);
 
             // The kit is part of the tuned stats; trophies can drop from it
-            BattleOfAges.Crafting.Equipment gear = GetComponent<BattleOfAges.Crafting.Equipment>();
-            if (gear == null) gear = gameObject.AddComponent<BattleOfAges.Crafting.Equipment>();
+            Equipment gear = GetComponent<Equipment>();
+            if (gear == null) gear = gameObject.AddComponent<Equipment>();
             gear.DropsLoot = true;
-            gear.InitLoadout(BattleOfAges.Crafting.StartingKits.For(mobType));
+            gear.InitLoadout(StartingKits.For(mobType));
         }
 
         protected override void RegisterStates()

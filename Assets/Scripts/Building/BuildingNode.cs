@@ -1,3 +1,4 @@
+using BattleOfAges.Crafting;
 ﻿using UnityEngine;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
@@ -29,8 +30,8 @@ namespace BattleOfAges.Building
             {
                 if (buildingType != BuildingType.WorkerHouse) return buildingType;
                 if (GetComponent<MineNode>() != null) return BuildingType.Mine;
-                if (GetComponent<BattleOfAges.Crafting.WorkbenchNode>() != null) return BuildingType.Workbench;
-                if (GetComponent<BattleOfAges.Resources.StorageChestNode>() != null) return BuildingType.StorageChest;
+                if (GetComponent<WorkbenchNode>() != null) return BuildingType.Workbench;
+                if (GetComponent<StorageChestNode>() != null) return BuildingType.StorageChest;
                 return buildingType;
             }
         }
@@ -73,7 +74,6 @@ namespace BattleOfAges.Building
 
         private void HandleBuildingDestroyed()
         {
-            Debug.Log($"[BuildingNode] 💥 Споруда {name} зруйнована через втрату міцності!");
             Destroy(gameObject);
         }
 
@@ -92,7 +92,6 @@ namespace BattleOfAges.Building
                 SpawnWorkerNpc(i);
             }
 
-            Debug.Log($"[Building] {def.DisplayName} built at {transform.position}! Spawned {def.NpcSpawnCount} worker(s).");
         }
 
         private void SpawnWorkerNpc(int index)
@@ -158,7 +157,6 @@ namespace BattleOfAges.Building
             indicator.SetActive(false);
             unitComp.SetSelectionIndicator(indicator);
 
-            Debug.Log($"[Building] Spawned worker: {npcName} at {spawnPos}");
             return npcObj;
         }
 
@@ -346,7 +344,7 @@ namespace BattleOfAges.Building
             }
             else if (type == BuildingType.Workbench)
             {
-                ghost = BattleOfAges.Crafting.WorkbenchNode.CreateWorkbenchPrefab("BuildGhost_Workbench");
+                ghost = WorkbenchNode.CreateWorkbenchPrefab("BuildGhost_Workbench");
             }
             else if (type == BuildingType.CastleWall)
             {
@@ -368,7 +366,7 @@ namespace BattleOfAges.Building
             MineNode mNode = ghost.GetComponent<MineNode>();
             if (mNode != null) DestroyImmediate(mNode);
 
-            BattleOfAges.Crafting.WorkbenchNode wNode = ghost.GetComponent<BattleOfAges.Crafting.WorkbenchNode>();
+            WorkbenchNode wNode = ghost.GetComponent<WorkbenchNode>();
             if (wNode != null) DestroyImmediate(wNode);
 
             TownHall hNode = ghost.GetComponent<TownHall>();

@@ -3,6 +3,9 @@ using UnityEngine;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
+using BattleOfAges.UI;
 
 namespace BattleOfAges.Building
 {
@@ -64,7 +67,7 @@ namespace BattleOfAges.Building
         {
             if (!CanUpgrade(out string reason))
             {
-                BattleOfAges.UI.StrategyHud.Notify(reason);
+                StrategyHud.Notify(reason);
                 return false;
             }
             UpgradeCost(level + 1, out int wood, out int ore, out int tier);
@@ -75,7 +78,7 @@ namespace BattleOfAges.Building
                 rm.ConsumeOreAtLeast(tier, ore);
             }
             level++;
-            BattleOfAges.UI.StrategyHud.Notify($"Ратуша {BattleOfAges.Crafting.ItemTypeNames.Roman(level)}: населення до {CapForLevel(level)}");
+            StrategyHud.Notify($"Ратуша {ItemTypeNames.Roman(level)}: населення до {CapForLevel(level)}");
             return true;
         }
 
@@ -89,7 +92,7 @@ namespace BattleOfAges.Building
             TownHall th = root.AddComponent<TownHall>();
             if (!active.Contains(th)) active.Add(th); // (OnEnable does not run in edit mode)
             root.AddComponent<BuildingNode>().SetType(BuildingType.TownHall);
-            root.AddComponent<BattleOfAges.Combat.HealthComponent>().InitializeHealth(BuildingData.GetDefinition(BuildingType.TownHall).MaxHealth);
+            root.AddComponent<HealthComponent>().InitializeHealth(BuildingData.GetDefinition(BuildingType.TownHall).MaxHealth);
 
             GameObject hall = WorkerHouseBuilder.Attach(root.transform);
             hall.transform.localScale = new Vector3(1.6f, 1.45f, 1.6f);

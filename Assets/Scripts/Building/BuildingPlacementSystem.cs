@@ -4,6 +4,9 @@ using BattleOfAges.Resources;
 using BattleOfAges.RTS;
 using BattleOfAges.CameraSystem;
 using BattleOfAges.InputSystem;
+using BattleOfAges.Crafting;
+using BattleOfAges.UI;
+using BattleOfAges.World;
 
 namespace BattleOfAges.Building
 {
@@ -101,7 +104,7 @@ namespace BattleOfAges.Building
             }
             if (!IsAllowed(type, out string why))
             {
-                BattleOfAges.UI.StrategyHud.Notify(why);
+                StrategyHud.Notify(why);
                 return;
             }
 
@@ -114,7 +117,6 @@ namespace BattleOfAges.Building
                 ghostPreview.SetActive(true);
             }
 
-            Debug.Log($"[Building] Placement mode started for: {def.DisplayName}");
         }
 
         public void CancelPlacement()
@@ -206,8 +208,8 @@ namespace BattleOfAges.Building
         {
             if (col == null) return false;
             if (col is TerrainCollider) return true;
-            if (col.GetComponent<BattleOfAges.World.ProceduralBiomeChunk>() != null || 
-                col.GetComponentInParent<BattleOfAges.World.ProceduralBiomeChunk>() != null)
+            if (col.GetComponent<ProceduralBiomeChunk>() != null || 
+                col.GetComponentInParent<ProceduralBiomeChunk>() != null)
             {
                 return true;
             }
@@ -229,7 +231,7 @@ namespace BattleOfAges.Building
 
             if (!IsAllowed(currentBuildingType, out string notAllowed))
             {
-                BattleOfAges.UI.StrategyHud.Notify(notAllowed);
+                StrategyHud.Notify(notAllowed);
                 CancelPlacement();
                 return;
             }
@@ -306,7 +308,7 @@ namespace BattleOfAges.Building
                 case BuildingType.WorkerHouse: return BuildingNode.CreateWorkerHousePrefab("WorkerHouse");
                 case BuildingType.StorageChest: return StorageChestNode.CreateStorageChestPrefab("StorageChest");
                 case BuildingType.Mine: return MineNode.CreateMinePrefab("Mine");
-                case BuildingType.Workbench: return BattleOfAges.Crafting.WorkbenchNode.CreateWorkbenchPrefab("Workbench");
+                case BuildingType.Workbench: return WorkbenchNode.CreateWorkbenchPrefab("Workbench");
                 case BuildingType.CastleWall: return BuildingNode.CreateCastleWallPrefab("CastleWall");
                 case BuildingType.TownHall: return TownHall.CreatePrefab("TownHall");
                 default: return null;
