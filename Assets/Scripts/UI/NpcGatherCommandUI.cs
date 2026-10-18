@@ -245,12 +245,8 @@ namespace BattleOfAges.UI
             Font font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
 
             // Main Panel Window
-            commandPanelObj = new GameObject("NpcCommandPanel", typeof(RectTransform));
-            commandPanelObj.transform.SetParent(transform, false);
-
-            RectTransform panelRect = commandPanelObj.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
-            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            RectTransform panelRect = UiTheme.Child(transform, "NpcCommandPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            commandPanelObj = panelRect.gameObject;
             panelRect.pivot = new Vector2(0.5f, 0.5f);
             panelRect.sizeDelta = new Vector2(760f, 620f);
 
@@ -258,11 +254,8 @@ namespace BattleOfAges.UI
             panelBg.color = new Color(0.05f, 0.08f, 0.15f, 0.97f);
 
             // Header Bar
-            GameObject headerObj = new GameObject("Header", typeof(RectTransform));
-            headerObj.transform.SetParent(commandPanelObj.transform, false);
-            RectTransform headerRect = headerObj.GetComponent<RectTransform>();
-            headerRect.anchorMin = new Vector2(0f, 1f);
-            headerRect.anchorMax = new Vector2(1f, 1f);
+            RectTransform headerRect = UiTheme.Child(commandPanelObj.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f));
+            GameObject headerObj = headerRect.gameObject;
             headerRect.pivot = new Vector2(0.5f, 1f);
             headerRect.anchoredPosition = Vector2.zero;
             headerRect.sizeDelta = new Vector2(0f, 60f);
@@ -270,13 +263,8 @@ namespace BattleOfAges.UI
             Image headerBg = headerObj.AddComponent<Image>();
             headerBg.color = new Color(0.10f, 0.16f, 0.28f, 0.98f);
 
-            GameObject titleObj = new GameObject("TitleText", typeof(RectTransform));
-            titleObj.transform.SetParent(headerObj.transform, false);
-            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-            titleRect.anchorMin = Vector2.zero;
-            titleRect.anchorMax = Vector2.one;
-            titleRect.offsetMin = new Vector2(50f, 0f);
-            titleRect.offsetMax = new Vector2(-50f, 0f);
+            RectTransform titleRect = UiTheme.Child(headerObj.transform, "TitleText", Vector2.zero, Vector2.one, new Vector2(50f, 0f), new Vector2(-50f, 0f));
+            GameObject titleObj = titleRect.gameObject;
 
             titleTxt = titleObj.AddComponent<Text>();
             titleTxt.font = font;
@@ -288,11 +276,8 @@ namespace BattleOfAges.UI
             UpdateHeaderText();
 
             // Header Close Button [ X ]
-            GameObject closeBtnObj = new GameObject("CloseBtn", typeof(RectTransform));
-            closeBtnObj.transform.SetParent(headerObj.transform, false);
-            RectTransform closeRect = closeBtnObj.GetComponent<RectTransform>();
-            closeRect.anchorMin = new Vector2(1f, 0.5f);
-            closeRect.anchorMax = new Vector2(1f, 0.5f);
+            RectTransform closeRect = UiTheme.Child(headerObj.transform, "CloseBtn", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
+            GameObject closeBtnObj = closeRect.gameObject;
             closeRect.pivot = new Vector2(1f, 0.5f);
             closeRect.anchoredPosition = new Vector2(-12f, 0f);
             closeRect.sizeDelta = new Vector2(40f, 40f);
@@ -302,28 +287,13 @@ namespace BattleOfAges.UI
             Button closeBtn = closeBtnObj.AddComponent<Button>();
             closeBtn.onClick.AddListener(CloseMenu);
 
-            GameObject closeTxtObj = new GameObject("Text", typeof(RectTransform));
-            closeTxtObj.transform.SetParent(closeBtnObj.transform, false);
-            RectTransform closeTxtRect = closeTxtObj.GetComponent<RectTransform>();
-            closeTxtRect.anchorMin = Vector2.zero;
-            closeTxtRect.anchorMax = Vector2.one;
-            Text closeTxt = closeTxtObj.AddComponent<Text>();
-            closeTxt.font = font;
-            closeTxt.fontSize = 20;
-            closeTxt.fontStyle = FontStyle.Bold;
-            closeTxt.alignment = TextAnchor.MiddleCenter;
-            closeTxt.color = Color.white;
-            closeTxt.text = "✖";
-            closeTxt.raycastTarget = false;
+            RectTransform closeTxtRect = UiTheme.Child(closeBtnObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject closeTxtObj = closeTxtRect.gameObject;
+            Text closeTxt = UiTheme.PlainText(closeTxtObj, font, 20, TextAnchor.MiddleCenter, Color.white, "✖", style: FontStyle.Bold, raycast: false);
 
             // Status Subheader Text
-            GameObject statusObj = new GameObject("StatusText", typeof(RectTransform));
-            statusObj.transform.SetParent(commandPanelObj.transform, false);
-            RectTransform statusRect = statusObj.GetComponent<RectTransform>();
-            statusRect.anchorMin = new Vector2(0f, 0.81f);
-            statusRect.anchorMax = new Vector2(1f, 0.89f);
-            statusRect.offsetMin = new Vector2(25f, 0f);
-            statusRect.offsetMax = new Vector2(-25f, 0f);
+            RectTransform statusRect = UiTheme.Child(commandPanelObj.transform, "StatusText", new Vector2(0f, 0.81f), new Vector2(1f, 0.89f), new Vector2(25f, 0f), new Vector2(-25f, 0f));
+            GameObject statusObj = statusRect.gameObject;
 
             statusText = statusObj.AddComponent<Text>();
             statusText.font = font;
@@ -335,13 +305,8 @@ namespace BattleOfAges.UI
             statusText.raycastTarget = false;
 
             // Rows Container with VerticalLayoutGroup
-            GameObject rowsContainer = new GameObject("RowsContainer", typeof(RectTransform));
-            rowsContainer.transform.SetParent(commandPanelObj.transform, false);
-            RectTransform containerRect = rowsContainer.GetComponent<RectTransform>();
-            containerRect.anchorMin = new Vector2(0.03f, 0.22f);
-            containerRect.anchorMax = new Vector2(0.97f, 0.79f);
-            containerRect.offsetMin = Vector2.zero;
-            containerRect.offsetMax = Vector2.zero;
+            RectTransform containerRect = UiTheme.Child(commandPanelObj.transform, "RowsContainer", new Vector2(0.03f, 0.22f), new Vector2(0.97f, 0.79f), Vector2.zero, Vector2.zero);
+            GameObject rowsContainer = containerRect.gameObject;
 
             VerticalLayoutGroup layout = rowsContainer.AddComponent<VerticalLayoutGroup>();
             layout.spacing = 10f;
@@ -358,13 +323,8 @@ namespace BattleOfAges.UI
             autoText = CreateJobCounterRow(rowsContainer.transform, font, "🔄 Автономні (Шукають найближчі)", GatherDirective.Auto);
 
             // Bottom Action Buttons Bar
-            GameObject bottomBar = new GameObject("BottomBar", typeof(RectTransform));
-            bottomBar.transform.SetParent(commandPanelObj.transform, false);
-            RectTransform barRect = bottomBar.GetComponent<RectTransform>();
-            barRect.anchorMin = new Vector2(0.03f, 0.04f);
-            barRect.anchorMax = new Vector2(0.97f, 0.18f);
-            barRect.offsetMin = Vector2.zero;
-            barRect.offsetMax = Vector2.zero;
+            RectTransform barRect = UiTheme.Child(commandPanelObj.transform, "BottomBar", new Vector2(0.03f, 0.04f), new Vector2(0.97f, 0.18f), Vector2.zero, Vector2.zero);
+            GameObject bottomBar = barRect.gameObject;
 
             HorizontalLayoutGroup barLayout = bottomBar.AddComponent<HorizontalLayoutGroup>();
             barLayout.spacing = 10f;
@@ -405,105 +365,48 @@ namespace BattleOfAges.UI
             rowBg.color = new Color(0.10f, 0.16f, 0.26f, 0.95f);
 
             // Job Title Label
-            GameObject labelObj = new GameObject("Label", typeof(RectTransform));
-            labelObj.transform.SetParent(rowObj.transform, false);
-            RectTransform labelRect = labelObj.GetComponent<RectTransform>();
-            labelRect.anchorMin = new Vector2(0.02f, 0f);
-            labelRect.anchorMax = new Vector2(0.60f, 1f);
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
+            RectTransform labelRect = UiTheme.Child(rowObj.transform, "Label", new Vector2(0.02f, 0f), new Vector2(0.60f, 1f), Vector2.zero, Vector2.zero);
+            GameObject labelObj = labelRect.gameObject;
 
-            Text labelTxt = labelObj.AddComponent<Text>();
-            labelTxt.font = font;
-            labelTxt.fontSize = 16;
-            labelTxt.fontStyle = FontStyle.Bold;
-            labelTxt.alignment = TextAnchor.MiddleLeft;
-            labelTxt.color = Color.white;
-            labelTxt.text = label;
-            labelTxt.raycastTarget = false;
+            Text labelTxt = UiTheme.PlainText(labelObj, font, 16, TextAnchor.MiddleLeft, Color.white, label, style: FontStyle.Bold, raycast: false);
 
             // Minus Button [-]
-            GameObject minusBtnObj = new GameObject("MinusBtn", typeof(RectTransform));
-            minusBtnObj.transform.SetParent(rowObj.transform, false);
-            RectTransform minusRect = minusBtnObj.GetComponent<RectTransform>();
-            minusRect.anchorMin = new Vector2(0.62f, 0.12f);
-            minusRect.anchorMax = new Vector2(0.72f, 0.88f);
-            minusRect.offsetMin = Vector2.zero;
-            minusRect.offsetMax = Vector2.zero;
+            RectTransform minusRect = UiTheme.Child(rowObj.transform, "MinusBtn", new Vector2(0.62f, 0.12f), new Vector2(0.72f, 0.88f), Vector2.zero, Vector2.zero);
+            GameObject minusBtnObj = minusRect.gameObject;
 
             Image minusBg = minusBtnObj.AddComponent<Image>();
             minusBg.color = new Color(0.45f, 0.15f, 0.15f, 0.95f);
             Button minusBtn = minusBtnObj.AddComponent<Button>();
             minusBtn.onClick.AddListener(() => ChangeJobCount(directive, -1));
 
-            GameObject minusTxtObj = new GameObject("Text", typeof(RectTransform));
-            minusTxtObj.transform.SetParent(minusBtnObj.transform, false);
-            RectTransform minusTxtRect = minusTxtObj.GetComponent<RectTransform>();
-            minusTxtRect.anchorMin = Vector2.zero;
-            minusTxtRect.anchorMax = Vector2.one;
-            Text minusTxt = minusTxtObj.AddComponent<Text>();
-            minusTxt.font = font;
-            minusTxt.fontSize = 22;
-            minusTxt.fontStyle = FontStyle.Bold;
-            minusTxt.alignment = TextAnchor.MiddleCenter;
-            minusTxt.color = Color.white;
-            minusTxt.text = "-";
-            minusTxt.raycastTarget = false;
+            RectTransform minusTxtRect = UiTheme.Child(minusBtnObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject minusTxtObj = minusTxtRect.gameObject;
+            Text minusTxt = UiTheme.PlainText(minusTxtObj, font, 22, TextAnchor.MiddleCenter, Color.white, "-", style: FontStyle.Bold, raycast: false);
 
             // Counter Display [ 0 ]
-            GameObject countObj = new GameObject("CountBox", typeof(RectTransform));
-            countObj.transform.SetParent(rowObj.transform, false);
-            RectTransform countRect = countObj.GetComponent<RectTransform>();
-            countRect.anchorMin = new Vector2(0.73f, 0.12f);
-            countRect.anchorMax = new Vector2(0.86f, 0.88f);
-            countRect.offsetMin = Vector2.zero;
-            countRect.offsetMax = Vector2.zero;
+            RectTransform countRect = UiTheme.Child(rowObj.transform, "CountBox", new Vector2(0.73f, 0.12f), new Vector2(0.86f, 0.88f), Vector2.zero, Vector2.zero);
+            GameObject countObj = countRect.gameObject;
 
             Image countBg = countObj.AddComponent<Image>();
             countBg.color = new Color(0.04f, 0.08f, 0.14f, 0.95f);
 
-            GameObject countTxtObj = new GameObject("Text", typeof(RectTransform));
-            countTxtObj.transform.SetParent(countObj.transform, false);
-            RectTransform countTxtRect = countTxtObj.GetComponent<RectTransform>();
-            countTxtRect.anchorMin = Vector2.zero;
-            countTxtRect.anchorMax = Vector2.one;
+            RectTransform countTxtRect = UiTheme.Child(countObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject countTxtObj = countTxtRect.gameObject;
 
-            Text countTxt = countTxtObj.AddComponent<Text>();
-            countTxt.font = font;
-            countTxt.fontSize = 20;
-            countTxt.fontStyle = FontStyle.Bold;
-            countTxt.alignment = TextAnchor.MiddleCenter;
-            countTxt.color = new Color(0.3f, 0.95f, 1.0f);
-            countTxt.text = "0";
-            countTxt.raycastTarget = false;
+            Text countTxt = UiTheme.PlainText(countTxtObj, font, 20, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), "0", style: FontStyle.Bold, raycast: false);
 
             // Plus Button [+]
-            GameObject plusBtnObj = new GameObject("PlusBtn", typeof(RectTransform));
-            plusBtnObj.transform.SetParent(rowObj.transform, false);
-            RectTransform plusRect = plusBtnObj.GetComponent<RectTransform>();
-            plusRect.anchorMin = new Vector2(0.87f, 0.12f);
-            plusRect.anchorMax = new Vector2(0.97f, 0.88f);
-            plusRect.offsetMin = Vector2.zero;
-            plusRect.offsetMax = Vector2.zero;
+            RectTransform plusRect = UiTheme.Child(rowObj.transform, "PlusBtn", new Vector2(0.87f, 0.12f), new Vector2(0.97f, 0.88f), Vector2.zero, Vector2.zero);
+            GameObject plusBtnObj = plusRect.gameObject;
 
             Image plusBg = plusBtnObj.AddComponent<Image>();
             plusBg.color = new Color(0.15f, 0.45f, 0.20f, 0.95f);
             Button plusBtn = plusBtnObj.AddComponent<Button>();
             plusBtn.onClick.AddListener(() => ChangeJobCount(directive, 1));
 
-            GameObject plusTxtObj = new GameObject("Text", typeof(RectTransform));
-            plusTxtObj.transform.SetParent(plusBtnObj.transform, false);
-            RectTransform plusTxtRect = plusTxtObj.GetComponent<RectTransform>();
-            plusTxtRect.anchorMin = Vector2.zero;
-            plusTxtRect.anchorMax = Vector2.one;
-            Text plusTxt = plusTxtObj.AddComponent<Text>();
-            plusTxt.font = font;
-            plusTxt.fontSize = 22;
-            plusTxt.fontStyle = FontStyle.Bold;
-            plusTxt.alignment = TextAnchor.MiddleCenter;
-            plusTxt.color = Color.white;
-            plusTxt.text = "+";
-            plusTxt.raycastTarget = false;
+            RectTransform plusTxtRect = UiTheme.Child(plusBtnObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject plusTxtObj = plusTxtRect.gameObject;
+            Text plusTxt = UiTheme.PlainText(plusTxtObj, font, 22, TextAnchor.MiddleCenter, Color.white, "+", style: FontStyle.Bold, raycast: false);
 
             return countTxt;
         }
@@ -524,20 +427,10 @@ namespace BattleOfAges.UI
             btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
-            GameObject txtObj = new GameObject("Text", typeof(RectTransform));
-            txtObj.transform.SetParent(btnObj.transform, false);
-            RectTransform txtRect = txtObj.GetComponent<RectTransform>();
-            txtRect.anchorMin = Vector2.zero;
-            txtRect.anchorMax = Vector2.one;
+            RectTransform txtRect = UiTheme.Child(btnObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject txtObj = txtRect.gameObject;
 
-            Text txt = txtObj.AddComponent<Text>();
-            txt.font = font;
-            txt.fontSize = 15;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.color = Color.white;
-            txt.text = label;
-            txt.raycastTarget = false;
+            Text txt = UiTheme.PlainText(txtObj, font, 15, TextAnchor.MiddleCenter, Color.white, label, style: FontStyle.Bold, raycast: false);
         }
     }
 }

@@ -209,63 +209,30 @@ namespace BattleOfAges.UI
                 Image bg = slotObj.AddComponent<Image>();
                 bg.color = new Color(0.09f, 0.13f, 0.20f, 0.94f);
 
-                GameObject badgeObj = new GameObject("Badge", typeof(RectTransform));
-                badgeObj.transform.SetParent(slotObj.transform, false);
-                RectTransform badgeRect = badgeObj.GetComponent<RectTransform>();
-                badgeRect.anchorMin = new Vector2(0f, 0f);
-                badgeRect.anchorMax = new Vector2(0f, 1f);
-                badgeRect.offsetMin = new Vector2(10f, 8f);
-                badgeRect.offsetMax = new Vector2(100f, -8f);
+                RectTransform badgeRect = UiTheme.Child(slotObj.transform, "Badge", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(10f, 8f), new Vector2(100f, -8f));
+                GameObject badgeObj = badgeRect.gameObject;
 
                 Image badgeBg = badgeObj.AddComponent<Image>();
                 Color tierCol = OreTierHelper.GetTierColor(tierLevel);
                 badgeBg.color = new Color(tierCol.r * 0.35f, tierCol.g * 0.35f, tierCol.b * 0.35f, 0.95f);
 
-                GameObject badgeTxtObj = new GameObject("BadgeText", typeof(RectTransform));
-                badgeTxtObj.transform.SetParent(badgeObj.transform, false);
-                RectTransform bTxtRect = badgeTxtObj.GetComponent<RectTransform>();
-                bTxtRect.anchorMin = Vector2.zero;
-                bTxtRect.anchorMax = Vector2.one;
+                RectTransform bTxtRect = UiTheme.Child(badgeObj.transform, "BadgeText", Vector2.zero, Vector2.one);
+                GameObject badgeTxtObj = bTxtRect.gameObject;
 
-                Text bTxt = badgeTxtObj.AddComponent<Text>();
-                bTxt.font = font;
-                bTxt.fontSize = 17;
-                bTxt.fontStyle = FontStyle.Bold;
-                bTxt.alignment = TextAnchor.MiddleCenter;
-                bTxt.color = tierCol;
-                bTxt.text = $"Рів. {tierLevel}";
+                Text bTxt = UiTheme.PlainText(badgeTxtObj, font, 17, TextAnchor.MiddleCenter, tierCol, $"Рів. {tierLevel}", style: FontStyle.Bold);
 
-                GameObject nameObj = new GameObject("NameText", typeof(RectTransform));
-                nameObj.transform.SetParent(slotObj.transform, false);
-                RectTransform nameRect = nameObj.GetComponent<RectTransform>();
-                nameRect.anchorMin = Vector2.zero;
-                nameRect.anchorMax = Vector2.one;
-                nameRect.offsetMin = new Vector2(115f, 0f);
-                nameRect.offsetMax = new Vector2(-120f, 0f);
+                RectTransform nameRect = UiTheme.Child(slotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
+                GameObject nameObj = nameRect.gameObject;
 
-                Text nameTxt = nameObj.AddComponent<Text>();
-                nameTxt.font = font;
-                nameTxt.fontSize = 20;
-                nameTxt.fontStyle = FontStyle.Bold;
-                nameTxt.alignment = TextAnchor.MiddleLeft;
-                nameTxt.color = Color.white;
-                nameTxt.text = OreTierHelper.GetTierName(tierLevel);
+                Text nameTxt = UiTheme.PlainText(nameObj, font, 20, TextAnchor.MiddleLeft, Color.white, OreTierHelper.GetTierName(tierLevel), style: FontStyle.Bold);
 
-                GameObject qtyObj = new GameObject("QtyText", typeof(RectTransform));
-                qtyObj.transform.SetParent(slotObj.transform, false);
-                RectTransform qtyRect = qtyObj.GetComponent<RectTransform>();
-                qtyRect.anchorMin = new Vector2(1f, 0f);
-                qtyRect.anchorMax = new Vector2(1f, 1f);
+                RectTransform qtyRect = UiTheme.Child(slotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
+                GameObject qtyObj = qtyRect.gameObject;
                 qtyRect.pivot = new Vector2(1f, 0.5f);
                 qtyRect.offsetMin = new Vector2(-110f, 0f);
                 qtyRect.offsetMax = new Vector2(-15f, 0f);
 
-                Text qtyTxt = qtyObj.AddComponent<Text>();
-                qtyTxt.font = font;
-                qtyTxt.fontSize = 22;
-                qtyTxt.fontStyle = FontStyle.Bold;
-                qtyTxt.alignment = TextAnchor.MiddleRight;
-                qtyTxt.color = new Color(0.3f, 0.95f, 0.95f);
+                Text qtyTxt = UiTheme.PlainText(qtyObj, font, 22, TextAnchor.MiddleRight, new Color(0.3f, 0.95f, 0.95f), style: FontStyle.Bold);
 
                 oreSlotObjMap[tierLevel] = slotObj;
                 oreQuantityTextMap[tierLevel] = qtyTxt;
@@ -301,36 +268,24 @@ namespace BattleOfAges.UI
 
             Font defaultFont = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-            inventoryPanelObj = new GameObject("InventoryPanel", typeof(RectTransform));
-            inventoryPanelObj.transform.SetParent(transform, false);
-
-            RectTransform panelRect = inventoryPanelObj.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 0.5f);
-            panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            RectTransform panelRect = UiTheme.Child(transform, "InventoryPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            inventoryPanelObj = panelRect.gameObject;
             panelRect.pivot = new Vector2(0.5f, 0.5f);
             panelRect.sizeDelta = new Vector2(840f, 680f);
 
             Image panelBg = inventoryPanelObj.AddComponent<Image>();
             panelBg.color = new Color(0.04f, 0.07f, 0.12f, 0.97f);
 
-            GameObject headerObj = new GameObject("HeaderBar", typeof(RectTransform));
-            headerObj.transform.SetParent(inventoryPanelObj.transform, false);
-            RectTransform headerRect = headerObj.GetComponent<RectTransform>();
-            headerRect.anchorMin = new Vector2(0f, 1f);
-            headerRect.anchorMax = new Vector2(1f, 1f);
+            RectTransform headerRect = UiTheme.Child(inventoryPanelObj.transform, "HeaderBar", new Vector2(0f, 1f), new Vector2(1f, 1f));
+            GameObject headerObj = headerRect.gameObject;
             headerRect.pivot = new Vector2(0.5f, 1f);
             headerRect.sizeDelta = new Vector2(0, 70f);
 
             Image headerBg = headerObj.AddComponent<Image>();
             headerBg.color = new Color(0.08f, 0.13f, 0.22f, 0.98f);
 
-            GameObject titleObj = new GameObject("TitleText", typeof(RectTransform));
-            titleObj.transform.SetParent(headerObj.transform, false);
-            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-            titleRect.anchorMin = Vector2.zero;
-            titleRect.anchorMax = Vector2.one;
-            titleRect.offsetMin = new Vector2(25f, 0);
-            titleRect.offsetMax = new Vector2(-25f, 0);
+            RectTransform titleRect = UiTheme.Child(headerObj.transform, "TitleText", Vector2.zero, Vector2.one, new Vector2(25f, 0), new Vector2(-25f, 0));
+            GameObject titleObj = titleRect.gameObject;
 
             titleText = titleObj.AddComponent<Text>();
             titleText.font = defaultFont;
@@ -340,23 +295,15 @@ namespace BattleOfAges.UI
             titleText.color = new Color(0.3f, 0.9f, 1.0f);
             UpdateHeaderText();
 
-            GameObject scrollObj = new GameObject("ScrollView", typeof(RectTransform));
-            scrollObj.transform.SetParent(inventoryPanelObj.transform, false);
-            RectTransform scrollRect = scrollObj.GetComponent<RectTransform>();
-            scrollRect.anchorMin = Vector2.zero;
-            scrollRect.anchorMax = Vector2.one;
-            scrollRect.offsetMin = new Vector2(20f, 20f);
-            scrollRect.offsetMax = new Vector2(-20f, -85f);
+            RectTransform scrollRect = UiTheme.Child(inventoryPanelObj.transform, "ScrollView", Vector2.zero, Vector2.one, new Vector2(20f, 20f), new Vector2(-20f, -85f));
+            GameObject scrollObj = scrollRect.gameObject;
 
             ScrollRect scroll = scrollObj.AddComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.vertical = true;
 
-            GameObject viewportObj = new GameObject("Viewport", typeof(RectTransform));
-            viewportObj.transform.SetParent(scrollObj.transform, false);
-            RectTransform viewportRect = viewportObj.GetComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
+            RectTransform viewportRect = UiTheme.Child(scrollObj.transform, "Viewport", Vector2.zero, Vector2.one);
+            GameObject viewportObj = viewportRect.gameObject;
 
             Image viewportMask = viewportObj.AddComponent<Image>();
             viewportMask.color = Color.white;
@@ -394,52 +341,24 @@ namespace BattleOfAges.UI
             Image woodBg = woodSlotObj.AddComponent<Image>();
             woodBg.color = new Color(0.16f, 0.12f, 0.06f, 0.95f);
 
-            GameObject woodBadge = new GameObject("Badge", typeof(RectTransform));
-            woodBadge.transform.SetParent(woodSlotObj.transform, false);
-            RectTransform wBadgeRect = woodBadge.GetComponent<RectTransform>();
-            wBadgeRect.anchorMin = new Vector2(0f, 0f);
-            wBadgeRect.anchorMax = new Vector2(0f, 1f);
-            wBadgeRect.offsetMin = new Vector2(10f, 8f);
-            wBadgeRect.offsetMax = new Vector2(100f, -8f);
+            RectTransform wBadgeRect = UiTheme.Child(woodSlotObj.transform, "Badge", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(10f, 8f), new Vector2(100f, -8f));
+            GameObject woodBadge = wBadgeRect.gameObject;
 
             Image wBadgeBg = woodBadge.AddComponent<Image>();
             wBadgeBg.color = new Color(0.55f, 0.40f, 0.15f, 0.95f);
 
-            GameObject wBadgeTxtObj = new GameObject("BadgeText", typeof(RectTransform));
-            wBadgeTxtObj.transform.SetParent(woodBadge.transform, false);
-            RectTransform wBTxtRect = wBadgeTxtObj.GetComponent<RectTransform>();
-            wBTxtRect.anchorMin = Vector2.zero;
-            wBTxtRect.anchorMax = Vector2.one;
+            RectTransform wBTxtRect = UiTheme.Child(woodBadge.transform, "BadgeText", Vector2.zero, Vector2.one);
+            GameObject wBadgeTxtObj = wBTxtRect.gameObject;
 
-            Text wBTxt = wBadgeTxtObj.AddComponent<Text>();
-            wBTxt.font = defaultFont;
-            wBTxt.fontSize = 17;
-            wBTxt.fontStyle = FontStyle.Bold;
-            wBTxt.alignment = TextAnchor.MiddleCenter;
-            wBTxt.color = new Color(1.0f, 0.92f, 0.55f);
-            wBTxt.text = "Дерево";
+            Text wBTxt = UiTheme.PlainText(wBadgeTxtObj, defaultFont, 17, TextAnchor.MiddleCenter, new Color(1.0f, 0.92f, 0.55f), "Дерево", style: FontStyle.Bold);
 
-            GameObject wNameObj = new GameObject("NameText", typeof(RectTransform));
-            wNameObj.transform.SetParent(woodSlotObj.transform, false);
-            RectTransform wNameRect = wNameObj.GetComponent<RectTransform>();
-            wNameRect.anchorMin = Vector2.zero;
-            wNameRect.anchorMax = Vector2.one;
-            wNameRect.offsetMin = new Vector2(115f, 0f);
-            wNameRect.offsetMax = new Vector2(-120f, 0f);
+            RectTransform wNameRect = UiTheme.Child(woodSlotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
+            GameObject wNameObj = wNameRect.gameObject;
 
-            Text woodNameText = wNameObj.AddComponent<Text>();
-            woodNameText.font = defaultFont;
-            woodNameText.fontSize = 20;
-            woodNameText.fontStyle = FontStyle.Bold;
-            woodNameText.alignment = TextAnchor.MiddleLeft;
-            woodNameText.color = new Color(0.98f, 0.88f, 0.45f);
-            woodNameText.text = "Колоди";
+            Text woodNameText = UiTheme.PlainText(wNameObj, defaultFont, 20, TextAnchor.MiddleLeft, new Color(0.98f, 0.88f, 0.45f), "Колоди", style: FontStyle.Bold);
 
-            GameObject wQtyObj = new GameObject("QtyText", typeof(RectTransform));
-            wQtyObj.transform.SetParent(woodSlotObj.transform, false);
-            RectTransform wQtyRect = wQtyObj.GetComponent<RectTransform>();
-            wQtyRect.anchorMin = new Vector2(1f, 0f);
-            wQtyRect.anchorMax = new Vector2(1f, 1f);
+            RectTransform wQtyRect = UiTheme.Child(woodSlotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
+            GameObject wQtyObj = wQtyRect.gameObject;
             wQtyRect.pivot = new Vector2(1f, 0.5f);
             wQtyRect.offsetMin = new Vector2(-110f, 0f);
             wQtyRect.offsetMax = new Vector2(-15f, 0f);
@@ -457,12 +376,7 @@ namespace BattleOfAges.UI
             RectTransform emptyRect = emptyPlaceholderObj.GetComponent<RectTransform>();
             emptyRect.sizeDelta = new Vector2(740f, 120f);
 
-            Text emptyTxt = emptyPlaceholderObj.AddComponent<Text>();
-            emptyTxt.font = defaultFont;
-            emptyTxt.fontSize = 22;
-            emptyTxt.alignment = TextAnchor.MiddleCenter;
-            emptyTxt.color = new Color(0.6f, 0.68f, 0.78f);
-            emptyTxt.text = "Inventory is empty!\nHarvest trees or pick up pebbles in the steppe.";
+            Text emptyTxt = UiTheme.PlainText(emptyPlaceholderObj, defaultFont, 22, TextAnchor.MiddleCenter, new Color(0.6f, 0.68f, 0.78f), "Inventory is empty!\nHarvest trees or pick up pebbles in the steppe.");
 
             if (inventoryPanelObj != null) inventoryPanelObj.SetActive(false);
         }

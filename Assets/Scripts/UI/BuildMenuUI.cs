@@ -152,12 +152,8 @@ namespace BattleOfAges.UI
             Font defaultFont = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
                 ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-            menuPanelObj = new GameObject("BuildMenuPanel", typeof(RectTransform));
-            menuPanelObj.transform.SetParent(transform, false);
-
-            RectTransform panelRect = menuPanelObj.GetComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.5f, 0f);
-            panelRect.anchorMax = new Vector2(0.5f, 0f);
+            RectTransform panelRect = UiTheme.Child(transform, "BuildMenuPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
+            menuPanelObj = panelRect.gameObject;
             panelRect.pivot = new Vector2(0.5f, 0f);
             panelRect.anchoredPosition = new Vector2(0f, 160f); // above the unit command panel
             panelRect.sizeDelta = new Vector2(580f, 590f); // six buildings
@@ -165,23 +161,16 @@ namespace BattleOfAges.UI
             Image panelBg = menuPanelObj.AddComponent<Image>();
             panelBg.color = new Color(0.04f, 0.07f, 0.14f, 0.96f);
 
-            GameObject headerObj = new GameObject("Header", typeof(RectTransform));
-            headerObj.transform.SetParent(menuPanelObj.transform, false);
-            RectTransform headerRect = headerObj.GetComponent<RectTransform>();
-            headerRect.anchorMin = new Vector2(0f, 1f);
-            headerRect.anchorMax = new Vector2(1f, 1f);
+            RectTransform headerRect = UiTheme.Child(menuPanelObj.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f));
+            GameObject headerObj = headerRect.gameObject;
             headerRect.pivot = new Vector2(0.5f, 1f);
             headerRect.sizeDelta = new Vector2(0f, 50f);
 
             Image headerBg = headerObj.AddComponent<Image>();
             headerBg.color = new Color(0.08f, 0.14f, 0.25f, 0.98f);
 
-            GameObject titleObj = new GameObject("Title", typeof(RectTransform));
-            titleObj.transform.SetParent(headerObj.transform, false);
-            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
-            titleRect.anchorMin = Vector2.zero;
-            titleRect.anchorMax = Vector2.one;
-            titleRect.offsetMin = new Vector2(15f, 0f);
+            RectTransform titleRect = UiTheme.Child(headerObj.transform, "Title", Vector2.zero, Vector2.one, offsetMin: new Vector2(15f, 0f));
+            GameObject titleObj = titleRect.gameObject;
 
             titleText = titleObj.AddComponent<Text>();
             titleText.font = defaultFont;
@@ -191,11 +180,8 @@ namespace BattleOfAges.UI
             titleText.color = new Color(0.3f, 0.95f, 1.0f);
             UpdateHeaderText();
 
-            GameObject statusObj = new GameObject("StatusText", typeof(RectTransform));
-            statusObj.transform.SetParent(menuPanelObj.transform, false);
-            RectTransform statusRect = statusObj.GetComponent<RectTransform>();
-            statusRect.anchorMin = new Vector2(0f, 0f);
-            statusRect.anchorMax = new Vector2(1f, 0f);
+            RectTransform statusRect = UiTheme.Child(menuPanelObj.transform, "StatusText", new Vector2(0f, 0f), new Vector2(1f, 0f));
+            GameObject statusObj = statusRect.gameObject;
             statusRect.pivot = new Vector2(0.5f, 0f);
             statusRect.sizeDelta = new Vector2(0f, 35f);
             statusRect.anchoredPosition = new Vector2(0f, 5f);
@@ -207,13 +193,8 @@ namespace BattleOfAges.UI
             statusText.color = new Color(0.7f, 0.8f, 0.9f);
             statusText.text = "Оберіть споруду для будівництва";
 
-            GameObject btnContainer = new GameObject("ButtonsContainer", typeof(RectTransform));
-            btnContainer.transform.SetParent(menuPanelObj.transform, false);
-            RectTransform containerRect = btnContainer.GetComponent<RectTransform>();
-            containerRect.anchorMin = new Vector2(0f, 0f);
-            containerRect.anchorMax = new Vector2(1f, 1f);
-            containerRect.offsetMin = new Vector2(15f, 45f);
-            containerRect.offsetMax = new Vector2(-15f, -55f);
+            RectTransform containerRect = UiTheme.Child(menuPanelObj.transform, "ButtonsContainer", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(15f, 45f), new Vector2(-15f, -55f));
+            GameObject btnContainer = containerRect.gameObject;
 
             VerticalLayoutGroup layout = btnContainer.AddComponent<VerticalLayoutGroup>();
             layout.spacing = 8f;
@@ -263,28 +244,16 @@ namespace BattleOfAges.UI
             BuildingType capturedType = def.Type;
             btn.onClick.AddListener(() => OnBuildButtonClicked(capturedType));
 
-            GameObject iconObj = new GameObject("Icon", typeof(RectTransform));
-            iconObj.transform.SetParent(btnObj.transform, false);
-            RectTransform iconRect = iconObj.GetComponent<RectTransform>();
-            iconRect.anchorMin = new Vector2(0f, 0f);
-            iconRect.anchorMax = new Vector2(0f, 1f);
-            iconRect.offsetMin = new Vector2(8f, 8f);
-            iconRect.offsetMax = new Vector2(62f, -8f);
+            RectTransform iconRect = UiTheme.Child(btnObj.transform, "Icon", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(8f, 8f), new Vector2(62f, -8f));
+            GameObject iconObj = iconRect.gameObject;
 
             Image iconBg = iconObj.AddComponent<Image>();
             iconBg.color = new Color(0.6f, 0.15f, 0.10f, 0.9f);
 
-            GameObject iconTxt = new GameObject("IconText", typeof(RectTransform));
-            iconTxt.transform.SetParent(iconObj.transform, false);
-            RectTransform iconTxtRect = iconTxt.GetComponent<RectTransform>();
-            iconTxtRect.anchorMin = Vector2.zero;
-            iconTxtRect.anchorMax = Vector2.one;
+            RectTransform iconTxtRect = UiTheme.Child(iconObj.transform, "IconText", Vector2.zero, Vector2.one);
+            GameObject iconTxt = iconTxtRect.gameObject;
 
-            Text icoTxt = iconTxt.AddComponent<Text>();
-            icoTxt.font = font;
-            icoTxt.fontSize = 26;
-            icoTxt.alignment = TextAnchor.MiddleCenter;
-            icoTxt.color = Color.white;
+            Text icoTxt = UiTheme.PlainText(iconTxt, font, 26, TextAnchor.MiddleCenter, Color.white);
             icoTxt.text = ""; // the font has no emoji: a themed icon instead
             UiTheme.Icon icon = def.Type == BuildingType.Mine ? UiTheme.Icon.Ore
                               : def.Type == BuildingType.StorageChest ? UiTheme.Icon.Wood
@@ -293,35 +262,15 @@ namespace BattleOfAges.UI
                               : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
             UiTheme.IconImage(iconObj.transform, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
-            GameObject nameObj = new GameObject("NameText", typeof(RectTransform));
-            nameObj.transform.SetParent(btnObj.transform, false);
-            RectTransform nameRect = nameObj.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0f, 0.5f);
-            nameRect.anchorMax = new Vector2(1f, 1f);
-            nameRect.offsetMin = new Vector2(72f, 0f);
-            nameRect.offsetMax = new Vector2(-10f, -4f);
+            RectTransform nameRect = UiTheme.Child(btnObj.transform, "NameText", new Vector2(0f, 0.5f), new Vector2(1f, 1f), new Vector2(72f, 0f), new Vector2(-10f, -4f));
+            GameObject nameObj = nameRect.gameObject;
 
-            Text nameTxt = nameObj.AddComponent<Text>();
-            nameTxt.font = font;
-            nameTxt.fontSize = 19;
-            nameTxt.fontStyle = FontStyle.Bold;
-            nameTxt.alignment = TextAnchor.MiddleLeft;
-            nameTxt.color = Color.white;
-            nameTxt.text = def.DisplayName;
+            Text nameTxt = UiTheme.PlainText(nameObj, font, 19, TextAnchor.MiddleLeft, Color.white, def.DisplayName, style: FontStyle.Bold);
 
-            GameObject costObj = new GameObject("CostText", typeof(RectTransform));
-            costObj.transform.SetParent(btnObj.transform, false);
-            RectTransform costRect = costObj.GetComponent<RectTransform>();
-            costRect.anchorMin = new Vector2(0f, 0f);
-            costRect.anchorMax = new Vector2(1f, 0.5f);
-            costRect.offsetMin = new Vector2(72f, 4f);
-            costRect.offsetMax = new Vector2(-10f, 0f);
+            RectTransform costRect = UiTheme.Child(btnObj.transform, "CostText", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(72f, 4f), new Vector2(-10f, 0f));
+            GameObject costObj = costRect.gameObject;
 
-            Text costTxt = costObj.AddComponent<Text>();
-            costTxt.font = font;
-            costTxt.fontSize = 16;
-            costTxt.alignment = TextAnchor.MiddleLeft;
-            costTxt.color = new Color(0.85f, 0.80f, 0.55f);
+            Text costTxt = UiTheme.PlainText(costObj, font, 16, TextAnchor.MiddleLeft, new Color(0.85f, 0.80f, 0.55f));
 
             string shortTierName = def.OreTierRequired == 0 ? "Руда рів. 0" : $"Руда рів. {def.OreTierRequired}";
             costTxt.text = $"Ціна: 🪵 {def.WoodCost} Дерево  +  🪨 {def.OreCost} {shortTierName}  |  {def.Description}";

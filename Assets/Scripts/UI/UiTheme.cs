@@ -227,6 +227,33 @@ namespace BattleOfAges.UI
             return rt;
         }
 
+        /// <summary>Child RectTransform spanning anchorMin..anchorMax of the parent; offsets only when given.</summary>
+        public static RectTransform Child(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2? offsetMin = null, Vector2? offsetMax = null)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            if (offsetMin.HasValue) rt.offsetMin = offsetMin.Value;
+            if (offsetMax.HasValue) rt.offsetMax = offsetMax.Value;
+            return rt;
+        }
+
+        /// <summary>A plain Text on go (the older windows' style; UiRestyler themes it later).</summary>
+        public static Text PlainText(GameObject go, Font font, int size, TextAnchor align, Color color, string text = null, FontStyle style = FontStyle.Normal, bool raycast = true)
+        {
+            var t = go.AddComponent<Text>();
+            t.font = font;
+            t.fontSize = size;
+            t.fontStyle = style;
+            t.alignment = align;
+            t.color = color;
+            if (text != null) t.text = text;
+            t.raycastTarget = raycast;
+            return t;
+        }
+
         public static Image PanelImage(RectTransform rt, Sprite sprite = null, Color? tint = null)
         {
             var img = rt.gameObject.AddComponent<Image>();

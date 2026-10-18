@@ -293,12 +293,8 @@ namespace BattleOfAges.UI
             Font font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
                 ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-            keybindsContainerObj = new GameObject("KeybindsPanel", typeof(RectTransform));
-            keybindsContainerObj.transform.SetParent(settingsPanel.transform, false);
-
-            RectTransform containerRect = keybindsContainerObj.GetComponent<RectTransform>();
-            containerRect.anchorMin = new Vector2(0.5f, 0.5f);
-            containerRect.anchorMax = new Vector2(0.5f, 0.5f);
+            RectTransform containerRect = UiTheme.Child(settingsPanel.transform, "KeybindsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            keybindsContainerObj = containerRect.gameObject;
             containerRect.pivot = new Vector2(0.5f, 0.5f);
             containerRect.anchoredPosition = new Vector2(220f, 0f);
             containerRect.sizeDelta = new Vector2(400f, 480f);
@@ -307,11 +303,8 @@ namespace BattleOfAges.UI
             bg.color = new Color(0.06f, 0.10f, 0.18f, 0.95f);
 
             // Header Title
-            GameObject headerObj = new GameObject("Title", typeof(RectTransform));
-            headerObj.transform.SetParent(keybindsContainerObj.transform, false);
-            RectTransform headerRect = headerObj.GetComponent<RectTransform>();
-            headerRect.anchorMin = new Vector2(0f, 1f);
-            headerRect.anchorMax = new Vector2(1f, 1f);
+            RectTransform headerRect = UiTheme.Child(keybindsContainerObj.transform, "Title", new Vector2(0f, 1f), new Vector2(1f, 1f));
+            GameObject headerObj = headerRect.gameObject;
             headerRect.pivot = new Vector2(0.5f, 1f);
             headerRect.sizeDelta = new Vector2(0f, 45f);
 
@@ -324,32 +317,18 @@ namespace BattleOfAges.UI
             RectTransform headerTxtRect = headerTxtObj.GetComponent<RectTransform>();
             headerTxtRect.anchorMin = Vector2.zero; headerTxtRect.anchorMax = Vector2.one;
             headerTxtRect.offsetMin = headerTxtRect.offsetMax = Vector2.zero;
-            Text headerTxt = headerTxtObj.AddComponent<Text>();
-            headerTxt.font = font;
-            headerTxt.fontSize = 18;
-            headerTxt.fontStyle = FontStyle.Bold;
-            headerTxt.alignment = TextAnchor.MiddleCenter;
-            headerTxt.color = new Color(0.3f, 0.95f, 1.0f);
-            headerTxt.text = "🎮 НАЛАШТУВАННЯ КЕРУВАННЯ";
+            Text headerTxt = UiTheme.PlainText(headerTxtObj, font, 18, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), "🎮 НАЛАШТУВАННЯ КЕРУВАННЯ", style: FontStyle.Bold);
 
             // Scrollable List Container
-            GameObject scrollObj = new GameObject("ScrollView", typeof(RectTransform));
-            scrollObj.transform.SetParent(keybindsContainerObj.transform, false);
-            RectTransform scrollRect = scrollObj.GetComponent<RectTransform>();
-            scrollRect.anchorMin = Vector2.zero;
-            scrollRect.anchorMax = Vector2.one;
-            scrollRect.offsetMin = new Vector2(10f, 55f);
-            scrollRect.offsetMax = new Vector2(-10f, -50f);
+            RectTransform scrollRect = UiTheme.Child(keybindsContainerObj.transform, "ScrollView", Vector2.zero, Vector2.one, new Vector2(10f, 55f), new Vector2(-10f, -50f));
+            GameObject scrollObj = scrollRect.gameObject;
 
             ScrollRect scroll = scrollObj.AddComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.vertical = true;
 
-            GameObject viewportObj = new GameObject("Viewport", typeof(RectTransform));
-            viewportObj.transform.SetParent(scrollObj.transform, false);
-            RectTransform viewportRect = viewportObj.GetComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
+            RectTransform viewportRect = UiTheme.Child(scrollObj.transform, "Viewport", Vector2.zero, Vector2.one);
+            GameObject viewportObj = viewportRect.gameObject;
 
             Image vpMask = viewportObj.AddComponent<Image>();
             vpMask.color = Color.white;
@@ -357,11 +336,8 @@ namespace BattleOfAges.UI
             mask.showMaskGraphic = false;
             scroll.viewport = viewportRect;
 
-            GameObject contentObj = new GameObject("Content", typeof(RectTransform));
-            contentObj.transform.SetParent(viewportObj.transform, false);
-            RectTransform contentRect = contentObj.GetComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0f, 1f);
-            contentRect.anchorMax = new Vector2(1f, 1f);
+            RectTransform contentRect = UiTheme.Child(viewportObj.transform, "Content", new Vector2(0f, 1f), new Vector2(1f, 1f));
+            GameObject contentObj = contentRect.gameObject;
             contentRect.pivot = new Vector2(0.5f, 1f);
             contentRect.sizeDelta = new Vector2(0f, 0f);
 
@@ -382,13 +358,8 @@ namespace BattleOfAges.UI
             }
 
             // Reset Defaults Button
-            GameObject resetBtnObj = new GameObject("ResetDefaultsBtn", typeof(RectTransform));
-            resetBtnObj.transform.SetParent(keybindsContainerObj.transform, false);
-            RectTransform resetRect = resetBtnObj.GetComponent<RectTransform>();
-            resetRect.anchorMin = new Vector2(0.05f, 0.02f);
-            resetRect.anchorMax = new Vector2(0.95f, 0.09f);
-            resetRect.offsetMin = Vector2.zero;
-            resetRect.offsetMax = Vector2.zero;
+            RectTransform resetRect = UiTheme.Child(keybindsContainerObj.transform, "ResetDefaultsBtn", new Vector2(0.05f, 0.02f), new Vector2(0.95f, 0.09f), Vector2.zero, Vector2.zero);
+            GameObject resetBtnObj = resetRect.gameObject;
 
             Image resetBg = resetBtnObj.AddComponent<Image>();
             resetBg.color = new Color(0.45f, 0.18f, 0.18f, 0.95f);
@@ -405,19 +376,10 @@ namespace BattleOfAges.UI
                 KeybindsManager.ResetToDefaults();
             });
 
-            GameObject resetTxtObj = new GameObject("Text", typeof(RectTransform));
-            resetTxtObj.transform.SetParent(resetBtnObj.transform, false);
-            RectTransform resetTxtRect = resetTxtObj.GetComponent<RectTransform>();
-            resetTxtRect.anchorMin = Vector2.zero;
-            resetTxtRect.anchorMax = Vector2.one;
+            RectTransform resetTxtRect = UiTheme.Child(resetBtnObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject resetTxtObj = resetTxtRect.gameObject;
 
-            Text resetTxt = resetTxtObj.AddComponent<Text>();
-            resetTxt.font = font;
-            resetTxt.fontSize = 15;
-            resetTxt.fontStyle = FontStyle.Bold;
-            resetTxt.alignment = TextAnchor.MiddleCenter;
-            resetTxt.color = Color.white;
-            resetTxt.text = "🔄 Скинути за замовчуванням";
+            Text resetTxt = UiTheme.PlainText(resetTxtObj, font, 15, TextAnchor.MiddleCenter, Color.white, "🔄 Скинути за замовчуванням", style: FontStyle.Bold);
 
             RefreshKeybindButtonTexts();
         }
@@ -435,30 +397,14 @@ namespace BattleOfAges.UI
             rowBg.color = new Color(0.10f, 0.15f, 0.25f, 0.9f);
 
             // Label
-            GameObject labelObj = new GameObject("Label", typeof(RectTransform));
-            labelObj.transform.SetParent(rowObj.transform, false);
-            RectTransform labelRect = labelObj.GetComponent<RectTransform>();
-            labelRect.anchorMin = new Vector2(0.03f, 0f);
-            labelRect.anchorMax = new Vector2(0.65f, 1f);
-            labelRect.offsetMin = Vector2.zero;
-            labelRect.offsetMax = Vector2.zero;
+            RectTransform labelRect = UiTheme.Child(rowObj.transform, "Label", new Vector2(0.03f, 0f), new Vector2(0.65f, 1f), Vector2.zero, Vector2.zero);
+            GameObject labelObj = labelRect.gameObject;
 
-            Text labelTxt = labelObj.AddComponent<Text>();
-            labelTxt.font = font;
-            labelTxt.fontSize = 14;
-            labelTxt.fontStyle = FontStyle.Bold;
-            labelTxt.alignment = TextAnchor.MiddleLeft;
-            labelTxt.color = Color.white;
-            labelTxt.text = KeybindsManager.GetActionDisplayName(action);
+            Text labelTxt = UiTheme.PlainText(labelObj, font, 14, TextAnchor.MiddleLeft, Color.white, KeybindsManager.GetActionDisplayName(action), style: FontStyle.Bold);
 
             // Key Button
-            GameObject btnObj = new GameObject("KeyBtn", typeof(RectTransform));
-            btnObj.transform.SetParent(rowObj.transform, false);
-            RectTransform btnRect = btnObj.GetComponent<RectTransform>();
-            btnRect.anchorMin = new Vector2(0.67f, 0.10f);
-            btnRect.anchorMax = new Vector2(0.97f, 0.90f);
-            btnRect.offsetMin = Vector2.zero;
-            btnRect.offsetMax = Vector2.zero;
+            RectTransform btnRect = UiTheme.Child(rowObj.transform, "KeyBtn", new Vector2(0.67f, 0.10f), new Vector2(0.97f, 0.90f), Vector2.zero, Vector2.zero);
+            GameObject btnObj = btnRect.gameObject;
 
             Image btnBg = btnObj.AddComponent<Image>();
             btnBg.color = new Color(0.18f, 0.35f, 0.55f, 0.95f);
@@ -467,18 +413,10 @@ namespace BattleOfAges.UI
             KeyAction capturedAction = action;
             btn.onClick.AddListener(() => StartRebinding(capturedAction));
 
-            GameObject txtObj = new GameObject("Text", typeof(RectTransform));
-            txtObj.transform.SetParent(btnObj.transform, false);
-            RectTransform txtRect = txtObj.GetComponent<RectTransform>();
-            txtRect.anchorMin = Vector2.zero;
-            txtRect.anchorMax = Vector2.one;
+            RectTransform txtRect = UiTheme.Child(btnObj.transform, "Text", Vector2.zero, Vector2.one);
+            GameObject txtObj = txtRect.gameObject;
 
-            Text keyTxt = txtObj.AddComponent<Text>();
-            keyTxt.font = font;
-            keyTxt.fontSize = 15;
-            keyTxt.fontStyle = FontStyle.Bold;
-            keyTxt.alignment = TextAnchor.MiddleCenter;
-            keyTxt.color = new Color(0.3f, 0.95f, 1.0f);
+            Text keyTxt = UiTheme.PlainText(txtObj, font, 15, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), style: FontStyle.Bold);
 
             keybindButtonTexts[action] = keyTxt;
         }
