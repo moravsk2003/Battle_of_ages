@@ -43,6 +43,25 @@ namespace BattleOfAges.World
             poolContainer.gameObject.SetActive(false);
 
             PrewarmPools();
+            PrewarmStreamedModels();
+        }
+
+        /// <summary>
+        /// Builds (and drops) one visual of every wildlife species and raider type, so their first appearance while chunks
+        /// stream does not pay for loading baked meshes and building the cached character / gear meshes (27-50 ms each).
+        /// </summary>
+        private void PrewarmStreamedModels()
+        {
+            var warm = new GameObject("[WarmUp]");
+            warm.transform.SetParent(poolContainer, false); // inactive: what is built below never renders, animates or thinks
+            void Keep(GameObject built) => built.transform.SetParent(warm.transform, false);
+
+            var deer = new GameObject("Deer"); DeerModelBuilder.Build(deer.transform); Keep(deer);
+            var boar = new GameObject("Boar"); BoarModelBuilder.Build(boar.transform); Keep(boar);
+            var rabbit = new GameObject("Rabbit"); RabbitModelBuilder.Build(rabbit.transform); Keep(rabbit);
+            foreach (HumanoidModelBuilder.HumanType type in new[] { HumanoidModelBuilder.HumanType.Warlord, HumanoidModelBuilder.HumanType.Bandit, HumanoidModelBuilder.HumanType.Goblin })
+                Keep(HumanoidModelBuilder.CreateHumanoidModel(type, "Raider"));
+            Destroy(warm);
         }
 
         private void PrewarmPools()
@@ -154,6 +173,7 @@ namespace BattleOfAges.World
             pebblePool.Enqueue(pebble);
         }
 
+        /// <summary>A chunk for coord, inactive: its first generation step (terrain) activates it, so stale ground never shows.</summary>
         public ProceduralBiomeChunk GetChunk(Transform parent, Vector2Int coord)
         {
             ProceduralBiomeChunk chunk;
@@ -162,11 +182,11 @@ namespace BattleOfAges.World
                 chunk = chunkPool.Dequeue();
                 chunk.gameObject.name = $"Chunk_{coord.x}_{coord.y}";
                 chunk.transform.SetParent(parent, false);
-                chunk.gameObject.SetActive(true);
             }
             else
             {
                 GameObject chunkObj = new GameObject($"Chunk_{coord.x}_{coord.y}");
+                chunkObj.SetActive(false);
                 chunkObj.transform.SetParent(parent, false);
                 chunk = chunkObj.AddComponent<ProceduralBiomeChunk>();
             }

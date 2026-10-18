@@ -27,8 +27,10 @@ namespace BattleOfAges.PlayModeTests
     {
         private sealed class Sample
         {
-            public float FrameMs, MainMs, RenderMs;
+            public float FrameMs, MainMs, RenderMs, ScriptMs;
             public long GcBytes, Batches, SetPass, Tris;
+            public int Frame;
+            public bool Collected;
         }
 
         private ProfilerRecorder mainThread, gcAlloc, batches, setPass, tris, behaviourUpdate, lateBehaviour, fixedBehaviour, physics, animators;
@@ -88,6 +90,19 @@ namespace BattleOfAges.PlayModeTests
                 player.transform.rotation = Quaternion.LookRotation(dir2);
             });
 
+            if (Environment.GetEnvironmentVariable("PERF_TRAVEL_ONLY") == "1")
+            {
+                report.AppendLine(); report.AppendLine("Hitches:");
+                foreach (string h in pendingHitches) report.AppendLine(h);
+                if (pendingHitches.Count == 0) report.AppendLine("- none");
+                File.WriteAllText(Path.Combine(dir, "perf_report.md"), report.ToString());
+                Debug.Log("[Perf] report written\n" + report);
+                cam.targetTexture = null;
+                rt.Release();
+                foreach (ProfilerRecorder r in new[] { mainThread, gcAlloc, batches, setPass, tris, behaviourUpdate, lateBehaviour, fixedBehaviour, physics, animators }) r.Dispose();
+                yield break;
+            }
+
             // Phase 3: near a raider camp (mobs patrol / attack)
             Vector3 camp = new Vector3(-416f, 0f, 416f);
             Vector3 approach = camp + new Vector3(18f, 0f, -18f);
@@ -122,10 +137,13 @@ namespace BattleOfAges.PlayModeTests
             while (Time.realtimeSinceStartup < end) { RenderFrame(); yield return null; }
         }
 
+        // PERF_NO_RENDER=1: CPU-only run (no camera rendering), e.g. to time streaming while the GPU is busy elsewhere
+        private readonly bool noRender = Environment.GetEnvironmentVariable("PERF_NO_RENDER") == "1";
+
         private float RenderFrame()
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            cam.Render();
+            if (!noRender) cam.Render();
             return (float)sw.Elapsed.TotalMilliseconds;
         }
 
@@ -149,16 +167,24 @@ namespace BattleOfAges.PlayModeTests
                 var s = new Sample
                 {
                     FrameMs = (now - last) * 1000f, MainMs = mainThread.LastValue * 1e-6f, RenderMs = renderMs,
-                    GcBytes = gcAlloc.LastValue, Batches = batches.LastValue, SetPass = setPass.LastValue, Tris = tris.LastValue
+                    GcBytes = gcAlloc.LastValue, Batches = batches.LastValue, SetPass = setPass.LastValue, Tris = tris.LastValue,
+                    ScriptMs = (behaviourUpdate.LastValue + lateBehaviour.LastValue + fixedBehaviour.LastValue) * 1e-6f, Frame = Time.frameCount
                 };
-                scriptMs.Add((behaviourUpdate.LastValue + lateBehaviour.LastValue + fixedBehaviour.LastValue) * 1e-6f);
+                scriptMs.Add(s.ScriptMs);
                 physMs.Add(physics.LastValue * 1e-6f);
                 animMs.Add(animators.LastValue * 1e-6f);
                 last = now;
                 samples.Add(s);
                 int gcNow = System.GC.CollectionCount(0);
-                bool collected = gcNow != gcCount; gcCount = gcNow;
-                if (s.FrameMs > 50f) hitches.Add($"{s.FrameMs:0} ms{(collected ? " [GC collection]" : "")} (main {s.MainMs:0}, render {s.RenderMs:0}, scripts {scriptMs[scriptMs.Count - 1]:0}, GC {s.GcBytes / 1024} KB)");
+                s.Collected = gcNow != gcCount; gcCount = gcNow;
+            }
+            // A sample's wall time ends inside the current frame's Update (where streaming runs), but the recorders' LastValue
+            // is the previous, completed frame: the hitch frame's main-thread / script / GC numbers arrive with the next sample.
+            for (int i = 0; i < samples.Count; i++)
+            {
+                if (samples[i].FrameMs <= 33f) continue;
+                Sample s = samples[i], n = i + 1 < samples.Count ? samples[i + 1] : samples[i];
+                hitches.Add($"{s.FrameMs:0} ms at frame {s.Frame}{(s.Collected ? " [GC collection]" : "")} (main {n.MainMs:0}, render {s.RenderMs:0}, scripts {n.ScriptMs:0}, GC {n.GcBytes / 1024} KB)");
             }
 
             var ms = samples.Select(x => x.FrameMs).OrderBy(x => x).ToList();
@@ -167,7 +193,7 @@ namespace BattleOfAges.PlayModeTests
             report.AppendLine($"| {name} | {samples.Count} | {1000f / avg:0} | {avg:0.0} | {P(0.95f):0.0} | {P(0.99f):0.0} | {ms[ms.Count - 1]:0.0} | " +
                               $"{samples.Average(x => x.MainMs):0.0} | {samples.Average(x => x.RenderMs):0.0} | {scriptMs.Average():0.00} | {physMs.Average():0.00} | {animMs.Average():0.00} | " +
                               $"{samples.Average(x => x.GcBytes) / 1024f:0.0} ({samples.Max(x => x.GcBytes) / 1024} ) | {samples.Average(x => x.Batches):0} | {samples.Average(x => x.SetPass):0} | {samples.Average(x => x.Tris) / 1000f:0} |");
-            if (hitches.Count > 0) pendingHitches.Add($"- **{name}**: {hitches.Count} hitches > 50 ms: " + string.Join("; ", hitches.Take(8)));
+            if (hitches.Count > 0) pendingHitches.Add($"- **{name}**: {hitches.Count} frames > 33 ms: " + string.Join("; ", hitches.Take(12)));
             if (name.StartsWith("raider")) { report.AppendLine(); report.AppendLine("Hitches:"); foreach (string h in pendingHitches) report.AppendLine(h); if (pendingHitches.Count == 0) report.AppendLine("- none"); }
         }
 

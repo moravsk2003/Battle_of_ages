@@ -24,12 +24,17 @@ namespace BattleOfAges.World
         [SerializeField] private int chunkResolution = 32;
         [SerializeField] private int renderDistanceRadius = 3; // 7x7 active chunks around player/camera
 
+        [Tooltip("Main-thread time per frame spent building streamed chunks, in ms (the ground of chunks next to the viewer is built at once regardless)")]
+        [SerializeField] private float streamingBudgetMs = 3f;
+
         [Header("Target Tracking")]
         [SerializeField] private Transform viewerTarget;
 
         private readonly Dictionary<Vector2Int, ProceduralBiomeChunk> activeChunks = new Dictionary<Vector2Int, ProceduralBiomeChunk>();
         private readonly HashSet<Vector2Int> requiredChunksBuffer = new HashSet<Vector2Int>();
         private readonly List<Vector2Int> chunksToRemoveBuffer = new List<Vector2Int>();
+        private readonly List<ProceduralBiomeChunk> pendingChunks = new List<ProceduralBiomeChunk>(); // generation steps left
+        private bool swapPending; // out-of-range chunks and the far terrain wait until every required chunk has ground
 
         private Vector2Int currentViewerChunk = new Vector2Int(99999, 99999);
         private Material steppeMat, forestMat, desertMat, snowMat;
@@ -70,6 +75,7 @@ namespace BattleOfAges.World
             FindViewerTarget();
             if (viewerTarget != null) currentViewerChunk = GetChunkCoordFromWorldPos(viewerTarget.position); // not the (99999, 99999) placeholder
             UpdateChunksAroundViewer();
+            StreamChunks(unbounded: true); // the first view is built while the scene loads
         }
 
         public void FindViewerTarget()
@@ -95,6 +101,73 @@ namespace BattleOfAges.World
             {
                 currentViewerChunk = newChunkPos;
                 UpdateChunksAroundViewer();
+            }
+            StreamChunks(unbounded: false);
+        }
+
+        private int RingOf(Vector2Int coord) => Mathf.Max(Mathf.Abs(coord.x - currentViewerChunk.x), Mathf.Abs(coord.y - currentViewerChunk.y));
+
+        /// <summary>
+        /// Runs chunk generation steps until this frame's budget is spent: ground first (nearest chunk first), then trees,
+        /// pebbles, animals and camps, nearest first. Ground next to the viewer is built regardless of the budget (after a
+        /// teleport or load there would be none). Once every required chunk has ground, the out-of-range chunks go back
+        /// to the pool and the far terrain moves its hole, so no gap opens at the edge while chunks stream.
+        /// </summary>
+        private void StreamChunks(bool unbounded)
+        {
+            if (pendingChunks.Count == 0 && !swapPending) return;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+
+            while (pendingChunks.Count > 0)
+            {
+                int best = 0, bestKey = int.MaxValue;
+                for (int i = 0; i < pendingChunks.Count; i++)
+                {
+                    ProceduralBiomeChunk c = pendingChunks[i];
+                    int key = (c.HasTerrain ? 1000 : 0) + RingOf(c.ChunkCoord);
+                    if (key < bestKey) { bestKey = key; best = i; }
+                }
+                ProceduralBiomeChunk chunk = pendingChunks[best];
+                bool urgent = !chunk.HasTerrain && RingOf(chunk.ChunkCoord) <= 1;
+                if (!unbounded && !urgent && timer.Elapsed.TotalMilliseconds >= streamingBudgetMs) break;
+                if (chunk == null || !chunk.Step()) pendingChunks.RemoveAt(best);
+            }
+
+            if (swapPending)
+            {
+                bool groundReady = true;
+                for (int i = 0; i < pendingChunks.Count; i++)
+                    if (pendingChunks[i] != null && !pendingChunks[i].HasTerrain) { groundReady = false; break; }
+                if (groundReady)
+                {
+                    swapPending = false;
+                    RemoveChunks(onlyWithoutGround: false);
+                    if (farTerrain != null) farTerrain.Rebuild(currentViewerChunk, chunkSize, renderDistanceRadius);
+                }
+            }
+        }
+
+        /// <summary>Returns the chunks outside the required set to the pool (onlyWithoutGround: those not built yet, which show nothing).</summary>
+        private void RemoveChunks(bool onlyWithoutGround)
+        {
+            chunksToRemoveBuffer.Clear();
+            foreach (var kvp in activeChunks)
+            {
+                if (requiredChunksBuffer.Contains(kvp.Key)) continue;
+                if (onlyWithoutGround && kvp.Value != null && kvp.Value.HasTerrain) continue;
+                chunksToRemoveBuffer.Add(kvp.Key);
+            }
+
+            EnvironmentPoolManager pool = EnvironmentPoolManager.Instance;
+            for (int i = 0; i < chunksToRemoveBuffer.Count; i++)
+            {
+                Vector2Int coord = chunksToRemoveBuffer[i];
+                if (!activeChunks.TryGetValue(coord, out ProceduralBiomeChunk chunk)) continue;
+                activeChunks.Remove(coord);
+                pendingChunks.Remove(chunk);
+                if (chunk == null) continue;
+                if (pool != null) pool.ReturnChunk(chunk);
+                else Destroy(chunk.gameObject);
             }
         }
 
@@ -137,59 +210,20 @@ namespace BattleOfAges.World
 
                     bool isLowLOD = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) >= 2;
 
-                    if (!activeChunks.ContainsKey(chunkCoord))
+                    if (!activeChunks.TryGetValue(chunkCoord, out ProceduralBiomeChunk chunk) || chunk == null)
                     {
-                        ProceduralBiomeChunk newChunk = CreateChunkAt(chunkCoord, isLowLOD);
-                        activeChunks.Add(chunkCoord, newChunk);
+                        activeChunks[chunkCoord] = QueueChunk(AcquireChunk(chunkCoord), chunkCoord, isLowLOD);
                     }
-                    else
+                    else if (chunk.IsLowLOD != isLowLOD)
                     {
-                        ProceduralBiomeChunk existingChunk = activeChunks[chunkCoord];
-                        if (existingChunk != null)
-                        {
-                            if (existingChunk.IsLowLOD != isLowLOD)
-                            {
-                                existingChunk.GenerateChunk(chunkCoord, chunkSize, chunkResolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
-                            }
-                            existingChunk.gameObject.SetActive(true);
-                        }
+                        QueueChunk(chunk, chunkCoord, isLowLOD);
                     }
                 }
             }
 
-            // Deactivate or return chunks outside render radius
-            chunksToRemoveBuffer.Clear();
-            foreach (var kvp in activeChunks)
-            {
-                if (!requiredChunksBuffer.Contains(kvp.Key))
-                {
-                    chunksToRemoveBuffer.Add(kvp.Key);
-                }
-            }
-
-            EnvironmentPoolManager pool = EnvironmentPoolManager.Instance;
-            int removeCount = chunksToRemoveBuffer.Count;
-            for (int i = 0; i < removeCount; i++)
-            {
-                Vector2Int coord = chunksToRemoveBuffer[i];
-                if (activeChunks.TryGetValue(coord, out ProceduralBiomeChunk chunk))
-                {
-                    activeChunks.Remove(coord);
-                    if (pool != null)
-                    {
-                        pool.ReturnChunk(chunk);
-                    }
-                    else if (chunk != null)
-                    {
-                        chunk.gameObject.SetActive(false);
-                    }
-                }
-            }
-
-            if (farTerrain != null)
-            {
-                farTerrain.Rebuild(currentViewerChunk, chunkSize, renderDistanceRadius);
-            }
+            // Out-of-range chunks not built yet go at once; the rest (and the far terrain's hole) once the new ground is in
+            RemoveChunks(onlyWithoutGround: true);
+            swapPending = true;
         }
 
         private void CreateFarTerrain()
@@ -202,21 +236,23 @@ namespace BattleOfAges.World
             gameObject.AddComponent<GrassFieldRenderer>().Initialize(Shader.Find("Custom/GrassBlades"));
         }
 
-        private ProceduralBiomeChunk CreateChunkAt(Vector2Int coord, bool isLowLOD)
+        /// <summary>An inactive chunk object for coord (from the pool when there is one); generation activates it.</summary>
+        private ProceduralBiomeChunk AcquireChunk(Vector2Int coord)
         {
             EnvironmentPoolManager pool = EnvironmentPoolManager.Instance;
-            ProceduralBiomeChunk chunk = (pool != null)
-                ? pool.GetChunk(transform, coord)
-                : null;
+            if (pool != null) return pool.GetChunk(transform, coord);
 
-            if (chunk == null)
-            {
-                GameObject chunkObj = new GameObject($"Chunk_{coord.x}_{coord.y}");
-                chunkObj.transform.SetParent(transform, false);
-                chunk = chunkObj.AddComponent<ProceduralBiomeChunk>();
-            }
+            GameObject chunkObj = new GameObject($"Chunk_{coord.x}_{coord.y}");
+            chunkObj.SetActive(false);
+            chunkObj.transform.SetParent(transform, false);
+            return chunkObj.AddComponent<ProceduralBiomeChunk>();
+        }
 
-            chunk.GenerateChunk(coord, chunkSize, chunkResolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+        /// <summary>(Re)starts the chunk's generation; StreamChunks runs its steps.</summary>
+        private ProceduralBiomeChunk QueueChunk(ProceduralBiomeChunk chunk, Vector2Int coord, bool isLowLOD)
+        {
+            chunk.BeginGenerate(coord, chunkSize, chunkResolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            if (!pendingChunks.Contains(chunk)) pendingChunks.Add(chunk);
             return chunk;
         }
 

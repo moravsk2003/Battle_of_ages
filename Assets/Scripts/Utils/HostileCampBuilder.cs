@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.AI;
@@ -15,6 +16,18 @@ namespace BattleOfAges.Utils
         public static GameObject CreateHostileCamp(Vector3 campCenter, string name = "HostileRaiderCamp")
         {
             GameObject root = new GameObject(name);
+            IEnumerator steps = BuildHostileCamp(root, campCenter);
+            while (steps.MoveNext()) { }
+            return root;
+        }
+
+        /// <summary>
+        /// Builds the camp under root one piece per step (structures, the warlord, then each raider), so streamed chunks
+        /// can spread it over frames. The root stays inactive until the last step has given the warlord his squad.
+        /// </summary>
+        public static IEnumerator BuildHostileCamp(GameObject root, Vector3 campCenter)
+        {
+            root.SetActive(false);
             root.transform.position = campCenter;
 
             Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.35f, 0.22f, 0.12f), 0f, 0.25f);
@@ -67,6 +80,7 @@ namespace BattleOfAges.Utils
 
             // 4. War Standard / Skull Totem
             BuildWarBanner(root.transform, new Vector3(1.8f, 0f, 1.8f), woodMat, clothMat);
+            yield return null;
 
             // 5. Spawn Warlord (Leader) & Raider Squad
             GameObject leaderObj = CreateHostileMob(HostileMobType.WarlordGuard, "Warlord_Leader");
@@ -76,6 +90,7 @@ namespace BattleOfAges.Utils
             leaderObj.GetComponent<HostileMobAI>().SetGuardOrigin(leaderObj.transform.position);
 
             HostileSettlementLeader leaderComp = leaderObj.GetComponent<HostileSettlementLeader>();
+            yield return null;
 
             List<HostileMobAI> squad = new List<HostileMobAI>();
             Vector3[] squadOffsets = new Vector3[]
@@ -101,14 +116,14 @@ namespace BattleOfAges.Utils
                     mobAI.SetGuardOrigin(spawnPos);
                     squad.Add(mobAI);
                 }
+                yield return null;
             }
 
             if (leaderComp != null)
             {
                 leaderComp.InitializeSquad(squad);
             }
-
-            return root;
+            root.SetActive(true);
         }
 
         private static void BuildTent(Transform parent, Vector3 localPos, float yaw, Material woodMat, Material clothMat)

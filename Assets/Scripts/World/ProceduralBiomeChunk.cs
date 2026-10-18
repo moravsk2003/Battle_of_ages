@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Resources;
@@ -44,26 +45,76 @@ namespace BattleOfAges.World
         private readonly List<GameObject> activeTrees = new List<GameObject>(16);
         private readonly List<GameObject> activePebbles = new List<GameObject>(16);
 
+        /// <summary>True once the chunk has ground (terrain mesh and collider) at ChunkCoord; a LOD rebuild keeps the old one meanwhile.</summary>
+        public bool HasTerrain { get; private set; }
+
+        private IEnumerator steps;
+        private Random.State random; // this chunk's scatter sequence, kept apart from everything that runs between its steps
+
         private void Awake()
         {
+            EnsureComponents();
+        }
+
+        // (a chunk taken from the pool may be generated before it was ever active, so Awake has not run)
+        private void EnsureComponents()
+        {
+            if (meshFilter != null) return;
             meshFilter = GetComponent<MeshFilter>();
             meshRenderer = GetComponent<MeshRenderer>();
             meshCollider = GetComponent<MeshCollider>();
         }
 
+        /// <summary>Generates the whole chunk at once.</summary>
         public void GenerateChunk(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
         {
-            var timer = System.Diagnostics.Stopwatch.StartNew();
-            GenerateChunkInternal(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
-            if (timer.ElapsedMilliseconds > 20)
-                Debug.Log($"[Chunk] {coord} generated in {timer.ElapsedMilliseconds} ms (low LOD {isLowLOD}, trees {activeTrees.Count}, pebbles {activePebbles.Count}, entities {activeEntities.Count})");
+            BeginGenerate(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            while (Step()) { }
         }
 
-        private void GenerateChunkInternal(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
+        /// <summary>
+        /// Starts (or restarts) generation; the work is done by Step calls, so the world manager can spread it over frames:
+        /// the first step builds the terrain mesh and collider (and activates the chunk), each later one places one tree,
+        /// pebble, animal or raider camp. The result is the same as GenerateChunk.
+        /// </summary>
+        public void BeginGenerate(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
         {
+            if (coord != ChunkCoord) HasTerrain = false;
             ChunkCoord = coord;
             IsLowLOD = isLowLOD;
+            steps = GenerateSteps(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+        }
 
+        /// <summary>Runs the next generation step; false when the chunk is complete.</summary>
+        public bool Step()
+        {
+            if (steps == null) return false;
+            Random.State outer = Random.state;
+            Random.state = random;
+            bool more;
+            try { more = steps.MoveNext(); }
+            finally { random = Random.state; Random.state = outer; }
+            if (!more) steps = null;
+            return more;
+        }
+
+        private IEnumerator GenerateSteps(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
+        {
+            ReleaseChunkResources(true); // the previous content (another place or LOD)
+            BuildTerrain(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            HasTerrain = true;
+            if (!gameObject.activeSelf) gameObject.SetActive(true);
+            yield return null;
+
+            float startWorldX = coord.x * size - size * 0.5f;
+            float startWorldZ = coord.y * size - size * 0.5f;
+            IEnumerator scatter = ScatterBiomeResources(startWorldX, startWorldZ, size, isLowLOD);
+            while (scatter.MoveNext()) yield return null;
+        }
+
+        private void BuildTerrain(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
+        {
+            EnsureComponents();
             float startWorldX = coord.x * size - size * 0.5f;
             float startWorldZ = coord.y * size - size * 0.5f;
             transform.position = new Vector3(startWorldX, 0f, startWorldZ);
@@ -144,10 +195,6 @@ namespace BattleOfAges.World
 
             // Assign Material based on dominant Biome
             meshRenderer.sharedMaterial = GetBiomeMaterial(MainBiome, steppeMat, forestMat, desertMat, snowMat);
-
-            // Populate Biome-specific resources (trees & ore pebbles) using pooling
-            ReleaseChunkResources();
-            ScatterBiomeResources(startWorldX, startWorldZ, size, isLowLOD);
         }
 
         /// <summary>Per-vertex biome colour (smoothly blended); used as the grass tint by the terrain shader.</summary>
@@ -188,7 +235,7 @@ namespace BattleOfAges.World
             }
         }
 
-        private void ScatterBiomeResources(float startX, float startZ, float size, bool isLowLOD)
+        private IEnumerator ScatterBiomeResources(float startX, float startZ, float size, bool isLowLOD)
         {
             int seed = Mathf.Abs((ChunkCoord.x * 73856093) ^ (ChunkCoord.y * 19349663));
             Random.InitState(seed);
@@ -244,6 +291,7 @@ namespace BattleOfAges.World
 
                 activeTrees.Add(tree);
                 BattleOfAges.SaveLoad.WorldPersistence.RegisterTree(tree.GetComponent<ResourceNodeTree>(), ChunkCoord.x + "," + ChunkCoord.y + ":" + i);
+                yield return null;
             }
 
             // Ore Pebbles
@@ -268,6 +316,7 @@ namespace BattleOfAges.World
                 }
 
                 activePebbles.Add(pebble);
+                yield return null;
             }
 
             // Wildlife Spawning (Deer, Boar, Rabbit)
@@ -291,6 +340,7 @@ namespace BattleOfAges.World
                     animal.transform.position = new Vector3(worldX, y, worldZ);
                     animal.transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
                     if (BattleOfAges.SaveLoad.WorldPersistence.RegisterAnimal(animal)) activeEntities.Add(animal);
+                    yield return null;
                 }
             }
 
@@ -303,8 +353,12 @@ namespace BattleOfAges.World
 
                 if (campY < SnowLineHeight - 10f)
                 {
-                    GameObject camp = Utils.HostileCampBuilder.CreateHostileCamp(new Vector3(campX, campY, campZ), $"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
+                    GameObject camp = new GameObject($"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
                     camp.transform.SetParent(transform);
+                    buildingCamp = camp; // until complete it is destroyed on release without being recorded
+                    IEnumerator build = Utils.HostileCampBuilder.BuildHostileCamp(camp, new Vector3(campX, campY, campZ));
+                    while (build.MoveNext()) yield return null;
+                    buildingCamp = null;
                     BattleOfAges.SaveLoad.WorldPersistence.RegisterCamp(camp);
                     activeEntities.Add(camp);
                 }
@@ -312,8 +366,15 @@ namespace BattleOfAges.World
         }
 
         private readonly List<GameObject> activeEntities = new List<GameObject>();
+        private GameObject buildingCamp;
 
-        public void ReleaseChunkResources() => ReleaseChunkResources(true);
+        /// <summary>Clears the chunk for the pool: stops any generation in progress and returns its content.</summary>
+        public void ReleaseChunkResources()
+        {
+            steps = null;
+            HasTerrain = false;
+            ReleaseChunkResources(true);
+        }
 
         /// <summary>returnToPool = false while the chunk itself is destroyed (scene unload): the pool may be going away too.</summary>
         private void ReleaseChunkResources(bool returnToPool)
@@ -350,6 +411,9 @@ namespace BattleOfAges.World
                 }
             }
             activeEntities.Clear();
+
+            if (buildingCamp != null) Destroy(buildingCamp);
+            buildingCamp = null;
         }
 
         private void OnDestroy()

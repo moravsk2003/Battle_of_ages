@@ -16,9 +16,12 @@ namespace BattleOfAges.World
         private const int HalfExtentCells = 96;     // 96 * 16 = 1536 m in every direction
 
         private Mesh mesh;
-        private Vector3[] vertices;
-        private Color[] colors;
+        private Vector3[] vertices, spareVertices;
+        private Color[] colors, spareColors;
         private int[] triangles;
+        private int triangleHoleCells = -1;         // hole size the mesh's triangles were built for
+        private Vector2Int gridCentre;              // in cells; the grid is world-aligned, so a moved grid reuses its overlap
+        private bool hasGrid;
 
         public void Initialize(Material material)
         {
@@ -34,60 +37,83 @@ namespace BattleOfAges.World
             int side = HalfExtentCells * 2 + 1;
             vertices = new Vector3[side * side];
             colors = new Color[side * side];
+            spareVertices = new Vector3[side * side];
+            spareColors = new Color[side * side];
         }
 
-        /// <summary>Rebuilds the mesh around the viewer chunk, leaving out the detailed chunk square.</summary>
+        /// <summary>
+        /// Rebuilds the mesh around the viewer chunk, leaving out the detailed chunk square. Only the vertices the grid did
+        /// not cover before are sampled (a one-chunk move samples 4 rows instead of all 193), and the triangles, which are
+        /// the same relative to the grid, are set once.
+        /// </summary>
         public void Rebuild(Vector2Int viewerChunk, float chunkSize, int detailRadiusChunks)
         {
             if (mesh == null) return;
 
             int side = HalfExtentCells * 2 + 1;
-            float centerX = viewerChunk.x * chunkSize;
-            float centerZ = viewerChunk.y * chunkSize;
+            int cellsPerChunk = Mathf.RoundToInt(chunkSize / Spacing);
+            Vector2Int centre = viewerChunk * cellsPerChunk;
+            Vector2Int shift = centre - gridCentre;
+            bool reuse = hasGrid && Mathf.Abs(shift.x) < side && Mathf.Abs(shift.y) < side;
             transform.position = Vector3.zero;
 
             for (int z = 0; z < side; z++)
             {
+                int oz = z + shift.y;
                 for (int x = 0; x < side; x++)
                 {
-                    float wx = centerX + (x - HalfExtentCells) * Spacing;
-                    float wz = centerZ + (z - HalfExtentCells) * Spacing;
-                    float h = InfiniteWorldManager.GetSampledTerrainHeight(wx, wz);
                     int i = z * side + x;
-                    vertices[i] = new Vector3(wx, h, wz);
-                    colors[i] = ProceduralBiomeChunk.GetBlendedBiomeColor(wx, wz, h);
+                    int ox = x + shift.x;
+                    if (reuse && ox >= 0 && ox < side && oz >= 0 && oz < side)
+                    {
+                        int o = oz * side + ox;
+                        spareVertices[i] = vertices[o];
+                        spareColors[i] = colors[o];
+                        continue;
+                    }
+                    float wx = (centre.x + x - HalfExtentCells) * Spacing;
+                    float wz = (centre.y + z - HalfExtentCells) * Spacing;
+                    float h = InfiniteWorldManager.GetSampledTerrainHeight(wx, wz);
+                    spareVertices[i] = new Vector3(wx, h, wz);
+                    spareColors[i] = ProceduralBiomeChunk.GetBlendedBiomeColor(wx, wz, h);
                 }
             }
+            (vertices, spareVertices) = (spareVertices, vertices);
+            (colors, spareColors) = (spareColors, colors);
+            gridCentre = centre;
+            hasGrid = true;
 
             // Hole = the detailed chunk square: chunks cover [c - r - 0.5, c + r + 0.5] * chunkSize around the viewer chunk.
             float holeHalf = (detailRadiusChunks + 0.5f) * chunkSize;
             int holeCells = Mathf.RoundToInt(holeHalf / Spacing);
 
-            int quadCount = (side - 1) * (side - 1);
-            if (triangles == null || triangles.Length != quadCount * 6) triangles = new int[quadCount * 6];
-            int t = 0;
-            for (int z = 0; z < side - 1; z++)
+            mesh.SetVertices(vertices);
+            mesh.SetColors(colors);
+            if (holeCells != triangleHoleCells)
             {
-                for (int x = 0; x < side - 1; x++)
+                triangleHoleCells = holeCells;
+                int quadCount = (side - 1) * (side - 1);
+                if (triangles == null || triangles.Length != quadCount * 6) triangles = new int[quadCount * 6];
+                int t = 0;
+                for (int z = 0; z < side - 1; z++)
                 {
-                    int cx = x - HalfExtentCells, cz = z - HalfExtentCells; // cell's lower-left corner, in cells from centre
-                    bool insideHole = cx >= -holeCells && cx + 1 <= holeCells && cz >= -holeCells && cz + 1 <= holeCells;
-                    if (insideHole) continue;
+                    for (int x = 0; x < side - 1; x++)
+                    {
+                        int cx = x - HalfExtentCells, cz = z - HalfExtentCells; // cell's lower-left corner, in cells from centre
+                        bool insideHole = cx >= -holeCells && cx + 1 <= holeCells && cz >= -holeCells && cz + 1 <= holeCells;
+                        if (insideHole) continue;
 
-                    int i = z * side + x;
-                    triangles[t++] = i;
-                    triangles[t++] = i + side;
-                    triangles[t++] = i + 1;
-                    triangles[t++] = i + 1;
-                    triangles[t++] = i + side;
-                    triangles[t++] = i + side + 1;
+                        int i = z * side + x;
+                        triangles[t++] = i;
+                        triangles[t++] = i + side;
+                        triangles[t++] = i + 1;
+                        triangles[t++] = i + 1;
+                        triangles[t++] = i + side;
+                        triangles[t++] = i + side + 1;
+                    }
                 }
+                mesh.SetTriangles(triangles, 0, t, 0);
             }
-
-            mesh.Clear();
-            mesh.vertices = vertices;
-            mesh.colors = colors;
-            mesh.SetTriangles(triangles, 0, t, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
         }
