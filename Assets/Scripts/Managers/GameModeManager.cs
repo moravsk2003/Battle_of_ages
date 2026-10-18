@@ -109,7 +109,5 @@ namespace BattleOfAges.Managers
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
-
-        public GameMode GetCurrentMode() => CurrentMode;
     }
 }

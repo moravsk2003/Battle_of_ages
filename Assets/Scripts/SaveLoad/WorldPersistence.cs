@@ -138,8 +138,6 @@ namespace BattleOfAges.SaveLoad
             return c;
         }
 
-        public static bool IsMobKilled(string camp, string mob) => Camps.TryGetValue(camp, out CampSave c) && c.Killed.Contains(mob);
-
         // ------------------------------------------------------------------ wildlife
 
         /// <summary>A chunk spawned an animal: a killed one does not come back.</summary>

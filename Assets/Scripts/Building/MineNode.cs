@@ -187,49 +187,18 @@ namespace BattleOfAges.Building
             return pos;
         }
 
-        public static MineNode GetNearestMineWithOre(Vector3 fromPos)
+        public static MineNode GetNearestMineWithOre(Vector3 fromPos) => Nearest(fromPos, m => m.AccumulatedOreCount > 0);
+
+        private static MineNode Nearest(Vector3 fromPos, System.Predicate<MineNode> suits)
         {
             MineNode nearest = null;
             float minSqrDst = float.MaxValue;
-
-            int count = activeMines.Count;
-            for (int i = 0; i < count; i++)
+            foreach (MineNode mine in activeMines)
             {
-                MineNode mine = activeMines[i];
-                if (mine == null || !mine.gameObject.activeInHierarchy) continue;
-                if (mine.AccumulatedOreCount <= 0) continue;
-
+                if (mine == null || !mine.gameObject.activeInHierarchy || !suits(mine)) continue;
                 float sqrDst = (fromPos - mine.transform.position).sqrMagnitude;
-                if (sqrDst < minSqrDst)
-                {
-                    minSqrDst = sqrDst;
-                    nearest = mine;
-                }
+                if (sqrDst < minSqrDst) { minSqrDst = sqrDst; nearest = mine; }
             }
-
-            return nearest;
-        }
-
-        public static MineNode GetNearestMineWithCapacity(Vector3 fromPos)
-        {
-            MineNode nearest = null;
-            float minSqrDst = float.MaxValue;
-
-            int count = activeMines.Count;
-            for (int i = 0; i < count; i++)
-            {
-                MineNode mine = activeMines[i];
-                if (mine == null || !mine.gameObject.activeInHierarchy) continue;
-                if (mine.IsFullWorkers) continue;
-
-                float sqrDst = (fromPos - mine.transform.position).sqrMagnitude;
-                if (sqrDst < minSqrDst)
-                {
-                    minSqrDst = sqrDst;
-                    nearest = mine;
-                }
-            }
-
             return nearest;
         }
 

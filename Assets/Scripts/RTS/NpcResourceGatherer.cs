@@ -106,19 +106,7 @@ namespace BattleOfAges.RTS
         public void SetGatherDirective(GatherDirective newDirective)
         {
             currentDirective = newDirective;
-            if (assignedMine != null)
-            {
-                assignedMine.UnassignWorker(this);
-                assignedMine = null;
-                SetRenderersActive(true);
-            }
-            if (targetPebble != null && targetPebble.TargetedBy == this)
-            {
-                targetPebble.TargetedBy = null;
-            }
-            targetTree = null;
-            targetPebble = null;
-            targetMine = null;
+            ClearCurrentTargets();
             currentState = GathererState.FindingResource;
         }
 

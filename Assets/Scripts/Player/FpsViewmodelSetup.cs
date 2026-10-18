@@ -109,14 +109,6 @@ namespace BattleOfAges.Player
             Configure();
         }
 
-        public void SetViewmodelCameraEnabled(bool enabled)
-        {
-            if (viewmodelCamera != null)
-            {
-                viewmodelCamera.enabled = enabled;
-            }
-        }
-
         private void ResolveMissingReferences()
         {
             if (mainCamera == null)

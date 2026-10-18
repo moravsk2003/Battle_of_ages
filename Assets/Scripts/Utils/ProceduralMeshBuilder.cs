@@ -28,47 +28,9 @@ namespace BattleOfAges.Utils
                 );
             }
 
-            int numTris = origTris.Length / 3;
-            Vector3[] flatVerts = new Vector3[numTris * 3];
-            Vector3[] flatNormals = new Vector3[numTris * 3];
-            Vector2[] flatUVs = new Vector2[numTris * 3];
-            Color[] flatColors = new Color[numTris * 3];
-            int[] flatTris = new int[numTris * 3];
-
-            for (int t = 0; t < numTris; t++)
-            {
-                int i0 = origTris[t * 3 + 0];
-                int i1 = origTris[t * 3 + 1];
-                int i2 = origTris[t * 3 + 2];
-
-                Vector3 v0 = displacedVerts[i0];
-                Vector3 v1 = displacedVerts[i1];
-                Vector3 v2 = displacedVerts[i2];
-
-                Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0).normalized;
-                float mossFactor = Mathf.Clamp01(Vector3.Dot(normal, Vector3.up) * 1.6f - 0.3f);
-                Color faceColor = Color.Lerp(new Color(0.48f, 0.46f, 0.44f), new Color(0.35f, 0.52f, 0.18f), mossFactor);
-
-                for (int v = 0; v < 3; v++)
-                {
-                    int index = t * 3 + v;
-                    flatVerts[index] = (v == 0) ? v0 : ((v == 1) ? v1 : v2);
-                    flatNormals[index] = normal;
-                    flatUVs[index] = new Vector2(flatVerts[index].x + flatVerts[index].y, flatVerts[index].z + flatVerts[index].y);
-                    flatColors[index] = faceColor;
-                    flatTris[index] = index;
-                }
-            }
-
-            Mesh flatMesh = new Mesh();
-            flatMesh.name = "FacetedRock";
-            flatMesh.vertices = flatVerts;
-            flatMesh.normals = flatNormals;
-            flatMesh.uv = flatUVs;
-            flatMesh.colors = flatColors;
-            flatMesh.triangles = flatTris;
-            flatMesh.RecalculateBounds();
-            return flatMesh;
+            return FlatShaded("FacetedRock", displacedVerts, origTris,
+                normal => Color.Lerp(new Color(0.48f, 0.46f, 0.44f), new Color(0.35f, 0.52f, 0.18f), Mathf.Clamp01(Vector3.Dot(normal, Vector3.up) * 1.6f - 0.3f)), // moss on top
+                p => new Vector2(p.x + p.y, p.z + p.y));
         }
 
         // ----------------------------------------------------
@@ -93,43 +55,35 @@ namespace BattleOfAges.Utils
                 );
             }
 
-            int numTris = origTris.Length / 3;
-            Vector3[] flatVerts = new Vector3[numTris * 3];
-            Vector3[] flatNormals = new Vector3[numTris * 3];
-            Vector2[] flatUVs = new Vector2[numTris * 3];
-            Color[] flatColors = new Color[numTris * 3];
-            int[] flatTris = new int[numTris * 3];
+            return FlatShaded("StylizedFoliageCluster", displaced, origTris, _ => Color.white, p => new Vector2(p.x * 0.5f, p.z * 0.5f));
+        }
 
-            for (int t = 0; t < numTris; t++)
+        /// <summary>Unshares the vertices so every triangle is flat shaded; colour per face (from its normal), UV per vertex.</summary>
+        private static Mesh FlatShaded(string name, Vector3[] verts, int[] tris, System.Func<Vector3, Color> faceColor, System.Func<Vector3, Vector2> uv)
+        {
+            int n = tris.Length;
+            var flatVerts = new Vector3[n];
+            var flatNormals = new Vector3[n];
+            var flatUVs = new Vector2[n];
+            var flatColors = new Color[n];
+            var flatTris = new int[n];
+            for (int t = 0; t < n; t += 3)
             {
-                int i0 = origTris[t * 3 + 0];
-                int i1 = origTris[t * 3 + 1];
-                int i2 = origTris[t * 3 + 2];
-
-                Vector3 v0 = displaced[i0];
-                Vector3 v1 = displaced[i1];
-                Vector3 v2 = displaced[i2];
-
+                Vector3 v0 = verts[tris[t]], v1 = verts[tris[t + 1]], v2 = verts[tris[t + 2]];
                 Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0).normalized;
-
-                for (int v = 0; v < 3; v++)
+                Color color = faceColor(normal);
+                for (int k = 0; k < 3; k++)
                 {
-                    int index = t * 3 + v;
-                    flatVerts[index] = (v == 0) ? v0 : ((v == 1) ? v1 : v2);
+                    int index = t + k;
+                    flatVerts[index] = k == 0 ? v0 : k == 1 ? v1 : v2;
                     flatNormals[index] = normal;
-                    flatUVs[index] = new Vector2(flatVerts[index].x * 0.5f, flatVerts[index].z * 0.5f);
-                    flatColors[index] = Color.white;
+                    flatUVs[index] = uv(flatVerts[index]);
+                    flatColors[index] = color;
                     flatTris[index] = index;
                 }
             }
 
-            Mesh mesh = new Mesh();
-            mesh.name = "StylizedFoliageCluster";
-            mesh.vertices = flatVerts;
-            mesh.normals = flatNormals;
-            mesh.uv = flatUVs;
-            mesh.colors = flatColors;
-            mesh.triangles = flatTris;
+            var mesh = new Mesh { name = name, vertices = flatVerts, normals = flatNormals, uv = flatUVs, colors = flatColors, triangles = flatTris };
             mesh.RecalculateBounds();
             return mesh;
         }

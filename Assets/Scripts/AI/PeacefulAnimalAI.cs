@@ -144,6 +144,16 @@ namespace BattleOfAges.AI
             detectedThreat = threat;
         }
 
+        /// <summary>Switches to fleeing when a threat is near; true if it did.</summary>
+        public bool FleeIfThreatened()
+        {
+            Transform threat = FindThreatNearby();
+            if (threat == null) return false;
+            SetDetectedThreat(threat);
+            ChangeState(AIStateType.Flee);
+            return true;
+        }
+
         public Transform FindThreatNearby()
         {
             if (cachedPlayer == null)
@@ -297,13 +307,7 @@ namespace BattleOfAges.AI
             PeacefulAnimalAI animal = controller as PeacefulAnimalAI;
             if (animal == null) return;
 
-            Transform threat = animal.FindThreatNearby();
-            if (threat != null)
-            {
-                animal.SetDetectedThreat(threat);
-                animal.ChangeState(AIStateType.Flee);
-                return;
-            }
+            if (animal.FleeIfThreatened()) return;
 
             idleTimer += deltaTime;
             if (idleTimer >= idleDuration)
@@ -339,13 +343,7 @@ namespace BattleOfAges.AI
             PeacefulAnimalAI animal = controller as PeacefulAnimalAI;
             if (animal == null) return;
 
-            Transform threat = animal.FindThreatNearby();
-            if (threat != null)
-            {
-                animal.SetDetectedThreat(threat);
-                animal.ChangeState(AIStateType.Flee);
-                return;
-            }
+            if (animal.FleeIfThreatened()) return;
 
             wanderTimer += deltaTime;
             // HasDestination is cleared by the movement code on (horizontal) arrival; a 3D distance

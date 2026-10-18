@@ -155,7 +155,5 @@ namespace BattleOfAges.Player
                 velocity = Vector3.zero;
             }
         }
-
-        public bool IsControlEnabled() => isControlEnabled;
     }
 }

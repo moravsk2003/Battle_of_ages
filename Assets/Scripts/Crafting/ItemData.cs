@@ -87,8 +87,6 @@ namespace BattleOfAges.Crafting
             }
         }
 
-        public static bool IsWeapon(ItemType t) => SlotOf(t) == EquipSlot.Weapon;
-
         public static string Roman(int level)
         {
             switch (level) { case 0: return "0"; case 1: return "I"; case 2: return "II"; case 3: return "III"; case 4: return "IV"; case 5: return "V"; default: return ""; }
@@ -132,20 +130,6 @@ namespace BattleOfAges.Crafting
         private static int Pct(float f) => Mathf.RoundToInt(f * 100f);
     }
 
-    [System.Serializable]
-    public struct ItemDefinition
-    {
-        public ItemType Type;
-        public string DisplayName;
-        public string Description;
-        public float BaseDamage;
-        public float BaseDefense;
-        public float BaseEfficiency;
-        public float BaseCraftTimeSeconds;
-        public int BaseWoodCost;
-        public int BaseOreCost;
-    }
-
     /// <summary>
     /// Pure mathematical calculation engine for Item Scaling (Levels 1 to 5) and Combat Defense.
     /// Fully covered by EditMode Unit Tests.
@@ -160,7 +144,6 @@ namespace BattleOfAges.Crafting
         public const float SWORD_SCALING_PER_LEVEL = 0.20f;
 
         // Armor: 10% damage reduction per level (10% * level)
-        public const float ARMOR_BASE_DEFENSE = 10.0f;
         public const float ARMOR_SCALING_PER_LEVEL = 0.10f;
 
         // Bow: +20% damage per level (+0.20 * level)
@@ -180,12 +163,6 @@ namespace BattleOfAges.Crafting
         {
             int lvl = ClampLevel(level);
             return baseDamage * (1.0f + SWORD_SCALING_PER_LEVEL * lvl);
-        }
-
-        public static float CalculateArmorDefense(int level, float baseDefense = ARMOR_BASE_DEFENSE)
-        {
-            int lvl = ClampLevel(level);
-            return baseDefense * (1.0f + ARMOR_SCALING_PER_LEVEL * lvl);
         }
 
         public static float CalculateArmorReductionPercent(int level)
@@ -310,17 +287,6 @@ namespace BattleOfAges.Crafting
             if (armorLevel <= 0) return rawDamage;
 
             float reduction = CalculateArmorReductionPercent(armorLevel);
-            float effective = rawDamage * (1.0f - reduction);
-
-            return Mathf.Max(1, Mathf.RoundToInt(effective));
-        }
-
-        public static int CalculateEffectiveDamage(int rawDamage, float defense)
-        {
-            if (rawDamage <= 0) return 0;
-            if (defense <= 0f) return rawDamage;
-
-            float reduction = defense / (defense + 50.0f);
             float effective = rawDamage * (1.0f - reduction);
 
             return Mathf.Max(1, Mathf.RoundToInt(effective));
