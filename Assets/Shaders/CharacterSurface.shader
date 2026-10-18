@@ -103,6 +103,107 @@ Shader "Custom/CharacterSurface"
             float3 objectScale = float3(length(unity_ObjectToWorld._m00_m10_m20), length(unity_ObjectToWorld._m01_m11_m21), length(unity_ObjectToWorld._m02_m12_m22));
             return (_ObjectSpace > 0.5 ? positionOS * objectScale : uv3) * _PatternScale;
         }
+
+        // ---- GPU skinning for distant characters (GpuSkinnedCharacter). _BoneTex holds, per baked frame (row), the
+        // skin matrix (bone * bindpose, in the renderer's space) of every bone as 3 texels, then the upper-body anchor
+        // bone's matrix and its inverse; the last row holds the upper-body mask. Weights and bone indices come in UV4 / UV5.
+        #if defined(_GPU_SKIN)
+            TEXTURE2D(_BoneTex);
+            float4 _BoneTexInfo; // x anchor column, y mask row
+
+            UNITY_INSTANCING_BUFFER_START(GpuSkinProps)
+                UNITY_DEFINE_INSTANCED_PROP(float4, _Loco)     // first row, frames (negative: holds the last frame), fps, start time
+                UNITY_DEFINE_INSTANCED_PROP(float4, _LocoPrev) // the clip fading out
+                UNITY_DEFINE_INSTANCED_PROP(float4, _Swing)    // upper-body attack like _Loco; start time < 0: none
+                UNITY_DEFINE_INSTANCED_PROP(float4, _Fade)     // fade start time, fade duration
+            UNITY_INSTANCING_BUFFER_END(GpuSkinProps)
+
+            float3x4 BoneLoad(int column, int row)
+            {
+                return float3x4(LOAD_TEXTURE2D_LOD(_BoneTex, int2(column, row), 0),
+                                LOAD_TEXTURE2D_LOD(_BoneTex, int2(column + 1, row), 0),
+                                LOAD_TEXTURE2D_LOD(_BoneTex, int2(column + 2, row), 0));
+            }
+
+            // The two baked rows around the clip's current time and the blend between them
+            void ClipRows(float4 clip, out int r0, out int r1, out float k)
+            {
+                float frames = abs(clip.y);
+                float t = max(0.0, (_Time.y - clip.w) * clip.z);
+                t = clip.y > 0.0 ? fmod(t, frames) : min(t, frames - 1.0);
+                float f = floor(t);
+                k = t - f;
+                float next = f + 1.0;
+                if (next >= frames) next = clip.y > 0.0 ? 0.0 : frames - 1.0;
+                r0 = (int)(clip.x + f);
+                r1 = (int)(clip.x + next);
+            }
+
+            float3x4 BoneAt(int column, int r0, int r1, float k) { return lerp(BoneLoad(column, r0), BoneLoad(column, r1), k); }
+
+            float3x4 MulAffine(float3x4 a, float3x4 b)
+            {
+                float3x3 r = mul((float3x3)a, (float3x3)b);
+                float3 t = mul((float3x3)a, float3(b._m03, b._m13, b._m23)) + float3(a._m03, a._m13, a._m23);
+                return float3x4(float4(r[0], t.x), float4(r[1], t.y), float4(r[2], t.z));
+            }
+
+            void GpuSkin(inout float3 position, inout float3 normal, float4 weights, float4 bones)
+            {
+                float4 loco = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _Loco);
+                float4 prev = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _LocoPrev);
+                float4 swing = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _Swing);
+                float4 fade = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _Fade);
+
+                int a0, a1; float ak;
+                ClipRows(loco, a0, a1, ak);
+                float fadeK = fade.y > 0.0 ? saturate((_Time.y - fade.x) / fade.y) : 1.0;
+                int p0 = 0, p1 = 0; float pk = 0.0;
+                if (fadeK < 1.0) ClipRows(prev, p0, p1, pk);
+
+                // Attack on the upper body (like the Animator's masked layer): the swing pose of the upper bones,
+                // re-seated on the walking pose of the bone they hang from.
+                float swingW = 0.0;
+                int s0 = 0, s1 = 0; float sk = 0.0;
+                float3x4 seat = (float3x4)0;
+                if (swing.w >= 0.0)
+                {
+                    float t = _Time.y - swing.w, clipLength = abs(swing.y) / swing.z;
+                    swingW = saturate(t * 12.0) * saturate(1.0 - (t - (clipLength - 0.18)) * 5.0);
+                    if (swingW > 0.0)
+                    {
+                        ClipRows(swing, s0, s1, sk);
+                        int anchor = (int)_BoneTexInfo.x;
+                        seat = MulAffine(BoneAt(anchor, a0, a1, ak), BoneAt(anchor + 3, s0, s1, sk));
+                    }
+                }
+
+                float3 p = 0.0, n = 0.0;
+                [unroll] for (int i = 0; i < 4; i++)
+                {
+                    float w = weights[i];
+                    if (w <= 0.0) continue;
+                    int column = (int)bones[i] * 3;
+                    float3x4 m = BoneAt(column, a0, a1, ak);
+                    if (fadeK < 1.0) m = lerp(BoneAt(column, p0, p1, pk), m, fadeK);
+                    if (swingW > 0.0)
+                    {
+                        float mask = LOAD_TEXTURE2D_LOD(_BoneTex, int2(column, (int)_BoneTexInfo.y), 0).x;
+                        if (mask > 0.0) m = lerp(m, MulAffine(seat, BoneAt(column, s0, s1, sk)), swingW * mask);
+                    }
+                    p += w * mul(m, float4(position, 1.0));
+                    n += w * mul((float3x3)m, normal);
+                }
+                position = p;
+                normal = n;
+            }
+
+            #define GPU_SKIN_INPUT float4 skinWeights : TEXCOORD4; float4 skinBones : TEXCOORD5;
+            #define GPU_SKIN(input) GpuSkin(input.positionOS.xyz, input.normalOS, input.skinWeights, input.skinBones)
+        #else
+            #define GPU_SKIN_INPUT
+            #define GPU_SKIN(input)
+        #endif
         ENDHLSL
 
         Pass
@@ -114,6 +215,7 @@ Shader "Custom/CharacterSurface"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma multi_compile_local _ _GPU_SKIN
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
@@ -124,7 +226,7 @@ Shader "Custom/CharacterSurface"
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float3 uv2 : TEXCOORD2; float3 uv3 : TEXCOORD3; float4 color : COLOR; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float3 uv2 : TEXCOORD2; float3 uv3 : TEXCOORD3; float4 color : COLOR; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
             {
                 float4 positionCS : SV_POSITION;
@@ -138,7 +240,7 @@ Shader "Custom/CharacterSurface"
 
             Varyings vert(Attributes input)
             {
-                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_INSTANCE_ID(input); GPU_SKIN(input);
                 Varyings o;
                 o.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 o.positionCS = TransformWorldToHClip(o.positionWS);
@@ -213,12 +315,13 @@ Shader "Custom/CharacterSurface"
             #pragma vertex ShadowVert
             #pragma fragment ShadowFrag
             #pragma multi_compile_instancing
+            #pragma multi_compile_local _ _GPU_SKIN
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };
             float3 _LightDirection;
             float4 ShadowVert(Attributes input) : SV_POSITION
             {
-                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_INSTANCE_ID(input); GPU_SKIN(input);
                 float3 pws = TransformObjectToWorld(input.positionOS.xyz);
                 return TransformWorldToHClip(ApplyShadowBias(pws, TransformObjectToWorldNormal(input.normalOS), _LightDirection));
             }
@@ -235,8 +338,9 @@ Shader "Custom/CharacterSurface"
             #pragma vertex DepthVert
             #pragma fragment DepthFrag
             #pragma multi_compile_instancing
-            struct Attributes { float4 positionOS : POSITION; UNITY_VERTEX_INPUT_INSTANCE_ID };
-            float4 DepthVert(Attributes input) : SV_POSITION { UNITY_SETUP_INSTANCE_ID(input); return TransformObjectToHClip(input.positionOS.xyz); }
+            #pragma multi_compile_local _ _GPU_SKIN
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };
+            float4 DepthVert(Attributes input) : SV_POSITION { UNITY_SETUP_INSTANCE_ID(input); GPU_SKIN(input); return TransformObjectToHClip(input.positionOS.xyz); }
             half DepthFrag(float4 pos : SV_POSITION) : SV_Target { return pos.z; }
             ENDHLSL
         }
@@ -250,12 +354,13 @@ Shader "Custom/CharacterSurface"
             #pragma vertex DNVert
             #pragma fragment DNFrag
             #pragma multi_compile_instancing
+            #pragma multi_compile_local _ _GPU_SKIN
             #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; };
             Varyings DNVert(Attributes input)
             {
-                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_INSTANCE_ID(input); GPU_SKIN(input);
                 Varyings o;
                 o.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);

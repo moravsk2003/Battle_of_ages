@@ -30,6 +30,18 @@ namespace BattleOfAges.Utils
         /// <summary>When set (e.g. for screenshots), overrides the measured speed.</summary>
         public float? SpeedOverride { get; set; }
 
+        /// <summary>Horizontal speed the locomotion follows (also for GpuSkinnedCharacter while the Animator is off).</summary>
+        public float Speed => SpeedOverride ?? smoothedSpeed;
+
+        /// <summary>The Animator is back on (GpuSkinnedCharacter drew it meanwhile): send it the current state.</summary>
+        public void Resync(bool dead)
+        {
+            if (animator == null) return;
+            animator.SetFloat(SpeedId, Speed);
+            sentSpeed = Speed;
+            if (dead) { animator.SetBool(DeadId, true); animator.Play("Death", 0, 1f); }
+        }
+
         private void Awake()
         {
             animator = GetComponentInChildren<Animator>();
@@ -71,6 +83,7 @@ namespace BattleOfAges.Utils
             if (measured > 30f) measured = 0f; // teleports / respawns are not movement
 
             smoothedSpeed = Mathf.Lerp(smoothedSpeed, measured, 1f - Mathf.Exp(-10f * dt));
+            if (!animator.enabled) return; // drawn on the GPU meanwhile (GpuSkinnedCharacter)
             float speed = SpeedOverride ?? smoothedSpeed;
             if (Mathf.Abs(speed - sentSpeed) > 0.02f || (speed == 0f && sentSpeed != 0f)) { animator.SetFloat(SpeedId, speed); sentSpeed = speed; } // 1000 units: only on change
 
@@ -86,7 +99,7 @@ namespace BattleOfAges.Utils
 
         private void HandleAttack()
         {
-            if (animator == null || (health != null && !health.IsAlive)) return;
+            if (animator == null || !animator.enabled || (health != null && !health.IsAlive)) return;
             if (animator.layerCount > UpperBodyLayer)
             {
                 animator.Play("Attack", UpperBodyLayer, 0f);
@@ -97,9 +110,9 @@ namespace BattleOfAges.Utils
 
         private void HandleDeath()
         {
-            if (animator == null) return;
-            animator.SetBool(DeadId, true);
             attackTimer = 0f; // the death clip takes the whole body
+            if (animator == null || !animator.enabled) return; // on the GPU: it plays the fall itself
+            animator.SetBool(DeadId, true);
         }
     }
 }

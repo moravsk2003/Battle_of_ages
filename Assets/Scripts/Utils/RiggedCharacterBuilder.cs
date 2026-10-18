@@ -48,10 +48,15 @@ namespace BattleOfAges.Utils
             animator.runtimeAnimatorController = controller;
             animator.applyRootMotion = false;
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            root.AddComponent<GpuSkinnedCharacter>(); // drawn on the GPU when small on screen (if its body allows it)
 
             // The knight guard has its own sculpted body and gear on this skeleton
             if (type == HumanoidModelBuilder.HumanType.KnightGuard && KnightModelBuilder.Build(root, model.transform))
             {
+                // The Animator bound the imported body when it got its controller; with the sculpted skin unknown to
+                // it, CullUpdateTransforms saw nothing visible and never moved the bones (knights spawned in play
+                // stood still). Rebind makes it see the new skin.
+                animator.Rebind();
                 root.AddComponent<CharacterGear>().Type = type; // sculpted armour: the gear only changes stats
                 model.AddComponent<FootIK>();
                 root.AddComponent<CharacterAnimationDriver>();

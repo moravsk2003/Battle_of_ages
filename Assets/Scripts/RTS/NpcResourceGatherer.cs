@@ -2,6 +2,7 @@ using UnityEngine;
 using BattleOfAges.Resources;
 using BattleOfAges.Building;
 using BattleOfAges.Combat;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.RTS
 {
@@ -299,6 +300,8 @@ namespace BattleOfAges.RTS
             {
                 if (renderers[i] != null) renderers[i].enabled = active;
             }
+            GpuSkinnedCharacter gpu = GetComponentInChildren<GpuSkinnedCharacter>();
+            if (gpu != null) gpu.SetHidden(!active); // only one of its two bodies is drawn
         }
 
         private void HandleFindingResourceState()

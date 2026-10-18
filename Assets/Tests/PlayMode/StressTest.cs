@@ -64,9 +64,11 @@ namespace BattleOfAges.PlayModeTests
             cam.targetTexture = rt;
             cam.enabled = false;                    // rendered once per frame by hand, never twice
             FootIK.LodViewerOverride = cam.transform; // Camera.main is null while the camera is disabled
+            GpuSkinnedCharacter.ViewerOverride = cam;
+            GpuSkinnedCharacter.Enabled = Environment.GetEnvironmentVariable("STRESS_NO_GPU") != "1";
 
             report.AppendLine("# Battle of Ages — stress test (large battles)");
-            report.AppendLine($"{SystemInfo.processorType}, {SystemInfo.graphicsDeviceName}, render 1920x1080 every frame, scale {scale}. Recorder CharacterController.Move valid: {charCtrl.Valid}");
+            report.AppendLine($"{SystemInfo.processorType}, {SystemInfo.graphicsDeviceName}, render 1920x1080 every frame, scale {scale}. GPU skinning {(GpuSkinnedCharacter.Enabled ? "on" : "off")}. Recorder CharacterController.Move valid: {charCtrl.Valid}");
             report.AppendLine();
             report.AppendLine("| Scenario | units alive | frames | avg FPS | avg ms | p95 | p99 | max | main | render | scripts | late scripts | physics | char ctrl | animators | GC KB/f | batches |");
             report.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
@@ -125,6 +127,8 @@ namespace BattleOfAges.PlayModeTests
             cam.targetTexture = null;
             cam.enabled = true;
             FootIK.LodViewerOverride = null;
+            GpuSkinnedCharacter.ViewerOverride = null;
+            GpuSkinnedCharacter.Enabled = true;
             rt.Release();
             foreach (ProfilerRecorder r in new[] { mainThread, gcAlloc, batches, behaviour, lateBehaviour, physics, animators, charCtrl }) r.Dispose();
         }
