@@ -107,7 +107,7 @@ namespace BattleOfAges.Combat
             forward.y = 0f;
             forward = forward.sqrMagnitude > 1e-4f ? forward.normalized : transform.forward;
             float range = combat.AttackRange;
-            int n = UnitSpatialGrid.Query(transform.position, range, UnitSpatialGrid.TeamHostile, found);
+            int n = UnitSpatialGrid.Query(transform.position, range, combat.EnemyTeam, found); // the caster's enemies, whichever side it is on
             int hits = 0;
             for (int i = 0; i < n; i++)
             {

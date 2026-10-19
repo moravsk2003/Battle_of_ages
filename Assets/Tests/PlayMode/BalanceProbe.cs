@@ -27,6 +27,7 @@ namespace BattleOfAges.PlayModeTests
         private static readonly HeroClass[] Classes = { HeroClass.None, HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
         private readonly BattleSim sim = new BattleSim();
         private readonly StringBuilder report = new StringBuilder();
+        private int heroLevel = 1;
 
         [UnityTest, Timeout(3600000)] // a long run of fights
         public IEnumerator PlayBalance()
@@ -62,8 +63,47 @@ namespace BattleOfAges.PlayModeTests
                     report.AppendLine($"| {HeroUI.RankName(Ranks[w])} | {HeroUI.RankName(Ranks[s])} | {(need > 0 ? need.ToString() : $"> {MaxPack}")} | {left * 100f:0}% | ×{weight:0.#} (Ланчестер √: {Mathf.Sqrt(weight):0.#}) |");
                 }
 
-            // 2. classes one on one ---------------------------------------------------------------------------------
-            report.AppendLine("\n## 2. Класи героїв 1 на 1 (герої-генерали)\n");
+            yield return DuelTable("2. Класи героїв 1 на 1 (герої-генерали)");
+            yield return RanksTable($"3. Скількох юнітів кожного рангу ({gearNote}) перемагає герой-генерал");
+
+            Time.timeScale = 1f;
+            Time.maximumDeltaTime = 1f / 3f;
+            File.WriteAllText(Path.Combine(dir, "balance_report.md"), report.ToString(), new UTF8Encoding(true));
+        }
+
+        /// <summary>The same with heroes of level 2, 5 and 10, points spent the usual way (BattleSim.Develop), skills used.</summary>
+        [UnityTest, Timeout(7200000)] // three long runs of fights
+        public IEnumerator PlayLevels()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
+            if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
+            Directory.CreateDirectory(dir);
+            int.TryParse(Environment.GetEnvironmentVariable("BALANCE_GEAR"), out int gearLevel);
+            sim.GearLevel = gearLevel;
+            Time.timeScale = 50f;
+            Time.maximumDeltaTime = 0.1f;
+            report.AppendLine("# Баланс: герої різних рівнів з навиками\n");
+            report.AppendLine("Очки: Танк — усе в HP, без класу — почергово, решта — у силу. Навики: Танк — Відхіл до краю, далі Регенерація; " +
+                              "Лучник — Далекий постріл; Маг — Вогняне віяло; ДД — Ривок. Бот користується вміннями (Танк лікується нижче половини HP, " +
+                              "Маг кидає віяло в ціль у дальності, ДД робить ривок до далекої цілі). " +
+                              (gearLevel > 0 ? $"Спорядження: у всіх меч (Лучник — лук) і броня рівня {gearLevel}." : "Без спорядження.") + "\n");
+            foreach (int level in new[] { 2, 5, 10 })
+            {
+                heroLevel = level;
+                yield return DuelTable($"Рівень {level}: класи 1 на 1");
+                yield return RanksTable($"Рівень {level}: скількох юнітів кожного рангу перемагає герой-генерал");
+            }
+            heroLevel = 1;
+            Time.timeScale = 1f;
+            Time.maximumDeltaTime = 1f / 3f;
+            File.WriteAllText(Path.Combine(dir, "balance_levels.md"), report.ToString(), new UTF8Encoding(true));
+        }
+
+        /// <summary>Every class against every class, both ways round (heroes of heroLevel).</summary>
+        private IEnumerator DuelTable(string title)
+        {
+            report.AppendLine($"\n## {title}\n");
             var header = new StringBuilder("| Рядок проти стовпця |");
             var line = new StringBuilder("|---|");
             foreach (HeroClass c in Classes) { header.Append($" {HeroClassRules.Name(c)} |"); line.Append("---|"); }
@@ -86,9 +126,12 @@ namespace BattleOfAges.PlayModeTests
             }
             report.AppendLine("\nКожна пара грає двічі, помінявшись сторонами. ✅ N% — рядок переміг обидва рази (у середньому лишилось N% HP); " +
                               "❌ — програв обидва; ≈ — по-різному (дуже близький бій); 💀 — обидва загинули (обмін ударами); ⏱ — вийшов час.");
+        }
 
-            // 3. a hero against every rank --------------------------------------------------------------------------
-            report.AppendLine($"\n## 3. Скількох юнітів кожного рангу ({gearNote}) перемагає герой-генерал\n");
+        /// <summary>A hero of each class (of heroLevel) against packs of every rank: the biggest pack it beats.</summary>
+        private IEnumerator RanksTable(string title)
+        {
+            report.AppendLine($"\n## {title}\n");
             var head3 = new StringBuilder("| Клас |");
             var line3 = new StringBuilder("|---|");
             foreach (UnitRank rank in Ranks) { head3.Append($" {HeroUI.RankName(rank)} |"); line3.Append("---|"); }
@@ -110,10 +153,6 @@ namespace BattleOfAges.PlayModeTests
                 report.AppendLine(row.ToString());
             }
             report.AppendLine("\nN (M% HP) — герой перемагає N юнітів цього рангу, у нього лишається M% HP; N + 1 його вбивають.");
-
-            Time.timeScale = 1f;
-            Time.maximumDeltaTime = 1f / 3f;
-            File.WriteAllText(Path.Combine(dir, "balance_report.md"), report.ToString(), new UTF8Encoding(true));
         }
 
         /// <summary>One cell of the duel table from the two fights (the row's hero was on side1, then on side2).</summary>
@@ -180,6 +219,6 @@ namespace BattleOfAges.PlayModeTests
 
         /// <summary>Hero general of the class; the archer and the mage kite, the rest stand and fight.</summary>
         private void AddHero(int side, HeroClass c) =>
-            sim.Add(side, UnitRank.General, hero: true, c, kite: c == HeroClass.Archer || c == HeroClass.Mage);
+            sim.Add(side, UnitRank.General, hero: true, c, kite: c == HeroClass.Archer || c == HeroClass.Mage, level: heroLevel);
     }
 }

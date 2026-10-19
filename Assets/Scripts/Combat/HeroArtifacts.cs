@@ -82,9 +82,10 @@ namespace BattleOfAges.Combat
             if (a == ArtifactType.FullHeal) hp.Heal(hp.MaxHealth);
             else
             {
-                int enemy = UnitSpatialGrid.FindNearest(transform.position, GameBalance.LightningRange, UnitSpatialGrid.TeamHostile);
-                if (enemy < 0) { UI.StrategyHud.Notify("Немає ворога поблизу"); return false; }
                 CombatUnit combat = GetComponent<CombatUnit>();
+                int enemy = UnitSpatialGrid.FindNearest(transform.position, GameBalance.LightningRange,
+                                                        combat != null ? combat.EnemyTeam : UnitSpatialGrid.TeamHostile);
+                if (enemy < 0) { UI.StrategyHud.Notify("Немає ворога поблизу"); return false; }
                 HealthComponent target = UnitSpatialGrid.Health(enemy);
                 if (combat != null) combat.DeliverHit(target, GameBalance.LightningDamage, ignoreArmor: true);
                 else target.TakeDamage(GameBalance.LightningDamage, ignoreArmor: true);

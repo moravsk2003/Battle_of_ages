@@ -39,7 +39,7 @@ namespace BattleOfAges.PlayModeTests
         private readonly List<int> gridIds = new List<int>();
 
         /// <summary>Real units of a rank; a hero gets its class and a weapon (the archer a bow, others a sword I).</summary>
-        public Unit Add(int side, UnitRank rank, bool hero = false, HeroClass cls = HeroClass.None, bool kite = false, bool weapon = false)
+        public Unit Add(int side, UnitRank rank, bool hero = false, HeroClass cls = HeroClass.None, bool kite = false, bool weapon = false, int level = 1)
         {
             int index = units.FindAll(u => u.Side == side).Count;
             var go = new GameObject(side == 0 ? "SideA" : "SideB", typeof(HealthComponent), typeof(CombatUnit));
@@ -52,6 +52,7 @@ namespace BattleOfAges.PlayModeTests
             {
                 HeroProgress progress = go.AddComponent<HeroProgress>();
                 if (cls != HeroClass.None) progress.ChooseClass(cls);
+                go.AddComponent<HeroSkills>();
             }
             if (GearLevel > 0)
             {
@@ -59,6 +60,7 @@ namespace BattleOfAges.PlayModeTests
                 gear.Equip(new Item(ItemType.Armor, GearLevel));
             }
             else if (weapon || hero) gear.Equip(new Item(cls == HeroClass.Archer ? ItemType.Bow : ItemType.Sword, 1));
+            if (hero && level > 1) Develop(go, cls, level);
             HealthComponent hp = go.GetComponent<HealthComponent>();
             hp.InitializeHealth(hp.MaxHealth);
             spawned.Add(go);
@@ -68,6 +70,37 @@ namespace BattleOfAges.PlayModeTests
             gridIds.Add(UnitSpatialGrid.Register(unit.Combat, hp, unit.Combat.Team, 0.4f));
             units.Add(unit);
             return unit;
+        }
+
+        /// <summary>
+        /// A hero of this level with its points spent the usual way: attributes - the tank all into HP, the classless
+        /// hero by turns, the others all into strength; skills - the tank Instant heal to the top, then Regeneration;
+        /// the archer Long shot; the mage Fire fan; the DD Dash.
+        /// </summary>
+        public static void Develop(GameObject go, HeroClass cls, int level)
+        {
+            HeroProgress hero = go.GetComponent<HeroProgress>();
+            HeroSkills skills = go.GetComponent<HeroSkills>();
+            int xp = 0;
+            for (int l = 1; l < level; l++) xp += HeroProgress.XpForLevelUp(l);
+            hero.AddXp(xp);
+            for (int i = 0; hero.AttributePoints > 0; i++)
+            {
+                bool health = cls == HeroClass.Tank || (cls == HeroClass.None && i % 2 == 1);
+                if (health) hero.SpendOnHealth(); else hero.SpendOnStrength();
+            }
+            for (int guard = 0; hero.SkillPoints > 0 && guard < 50; guard++)
+            {
+                bool learnt = cls switch
+                {
+                    HeroClass.Tank => skills.LearnHeal() || skills.LearnRegenStart() || skills.LearnRegenMax(),
+                    HeroClass.Archer => skills.LearnLongShot(),
+                    HeroClass.Mage => skills.LearnFireFan(),
+                    HeroClass.Dd => skills.LearnDash(),
+                    _ => false
+                };
+                if (!learnt) break;
+            }
         }
 
         /// <summary>Plays until one side is gone or the time is up (game seconds; run with a raised Time.timeScale).</summary>
@@ -121,6 +154,7 @@ namespace BattleOfAges.PlayModeTests
             Unit target = Nearest(me, out float d);
             if (target == null) return;
             CombatUnit c = me.Combat;
+            UseSkill(me, target, d);
             if (c.CanAttack)
             {
                 if (d <= c.AttackRange + 0.5f) c.TryAttack(target.Hp);
@@ -139,6 +173,22 @@ namespace BattleOfAges.PlayModeTests
                 if (away != Vector3.zero) Move(c, away);
             }
             else if (d > c.AttackRange * 0.9f) Move(c, target.Combat.transform.position - c.transform.position);
+        }
+
+        /// <summary>The class's active skill when it pays: the tank heals below half HP, the mage casts its fan at a target in
+        /// range, the DD dashes at a target still far away.</summary>
+        private static void UseSkill(Unit me, Unit target, float d)
+        {
+            HeroSkills skills = me.Combat.GetComponent<HeroSkills>();
+            if (skills == null || !skills.HasActive || skills.CooldownLeft > 0f) return;
+            HeroProgress hero = me.Combat.GetComponent<HeroProgress>();
+            Vector3 to = target.Combat.transform.position - me.Combat.transform.position;
+            switch (hero.Class)
+            {
+                case HeroClass.Tank: if (me.Hp.CurrentHealth < me.Hp.MaxHealth / 2) skills.UseActive(to); break;
+                case HeroClass.Mage: if (d <= me.Combat.AttackRange) skills.UseActive(to); break;
+                case HeroClass.Dd: if (d > me.Combat.AttackRange + 3f) skills.UseActive(to); break;
+            }
         }
 
         private Unit Nearest(Unit me, out float distance)
