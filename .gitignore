@@ -92,3 +92,6 @@ temp_*
 ehthumbs.db
 Thumbs.db
 [Dd]esktop.ini
+
+# Player builds
+/[Bb]uilds/
