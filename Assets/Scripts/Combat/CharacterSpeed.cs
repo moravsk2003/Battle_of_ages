@@ -21,6 +21,6 @@ namespace BattleOfAges.Combat
         public static float Of(float modifier, float strength) => Global * modifier * Mathf.Sqrt(Mathf.Max(0f, strength));
 
         public static float Of(CombatUnit combat) =>
-            combat != null ? Of(combat.SpeedModifier, combat.Strength) : Of(DefaultModifier, DefaultStrength);
+            combat != null ? Of(combat.SpeedModifier, combat.SpeedStrength) : Of(DefaultModifier, DefaultStrength);
     }
 }

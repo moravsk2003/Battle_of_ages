@@ -175,6 +175,28 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator HitEnemy_GoesAfterTheShooter_EvenFromBeyondItsSight()
+        {
+            CreateGround();
+            HealthComponent raider = CreateRaider(new Vector3(30f, 0f, 0f), thinking: true); // beyond its 18 m sight
+            GameObject shooterObj = Track(new GameObject("TestShooter", typeof(HealthComponent), typeof(CombatUnit)));
+            shooterObj.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(shooterObj, UnitRank.Knight);
+            shooterObj.GetComponent<HealthComponent>().InitializeHealth(100);
+            yield return null;
+
+            HostileMobAI mob = raider.GetComponent<HostileMobAI>();
+            Assert.IsNull(mob.CurrentCombatTarget, "Too far to notice anyone.");
+            shooterObj.GetComponent<CombatUnit>().DeliverHit(raider, 1, ignoreArmor: false);
+            Assert.AreEqual(shooterObj.GetComponent<HealthComponent>(), mob.CurrentCombatTarget, "Hit: it goes after the shooter.");
+            Assert.IsTrue(mob.IsProvoked);
+
+            shooterObj.transform.position = new Vector3(-20f, 0f, 0f); // 50 m: past the usual 29 m leash
+            yield return Wait(2f);
+            Assert.AreEqual(shooterObj.GetComponent<HealthComponent>(), mob.CurrentCombatTarget, "A provoked enemy does not give up at the leash.");
+        }
+
+        [UnityTest]
         public IEnumerator MageVolley_HomesInAndGoesThroughArmour()
         {
             GameObject heroObj = Track(new GameObject("TestMage", typeof(HealthComponent), typeof(CombatUnit)));

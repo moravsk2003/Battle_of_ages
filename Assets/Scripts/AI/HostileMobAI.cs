@@ -44,11 +44,27 @@ namespace BattleOfAges.AI
         public HealthComponent CurrentCombatTarget => currentCombatTarget;
         public bool IsOnAssaultOrder => isOnAssaultOrder;
 
+        private float provokedUntil = float.NegativeInfinity;
+        /// <summary>Hit lately: it goes after whoever hit it and does not give up at the leash (docs/GAME_DESIGN.md §11.1).</summary>
+        public bool IsProvoked => Time.time < provokedUntil;
+
+        private void OnHit(int damage)
+        {
+            CombatUnit attacker = Health != null ? Health.LastAttacker : null;
+            HealthComponent attackerHp = attacker != null ? attacker.GetComponent<HealthComponent>() : null;
+            if (attackerHp == null || !attackerHp.IsAlive || !Health.IsAlive) return;
+            provokedUntil = Time.time + GameBalance.ProvokedSeconds;
+            if (CurrentStateType == AIStateType.Retreat || currentCombatTarget != null) return;
+            SetTarget(attackerHp); // also calls the allies nearby
+            ChangeState(AIStateType.Chase);
+        }
+
         protected override void Awake()
         {
             base.Awake();
 
             if (combatUnit == null) combatUnit = gameObject.AddComponent<CombatUnit>();
+            if (Health != null) Health.OnTakeDamage += OnHit;
 
             ApplyMobStats();
         }
@@ -281,7 +297,7 @@ namespace BattleOfAges.AI
             }
 
             float dist = Vector3.Distance(mob.transform.position, mob.CurrentCombatTarget.transform.position);
-            if (!mob.IsOnAssaultOrder && dist > mob.AggroRadius * 1.6f)
+            if (!mob.IsOnAssaultOrder && !mob.IsProvoked && dist > mob.AggroRadius * 1.6f)
             {
                 // Lost target
                 mob.SetTarget(null);

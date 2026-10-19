@@ -76,6 +76,7 @@ namespace BattleOfAges.AI
             {
                 currentState.UpdateState(this, deltaTime);
             }
+            if (Combat != null) Combat.Pursuing = CurrentStateType == AIStateType.Chase; // chasers run a little faster
         }
 
         private int gridId = -1;

@@ -100,11 +100,19 @@ namespace BattleOfAges.Combat
         float IStatModifier.WeaponMultiplier(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.WeaponMultiplier(worn) : worn; }
         float IStatModifier.DamageReduction(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.DamageReduction(worn) : worn; }
 
+        /// <summary>The mage runs like 80% of its rank's strength; its strength points go into its spells only.</summary>
+        float IStatModifier.SpeedStrength(float strength)
+        {
+            if (heroClass != HeroClass.Mage) return strength;
+            UnitProgress rank = GetComponent<UnitProgress>();
+            return UnitRanks.Strength(rank != null ? rank.Rank : UnitRank.General, hero: true) * GameBalance.MageBodyStrengthShare;
+        }
+
         float IStatModifier.Range(float range, bool bow, float strength)
         {
             if (!HeroClassRules.IsRanged(heroClass, bow)) return range;
             if (combat == null) combat = GetComponent<CombatUnit>();
-            float speed = CharacterSpeed.Of(combat != null ? combat.SpeedModifier : CharacterSpeed.HeroModifier, strength);
+            float speed = CharacterSpeed.Of(combat != null ? combat.SpeedModifier : CharacterSpeed.HeroModifier, ((IStatModifier)this).SpeedStrength(strength));
             return HeroClassRules.Range(speed, RangeBonus);
         }
 

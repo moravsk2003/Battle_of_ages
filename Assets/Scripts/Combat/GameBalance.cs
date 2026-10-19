@@ -58,6 +58,8 @@ namespace BattleOfAges.Combat
         /// <summary>The mage's attack: this many homing bolts, each this share of the damage, through armour.</summary>
         public static int MageBolts = 5;
         public static float MageBoltShare = 0.2f;
+        /// <summary>The mage runs like this share of its rank's strength, and strength points add only to its spells.</summary>
+        public static float MageBodyStrengthShare = 0.8f;
 
         // ------------------------------------------------------------------ class skills (§8.1)
 
@@ -86,6 +88,10 @@ namespace BattleOfAges.Combat
         /// <summary>Wind-up: seconds from the start of a swing to its hit (a started swing lands even if the striker falls).</summary>
         public static float MeleeWindup = 0.35f, BowWindup = 0.5f, MageWindup = 0.2f;
         public static float RangedRootSeconds = 0.5f;
+        /// <summary>A unit chasing its target runs this much faster (the one fleeing is caught in the end).</summary>
+        public static float PursuitBonus = 0.05f;
+        /// <summary>A hit enemy goes after its attacker for this long, past its usual leash.</summary>
+        public static float ProvokedSeconds = 15f;
 
         // ------------------------------------------------------------------ promotions (§11.1)
 

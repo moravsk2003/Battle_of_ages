@@ -114,10 +114,11 @@ namespace BattleOfAges.PlayModeTests
             Unit target = Nearest(me, out float d);
             if (target == null) return;
             CombatUnit c = me.Combat;
+            c.Pursuing = false; // only while running after the target, as the game's AI does
             if (c.CanAttack)
             {
                 if (d <= c.AttackRange + 0.5f) c.TryAttack(target.Hp);
-                else Move(c, target.Combat.transform.position - c.transform.position);
+                else { c.Pursuing = true; Move(c, target.Combat.transform.position - c.transform.position); }
                 return;
             }
             if (me.Kite)
@@ -131,7 +132,7 @@ namespace BattleOfAges.PlayModeTests
                 }
                 if (away != Vector3.zero) Move(c, away);
             }
-            else if (d > c.AttackRange * 0.9f) Move(c, target.Combat.transform.position - c.transform.position);
+            else if (d > c.AttackRange * 0.9f) { c.Pursuing = true; Move(c, target.Combat.transform.position - c.transform.position); }
         }
 
         private Unit Nearest(Unit me, out float distance)

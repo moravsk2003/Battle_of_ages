@@ -187,6 +187,7 @@ namespace BattleOfAges.Crafting
             if (combat != null)
             {
                 combat.Strength = EffectiveStrength; // the characteristic; damage = strength x weapon
+                combat.SpeedStrength = Modifier != null ? Modifier.SpeedStrength(EffectiveStrength) : EffectiveStrength;
                 combat.InitializeCombatStats(Damage, Cooldown, Range);
             }
             CharacterGear gear = GetComponentInChildren<CharacterGear>(true);

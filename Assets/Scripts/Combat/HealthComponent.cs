@@ -48,6 +48,9 @@ namespace BattleOfAges.Combat
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
         }
 
+        /// <summary>Who landed the last hit (the provoked AI goes after it).</summary>
+        public CombatUnit LastAttacker { get; set; }
+
         /// <summary>Every Nth hit does nothing (the tank, §8.1; 0: off). A counter, no chance.</summary>
         public int IgnoreEveryNthHit { get; set; }
         private int hitCounter;

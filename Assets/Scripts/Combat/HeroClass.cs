@@ -58,5 +58,7 @@ namespace BattleOfAges.Combat
         float WeaponMultiplier(float worn);
         /// <summary>The share of a hit armour stops (artifact armour takes the armour slot).</summary>
         float DamageReduction(float worn);
+        /// <summary>The strength the run speed follows (normally the strength itself).</summary>
+        float SpeedStrength(float strength);
     }
 }

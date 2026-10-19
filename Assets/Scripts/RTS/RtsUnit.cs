@@ -165,6 +165,7 @@ namespace BattleOfAges.RTS
         {
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
             if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
+            if (combatUnit != null) combatUnit.Pursuing = false; // set again below while running after a target
 
             // Soldiers engage raiders that come near on their own (idle or after a fight), not workers or the hero.
             if (!isPlayerControlled && !IsWorking && combatUnit != null && attackTarget == null && !hasTarget)
@@ -212,6 +213,7 @@ namespace BattleOfAges.RTS
                     else
                     {
                         // Move closer to attack target
+                        if (combatUnit != null) combatUnit.Pursuing = true;
                         targetPosition = attackTarget.transform.position;
                         hasTarget = true;
                     }

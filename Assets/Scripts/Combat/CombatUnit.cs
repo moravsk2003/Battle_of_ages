@@ -24,11 +24,17 @@ namespace BattleOfAges.Combat
         [SerializeField] private float strength;
         /// <summary>Strength characteristic: the damage before the weapon (Equipment sets it; without gear = AttackDamage).</summary>
         public float Strength { get => strength > 0f ? strength : attackDamage; set => strength = value; }
+        private float speedStrength;
+        /// <summary>Strength the run speed follows (the mage: a fixed share of its rank, not its spell power).</summary>
+        public float SpeedStrength { get => speedStrength > 0f ? speedStrength : Strength; set => speedStrength = value; }
         [SerializeField] private float speedModifier = CharacterSpeed.DefaultModifier;
         /// <summary>Speed characteristic (person 7, soldiers 6, hero 5; see UnitRanks, CharacterSpeed).</summary>
         public float SpeedModifier { get => speedModifier; set => speedModifier = value; }
         /// <summary>Global x SpeedModifier x sqrt(strength).</summary>
-        public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor;
+        public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor * (Pursuing ? 1f + GameBalance.PursuitBonus : 1f);
+
+        /// <summary>Running after a target to attack it: a little faster than one fleeing (§11.1), set by the AI.</summary>
+        public bool Pursuing { get; set; }
 
         private float boostFactor = 1f, boostUntil = float.NegativeInfinity;
         /// <summary>Runs this many times faster for a while (the DD's Dash).</summary>
@@ -103,6 +109,7 @@ namespace BattleOfAges.Combat
         public void DeliverHit(HealthComponent target, int damage, bool ignoreArmor)
         {
             if (target == null || !target.IsAlive) return;
+            target.LastAttacker = this;
             int before = target.CurrentHealth;
             target.TakeDamage(damage, ignoreArmor);
             if (LifeSteal > 0f) GetComponent<HealthComponent>()?.Heal(Mathf.RoundToInt((before - target.CurrentHealth) * LifeSteal)); // the Vampiric artifact

@@ -76,7 +76,8 @@ namespace BattleOfAges.Tests
         {
             hero.ChooseClass(HeroClass.Mage);
             Assert.IsTrue(combat.FiresBolts);
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(50f) * 3f, combat.AttackRange, 1e-3f, "~26.5 m for a hero general.");
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(40f) * 3f, combat.AttackRange, 1e-3f, "~23.7 m: the mage runs like strength 40.");
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(40f), combat.MoveSpeed, 1e-3f, "A hero general mage runs 7.9 m/s.");
 
             Assert.AreEqual(12f, HeroClassRules.Range(2.5f), 1e-4f, "A hero person runs 7.5 m in 3 s: the minimum 12 m.");
         }
@@ -116,6 +117,26 @@ namespace BattleOfAges.Tests
                 Assert.AreEqual(0f, combat.MoveSpeed, 1e-5f, "A ranged shot roots the shooter.");
             }
             finally { Object.DestroyImmediate(victim); }
+        }
+
+        [Test]
+        public void Chasers_RunFivePercentFaster()
+        {
+            float speed = combat.MoveSpeed;
+            combat.Pursuing = true;
+            Assert.AreEqual(speed * 1.05f, combat.MoveSpeed, 1e-3f);
+        }
+
+        [Test]
+        public void MageStrengthPoints_GoIntoSpells_NotIntoRunning()
+        {
+            hero.ChooseClass(HeroClass.Mage);
+            hero.AddXp(100);
+            float speed = combat.MoveSpeed;
+            int damage = combat.AttackDamage;
+            Assert.IsTrue(hero.SpendOnStrength());
+            Assert.AreEqual(speed, combat.MoveSpeed, 1e-4f, "The mage's run speed stays.");
+            Assert.Greater(combat.AttackDamage, damage, "Its spells hit harder.");
         }
 
         [Test]
