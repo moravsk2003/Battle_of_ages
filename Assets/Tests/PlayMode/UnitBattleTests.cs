@@ -200,6 +200,41 @@ namespace BattleOfAges.PlayModeTests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator FallenHerosArtifacts_WaitForTheNewHero_TheEmpireTurnsIntoAShard()
+        {
+            yield return ClearWorld();
+            CreateGround();
+            HeroSuccession hero = CreateHero();
+            HeroArtifacts bag = hero.gameObject.AddComponent<HeroArtifacts>();
+            CreateKnight(new Vector3(4f, 0f, 0f));
+            CreateKnight(new Vector3(6f, 0f, 0f));
+            yield return null;
+            bag.Add(ArtifactType.SwordX5);
+            bag.Add(ArtifactType.CentralEmpire);
+            Assert.IsTrue(CentralEmpire.Active);
+            int epoch = CentralEmpire.WorldEpoch;
+
+            hero.GetComponent<HealthComponent>().TakeDamage(100000);
+            yield return null;
+            Assert.IsFalse(CentralEmpire.Active, "The bearer's death destroys the empire...");
+            Assert.AreEqual(epoch + 1, CentralEmpire.WorldEpoch, "... and opens a new world epoch.");
+            Assert.AreEqual(0, bag.Held.Count, "Everything fell to the ground.");
+            ArtifactPickup sword = null, empire = null;
+            foreach (ArtifactPickup p in ArtifactPickup.Active) { Track(p.gameObject); if (p.Type == ArtifactType.SwordX5) sword = p; else empire = p; }
+            Assert.IsNotNull(sword); Assert.IsNotNull(empire);
+            Assert.IsTrue(empire.IsShard, "The empire's artifact is a shard at once.");
+            Assert.IsFalse(sword.IsShard);
+            Assert.IsFalse(sword.MayTake(hero), "Nobody takes it during the interregnum.");
+
+            hero.EndInterregnum();
+            Assert.IsTrue(sword.MayTake(hero), "The new hero may take it...");
+            Assert.IsFalse(sword.MayTake(null), "... nobody else.");
+            sword.TakeBy(hero);
+            Assert.IsTrue(bag.Has(ArtifactType.SwordX5));
+            yield return ClearWorld(); // the deserter band must not wander into later tests
+        }
+
         private HeroSuccession CreateHero()
         {
             GameObject go = Track(new GameObject("TestHero", typeof(CharacterController), typeof(HealthComponent), typeof(CombatUnit)));

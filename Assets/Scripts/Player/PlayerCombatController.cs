@@ -66,6 +66,7 @@ namespace BattleOfAges.Player
             if (GetComponent<HeroProgress>() == null) gameObject.AddComponent<HeroProgress>();
             if (GetComponent<HeroSkills>() == null) gameObject.AddComponent<HeroSkills>();
             if (GetComponent<HeroSuccession>() == null) gameObject.AddComponent<HeroSuccession>();
+            if (GetComponent<HeroArtifacts>() == null) gameObject.AddComponent<HeroArtifacts>();
         }
 
         /// <summary>Wears the item (no store involved); returns what was worn in that slot.</summary>

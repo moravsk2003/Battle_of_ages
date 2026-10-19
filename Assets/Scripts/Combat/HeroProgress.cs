@@ -67,6 +67,8 @@ namespace BattleOfAges.Combat
         public void AddXp(int amount)
         {
             if (amount <= 0) return;
+            HeroArtifacts bag = GetComponent<HeroArtifacts>();
+            if (bag != null) amount = Mathf.RoundToInt(amount * (1f + bag.XpBonus)); // the Wisdom artifact
             xp += amount;
             while (xp >= XpToNextLevel)
             {
@@ -94,6 +96,9 @@ namespace BattleOfAges.Combat
         float IStatModifier.HealthFactor => HeroClassRules.HealthFactor(heroClass);
         float IStatModifier.StrengthFactor(bool bow) => HeroClassRules.StrengthFactor(heroClass, bow);
         float IStatModifier.CooldownFactor(bool bow) => HeroClassRules.CooldownFactor(heroClass, bow);
+
+        float IStatModifier.WeaponMultiplier(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.WeaponMultiplier(worn) : worn; }
+        float IStatModifier.DamageReduction(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.DamageReduction(worn) : worn; }
 
         float IStatModifier.Range(float range, bool bow, float strength)
         {

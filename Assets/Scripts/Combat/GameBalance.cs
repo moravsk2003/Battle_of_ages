@@ -31,6 +31,17 @@ namespace BattleOfAges.Combat
         /// <summary>Unranked beasts give 1 XP per this much of their max HP.</summary>
         public static int WildlifeHpPerXp = 10;
 
+        // ------------------------------------------------------------------ artifacts (§9.1.1)
+
+        public static float VampiricShare = 0.1f, SwordArtifactMultiplier = 5f, ArmorArtifactReduction = 0.9f;
+        public static float WisdomXpBonus = 0.2f;
+        public static int LightningDamage = 200;
+        public static float LightningRange = 40f;
+        /// <summary>No armour stops more than this share of a hit.</summary>
+        public static float MaxDamageReduction = 0.9f;
+        /// <summary>Central Empire: gear levels of the hero, warriors and up, people.</summary>
+        public static int EmpireHeroGear = 5, EmpireSoldierGear = 4, EmpirePersonGear = 3;
+
         // ------------------------------------------------------------------ hero death (§7.2)
 
         /// <summary>Real seconds between the hero's death and the new hero.</summary>

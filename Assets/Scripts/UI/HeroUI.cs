@@ -23,10 +23,14 @@ namespace BattleOfAges.UI
         private Button strengthButton, healthButton;
         private GameObject classPicker;
         private readonly Button[] skillButtons = new Button[4];
+        private Text artifactText;
+        private Button pickPrev, pickNext, pickTake, useHeal, useLightning, combine;
+        private int pickIndex;
+        private HeroArtifacts bag;
         private HeroProgress hero;
         private bool open, dirty;
 
-        private static readonly Vector2 Size = new Vector2(560f, 470f);
+        private static readonly Vector2 Size = new Vector2(560f, 610f);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
@@ -74,9 +78,13 @@ namespace BattleOfAges.UI
             if (hero != null) hero.Changed -= OnHeroChanged;
             hero = h;
             if (hero != null) hero.Changed += OnHeroChanged;
+            if (bag != null) bag.Changed -= OnBagChanged;
+            bag = hero != null ? hero.GetComponent<HeroArtifacts>() : null;
+            if (bag != null) bag.Changed += OnBagChanged;
         }
 
         private void OnHeroChanged(HeroProgress h) => dirty = true;
+        private void OnBagChanged(HeroArtifacts b) => dirty = true;
 
         private void Update()
         {
@@ -112,6 +120,7 @@ namespace BattleOfAges.UI
             strengthButton.interactable = healthButton.interactable = hero.AttributePoints > 0;
             classPicker.SetActive(hero.Class == HeroClass.None);
             RefreshSkills();
+            RefreshArtifacts();
         }
 
 
@@ -158,6 +167,35 @@ namespace BattleOfAges.UI
             b.onClick.AddListener(() => learn());
         }
 
+        /// <summary>Artifacts (docs/GAME_DESIGN.md §9): the starting pick, what is held, one-shots, shards.</summary>
+        private void RefreshArtifacts()
+        {
+            bool has = bag != null;
+            bool picking = has && !bag.StartChosen;
+            pickPrev.gameObject.SetActive(picking); pickNext.gameObject.SetActive(picking); pickTake.gameObject.SetActive(picking);
+            if (!has) { artifactText.text = ""; return; }
+            if (picking)
+            {
+                ArtifactType a = Artifacts.All[pickIndex];
+                artifactText.text = $"Стартовий артефакт: <b>{Artifacts.Name(a)}</b>\n{Artifacts.Description(a)}";
+            }
+            else
+            {
+                var names = new System.Text.StringBuilder();
+                foreach (ArtifactType a in bag.Held) names.Append(names.Length > 0 ? ", " : "").Append(Artifacts.Name(a));
+                artifactText.text = $"Артефакти: {(names.Length > 0 ? names.ToString() : "немає")}\nОсколки: {bag.Shards.Count}";
+            }
+            useHeal.gameObject.SetActive(!picking && bag.Has(ArtifactType.FullHeal));
+            useLightning.gameObject.SetActive(!picking && bag.Has(ArtifactType.Lightning));
+            combine.gameObject.SetActive(!picking && bag.Shards.Count >= 2);
+        }
+
+        private void StepPick(int d)
+        {
+            pickIndex = (pickIndex + d + Artifacts.All.Length) % Artifacts.All.Length;
+            dirty = true;
+        }
+
         public static string RankName(UnitRank rank)
         {
             switch (rank)
@@ -201,6 +239,21 @@ namespace BattleOfAges.UI
                 () => { if (hero != null) hero.SpendOnStrength(); }, 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
                 () => { if (hero != null) hero.SpendOnHealth(); }, 22);
+            // Artifacts: the starting pick (once), one-shots and shards
+            RectTransform art = UiTheme.Rect(panel, "Artifacts", new Vector2(0.5f, 0f), new Vector2(0f, 262f), new Vector2(500f, 62f));
+            artifactText = UiTheme.Label(art, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
+            artifactText.supportRichText = true;
+            pickPrev = UiTheme.TextButton(panel, "PickPrev", "‹", new Vector2(0f, 0f), new Vector2(30f, 206f), new Vector2(50f, 44f), () => StepPick(-1), 26);
+            pickNext = UiTheme.TextButton(panel, "PickNext", "›", new Vector2(0f, 0f), new Vector2(90f, 206f), new Vector2(50f, 44f), () => StepPick(1), 26);
+            pickTake = UiTheme.TextButton(panel, "PickTake", "Взяти", new Vector2(0f, 0f), new Vector2(150f, 206f), new Vector2(140f, 44f),
+                () => { if (bag != null) bag.ChooseStart(Artifacts.All[pickIndex]); }, 19);
+            useHeal = UiTheme.TextButton(panel, "UseHeal", "Зцілитися", new Vector2(0f, 0f), new Vector2(30f, 206f), new Vector2(150f, 44f),
+                () => { if (bag != null) bag.Use(ArtifactType.FullHeal); }, 17);
+            useLightning = UiTheme.TextButton(panel, "UseLightning", "Блискавка", new Vector2(0f, 0f), new Vector2(190f, 206f), new Vector2(150f, 44f),
+                () => { if (bag != null) bag.Use(ArtifactType.Lightning); }, 17);
+            combine = UiTheme.TextButton(panel, "Combine", "Об'єднати осколки", new Vector2(0f, 0f), new Vector2(350f, 206f), new Vector2(180f, 44f),
+                () => { if (bag != null) bag.CombineShards(); }, 15);
+
             // Class skills share the row with the class picker (shown once the class is chosen)
             for (int i = 0; i < skillButtons.Length; i++)
                 skillButtons[i] = UiTheme.TextButton(panel, "Skill" + i, "", new Vector2(0f, 0f), new Vector2(20f + i * 130f, 150f), new Vector2(124f, 46f), null, 14);

@@ -85,6 +85,7 @@ namespace BattleOfAges.RTS
                 // One kind of unit (docs/GAME_DESIGN.md §11.1): every unit can also work; one without a job stands by as a soldier
                 if (gatherer == null) { gatherer = gameObject.AddComponent<NpcResourceGatherer>(); gatherer.SetGatherDirective(GatherDirective.Idle); }
                 EnsureStartingKit();
+                CentralEmpire.ApplyTo(gameObject); // the empire's units wear its gear and do not work
             }
         }
 

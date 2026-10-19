@@ -59,14 +59,15 @@ namespace BattleOfAges.Crafting
             {
                 float r = 0f;
                 foreach (Item i in Slots) r += ItemStatCalculator.DamageReduction(i);
-                return Mathf.Min(r, ItemStatCalculator.MAX_DAMAGE_REDUCTION);
+                r = Mathf.Min(r, ItemStatCalculator.MAX_DAMAGE_REDUCTION);
+                return Modifier != null ? Modifier.DamageReduction(r) : r; // artifact armour takes the armour slot
             }
         }
 
         public int MaxHealth { get { EnsureBase(); return Mathf.RoundToInt(baseHealth * HealthFactor() * (Modifier != null ? Modifier.HealthFactor : 1f)); } }
         /// <summary>Strength in effect: the base, times what the hero's class gives (the archer's bow doubles it).</summary>
         public float EffectiveStrength { get { EnsureBase(); return baseDamage * (Modifier != null ? Modifier.StrengthFactor(HasBow) : 1f); } }
-        public int Damage => Mathf.Max(1, Mathf.RoundToInt(EffectiveStrength * DamageFactor()));
+        public int Damage => Mathf.Max(1, Mathf.RoundToInt(EffectiveStrength * (Modifier != null ? Modifier.WeaponMultiplier(DamageFactor()) : DamageFactor())));
         public float Cooldown { get { EnsureBase(); return baseCooldown * CooldownFactor() * (Modifier != null ? Modifier.CooldownFactor(HasBow) : 1f); } }
         public float Range
         {

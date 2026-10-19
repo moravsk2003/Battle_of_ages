@@ -54,5 +54,9 @@ namespace BattleOfAges.Combat
         float CooldownFactor(bool bow);
         /// <summary>Range for this strength (the run speed follows the strength), or the given range unchanged.</summary>
         float Range(float range, bool bow, float strength);
+        /// <summary>The weapon multiplier (an artifact sword takes the weapon slot).</summary>
+        float WeaponMultiplier(float worn);
+        /// <summary>The share of a hit armour stops (artifact armour takes the armour slot).</summary>
+        float DamageReduction(float worn);
     }
 }

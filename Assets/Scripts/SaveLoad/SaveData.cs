@@ -22,6 +22,8 @@ namespace BattleOfAges.SaveLoad
         public List<BuildingSave> Buildings = new List<BuildingSave>();
         public List<UnitSave> Units = new List<UnitSave>();
         public WorldSave World = new WorldSave();
+        public List<ArtifactSave> Pickups = new List<ArtifactSave>(); // artifacts and shards on the ground
+        public int WorldEpoch;
 
         public int OreTotal { get { int n = 0; foreach (TierCount t in Ore) n += t.Count; return n; } }
     }
@@ -45,6 +47,16 @@ namespace BattleOfAges.SaveLoad
         public bool HasMapCamera;
         public int Level = 1, Xp, AttributePoints, SkillPoints, StrengthPoints, HealthPoints, Class; // HeroProgress
         public bool RegenStart, LongShot, FireFan; public int RegenMaxPoints, RegenCurrentPoints, HealLevel, DashLevel; // HeroSkills
+        public List<int> Artifacts = new List<int>(), Shards = new List<int>(); public bool StartArtifactChosen; // HeroArtifacts
+    }
+
+    [Serializable]
+    public class ArtifactSave
+    {
+        public int Type;
+        public bool Shard;
+        public Vector3 Position;
+        public bool OwnedByPlayer;      // waits for the player's next hero
     }
 
     [Serializable]

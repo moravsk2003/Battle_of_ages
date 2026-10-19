@@ -149,6 +149,16 @@ namespace BattleOfAges.SaveLoad
                     d.Player.AttributePoints = hero.AttributePoints; d.Player.SkillPoints = hero.SkillPoints;
                     d.Player.StrengthPoints = hero.StrengthPoints; d.Player.HealthPoints = hero.HealthPoints; d.Player.Class = (int)hero.Class;
                 }
+                HeroArtifacts bag = player.GetComponent<HeroArtifacts>();
+                if (bag != null)
+                {
+                    foreach (ArtifactType a in bag.Held) d.Player.Artifacts.Add((int)a);
+                    foreach (ArtifactType a in bag.Shards) d.Player.Shards.Add((int)a);
+                    d.Player.StartArtifactChosen = bag.StartChosen;
+                }
+                foreach (ArtifactPickup p in ArtifactPickup.Active)
+                    d.Pickups.Add(new ArtifactSave { Type = (int)p.Type, Shard = p.IsShard, Position = p.transform.position, OwnedByPlayer = p.Owner != null });
+                d.WorldEpoch = CentralEmpire.WorldEpoch;
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null)
                 {
@@ -405,6 +415,11 @@ namespace BattleOfAges.SaveLoad
                 if (hero != null) hero.Restore(d.Player.Level, d.Player.Xp, d.Player.AttributePoints, d.Player.SkillPoints, d.Player.StrengthPoints, d.Player.HealthPoints, (HeroClass)d.Player.Class);
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null) skills.Restore(d.Player.RegenStart, d.Player.RegenMaxPoints, d.Player.RegenCurrentPoints, d.Player.HealLevel, d.Player.LongShot, d.Player.FireFan, d.Player.DashLevel);
+                player.GetComponent<HeroArtifacts>()?.Restore(d.Player.Artifacts, d.Player.Shards, d.Player.StartArtifactChosen);
+                CentralEmpire.WorldEpoch = d.WorldEpoch;
+                foreach (ArtifactPickup p in new List<ArtifactPickup>(ArtifactPickup.Active)) UnityEngine.Object.Destroy(p.gameObject);
+                foreach (ArtifactSave a in d.Pickups)
+                    ArtifactPickup.Spawn((ArtifactType)a.Type, a.Position, a.Shard, a.OwnedByPlayer ? player.GetComponent<HeroSuccession>() : null);
                 HealthComponent hp = player.GetComponent<HealthComponent>();
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }

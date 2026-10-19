@@ -256,14 +256,10 @@ namespace BattleOfAges.Building
                 return;
             }
 
-            if (def.WoodCost > 0)
+            if (!Combat.CentralEmpire.Active) // building is free for the Central Empire
             {
-                rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
-            }
-
-            if (def.OreCost > 0)
-            {
-                rm.ConsumeOre(def.OreTierRequired, def.OreCost);
+                if (def.WoodCost > 0) rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
+                if (def.OreCost > 0) rm.ConsumeOre(def.OreTierRequired, def.OreCost);
             }
 
             GameObject building = CreateBuilding(currentBuildingType);
@@ -319,6 +315,7 @@ namespace BattleOfAges.Building
         {
             ResourceManager rm = ResourceManager.Instance;
             if (rm == null) return false;
+            if (Combat.CentralEmpire.Active) return true;
 
             if (def.WoodCost > 0 && rm.WoodCount < def.WoodCost) return false;
             if (def.OreCost > 0 && rm.GetOreTierCount(def.OreTierRequired) < def.OreCost) return false;

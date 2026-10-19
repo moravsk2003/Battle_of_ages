@@ -79,11 +79,16 @@ namespace BattleOfAges.Combat
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
         public bool FiresBolts { get; set; }
 
+        /// <summary>Share of the damage dealt that heals this unit (the Vampiric artifact).</summary>
+        public float LifeSteal { get; set; }
+
         /// <summary>Lands a hit of this unit (directly or from one of its bolts): damage, battle experience, kill.</summary>
         public void DeliverHit(HealthComponent target, int damage, bool ignoreArmor)
         {
             if (target == null || !target.IsAlive) return;
+            int before = target.CurrentHealth;
             target.TakeDamage(damage, ignoreArmor);
+            if (LifeSteal > 0f) GetComponent<HealthComponent>()?.Heal(Mathf.RoundToInt((before - target.CurrentHealth) * LifeSteal)); // the Vampiric artifact
 
             // Battle experience (docs/GAME_DESIGN.md §11.1); heroes count kills for their own levels (Killed)
             if (progress == null) progress = GetComponent<UnitProgress>();

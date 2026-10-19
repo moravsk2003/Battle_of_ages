@@ -57,7 +57,7 @@ namespace BattleOfAges.Combat
         {
             if (!IsAlive || damage <= 0) return;
             if (IgnoreEveryNthHit > 0 && ++hitCounter >= IgnoreEveryNthHit) { hitCounter = 0; return; }
-            if (!ignoreArmor && DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, 0.8f))));
+            if (!ignoreArmor && DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, GameBalance.MaxDamageReduction))));
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             OnTakeDamage?.Invoke(damage);

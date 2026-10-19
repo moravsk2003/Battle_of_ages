@@ -46,6 +46,7 @@ namespace BattleOfAges.Building
             wood = GameBalance.TownHallWood[l];
             ore = GameBalance.TownHallOre[l];
             tier = l - 1;
+            if (CentralEmpire.Active) wood = ore = 0; // free for the Central Empire
         }
 
         public bool CanUpgrade(out string reason)

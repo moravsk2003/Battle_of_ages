@@ -199,6 +199,7 @@ namespace BattleOfAges.RTS
         /// <summary>A direct work order turns a soldier (Idle) into a worker with the Auto job.</summary>
         private void StartWorking()
         {
+            if (CentralEmpire.Active) return; // the Central Empire's units do not work (docs/GAME_DESIGN.md §9.1.1)
             if (currentDirective == GatherDirective.Idle) currentDirective = GatherDirective.Auto;
         }
 

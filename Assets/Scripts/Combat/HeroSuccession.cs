@@ -29,8 +29,15 @@ namespace BattleOfAges.Combat
         public float InterregnumLeft => Mathf.Max(0f, interregnumLeft);
         public bool IsGameOver { get; private set; }
 
+        private static readonly List<HeroSuccession> all = new List<HeroSuccession>();
+        /// <summary>Heroes on the map (the player's; NPC heroes later).</summary>
+        public static IReadOnlyList<HeroSuccession> All => all;
+
         private HealthComponent health;
         private float interregnumLeft;
+
+        private void OnEnable() { if (!all.Contains(this)) all.Add(this); }
+        private void OnDisable() => all.Remove(this);
 
         private void Awake()
         {
