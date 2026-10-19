@@ -145,6 +145,17 @@ namespace BattleOfAges.Combat
             if (health != null && health.IsAlive) health.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(share * health.MaxHealth)));
         }
 
+        /// <summary>A new hero after the old one died: level 1, no points, the class to be chosen anew (§7.2).</summary>
+        public void ResetForNewHero()
+        {
+            level = 1;
+            xp = attributePoints = skillPoints = strengthPoints = healthPoints = 0;
+            heroClass = HeroClass.None;
+            RangeBonus = 0f;
+            ApplyStats();
+            Changed?.Invoke(this);
+        }
+
         /// <summary>A loaded save.</summary>
         public void Restore(int savedLevel, int savedXp, int freeAttributes, int freeSkills, int strengthSpent, int healthSpent, HeroClass savedClass)
         {

@@ -65,6 +65,7 @@ namespace BattleOfAges.Player
             UnitProgress.Setup(gameObject, UnitRank.General, hero: true);
             if (GetComponent<HeroProgress>() == null) gameObject.AddComponent<HeroProgress>();
             if (GetComponent<HeroSkills>() == null) gameObject.AddComponent<HeroSkills>();
+            if (GetComponent<HeroSuccession>() == null) gameObject.AddComponent<HeroSuccession>();
         }
 
         /// <summary>Wears the item (no store involved); returns what was worn in that slot.</summary>
@@ -110,6 +111,7 @@ namespace BattleOfAges.Player
             GameModeManager gmm = cachedModeManager;
             if (gmm != null && gmm.CurrentMode != GameMode.FirstPerson) return;
             if (GameWindows.BlockGameplay) return;
+            if (healthComponent != null && !healthComponent.IsAlive) return; // fallen: the interregnum (HeroSuccession)
 
             // Attack on Left Mouse Button (LMB)
             if (UniversalInput.GetMouseButtonDown(0))

@@ -140,6 +140,79 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator HeroDeath_HalfDesert_ThenTheStrongestBecomesTheHero()
+        {
+            yield return ClearWorld();
+            CreateGround();
+            HeroSuccession hero = CreateHero();
+            RtsUnit knight = CreateKnight(new Vector3(4f, 0f, 0f));
+            for (int i = 0; i < 3; i++) Track(Building.BuildingNode.CreateWorkerNpc(OnGround(new Vector3(-4f - i * 2f, 0f, 3f)), "TestVillager"));
+            yield return null;
+            Assert.AreEqual(4, HeroSuccession.OwnUnits().Count);
+
+            hero.GetComponent<HealthComponent>().TakeDamage(100000);
+            Assert.IsTrue(hero.InInterregnum, "The hero's death starts the interregnum.");
+            Assert.AreEqual(GameBalance.InterregnumSeconds, hero.InterregnumLeft, 0.1f);
+            yield return null;
+            Assert.AreEqual(2, HeroSuccession.OwnUnits().Count, "Half of the units deserted.");
+            int deserters = 0;
+            foreach (HostileMobAI mob in Object.FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None))
+                if (mob.name == "Deserter") { deserters++; Track(mob.gameObject); }
+            Assert.AreEqual(2, deserters, "Deserters do not die: they become hostile bands.");
+
+            bool knightLeft = knight != null && knight.gameObject.activeInHierarchy;
+            hero.EndInterregnum();
+            yield return null;
+            UnitRank expected = knightLeft ? UnitRank.Knight : UnitRank.Person;
+            Assert.AreEqual(expected, hero.GetComponent<UnitProgress>().Rank, "The strongest unit left takes over.");
+            Assert.AreEqual(UnitRanks.Health(expected, hero: true), hero.GetComponent<Crafting.Equipment>().BaseHealth, "x2 of its rank.");
+            Assert.AreEqual(1, hero.GetComponent<HeroProgress>().Level);
+            Assert.IsTrue(hero.GetComponent<HealthComponent>().IsAlive);
+            Assert.AreEqual(1, HeroSuccession.OwnUnits().Count, "Its old body is gone.");
+        }
+
+        [UnityTest]
+        public IEnumerator HeroDeath_WithNoUnitsLeft_IsTheEndOfTheGame()
+        {
+            yield return ClearWorld();
+            CreateGround();
+            HeroSuccession hero = CreateHero();
+            bool over = false;
+            System.Action<HeroSuccession> onOver = s => over = true;
+            HeroSuccession.GameOver += onOver;
+            try
+            {
+                yield return null;
+                hero.GetComponent<HealthComponent>().TakeDamage(100000);
+                hero.EndInterregnum();
+                Assert.IsTrue(over);
+                Assert.IsTrue(hero.IsGameOver);
+            }
+            finally { HeroSuccession.GameOver -= onOver; }
+        }
+
+        /// <summary>Earlier tests may leave a loaded scene (units, a town hall, camps): these tests count units, so clear them.</summary>
+        private static IEnumerator ClearWorld()
+        {
+            foreach (RtsUnit u in Object.FindObjectsByType<RtsUnit>(FindObjectsSortMode.None)) Object.Destroy(u.gameObject);
+            foreach (HostileMobAI m in Object.FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None)) Object.Destroy(m.gameObject);
+            foreach (Building.TownHall h in Object.FindObjectsByType<Building.TownHall>(FindObjectsSortMode.None)) Object.Destroy(h.gameObject);
+            yield return null;
+        }
+
+        private HeroSuccession CreateHero()
+        {
+            GameObject go = Track(new GameObject("TestHero", typeof(CharacterController), typeof(HealthComponent), typeof(CombatUnit)));
+            go.transform.position = OnGround(new Vector3(0f, 0f, -6f));
+            go.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(go, UnitRank.General, hero: true);
+            go.GetComponent<HealthComponent>().InitializeHealth(go.GetComponent<HealthComponent>().MaxHealth);
+            go.AddComponent<HeroProgress>();
+            go.AddComponent<HeroSkills>();
+            return go.AddComponent<HeroSuccession>();
+        }
+
+        [UnityTest]
         public IEnumerator AttackCommand_IsKept_AndDamagesTheTarget()
         {
             CreateGround();

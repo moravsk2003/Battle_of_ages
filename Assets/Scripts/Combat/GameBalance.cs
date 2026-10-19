@@ -31,6 +31,13 @@ namespace BattleOfAges.Combat
         /// <summary>Unranked beasts give 1 XP per this much of their max HP.</summary>
         public static int WildlifeHpPerXp = 10;
 
+        // ------------------------------------------------------------------ hero death (§7.2)
+
+        /// <summary>Real seconds between the hero's death and the new hero.</summary>
+        public static float InterregnumSeconds = 90f;
+        /// <summary>Share of the units that desert when the hero dies.</summary>
+        public static float DesertionShare = 0.5f;
+
         // ------------------------------------------------------------------ hero classes (§8.1)
 
         public static float TankHealthBonus = 0.2f, ArcherHealthPenalty = 0.2f;
