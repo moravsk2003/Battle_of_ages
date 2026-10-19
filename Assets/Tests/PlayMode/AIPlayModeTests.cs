@@ -6,6 +6,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using BattleOfAges.AI;
 using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
 using BattleOfAges.Utils;
 
 namespace BattleOfAges.PlayModeTests
@@ -106,7 +107,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsNotNull(leader);
             HostileMobAI leaderAI = leader.GetComponent<HostileMobAI>();
             Assert.AreEqual(HostileMobType.WarlordGuard, leaderAI.MobType);
-            Assert.AreEqual(250, leaderAI.Health.MaxHealth);
+            Assert.AreEqual(UnitRanks.Health(UnitRank.General), leaderAI.GetComponent<Equipment>().BaseHealth, "The warlord is a general (before its armour).");
             Assert.AreEqual(4, leader.SquadMembers.Count);
         }
 
@@ -242,7 +243,7 @@ namespace BattleOfAges.PlayModeTests
             {
                 HostileMobAI leaderAI = leader.GetComponent<HostileMobAI>();
                 Assert.AreEqual(HostileMobType.WarlordGuard, leaderAI.MobType, $"{leader.name} is not a warlord.");
-                Assert.AreEqual(250, leaderAI.Health.MaxHealth);
+                Assert.AreEqual(UnitRanks.Health(UnitRank.General), leaderAI.GetComponent<Equipment>().BaseHealth, "The warlord is a general (before its armour).");
             }
 
             foreach (PeacefulAnimalAI animal in animals)

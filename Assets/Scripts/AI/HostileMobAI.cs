@@ -82,26 +82,18 @@ namespace BattleOfAges.AI
             if (CurrentStateType == AIStateType.Wander) ChangeState(AIStateType.Wander);
         }
 
-        /// <summary>Single source of truth for per-type mob stats.</summary>
+        /// <summary>Rank of each mob type (docs/GAME_DESIGN.md §11.1): bandits and goblins are warriors, the warlord a general.</summary>
+        public static UnitRank RankOf(HostileMobType type) => type == HostileMobType.WarlordGuard ? UnitRank.General : UnitRank.Warrior;
+
+        /// <summary>Base stats of the mob's rank with its kit worn on top; trophies can drop from the kit.</summary>
         private void ApplyMobStats()
         {
-            int hp;
-            int dmg;
-            switch (mobType)
-            {
-                case HostileMobType.WarlordGuard: hp = 250; dmg = 30; break; // speed: CharacterSpeed (damage x modifier)
-                case HostileMobType.Goblin:       hp = 80;  dmg = 12; break;
-                default:                          hp = 140; dmg = 18; break;
-            }
-
-            if (Health != null) Health.InitializeHealth(hp);
-            if (Combat != null) Combat.InitializeCombatStats(dmg, 1.6f, attackRange);
-
-            // The kit is part of the tuned stats; trophies can drop from it
             Equipment gear = GetComponent<Equipment>();
             if (gear == null) gear = gameObject.AddComponent<Equipment>();
             gear.DropsLoot = true;
-            gear.InitLoadout(StartingKits.For(mobType));
+            gear.LoadSlots(StartingKits.For(mobType));
+            UnitRanks.Apply(gameObject, RankOf(mobType), cooldown: 1.6f, range: attackRange);
+            if (Health != null) Health.InitializeHealth(Health.MaxHealth); // spawn at full health
         }
 
         protected override void RegisterStates()

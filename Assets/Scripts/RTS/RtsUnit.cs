@@ -38,7 +38,7 @@ namespace BattleOfAges.RTS
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
         private HealthComponent health;
         private CombatUnit combat;
-        /// <summary>CharacterSpeed formula: Global x modifier x strength (workers without a CombatUnit use the defaults).</summary>
+        /// <summary>CharacterSpeed formula: Global x modifier x sqrt(strength) (workers without a CombatUnit move like a person).</summary>
         private float MoveSpeed => combat != null ? combat.MoveSpeed : CharacterSpeed.Of(null);
         private bool touchingSolidNearTarget;
 
@@ -73,14 +73,21 @@ namespace BattleOfAges.RTS
             if (!isPlayerControlled) EnsureStartingKit();
         }
 
-        /// <summary>Own units get the kit their model is drawn with (knight: steel set, villager: axe).</summary>
+        /// <summary>
+        /// Own units get the kit their model is drawn with (knight: steel set, villager: axe) on top of the base stats
+        /// of their rank (knight model: knight, otherwise a person).
+        /// </summary>
         private void EnsureStartingKit()
         {
             if (GetComponent<Equipment>() != null) return;
             var visual = GetComponentInChildren<CharacterGear>(true);
             var type = visual != null ? visual.Type
                 : name.Contains("Knight") ? HumanoidModelBuilder.HumanType.KnightGuard : HumanoidModelBuilder.HumanType.Villager;
-            gameObject.AddComponent<Equipment>().InitLoadout(StartingKits.For(type));
+            Equipment gear = gameObject.AddComponent<Equipment>();
+            gear.LoadSlots(StartingKits.For(type));
+            UnitRanks.Apply(gameObject, type == HumanoidModelBuilder.HumanType.KnightGuard ? UnitRank.Knight : UnitRank.Person,
+                            cooldown: combat != null ? combat.AttackCooldown : 2f, range: combat != null ? combat.AttackRange : 3f);
+            if (health != null) health.InitializeHealth(health.MaxHealth);
         }
 
         private void SetupSelectionIndicatorVisuals()

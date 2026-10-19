@@ -2,6 +2,7 @@ using NUnit.Framework;
 using UnityEngine;
 using BattleOfAges.AI;
 using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
 
@@ -107,7 +108,8 @@ namespace BattleOfAges.Tests
             mobAI.InitializeMob(HostileMobType.WarlordGuard);
 
             Assert.AreEqual(HostileMobType.WarlordGuard, mobAI.MobType);
-            Assert.AreEqual(250, mobObj.GetComponent<HealthComponent>().MaxHealth);
+            Assert.AreEqual(250, mobObj.GetComponent<Equipment>().BaseHealth, "The warlord is a general: 250 HP before its armour.");
+            Assert.Greater(mobObj.GetComponent<HealthComponent>().MaxHealth, 250, "Its kit adds on top.");
         }
 
         [Test]

@@ -19,10 +19,7 @@ namespace BattleOfAges.Building
     {
         public const int MaxLevel = 5;
         /// <summary>Population cap without a town hall.</summary>
-        public const int CapWithoutHall = 5;
-        private static readonly int[] Caps = { CapWithoutHall, 10, 20, 35, 55, 80 };
-        private static readonly int[] UpgradeWoodCost = { 0, 0, 40, 80, 150, 250 };
-        private static readonly int[] UpgradeOreCost = { 0, 0, 10, 12, 15, 20 };
+        public static int CapWithoutHall => GameBalance.TownHallCaps[0];
 
         private static readonly List<TownHall> active = new List<TownHall>();
         public static TownHall Current
@@ -37,7 +34,7 @@ namespace BattleOfAges.Building
         [SerializeField, Range(1, MaxLevel)] private int level = 1;
         public int Level { get => level; set => level = Mathf.Clamp(value, 1, MaxLevel); }
 
-        public static int CapForLevel(int lvl) => Caps[Mathf.Clamp(lvl, 0, MaxLevel)];
+        public static int CapForLevel(int lvl) => GameBalance.TownHallCaps[Mathf.Clamp(lvl, 0, MaxLevel)];
         public static int PopulationCap => Current != null ? CapForLevel(Current.level) : CapWithoutHall;
         public static int Population => WorkerRegistry.WorkerCount;
         public static bool HasRoom(int extra = 1) => Population + extra <= PopulationCap;
@@ -46,8 +43,8 @@ namespace BattleOfAges.Building
         public static void UpgradeCost(int toLevel, out int wood, out int ore, out int tier)
         {
             int l = Mathf.Clamp(toLevel, 2, MaxLevel);
-            wood = UpgradeWoodCost[l];
-            ore = UpgradeOreCost[l];
+            wood = GameBalance.TownHallWood[l];
+            ore = GameBalance.TownHallOre[l];
             tier = l - 1;
         }
 

@@ -1,4 +1,5 @@
 using UnityEngine;
+using BattleOfAges.Combat;
 
 namespace BattleOfAges.Building
 {
@@ -97,8 +98,8 @@ namespace BattleOfAges.Building
                 Type = BuildingType.TownHall,
                 DisplayName = "Ратуша",
                 Description = "Головна будівля: ліміт населення (I-V)",
-                WoodCost = 15,
-                OreCost = 5,
+                WoodCost = GameBalance.TownHallWood[1],
+                OreCost = GameBalance.TownHallOre[1],
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
                 Size = new Vector3(5.6f, 5.0f, 5.6f),

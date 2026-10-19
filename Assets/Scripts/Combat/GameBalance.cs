@@ -1,0 +1,42 @@
+namespace BattleOfAges.Combat
+{
+    /// <summary>
+    /// Every tuning number of the game rules in one place (docs/GAME_DESIGN.md §16), grouped by topic. Static fields,
+    /// not constants, so a balance pass or a test can change them at runtime without touching the systems.
+    /// </summary>
+    public static class GameBalance
+    {
+        // ------------------------------------------------------------------ time (§4)
+
+        /// <summary>Real seconds in one game hour (a game day is 24 of them).</summary>
+        public static float GameHourSeconds = 60f;
+
+        // ------------------------------------------------------------------ unit ranks (§11.1)
+
+        /// <summary>Base HP of person, warrior, knight, general (without gear).</summary>
+        public static int[] RankHealth = { 20, 40, 100, 250 };
+        /// <summary>Base strength (damage without a weapon) of person, warrior, knight, general.</summary>
+        public static int[] RankStrength = { 2, 4, 10, 25 };
+        /// <summary>Hero XP for killing a person, warrior, knight, general (§8).</summary>
+        public static int[] RankKillXp = { 2, 4, 10, 50 };
+        /// <summary>A hero has this many times the HP and strength of its rank (§7.1).</summary>
+        public static float HeroStatMultiplier = 2f;
+
+        // ------------------------------------------------------------------ speed (§11.1)
+
+        /// <summary>speed = SpeedGlobal x modifier x sqrt(strength), metres per second.</summary>
+        public static float SpeedGlobal = 0.25f;
+        public static float SpeedModifierPerson = 7f;
+        public static float SpeedModifierSoldier = 6f; // warrior, knight, general
+        public static float SpeedModifierHero = 5f;
+
+        // ------------------------------------------------------------------ town hall (§10.4)
+
+        /// <summary>Population cap without a hall (index 0) and for hall levels I..V.</summary>
+        public static int[] TownHallCaps = { 6, 15, 25, 40, 60, 85 };
+        /// <summary>Wood to build the hall (level I) and to upgrade to levels II..V.</summary>
+        public static int[] TownHallWood = { 0, 10, 30, 60, 100, 160 };
+        /// <summary>Ore pieces for the same steps; the minimum ore tier is level - 1.</summary>
+        public static int[] TownHallOre = { 0, 5, 10, 12, 15, 20 };
+    }
+}

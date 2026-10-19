@@ -21,8 +21,9 @@ namespace BattleOfAges.Player
         private Camera fpsCamera;
         private FpsViewmodelAnimation viewmodelAnimation;
 
-        // Unarmed player (BaseDamage is the hero's strength, 50): the worn gear (Equipment) scales these
-        public const int BaseHealth = 500, BaseDamage = 50;
+        // Unarmed player: the hero is a general (docs/GAME_DESIGN.md §7.1), x2 its base; the worn gear (Equipment) scales these
+        public static int BaseHealth => UnitRanks.Health(UnitRank.General, hero: true);
+        public static int BaseDamage => UnitRanks.Strength(UnitRank.General, hero: true);
         public const float BaseCooldown = 1.8f;
 
         private Equipment gear;

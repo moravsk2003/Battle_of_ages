@@ -1,22 +1,26 @@
+using UnityEngine;
+
 namespace BattleOfAges.Combat
 {
     /// <summary>
-    /// Movement speed of every character (player, workers, knights, raiders; not wildlife):
-    /// speed = Global x SpeedModifier x Strength, where SpeedModifier is a per-character characteristic (5 for
-    /// everyone, 2 for the hero) and Strength is the character's strength characteristic (CombatUnit.Strength; its damage
-    /// is strength x weapon modifier, so a better sword does not change the speed). Global is the one tuning knob.
+    /// Movement speed of every character (player, workers, knights, raiders; not wildlife), docs/GAME_DESIGN.md §11.1:
+    /// speed = Global x SpeedModifier x sqrt(Strength). SpeedModifier is a per-character characteristic (person 7,
+    /// warrior / knight / general 6, hero 5, see UnitRanks) and Strength is the character's strength characteristic
+    /// (CombatUnit.Strength; its damage is strength x weapon modifier, so a better sword does not change the speed).
     /// </summary>
     public static class CharacterSpeed
     {
-        /// <summary>Metres per second per (modifier x strength) point.</summary>
-        public static float Global = 0.1f;
+        /// <summary>Metres per second per (modifier x sqrt(strength)) point.</summary>
+        public static float Global => GameBalance.SpeedGlobal;
 
-        public const float DefaultModifier = 5f;
-        public const float HeroModifier = 2f;
-        /// <summary>Strength of characters without a CombatUnit (workers): the default attack damage.</summary>
-        public const int DefaultStrength = 10;
+        /// <summary>Characters without a CombatUnit move like a person.</summary>
+        public static float DefaultModifier => GameBalance.SpeedModifierPerson;
+        public static float HeroModifier => GameBalance.SpeedModifierHero;
+        public static int DefaultStrength => GameBalance.RankStrength[(int)UnitRank.Person];
+
+        public static float Of(float modifier, float strength) => Global * modifier * Mathf.Sqrt(Mathf.Max(0f, strength));
 
         public static float Of(CombatUnit combat) =>
-            Global * (combat != null ? combat.SpeedModifier : DefaultModifier) * (combat != null ? combat.Strength : DefaultStrength);
+            combat != null ? Of(combat.SpeedModifier, combat.Strength) : Of(DefaultModifier, DefaultStrength);
     }
 }
