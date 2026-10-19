@@ -59,7 +59,7 @@ namespace BattleOfAges.Combat
         public static int MageBolts = 5;
         public static float MageBoltShare = 0.2f;
         /// <summary>The mage runs like this share of its rank's strength, and strength points add only to its spells.</summary>
-        public static float MageBodyStrengthShare = 0.8f;
+        public static float MageBodyStrengthShare = 0.7f; // hero general: 35
 
         // ------------------------------------------------------------------ class skills (§8.1)
 

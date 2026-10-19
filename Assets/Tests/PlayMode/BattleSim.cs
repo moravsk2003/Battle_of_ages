@@ -32,6 +32,8 @@ namespace BattleOfAges.PlayModeTests
         }
 
         public const float SideDistance = 30f, Spacing = 2f;
+        /// <summary>0: no gear (units bare, heroes a weapon I); 1 and up: everyone wears a weapon and armour of this level.</summary>
+        public int GearLevel;
         private readonly List<Unit> units = new List<Unit>();
         private readonly List<GameObject> spawned = new List<GameObject>();
         private readonly List<int> gridIds = new List<int>();
@@ -51,7 +53,12 @@ namespace BattleOfAges.PlayModeTests
                 HeroProgress progress = go.AddComponent<HeroProgress>();
                 if (cls != HeroClass.None) progress.ChooseClass(cls);
             }
-            if (weapon || hero) gear.Equip(new Item(cls == HeroClass.Archer ? ItemType.Bow : ItemType.Sword, 1));
+            if (GearLevel > 0)
+            {
+                gear.Equip(new Item(cls == HeroClass.Archer ? ItemType.Bow : ItemType.Sword, GearLevel));
+                gear.Equip(new Item(ItemType.Armor, GearLevel));
+            }
+            else if (weapon || hero) gear.Equip(new Item(cls == HeroClass.Archer ? ItemType.Bow : ItemType.Sword, 1));
             HealthComponent hp = go.GetComponent<HealthComponent>();
             hp.InitializeHealth(hp.MaxHealth);
             spawned.Add(go);

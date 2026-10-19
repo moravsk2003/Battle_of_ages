@@ -76,8 +76,8 @@ namespace BattleOfAges.Tests
         {
             hero.ChooseClass(HeroClass.Mage);
             Assert.IsTrue(combat.FiresBolts);
-            Assert.AreEqual((0.25f * 5f * Mathf.Sqrt(40f / 2f) + 1.5f) * 3f, combat.AttackRange, 1e-3f, "~21 m: the mage runs like strength 40.");
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(40f / 2f) + 1.5f, combat.MoveSpeed, 1e-3f, "A hero general mage runs 7.1 m/s.");
+            Assert.AreEqual((0.25f * 5f * Mathf.Sqrt(35f / 2f) + 1.5f) * 3f, combat.AttackRange, 1e-3f, "~20 m: the mage runs like strength 35.");
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(35f / 2f) + 1.5f, combat.MoveSpeed, 1e-3f, "A hero general mage runs 6.7 m/s.");
 
             Assert.AreEqual(12f, HeroClassRules.Range(2.5f), 1e-4f, "A hero person runs 7.5 m in 3 s: the minimum 12 m.");
         }

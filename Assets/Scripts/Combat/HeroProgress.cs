@@ -100,7 +100,7 @@ namespace BattleOfAges.Combat
         float IStatModifier.WeaponMultiplier(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.WeaponMultiplier(worn) : worn; }
         float IStatModifier.DamageReduction(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.DamageReduction(worn) : worn; }
 
-        /// <summary>The mage runs like 80% of its rank's strength; its strength points go into its spells only.</summary>
+        /// <summary>The mage runs like 70% of its rank's strength (a hero general: 35); its strength points go into its spells only.</summary>
         float IStatModifier.SpeedStrength(float strength)
         {
             if (heroClass != HeroClass.Mage) return strength;

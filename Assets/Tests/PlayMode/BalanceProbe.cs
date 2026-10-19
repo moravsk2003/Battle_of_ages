@@ -35,16 +35,21 @@ namespace BattleOfAges.PlayModeTests
             string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
             if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
             Directory.CreateDirectory(dir);
+            // BALANCE_GEAR=1: everyone in a weapon and armour of that level (default: no gear)
+            int.TryParse(Environment.GetEnvironmentVariable("BALANCE_GEAR"), out int gearLevel);
+            sim.GearLevel = gearLevel;
             Time.timeScale = 50f; // steps stay small: maximumDeltaTime
             Time.maximumDeltaTime = 0.1f;
 
             report.AppendLine("# Баланс: ранги й класи в бою\n");
             report.AppendLine($"Замах {GameBalance.MeleeWindup} с (лук {GameBalance.BowWindup}, маг {GameBalance.MageWindup}), " +
                               $"сповільнення {GameBalance.MeleeSlowSeconds} с, зупинка стрільців {GameBalance.RangedRootSeconds} с. " +
-                              "Відкрите поле, усі можуть дістати ціль (без строю й тісноти).\n");
+                              "Відкрите поле, усі можуть дістати ціль (без строю й тісноти). " +
+                              (gearLevel > 0 ? $"Спорядження: у всіх меч (Лучник — лук) і броня рівня {gearLevel}.\n" : "Без спорядження (герої — меч I, Лучник — лук I).\n"));
 
             // 1. ranks ---------------------------------------------------------------------------------------------
-            report.AppendLine("## 1. Скільки слабших перемагають одного сильнішого (без спорядження)\n");
+            string gearNote = gearLevel > 0 ? $"спорядження {gearLevel}" : "без спорядження";
+            report.AppendLine($"## 1. Скільки слабших перемагають одного сильнішого ({gearNote})\n");
             report.AppendLine("| Слабші | проти 1 | потрібно, шт | HP переможців лишилось | для порівняння: бойова вага (HP × урон) |\n|---|---|---|---|---|");
             for (int s = 1; s < Ranks.Length; s++)
                 for (int w = 0; w < s; w++)
@@ -83,7 +88,7 @@ namespace BattleOfAges.PlayModeTests
                               "❌ — програв обидва; ≈ — по-різному (дуже близький бій); 💀 — обидва загинули (обмін ударами); ⏱ — вийшов час.");
 
             // 3. a hero against every rank --------------------------------------------------------------------------
-            report.AppendLine("\n## 3. Скількох юнітів кожного рангу (без спорядження) перемагає герой-генерал\n");
+            report.AppendLine($"\n## 3. Скількох юнітів кожного рангу ({gearNote}) перемагає герой-генерал\n");
             var head3 = new StringBuilder("| Клас |");
             var line3 = new StringBuilder("|---|");
             foreach (UnitRank rank in Ranks) { head3.Append($" {HeroUI.RankName(rank)} |"); line3.Append("---|"); }
