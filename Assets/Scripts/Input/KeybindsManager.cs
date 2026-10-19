@@ -12,7 +12,8 @@ namespace BattleOfAges.InputSystem
         ToggleGameMode,
         InteractGather,
         ChopTree,
-        Equipment
+        Equipment,
+        Hero
     }
 
     /// <summary>
@@ -30,7 +31,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.ToggleGameMode,   KeyCode.M },
             { KeyAction.InteractGather,   KeyCode.E },
             { KeyAction.ChopTree,         KeyCode.F },
-            { KeyAction.Equipment,       KeyCode.C }
+            { KeyAction.Equipment,       KeyCode.C },
+            { KeyAction.Hero,            KeyCode.H }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -41,7 +43,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.ToggleGameMode,   "🔄 Зміна режиму (RTS / FPS)" },
             { KeyAction.InteractGather,   "🖐 Збір / Взаємодія" },
             { KeyAction.ChopTree,         "🪓 Рубання дерев" },
-            { KeyAction.Equipment,       "Спорядження" }
+            { KeyAction.Equipment,       "Спорядження" },
+            { KeyAction.Hero,            "Герой" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

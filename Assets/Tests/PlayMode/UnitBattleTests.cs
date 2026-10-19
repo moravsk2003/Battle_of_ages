@@ -98,6 +98,24 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator HerosKill_GivesXpByTheVictimsRank()
+        {
+            GameObject heroObj = Track(new GameObject("TestHero", typeof(HealthComponent), typeof(CombatUnit)));
+            heroObj.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
+            HeroProgress hero = heroObj.AddComponent<HeroProgress>();
+            GameObject victim = Track(new GameObject("TestRaider", typeof(HealthComponent), typeof(CombatUnit)));
+            victim.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(victim, UnitRank.Warrior);
+            victim.transform.position = new Vector3(1f, 0f, 0f);
+            yield return null;
+
+            victim.GetComponent<HealthComponent>().SetCurrentHealth(1);
+            Assert.IsTrue(heroObj.GetComponent<CombatUnit>().TryAttack(victim.GetComponent<HealthComponent>()));
+            Assert.AreEqual(4, hero.Xp, "Killing a warrior is worth 4 XP.");
+        }
+
+        [UnityTest]
         public IEnumerator AttackCommand_IsKept_AndDamagesTheTarget()
         {
             CreateGround();

@@ -63,6 +63,7 @@ namespace BattleOfAges.Player
 
             // The hero is a general with x2 stats; its rank never changes (docs/GAME_DESIGN.md §7.1)
             UnitProgress.Setup(gameObject, UnitRank.General, hero: true);
+            if (GetComponent<HeroProgress>() == null) gameObject.AddComponent<HeroProgress>();
         }
 
         /// <summary>Wears the item (no store involved); returns what was worn in that slot.</summary>

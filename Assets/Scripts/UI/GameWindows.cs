@@ -9,11 +9,12 @@ namespace BattleOfAges.UI
         public static bool BuildMenuOpen => BuildMenuUI.Instance != null && BuildMenuUI.Instance.IsOpen;
         public static bool EquipmentOpen => EquipmentUI.IsVisible;
         public static bool SaveSlotsOpen => SaveSlotsUI.IsVisible;
+        public static bool HeroOpen => HeroUI.IsVisible;
         public static bool Paused => PauseMenuController.Instance != null && PauseMenuController.Instance.IsPaused();
 
         /// <summary>A window that takes the mouse and keyboard (not the pause menu itself).</summary>
         public static bool AnyModalOpen =>
-            InventoryOpen || WorkbenchOpen || WorkersOpen || BuildMenuOpen || EquipmentOpen || SaveSlotsOpen;
+            InventoryOpen || WorkbenchOpen || WorkersOpen || BuildMenuOpen || EquipmentOpen || SaveSlotsOpen || HeroOpen;
 
         /// <summary>The player character should not move, look around or act.</summary>
         public static bool BlockGameplay => AnyModalOpen || Paused;
@@ -26,6 +27,7 @@ namespace BattleOfAges.UI
             if (WorkbenchOpen) WorkbenchUI.Instance.CloseUI();
             if (EquipmentOpen) EquipmentUI.Instance.Close();
             if (SaveSlotsOpen) SaveSlotsUI.Close();
+            if (HeroOpen) HeroUI.Instance.Close();
         }
     }
 }

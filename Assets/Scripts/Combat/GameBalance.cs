@@ -22,6 +22,15 @@ namespace BattleOfAges.Combat
         /// <summary>A hero has this many times the HP and strength of its rank (§7.1).</summary>
         public static float HeroStatMultiplier = 2f;
 
+        // ------------------------------------------------------------------ hero levels (§8)
+
+        /// <summary>Going from level n to n + 1 costs this x n XP.</summary>
+        public static int HeroXpPerLevel = 100;
+        /// <summary>What one attribute point buys: strength or HP (10 HP : 1 strength, like every rank's base).</summary>
+        public static int StrengthPerPoint = 5, HealthPerPoint = 50;
+        /// <summary>Unranked beasts give 1 XP per this much of their max HP.</summary>
+        public static int WildlifeHpPerXp = 10;
+
         // ------------------------------------------------------------------ promotions (§11.1)
 
         /// <summary>Battle XP to leave the rank: person -> warrior, warrior -> knight, knight -> general.</summary>
