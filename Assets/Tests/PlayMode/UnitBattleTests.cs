@@ -112,7 +112,34 @@ namespace BattleOfAges.PlayModeTests
 
             victim.GetComponent<HealthComponent>().SetCurrentHealth(1);
             Assert.IsTrue(heroObj.GetComponent<CombatUnit>().TryAttack(victim.GetComponent<HealthComponent>()));
+            yield return Wait(0.5f); // the swing lands after its wind-up
             Assert.AreEqual(4, hero.Xp, "Killing a warrior is worth 4 XP.");
+        }
+
+        [UnityTest]
+        public IEnumerator WalkingUpToAWarrior_ItStrikesBack_EvenThoughOneHitKillsIt()
+        {
+            GameObject heroObj = Track(new GameObject("TestHero", typeof(HealthComponent), typeof(CombatUnit)));
+            heroObj.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
+            HealthComponent heroHp = heroObj.GetComponent<HealthComponent>();
+            heroHp.InitializeHealth(heroHp.MaxHealth);
+            GameObject warriorObj = Track(new GameObject("TestWarrior", typeof(HealthComponent), typeof(CombatUnit)));
+            warriorObj.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(warriorObj, UnitRank.Warrior);
+            HealthComponent warriorHp = warriorObj.GetComponent<HealthComponent>();
+            warriorHp.InitializeHealth(warriorHp.MaxHealth);
+            warriorObj.transform.position = new Vector3(2f, 0f, 0f);
+            yield return null;
+
+            CombatUnit hero = heroObj.GetComponent<CombatUnit>(), warrior = warriorObj.GetComponent<CombatUnit>();
+            Assert.Greater(hero.AttackDamage, warriorHp.MaxHealth, "The hero kills the warrior with one hit.");
+            Assert.IsTrue(hero.TryAttack(warriorHp), "The hero swings first...");
+            yield return null;
+            Assert.IsTrue(warrior.TryAttack(heroHp), "... the warrior reacts a frame later, during the wind-up.");
+            yield return Wait(1f);
+            Assert.IsFalse(warriorHp.IsAlive);
+            Assert.AreEqual(heroHp.MaxHealth - warrior.AttackDamage, heroHp.CurrentHealth, "Its swing still landed: a trade.");
         }
 
         [UnityTest]

@@ -257,6 +257,7 @@ namespace BattleOfAges.PlayModeTests
             mob.GetComponent<HealthComponent>().SetCurrentHealth(1);
             yield return new WaitForSeconds(2.1f); // let the attack cooldown pass
             Assert.IsTrue(Of<CombatUnit>().TryAttack(mob.GetComponent<HealthComponent>()), "attack did not land");
+            yield return new WaitForSeconds(0.5f); // wind-up
             Assert.AreEqual(4, hero.Xp - xp0 + (hero.Level - level0) * 100, "kill XP");
             yield return $"вбивство бандита: +{hero.Xp - xp0} досвіду";
         }

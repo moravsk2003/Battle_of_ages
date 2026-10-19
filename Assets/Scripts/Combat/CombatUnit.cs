@@ -73,17 +73,21 @@ namespace BattleOfAges.Combat
             if (dst > attackRange + 1.0f) return false;
 
             nextAttackTime = Time.time + attackCooldown;
-            // No hit-and-run: a melee hit slows the attacker for a moment, a ranged shot roots it (docs/GAME_DESIGN.md §11.1)
+            // The swing lands after its wind-up (PendingHits), so the one walked up to can swing back (docs/GAME_DESIGN.md §11.1).
+            // No hit-and-run: the striker is slowed (melee) or rooted (ranged) from the swing until a moment after it lands.
+            float windup = Windup;
             recoveryFactor = IsRanged ? 0f : GameBalance.MeleeSlowFactor;
-            recoveryUntil = Time.time + (IsRanged ? GameBalance.RangedRootSeconds : GameBalance.MeleeSlowSeconds);
+            recoveryUntil = Time.time + windup + (IsRanged ? GameBalance.RangedRootSeconds : GameBalance.MeleeSlowSeconds);
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
-            if (FiresBolts) MageBolt.Volley(this, target, finalDamage);
-            else DeliverHit(target, finalDamage, ignoreArmor: false);
+            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, attackRange);
 
             TriggerAttackAnimation();
             return true;
         }
+
+        /// <summary>Time from the start of a swing to the hit: a sword swing, a bow draw, the mage's cast.</summary>
+        public float Windup => FiresBolts ? GameBalance.MageWindup : IsRanged ? GameBalance.BowWindup : GameBalance.MeleeWindup;
 
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
         public bool FiresBolts { get; set; }

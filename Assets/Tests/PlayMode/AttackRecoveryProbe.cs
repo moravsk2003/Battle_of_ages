@@ -68,6 +68,21 @@ namespace BattleOfAges.PlayModeTests
                 }
             }
 
+            report.AppendLine("\n## Замах перед ударом (мечник; сповільнення 1 с)\n");
+            report.AppendLine("| Сценарій | замах, с | переміг | HP героя втрачено | убито | час, с |\n|---|---|---|---|---|---|");
+            float windupWas = GameBalance.MeleeWindup;
+            GameBalance.MeleeSlowSeconds = 1f;
+            foreach ((UnitRank rank, int count, bool kite) in new[] { (UnitRank.Warrior, 6, false), (UnitRank.Warrior, 12, false), (UnitRank.General, 2, false), (UnitRank.General, 2, true) })
+                foreach (float w in new[] { 0f, 0.2f, 0.35f, 0.5f })
+                {
+                    GameBalance.MeleeWindup = w;
+                    Result r = default;
+                    yield return Fight(HeroClass.None, kite, rank, count, x => r = x);
+                    string pack = rank == UnitRank.General ? $"{count} генералів" : $"{count} воїнів";
+                    report.AppendLine(Row($"{(kite ? "вдарив — відійшов" : "стоїть і рубається")} проти {pack}", w, r, "0.##"));
+                }
+            GameBalance.MeleeWindup = windupWas;
+
             GameBalance.RangedRootSeconds = rootWas;
             GameBalance.MeleeSlowSeconds = slowWas;
             Time.timeScale = 1f;
@@ -75,8 +90,8 @@ namespace BattleOfAges.PlayModeTests
             File.WriteAllText(Path.Combine(dir, "attack_recovery.md"), report.ToString(), new UTF8Encoding(true));
         }
 
-        private static string Row(string name, float value, Result r) =>
-            $"| {name} | {value:0} | {(r.heroWon ? "так" : "ні")} | {r.heroHpLost * 100f:0}% | {r.killed}/{r.enemies} | {r.seconds:0} |";
+        private static string Row(string name, float value, Result r, string format = "0") =>
+            $"| {name} | {value.ToString(format)} | {(r.heroWon ? "так" : "ні")} | {r.heroHpLost * 100f:0}% | {r.killed}/{r.enemies} | {r.seconds:0} |";
 
         // ------------------------------------------------------------------ one fight
 
