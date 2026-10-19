@@ -164,7 +164,7 @@ namespace BattleOfAges.SaveLoad
                 {
                     d.Player.RegenStart = skills.RegenStart; d.Player.RegenMaxPoints = skills.RegenMaxPoints; d.Player.RegenCurrentPoints = skills.RegenCurrentPoints;
                     d.Player.HealLevel = skills.HealLevel; d.Player.LongShot = skills.LongShot; d.Player.FireFan = skills.FireFan; d.Player.DashLevel = skills.DashLevel;
-                    d.Player.PierceLevel = skills.PierceLevel; d.Player.Meteor = skills.Meteor; d.Player.CriticalHit = skills.CriticalHit;
+                    d.Player.PierceLevel = skills.PiercingArrow ? 1 : 0; d.Player.Meteor = skills.Meteor; d.Player.CriticalHit = skills.CriticalHit;
                 }
             }
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();

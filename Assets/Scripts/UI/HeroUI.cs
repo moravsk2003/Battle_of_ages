@@ -144,7 +144,7 @@ namespace BattleOfAges.UI
                         break;
                     case HeroClass.Archer:
                         if (!s.LongShot) SkillButton(ref used, $"Далекий постріл ({GameBalance.LongShotCost})", s.LearnLongShot);
-                        else if (s.PierceLevel < GameBalance.PierceMaxLevel) SkillButton(ref used, $"Пробивна стріла {(s.PierceShare + (s.PierceLevel == 0 ? GameBalance.PierceFirst : GameBalance.PierceStep)) * 100f:0}%", s.LearnPierce);
+                        else if (!s.PiercingArrow) SkillButton(ref used, "Пробивна стріла (1)", s.LearnPierce);
                         break;
                     case HeroClass.Mage:
                         if (!s.FireFan) SkillButton(ref used, "Вогняне віяло (1)", s.LearnFireFan);

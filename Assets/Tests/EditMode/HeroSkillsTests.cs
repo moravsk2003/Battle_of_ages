@@ -115,34 +115,43 @@ namespace BattleOfAges.Tests
 
             Assert.AreEqual(2, skills.CastFireFan(Vector3.forward));
             int full = combat.AttackDamage;
-            Assert.AreEqual(1000 - full, near.CurrentHealth, 1, "Close by: about the full damage.");
-            Assert.AreEqual(1000 - Mathf.RoundToInt(full * 0.5f), edge.CurrentHealth, 2, "At the edge: half.");
+            Assert.AreEqual(1000 - Mathf.RoundToInt(full * 0.6f), near.CurrentHealth, 1, "Close by: 60% of the attack.");
+            Assert.AreEqual(1000 - Mathf.RoundToInt(full * 0.6f * 0.5f), edge.CurrentHealth, 2, "At the edge: half of that.");
             Assert.AreEqual(1000, aside.CurrentHealth);
             Assert.AreEqual(1000, behind.CurrentHealth);
         }
 
         [Test]
-        public void ArcherPiercingArrow_NeedsLongShot_HitsTheEnemyBehind()
+        public void ArcherPiercingArrow_OnQ_200PercentThen100And50Behind()
         {
             hero.ChooseClass(HeroClass.Archer);
             Assert.IsFalse(skills.LearnPierce(), "Long shot first.");
             Assert.IsTrue(skills.LearnLongShot());
             Assert.IsTrue(skills.LearnPierce());
-            Assert.AreEqual(0.10f, skills.PierceShare, 1e-5f);
-            for (int i = 0; i < 6; i++) skills.LearnPierce();
-            Assert.AreEqual(0.40f, skills.PierceShare, 1e-5f, "+5% a point.");
+            Assert.IsTrue(skills.HasActiveIn(0), "The archer's piercing shot is on Q.");
 
             heroObj.GetComponent<Equipment>().Equip(new Item(ItemType.Bow, 1));
             CombatUnit combat = heroObj.GetComponent<CombatUnit>();
             HealthComponent front = Enemy(new Vector3(0f, 0f, 8f));
-            HealthComponent behind = Enemy(new Vector3(0.5f, 0f, 12f)); // on the line, 4 m further
+            HealthComponent second = Enemy(new Vector3(0.5f, 0f, 12f)); // on the line, behind
+            HealthComponent third = Enemy(new Vector3(-0.5f, 0f, 16f)); // further on the line
             HealthComponent aside = Enemy(new Vector3(6f, 0f, 12f));    // behind, but off the line
+            int dmg = combat.AttackDamage;
+
+            Assert.IsTrue(skills.UseActive(0, Vector3.forward));
+            Assert.IsFalse(skills.UseActive(0, Vector3.forward), "Then 100 s to recharge.");
+            combat.InitializeCombatStats(dmg, 0f, combat.AttackRange); // no attack cooldown for the test
             Assert.IsTrue(combat.TryAttack(front));
             PendingHits.FlushAll();
-            int dmg = combat.AttackDamage;
-            Assert.AreEqual(1000 - dmg, front.CurrentHealth);
-            Assert.AreEqual(1000 - Mathf.RoundToInt(dmg * 0.40f), behind.CurrentHealth, "The arrow goes on through: 40% to the one behind.");
+            Assert.AreEqual(1000 - dmg * 2, front.CurrentHealth, "200% to the target.");
+            Assert.AreEqual(1000 - dmg, second.CurrentHealth, "100% to the one behind.");
+            Assert.AreEqual(1000 - Mathf.RoundToInt(dmg * 0.5f), third.CurrentHealth, "50% to the next.");
             Assert.AreEqual(1000, aside.CurrentHealth);
+
+            Assert.IsTrue(combat.TryAttack(front));
+            PendingHits.FlushAll();
+            Assert.AreEqual(1000 - dmg * 3, front.CurrentHealth, "Then a normal shot again.");
+            Assert.AreEqual(1000 - dmg, second.CurrentHealth, "... that does not pierce.");
         }
 
         [Test]
@@ -190,7 +199,7 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
-        public void Meteor_HitsEveryoneAroundTheSpot_ThreeTimesTheDamage()
+        public void Meteor_HitsEveryoneAroundTheSpot_FiveTimesTheDamage()
         {
             hero.ChooseClass(HeroClass.Mage);
             CombatUnit combat = heroObj.GetComponent<CombatUnit>();
@@ -198,8 +207,8 @@ namespace BattleOfAges.Tests
             MeteorStrike m = MeteorStrike.Drop(combat, new Vector3(11f, 0f, 1f));
             extra.Add(m.gameObject);
             Assert.AreEqual(2, m.Impact());
-            Assert.AreEqual(1000 - Mathf.RoundToInt(combat.AttackDamage * 3f), a.CurrentHealth);
-            Assert.AreEqual(1000, far.CurrentHealth, "Outside the 4 m.");
+            Assert.AreEqual(1000 - Mathf.RoundToInt(combat.AttackDamage * 5f), a.CurrentHealth, "5x the mage's damage.");
+            Assert.AreEqual(1000, far.CurrentHealth, "Outside the 2.5 m.");
         }
 
         private HealthComponent Enemy(Vector3 position)

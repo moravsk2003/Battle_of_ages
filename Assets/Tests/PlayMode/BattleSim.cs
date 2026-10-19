@@ -188,6 +188,7 @@ namespace BattleOfAges.PlayModeTests
             {
                 case HeroClass.Tank: if (me.Hp.CurrentHealth < me.Hp.MaxHealth / 2) skills.UseActive(0, to); break;
                 case HeroClass.Mage: if (d <= reach && !skills.UseActive(1, to)) skills.UseActive(0, to); break; // meteor, else the fan
+                case HeroClass.Archer: if (d <= reach + 0.5f && me.Combat.CanAttack) skills.UseActive(0, to); break; // the next shot pierces
                 case HeroClass.Dd:
                     if (d > reach + 3f) skills.UseActive(0, to);                          // dash in
                     else if (d <= reach + 0.5f && me.Combat.CanAttack) skills.UseActive(1, to); // the next swing is a critical one

@@ -84,7 +84,9 @@ namespace BattleOfAges.Combat
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
             if (NextHitCritical) { finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); NextHitCritical = false; } // the DD's Critical hit
-            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, attackRange);
+            bool piercing = NextShotPiercing && IsRanged && !FiresBolts;
+            if (piercing) { NextShotPiercing = false; finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.PierceShotMultiplier); }
+            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, attackRange, piercing);
 
             TriggerAttackAnimation();
             return true;
@@ -100,8 +102,8 @@ namespace BattleOfAges.Combat
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
         public bool FiresBolts { get; set; }
 
-        /// <summary>Share of an arrow's damage that goes on through to the enemy behind the target (the archer's Piercing arrow).</summary>
-        public float PierceShare { get; set; }
+        /// <summary>The next arrow hits for double and goes on through (the archer's Piercing arrow, used on Q).</summary>
+        public bool NextShotPiercing { get; set; }
         /// <summary>The next swing hits for double (the DD's Critical hit, used on R).</summary>
         public bool NextHitCritical { get; set; }
 
@@ -114,26 +116,40 @@ namespace BattleOfAges.Combat
 
         private static readonly int[] behind = new int[64];
 
-        /// <summary>The arrow goes on through: the nearest enemy behind the target, close to the line of the shot, takes
-        /// PierceShare of the damage.</summary>
-        public void PierceBehind(HealthComponent target, int damage)
+        /// <summary>
+        /// The piercing arrow goes on through: the nearest enemy behind the last one hit, close to the line of the shot, takes
+        /// the next share of a normal shot (GameBalance.PierceThrough: 100%, then 50%).
+        /// </summary>
+        public void PierceBehind(HealthComponent target, int normalDamage)
         {
-            Vector3 from = transform.position, at = target.transform.position;
-            Vector3 line = at - from; line.y = 0f;
+            Vector3 line = target.transform.position - transform.position; line.y = 0f;
             if (line.sqrMagnitude < 1e-4f) return;
             line.Normalize();
+            HealthComponent last = target;
+            foreach (float share in GameBalance.PierceThrough)
+            {
+                HealthComponent next = NextBehind(last, line);
+                if (next == null) return;
+                DeliverHit(next, Mathf.Max(1, Mathf.RoundToInt(normalDamage * share)), ignoreArmor: false);
+                last = next;
+            }
+        }
+
+        private HealthComponent NextBehind(HealthComponent from, Vector3 line)
+        {
+            Vector3 at = from.transform.position;
             int n = RTS.UnitSpatialGrid.Query(at, GameBalance.PierceReach, EnemyTeam, behind);
             HealthComponent next = null; float best = float.MaxValue;
             for (int i = 0; i < n; i++)
             {
                 HealthComponent h = RTS.UnitSpatialGrid.Health(behind[i]);
-                if (h == null || h == target || !h.IsAlive) continue;
+                if (h == null || h == from || !h.IsAlive) continue;
                 Vector3 off = h.transform.position - at; off.y = 0f;
                 float along = Vector3.Dot(off, line);
                 if (along <= 0f || (off - line * along).magnitude > GameBalance.PierceWidth) continue; // not behind, or off the line
                 if (along < best) { best = along; next = h; }
             }
-            if (next != null) DeliverHit(next, Mathf.Max(1, Mathf.RoundToInt(damage * PierceShare)), ignoreArmor: false);
+            return next;
         }
 
         /// <summary>Share of the damage dealt that heals this unit (the Vampiric artifact).</summary>

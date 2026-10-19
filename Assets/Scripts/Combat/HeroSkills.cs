@@ -9,11 +9,11 @@ namespace BattleOfAges.Combat
     /// tank - 1. Regeneration (passive; start: +1% max and +2% current HP per game hour, each further point +1% max or
     ///           +2% current); 2. Instant heal (Q; 5% of max HP, +4% per point up to 25%; every 12 minutes) - after the
     ///           start of Regeneration and at least one point in one of its branches;
-    /// archer - 1. Long shot (passive, 2 points: +5% range); 2. Piercing arrow (passive: the arrow goes on through and
-    ///           the enemy behind the target takes 10% of its damage, +5% per point up to 50%);
-    /// mage - 1. Fire fan (Q: a 60° cone, the mage's damage to each target falling to 50% at the edge, through armour;
-    ///           every 10 s); 2. Meteor (R: falls on the nearest enemy in range after 1 s, 3x the mage's damage to everyone
-    ///           within 4 m, through armour; every 20 s). Both are cast like an attack: a wind-up before, standing after;
+    /// archer - 1. Long shot (passive, 2 points: +5% range); 2. Piercing arrow (Q: the next shot hits for 200% and goes on
+    ///           through: 100% to the enemy behind, 50% to the next; every 100 s);
+    /// mage - 1. Fire fan (Q: a 60° cone, 60% of the mage's damage to each target falling to half at the edge, through
+    ///           armour; every 10 s); 2. Meteor (R: falls on the nearest enemy in range after 1 s, 5x the mage's damage to
+    ///           everyone within 2.5 m, through armour; every 20 s). Both are cast like an attack: a wind-up before, standing after;
     /// DD - 1. Dash (Q: 1 s of x2 run speed, +1 per point up to x5; every 20 s); 2. Critical hit (R: the next hit deals
     ///           double damage; every 40 s).
     /// The first active skill is on Q, the second on R.
@@ -25,7 +25,7 @@ namespace BattleOfAges.Combat
         [SerializeField] private int regenMaxPoints, regenCurrentPoints;
         [SerializeField] private int healLevel;     // 0..6
         [SerializeField] private bool longShot;
-        [SerializeField] private int pierceLevel;   // 0..9: 10%..50% of armour
+        [SerializeField] private bool piercingArrow;
         [SerializeField] private bool fireFan;
         [SerializeField] private bool meteor;
         [SerializeField] private int dashLevel;     // 0..4: x2..x5
@@ -37,7 +37,7 @@ namespace BattleOfAges.Combat
         public int RegenCurrentPoints => regenCurrentPoints;
         public int HealLevel => healLevel;
         public bool LongShot => longShot;
-        public int PierceLevel => pierceLevel;
+        public bool PiercingArrow => piercingArrow;
         public bool FireFan => fireFan;
         public bool Meteor => meteor;
         public int DashLevel => dashLevel;
@@ -59,7 +59,7 @@ namespace BattleOfAges.Combat
         public bool LearnRegenCurrent() => Class == HeroClass.Tank && regenStart && Pay(1) && Set(() => regenCurrentPoints++);
         public bool LearnHeal() => Class == HeroClass.Tank && CanLearnHeal && healLevel < GameBalance.HealMaxLevel && Pay(1) && Set(() => healLevel++);
         public bool LearnLongShot() => Class == HeroClass.Archer && !longShot && Pay(GameBalance.LongShotCost) && Set(() => longShot = true);
-        public bool LearnPierce() => Class == HeroClass.Archer && longShot && pierceLevel < GameBalance.PierceMaxLevel && Pay(1) && Set(() => pierceLevel++);
+        public bool LearnPierce() => Class == HeroClass.Archer && longShot && !piercingArrow && Pay(1) && Set(() => piercingArrow = true);
         public bool LearnFireFan() => Class == HeroClass.Mage && !fireFan && Pay(1) && Set(() => fireFan = true);
         public bool LearnMeteor() => Class == HeroClass.Mage && fireFan && !meteor && Pay(1) && Set(() => meteor = true);
         public bool LearnDash() => Class == HeroClass.Dd && dashLevel < GameBalance.DashMaxLevel && Pay(1) && Set(() => dashLevel++);
@@ -75,8 +75,6 @@ namespace BattleOfAges.Combat
         public float RegenCurrentShare => regenStart ? GameBalance.RegenStepCurrent * (1 + regenCurrentPoints) : 0f;
         public float HealShare => healLevel <= 0 ? 0f : GameBalance.HealFirst + GameBalance.HealStep * (healLevel - 1);
         public float DashFactor => dashLevel <= 0 ? 1f : 1f + dashLevel;
-        /// <summary>Share of an arrow's damage that the enemy behind the target takes.</summary>
-        public float PierceShare => pierceLevel <= 0 ? 0f : GameBalance.PierceFirst + GameBalance.PierceStep * (pierceLevel - 1);
 
         public void ApplyPassives()
         {
@@ -84,7 +82,6 @@ namespace BattleOfAges.Combat
             if (health != null) { health.RegenMaxPerHour = RegenMaxShare; health.RegenCurrentPerHour = RegenCurrentShare; }
             if (Combat != null)
             {
-                Combat.PierceShare = PierceShare;
             }
             if (Hero != null)
             {
@@ -98,6 +95,7 @@ namespace BattleOfAges.Combat
         /// <summary>Has an active skill in the slot (0: Q, 1: R).</summary>
         public bool HasActiveIn(int slot) => slot == 0
             ? (Class == HeroClass.Tank && healLevel > 0) || (Class == HeroClass.Mage && fireFan) || (Class == HeroClass.Dd && dashLevel > 0)
+              || (Class == HeroClass.Archer && piercingArrow)
             : (Class == HeroClass.Mage && meteor) || (Class == HeroClass.Dd && criticalHit);
         public bool HasActive => HasActiveIn(0) || HasActiveIn(1);
         public float CooldownLeft => CooldownLeftIn(0);
@@ -132,6 +130,11 @@ namespace BattleOfAges.Combat
                     Vector3 spot = UnitSpatialGrid.Position(enemy);
                     CastLikeAnAttack(() => MeteorStrike.Drop(Combat, spot));
                     readyAt[slot] = Time.time + GameBalance.MeteorCooldown;
+                    return true;
+                case HeroClass.Archer:
+                    if (Combat == null) return false;
+                    Combat.NextShotPiercing = true; // the next arrow: x2 and on through
+                    readyAt[slot] = Time.time + GameBalance.PierceCooldown;
                     return true;
                 case HeroClass.Dd:
                     if (Combat == null) return false;
@@ -171,7 +174,7 @@ namespace BattleOfAges.Combat
                 to.y = 0f;
                 float d = to.magnitude;
                 if (d > range || (d > 0.01f && Vector3.Angle(forward, to) > GameBalance.FireFanAngle * 0.5f)) continue;
-                float falloff = 1f - (1f - GameBalance.FireFanEdgeDamage) * Mathf.Clamp01(d / range);
+                float falloff = GameBalance.FireFanDamageShare * (1f - (1f - GameBalance.FireFanEdgeDamage) * Mathf.Clamp01(d / range));
                 Combat.DeliverHit(target, Mathf.Max(1, Mathf.RoundToInt(Combat.AttackDamage * falloff)), ignoreArmor: true);
                 hits++;
             }
@@ -187,7 +190,7 @@ namespace BattleOfAges.Combat
             regenStart = start; regenMaxPoints = Mathf.Max(0, maxPts); regenCurrentPoints = Mathf.Max(0, currentPts);
             healLevel = Mathf.Clamp(heal, 0, GameBalance.HealMaxLevel); longShot = shot; fireFan = fan;
             dashLevel = Mathf.Clamp(dash, 0, GameBalance.DashMaxLevel);
-            pierceLevel = Mathf.Clamp(pierce, 0, GameBalance.PierceMaxLevel); meteor = meteorLearnt; criticalHit = crit;
+            piercingArrow = pierce > 0; meteor = meteorLearnt; criticalHit = crit;
             ApplyPassives();
         }
     }

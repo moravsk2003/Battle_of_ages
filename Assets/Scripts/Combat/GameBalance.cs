@@ -73,17 +73,22 @@ namespace BattleOfAges.Combat
         public static float LongShotRangeBonus = 0.05f;
         /// <summary>Mage Fire fan: cone angle, damage share at the edge of the range, cooldown.</summary>
         public static float FireFanAngle = 60f, FireFanEdgeDamage = 0.5f, FireFanCooldown = 10f;
+        /// <summary>The fan hits each target for this share of the mage's attack (at its centre).</summary>
+        public static float FireFanDamageShare = 0.6f;
         /// <summary>DD Dash: x(1 + level) run speed for DashSeconds, levels 1..DashMaxLevel (x2..x5).</summary>
         public static float DashSeconds = 1f, DashCooldown = 20f;
         public static int DashMaxLevel = 4;
-        /// <summary>Archer Piercing arrow: share of the damage the enemy behind the target takes at level 1, + step per level,
-        /// up to PierceMaxLevel (50%); "behind" is up to PierceReach past the target, within PierceWidth of the line of the shot.</summary>
-        public static float PierceFirst = 0.10f, PierceStep = 0.05f, PierceReach = 10f, PierceWidth = 1.5f;
-        public static int PierceMaxLevel = 9;
+        /// <summary>
+        /// Archer Piercing arrow (Q): the next shot hits its target for PierceShotMultiplier and goes on through, hitting the
+        /// enemies behind for these shares of a normal shot in turn (100%, then 50%); "behind" is up to PierceReach past the
+        /// last one hit, within PierceWidth of the line of the shot.
+        /// </summary>
+        public static float PierceShotMultiplier = 2f, PierceCooldown = 100f, PierceReach = 10f, PierceWidth = 1.5f;
+        public static float[] PierceThrough = { 1f, 0.5f };
         /// <summary>DD Critical hit (R): the next hit deals this many times the damage; cooldown in seconds.</summary>
         public static float CritMultiplier = 2f, CritCooldown = 40f;
         /// <summary>Mage Meteor: fall time, radius, damage (x the mage's), cooldown.</summary>
-        public static float MeteorDelay = 1f, MeteorRadius = 4f, MeteorDamageFactor = 3f, MeteorCooldown = 20f;
+        public static float MeteorDelay = 1f, MeteorRadius = 2.5f, MeteorDamageFactor = 5f, MeteorCooldown = 20f;
 
         // ------------------------------------------------------------------ attack recovery (§11.1)
 
