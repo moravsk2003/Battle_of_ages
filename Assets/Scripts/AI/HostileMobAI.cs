@@ -92,7 +92,7 @@ namespace BattleOfAges.AI
             if (gear == null) gear = gameObject.AddComponent<Equipment>();
             gear.DropsLoot = true;
             gear.LoadSlots(StartingKits.For(mobType));
-            UnitRanks.Apply(gameObject, RankOf(mobType), cooldown: 1.6f, range: attackRange);
+            UnitRanks.Apply(gameObject, RankOf(mobType), range: attackRange);
             UnitProgress.Setup(gameObject, RankOf(mobType));
             if (Health != null) Health.InitializeHealth(Health.MaxHealth); // spawn at full health
         }

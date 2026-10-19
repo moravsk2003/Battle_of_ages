@@ -24,7 +24,7 @@ namespace BattleOfAges.Player
         // Unarmed player: the hero is a general (docs/GAME_DESIGN.md §7.1), x2 its base; the worn gear (Equipment) scales these
         public static int BaseHealth => UnitRanks.Health(UnitRank.General, hero: true);
         public static int BaseDamage => UnitRanks.Strength(UnitRank.General, hero: true);
-        public const float BaseCooldown = 1.8f;
+        public static float BaseCooldown => GameBalance.BaseAttackCooldown;
 
         private Equipment gear;
         private bool gearReady;

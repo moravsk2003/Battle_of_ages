@@ -23,8 +23,9 @@ namespace BattleOfAges.Combat
         /// Gives the unit the base stats of its rank (gear is added on top, as Equipment does for any base) and the
         /// speed modifier; the worn kit stays.
         /// </summary>
-        public static void Apply(GameObject unit, UnitRank rank, bool hero = false, float cooldown = 2f, float range = 3f)
+        public static void Apply(GameObject unit, UnitRank rank, bool hero = false, float cooldown = -1f, float range = 3f)
         {
+            if (cooldown < 0f) cooldown = GameBalance.BaseAttackCooldown;
             CombatUnit combat = unit.GetComponent<CombatUnit>();
             if (combat != null) combat.SpeedModifier = SpeedModifier(rank, hero);
             Equipment gear = unit.GetComponent<Equipment>();

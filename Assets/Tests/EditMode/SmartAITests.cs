@@ -110,6 +110,7 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(HostileMobType.WarlordGuard, mobAI.MobType);
             Assert.AreEqual(250, mobObj.GetComponent<Equipment>().BaseHealth, "The warlord is a general: 250 HP before its armour.");
             Assert.Greater(mobObj.GetComponent<HealthComponent>().MaxHealth, 250, "Its kit adds on top.");
+            Assert.AreEqual(GameBalance.BaseAttackCooldown, mobObj.GetComponent<Equipment>().BaseCooldown, 1e-5f, "One base attack speed for every unit.");
         }
 
         [Test]

@@ -83,9 +83,8 @@ namespace BattleOfAges.Combat
             float share = health != null && health.MaxHealth > 0 ? (float)health.CurrentHealth / health.MaxHealth : 1f;
             Equipment gear = GetComponent<Equipment>();
             CombatUnit combat = GetComponent<CombatUnit>();
-            float cooldown = gear != null ? gear.BaseCooldown : combat != null ? combat.AttackCooldown : 2f;
             float range = gear != null ? gear.BaseRange : combat != null ? combat.AttackRange : 3f;
-            UnitRanks.Apply(gameObject, rank, isHero, cooldown, range);
+            UnitRanks.Apply(gameObject, rank, isHero, GameBalance.BaseAttackCooldown, range); // one base for everyone: only gear and class change it
             if (health != null && health.IsAlive) health.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(share * health.MaxHealth)));
         }
     }

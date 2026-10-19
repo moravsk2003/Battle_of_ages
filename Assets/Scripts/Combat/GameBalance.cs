@@ -97,6 +97,9 @@ namespace BattleOfAges.Combat
         /// <summary>Chance per worked game hour that a working person becomes a warrior.</summary>
         public static float WorkPromotionPerHour = 0.005f;
 
+        /// <summary>Seconds between attacks for every unit and hero: only the weapon, gloves and class change it (§8).</summary>
+        public static float BaseAttackCooldown = 2f;
+
         // ------------------------------------------------------------------ speed (§11.1)
 
         /// <summary>speed = SpeedGlobal x modifier x sqrt(strength), metres per second.</summary>
