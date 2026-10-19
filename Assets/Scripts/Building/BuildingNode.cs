@@ -117,6 +117,9 @@ namespace BattleOfAges.Building
             charCtrl.stepOffset = 0.4f;
             charCtrl.slopeLimit = 50.0f;
 
+            // Every unit can fight (docs/GAME_DESIGN.md §11.1): a villager is a person, 20 HP and strength 2 (RtsUnit applies the rank)
+            npcObj.AddComponent<Combat.HealthComponent>();
+            npcObj.AddComponent<Combat.CombatUnit>();
             RtsUnit unitComp = npcObj.AddComponent<RtsUnit>();
             npcObj.AddComponent<NpcResourceGatherer>();
 

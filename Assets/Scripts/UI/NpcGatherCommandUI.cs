@@ -155,7 +155,7 @@ namespace BattleOfAges.UI
             if (haulText != null) haulText.text = haulCount.ToString();
             if (autoText != null) autoText.text = autoCount.ToString();
 
-            int totalWorkers = WorkerRegistry.WorkerCount;
+            int totalWorkers = WorkerRegistry.WorkingCount;
             int totalAssigned = branchesCount + chopCount + pebblesCount + haulCount + autoCount;
 
             if (statusText != null)
@@ -177,7 +177,7 @@ namespace BattleOfAges.UI
 
         private void ChangeJobCount(GatherDirective directive, int delta)
         {
-            int total = WorkerRegistry.WorkerCount;
+            int total = WorkerRegistry.WorkingCount;
             int currentlyAssignedOther = GetTotalAssignedExcept(directive);
             int maxAllowed = Mathf.Max(0, total - currentlyAssignedOther);
 
@@ -206,7 +206,7 @@ namespace BattleOfAges.UI
         public void ApplyCurrentAllocation()
         {
             WorkerRegistry.ApplyJobDistribution(branchesCount, chopCount, pebblesCount, haulCount, autoCount);
-            int total = WorkerRegistry.WorkerCount;
+            int total = WorkerRegistry.WorkingCount;
 
             if (statusText != null)
             {

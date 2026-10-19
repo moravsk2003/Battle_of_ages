@@ -32,7 +32,9 @@ namespace BattleOfAges.RTS
         // Scale: kinematic movement (GroundMotor), steering probes 10x per second, spatial grid for engagement
         private const float SteerInterval = 0.1f, EngageInterval = 0.4f, EngageRadius = 14f;
         private bool isPlayerControlled;   // the hero keeps CharacterController physics
-        private bool isWorker;             // gatherers do not pick fights
+        private NpcResourceGatherer gatherer;
+        /// <summary>Busy with a job: working units do not go looking for fights (soldiers are units without a job).</summary>
+        private bool IsWorking => gatherer != null && gatherer.IsWorking;
         private int gridId = -1;
         private Vector3 steerDir, steerDesired;
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
@@ -43,6 +45,8 @@ namespace BattleOfAges.RTS
         private bool touchingSolidNearTarget;
 
         public bool IsSelected { get; private set; }
+        /// <summary>Ordered to attack or engaged in a fight (the job waits meanwhile).</summary>
+        public bool HasAttackTarget => attackTarget != null;
 
         private void Awake()
         {
@@ -69,8 +73,13 @@ namespace BattleOfAges.RTS
         {
             SnapToTerrain();
             lastPos = transform.position;
-            isWorker = GetComponent<NpcResourceGatherer>() != null;
-            if (!isPlayerControlled) EnsureStartingKit();
+            gatherer = GetComponent<NpcResourceGatherer>();
+            if (!isPlayerControlled)
+            {
+                // One kind of unit (docs/GAME_DESIGN.md §11.1): every unit can also work; one without a job stands by as a soldier
+                if (gatherer == null) { gatherer = gameObject.AddComponent<NpcResourceGatherer>(); gatherer.SetGatherDirective(GatherDirective.Idle); }
+                EnsureStartingKit();
+            }
         }
 
         /// <summary>
@@ -153,7 +162,7 @@ namespace BattleOfAges.RTS
             if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
 
             // Soldiers engage raiders that come near on their own (idle or after a fight), not workers or the hero.
-            if (!isPlayerControlled && !isWorker && combatUnit != null && attackTarget == null && !hasTarget)
+            if (!isPlayerControlled && !IsWorking && combatUnit != null && attackTarget == null && !hasTarget)
             {
                 engageTimer -= Time.deltaTime;
                 if (engageTimer <= 0f)

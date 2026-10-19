@@ -12,7 +12,10 @@ namespace BattleOfAges.RTS
         private static readonly List<NpcResourceGatherer> activeWorkers = new List<NpcResourceGatherer>(64);
 
         public static IReadOnlyList<NpcResourceGatherer> ActiveWorkers => activeWorkers;
+        /// <summary>All own units (every unit can work, docs/GAME_DESIGN.md §11.1): the population the town hall caps.</summary>
         public static int WorkerCount => activeWorkers.Count;
+        /// <summary>Units with a job (soldiers on stand-by are not counted): what the job window distributes.</summary>
+        public static int WorkingCount { get { int n = 0; foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking) n++; return n; } }
 
         public static void Register(NpcResourceGatherer worker)
         {
@@ -36,7 +39,7 @@ namespace BattleOfAges.RTS
             for (int i = 0; i < count; i++)
             {
                 NpcResourceGatherer worker = activeWorkers[i];
-                if (worker != null && worker.gameObject.activeInHierarchy)
+                if (worker != null && worker.IsWorking && worker.gameObject.activeInHierarchy)
                 {
                     worker.SetGatherDirective(directive);
                 }
@@ -56,41 +59,27 @@ namespace BattleOfAges.RTS
             return count;
         }
 
+        private static readonly List<NpcResourceGatherer> workingBuffer = new List<NpcResourceGatherer>(64);
+
+        /// <summary>Splits the units that have a job between the jobs (soldiers on stand-by keep standing by).</summary>
         public static void ApplyJobDistribution(int branchesCount, int chopCount, int pebblesCount, int haulCount, int autoCount)
         {
+            workingBuffer.Clear();
+            foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking) workingBuffer.Add(w);
+
             int index = 0;
-            int total = activeWorkers.Count;
+            index = Assign(index, branchesCount, GatherDirective.WoodGatherBranchesOnly);
+            index = Assign(index, chopCount, GatherDirective.WoodChopTreesOnly);
+            index = Assign(index, pebblesCount, GatherDirective.OrePebblesOnly);
+            index = Assign(index, haulCount, GatherDirective.HaulOreFromMineToChest);
+            Assign(index, workingBuffer.Count - index, GatherDirective.Auto); // the rest
+        }
 
-            // 1. Assign Branches
-            for (int i = 0; i < branchesCount && index < total; i++, index++)
-            {
-                if (activeWorkers[index] != null) activeWorkers[index].SetGatherDirective(GatherDirective.WoodGatherBranchesOnly);
-            }
-
-            // 2. Assign Chop
-            for (int i = 0; i < chopCount && index < total; i++, index++)
-            {
-                if (activeWorkers[index] != null) activeWorkers[index].SetGatherDirective(GatherDirective.WoodChopTreesOnly);
-            }
-
-            // 3. Assign Pebbles
-            for (int i = 0; i < pebblesCount && index < total; i++, index++)
-            {
-                if (activeWorkers[index] != null) activeWorkers[index].SetGatherDirective(GatherDirective.OrePebblesOnly);
-            }
-
-            // 4. Assign Mine Haul
-            for (int i = 0; i < haulCount && index < total; i++, index++)
-            {
-                if (activeWorkers[index] != null) activeWorkers[index].SetGatherDirective(GatherDirective.HaulOreFromMineToChest);
-            }
-
-            // 5. Remaining assigned to Auto
-            for (; index < total; index++)
-            {
-                if (activeWorkers[index] != null) activeWorkers[index].SetGatherDirective(GatherDirective.Auto);
-            }
-
+        private static int Assign(int from, int count, GatherDirective directive)
+        {
+            int end = Mathf.Min(workingBuffer.Count, from + Mathf.Max(0, count));
+            for (int i = from; i < end; i++) workingBuffer[i].SetGatherDirective(directive);
+            return end;
         }
     }
 }

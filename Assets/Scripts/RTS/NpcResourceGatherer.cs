@@ -12,7 +12,9 @@ namespace BattleOfAges.RTS
         WoodGatherBranchesOnly,
         WoodChopTreesOnly,
         OrePebblesOnly,
-        HaulOreFromMineToChest
+        HaulOreFromMineToChest,
+        /// <summary>No job: the unit stands by as a soldier until it is told to work.</summary>
+        Idle
     }
 
     public enum GathererState
@@ -61,6 +63,8 @@ namespace BattleOfAges.RTS
 
         public GatherDirective CurrentDirective => currentDirective;
         public GathererState CurrentState => currentState;
+        /// <summary>Has a job (any directive but Idle); a direct work order gives an idle unit the Auto job.</summary>
+        public bool IsWorking => currentDirective != GatherDirective.Idle;
 
         private HealthComponent healthComponent;
 
@@ -84,14 +88,16 @@ namespace BattleOfAges.RTS
 
         private void HandleDamageTaken(int damage)
         {
-            // Self-preservation: Immediately drop current target and flee towards base chest
+            // A soldier (no job) or a unit ordered to fight holds its ground
+            if (!IsWorking || (rtsUnit != null && rtsUnit.HasAttackTarget)) return;
+
+            // Self-preservation: a worker drops its job and flees towards the base chest
             ClearCurrentTargets();
             Vector3 safePos = StorageChestNode.GetNearestChestDepositPosition(transform.position);
             if (rtsUnit != null)
             {
                 rtsUnit.IssueMoveCommand(safePos);
             }
-            Debug.LogWarning($"[NPC Worker] ⚠️ {gameObject.name} атакований ({damage} урону)! Тікає під захист бази.");
         }
 
         private void OnEnable()
@@ -145,6 +151,7 @@ namespace BattleOfAges.RTS
         public void AssignToWorkInMine(MineNode mine)
         {
             if (mine == null) return;
+            StartWorking();
 
             if (assignedMine != null && assignedMine != mine)
             {
@@ -160,6 +167,7 @@ namespace BattleOfAges.RTS
         public void CommandHarvestTree(ResourceNodeTree tree)
         {
             if (tree == null || tree.CurrentState == TreeState.Depleted) return;
+            StartWorking();
 
             ClearCurrentTargets();
             targetTree = tree;
@@ -170,6 +178,7 @@ namespace BattleOfAges.RTS
         public void CommandHarvestPebble(OrePebbleNode pebble)
         {
             if (pebble == null || pebble.IsPickedUp) return;
+            StartWorking();
 
             ClearCurrentTargets();
             targetPebble = pebble;
@@ -180,10 +189,17 @@ namespace BattleOfAges.RTS
 
         public void CommandDeliverToChest()
         {
+            StartWorking();
             ClearCurrentTargets();
             currentState = GathererState.DeliveringToChest;
             Vector3 chestPos = StorageChestNode.GetNearestChestDepositPosition(transform.position);
             if (rtsUnit != null) rtsUnit.IssueMoveCommand(chestPos);
+        }
+
+        /// <summary>A direct work order turns a soldier (Idle) into a worker with the Auto job.</summary>
+        private void StartWorking()
+        {
+            if (currentDirective == GatherDirective.Idle) currentDirective = GatherDirective.Auto;
         }
 
         private void ClearCurrentTargets()
@@ -215,8 +231,8 @@ namespace BattleOfAges.RTS
                 return;
             }
 
-            // Pause AI logic if worker is selected by player in RTS mode
-            if (rtsUnit != null && rtsUnit.IsSelected) return;
+            // Pause AI logic if worker is selected by player in RTS mode, or while it fights
+            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget)) return;
 
             if (currentState == GathererState.MovingToResource || currentState == GathererState.DeliveringToChest)
             {
@@ -306,6 +322,7 @@ namespace BattleOfAges.RTS
 
         private void HandleFindingResourceState()
         {
+            if (!IsWorking) return; // a soldier waits for orders
             searchTimer += Time.deltaTime;
             if (searchTimer < 0.8f) return; // Stagger searches across frames
             searchTimer = 0f;

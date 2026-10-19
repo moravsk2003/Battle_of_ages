@@ -46,6 +46,44 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator Knight_CanWork_ButStandsByAsASoldierUntilToldTo()
+        {
+            CreateGround();
+            int before = WorkerRegistry.WorkerCount, workingBefore = WorkerRegistry.WorkingCount;
+            RtsUnit knight = CreateKnight(Vector3.zero);
+            yield return null;
+
+            var job = knight.GetComponent<NpcResourceGatherer>();
+            Assert.IsNotNull(job, "Every unit can work (one kind of unit).");
+            Assert.IsFalse(job.IsWorking, "Without an order a knight stands by as a soldier.");
+            Assert.AreEqual(before + 1, WorkerRegistry.WorkerCount, "The town hall cap counts soldiers too.");
+            Assert.AreEqual(workingBefore, WorkerRegistry.WorkingCount);
+            Assert.AreEqual(UnitRanks.Health(UnitRank.Knight), knight.GetComponent<Crafting.Equipment>().BaseHealth);
+
+            WorkerRegistry.ApplyJobDistribution(0, 0, 0, 0, 0);
+            Assert.IsFalse(job.IsWorking, "The job window only shares out units that already work.");
+
+            job.CommandDeliverToChest();
+            Assert.IsTrue(job.IsWorking, "A direct work order puts the knight to work.");
+        }
+
+        [UnityTest]
+        public IEnumerator Villager_IsAPersonThatCanBeOrderedToFight()
+        {
+            CreateGround();
+            GameObject villager = Track(Building.BuildingNode.CreateWorkerNpc(OnGround(Vector3.zero), "TestVillager"));
+            HealthComponent raider = CreateRaider(new Vector3(6f, 0f, 0f), thinking: false);
+            yield return null;
+
+            Assert.AreEqual(UnitRanks.Health(UnitRank.Person), villager.GetComponent<Crafting.Equipment>().BaseHealth);
+            Assert.AreEqual(UnitRanks.Strength(UnitRank.Person), villager.GetComponent<CombatUnit>().Strength, 1e-4f);
+
+            villager.GetComponent<RtsUnit>().IssueAttackCommand(raider);
+            yield return Wait(8f);
+            Assert.Less(raider.CurrentHealth, raider.MaxHealth, "A worker ordered to attack fights instead of working.");
+        }
+
+        [UnityTest]
         public IEnumerator AttackCommand_IsKept_AndDamagesTheTarget()
         {
             CreateGround();
