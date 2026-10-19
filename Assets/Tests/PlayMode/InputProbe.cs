@@ -82,6 +82,8 @@ namespace BattleOfAges.PlayModeTests
             yield return Phase($"FP scripted walk {speed:0.#} m/s, no input", 4f, cam, () => cc.Move(player.transform.forward * speed * Time.deltaTime));
             yield return Phase("FP W + mouse 16/frame", 4f, cam, () => { Keys(Key.W); MouseDelta(16); });
             yield return Phase("FP W+Shift+Space spam", 4f, cam, () => Keys(Time.frameCount % 2 == 0 ? new[] { Key.W, Key.LeftShift, Key.Space } : new[] { Key.W }));
+            yield return Phase("FP Space spam standing (press every 6th frame)", 6f, cam, () => Keys(Time.frameCount % 6 < 3 ? new[] { Key.Space } : new Key[0]));
+            yield return Phase("FP idle after jumps", 4f, cam, null);
             Keys();
 
             // Map
