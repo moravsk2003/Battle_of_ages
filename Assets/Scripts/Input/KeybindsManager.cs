@@ -14,7 +14,8 @@ namespace BattleOfAges.InputSystem
         ChopTree,
         Equipment,
         Hero,
-        Ability
+        Ability,
+        Ability2
     }
 
     /// <summary>
@@ -34,7 +35,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.ChopTree,         KeyCode.F },
             { KeyAction.Equipment,       KeyCode.C },
             { KeyAction.Hero,            KeyCode.H },
-            { KeyAction.Ability,         KeyCode.Q }
+            { KeyAction.Ability,         KeyCode.Q },
+            { KeyAction.Ability2,        KeyCode.R }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -47,7 +49,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.ChopTree,         "🪓 Рубання дерев" },
             { KeyAction.Equipment,       "Спорядження" },
             { KeyAction.Hero,            "Герой" },
-            { KeyAction.Ability,         "Уміння класу" }
+            { KeyAction.Ability,         "Уміння класу" },
+            { KeyAction.Ability2,        "Друге вміння класу" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

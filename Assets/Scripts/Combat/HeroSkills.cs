@@ -9,13 +9,14 @@ namespace BattleOfAges.Combat
     /// tank - 1. Regeneration (passive; start: +1% max and +2% current HP per game hour, each further point +1% max or
     ///           +2% current); 2. Instant heal (Q; 5% of max HP, +4% per point up to 25%; every 12 minutes) - after the
     ///           start of Regeneration and at least one point in one of its branches;
-    /// archer - 1. Long shot (passive, 2 points: +5% range); 2. Piercing arrow (passive: arrows ignore 10% of armour,
-    ///           +5% per point up to 50%);
-    /// mage - 1. Fire fan (cast on its own with the attack: a 60° cone, the mage's damage to each target falling to
-    ///           50% at the edge, through armour; every 10 s); 2. Meteor (Q: falls on the nearest enemy in range after
-    ///           1 s, 3x the mage's damage to everyone within 4 m, through armour; every 20 s);
-    /// DD - 1. Dash (Q: 1 s of x2 run speed, +1 per point up to x5; every 20 s); 2. Critical hit (passive: every 5th
-    ///           hit deals double damage).
+    /// archer - 1. Long shot (passive, 2 points: +5% range); 2. Piercing arrow (passive: the arrow goes on through and
+    ///           the enemy behind the target takes 10% of its damage, +5% per point up to 50%);
+    /// mage - 1. Fire fan (Q: a 60° cone, the mage's damage to each target falling to 50% at the edge, through armour;
+    ///           every 10 s); 2. Meteor (R: falls on the nearest enemy in range after 1 s, 3x the mage's damage to everyone
+    ///           within 4 m, through armour; every 20 s). Both are cast like an attack: a wind-up before, standing after;
+    /// DD - 1. Dash (Q: 1 s of x2 run speed, +1 per point up to x5; every 20 s); 2. Critical hit (R: the next hit deals
+    ///           double damage; every 40 s).
+    /// The first active skill is on Q, the second on R.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HeroSkills : MonoBehaviour
@@ -29,8 +30,7 @@ namespace BattleOfAges.Combat
         [SerializeField] private bool meteor;
         [SerializeField] private int dashLevel;     // 0..4: x2..x5
         [SerializeField] private bool criticalHit;
-        private float readyAt;                      // Time.time when the active skill (Q) can be used again
-        private float fanReadyAt;                   // the fan casts itself with the attack
+        private readonly float[] readyAt = new float[2]; // Time.time when each active skill (Q, R) can be used again
 
         public bool RegenStart => regenStart;
         public int RegenMaxPoints => regenMaxPoints;
@@ -48,9 +48,6 @@ namespace BattleOfAges.Combat
         private HeroClass Class => Hero != null ? Hero.Class : HeroClass.None;
         private CombatUnit combat;
         private CombatUnit Combat => combat != null ? combat : combat = GetComponent<CombatUnit>();
-
-        private void OnEnable() { if (Combat != null) { Combat.AttackLaunched -= OnAttackLaunched; Combat.AttackLaunched += OnAttackLaunched; } }
-        private void OnDisable() { if (Combat != null) Combat.AttackLaunched -= OnAttackLaunched; }
 
         // ------------------------------------------------------------------ learning
 
@@ -78,7 +75,7 @@ namespace BattleOfAges.Combat
         public float RegenCurrentShare => regenStart ? GameBalance.RegenStepCurrent * (1 + regenCurrentPoints) : 0f;
         public float HealShare => healLevel <= 0 ? 0f : GameBalance.HealFirst + GameBalance.HealStep * (healLevel - 1);
         public float DashFactor => dashLevel <= 0 ? 1f : 1f + dashLevel;
-        /// <summary>Share of the target's armour the archer's arrows go through.</summary>
+        /// <summary>Share of an arrow's damage that the enemy behind the target takes.</summary>
         public float PierceShare => pierceLevel <= 0 ? 0f : GameBalance.PierceFirst + GameBalance.PierceStep * (pierceLevel - 1);
 
         public void ApplyPassives()
@@ -87,10 +84,7 @@ namespace BattleOfAges.Combat
             if (health != null) { health.RegenMaxPerHour = RegenMaxShare; health.RegenCurrentPerHour = RegenCurrentShare; }
             if (Combat != null)
             {
-                Combat.AttackLaunched -= OnAttackLaunched; // (re)subscribe: the fan casts itself with the attack
-                Combat.AttackLaunched += OnAttackLaunched;
-                Combat.ArmorPierce = PierceShare;
-                Combat.CritEveryNth = criticalHit ? GameBalance.CritEveryNth : 0;
+                Combat.PierceShare = PierceShare;
             }
             if (Hero != null)
             {
@@ -99,45 +93,63 @@ namespace BattleOfAges.Combat
             }
         }
 
-        // ------------------------------------------------------------------ the mage's fan: with the attack
+        // ------------------------------------------------------------------ the active skills (Q, R)
 
-        private void OnAttackLaunched(HealthComponent target)
+        /// <summary>Has an active skill in the slot (0: Q, 1: R).</summary>
+        public bool HasActiveIn(int slot) => slot == 0
+            ? (Class == HeroClass.Tank && healLevel > 0) || (Class == HeroClass.Mage && fireFan) || (Class == HeroClass.Dd && dashLevel > 0)
+            : (Class == HeroClass.Mage && meteor) || (Class == HeroClass.Dd && criticalHit);
+        public bool HasActive => HasActiveIn(0) || HasActiveIn(1);
+        public float CooldownLeft => CooldownLeftIn(0);
+        public float CooldownLeftIn(int slot) => Mathf.Max(0f, readyAt[slot] - Time.time);
+
+        /// <summary>Uses the class's first active skill (Q).</summary>
+        public bool UseActive(Vector3 forward) => UseActive(0, forward);
+
+        /// <summary>Uses an active skill (0: Q, 1: R); false if there is none, it is recharging, or it has no target.</summary>
+        public bool UseActive(int slot, Vector3 forward)
         {
-            if (Class != HeroClass.Mage || !fireFan || target == null || Time.time < fanReadyAt) return;
-            fanReadyAt = Time.time + GameBalance.FireFanCooldown;
-            CastFireFan(target.transform.position - transform.position);
-        }
-
-        // ------------------------------------------------------------------ the active skill (Q)
-
-        public bool HasActive => (Class == HeroClass.Tank && healLevel > 0) || (Class == HeroClass.Mage && meteor) || (Class == HeroClass.Dd && dashLevel > 0);
-        public float CooldownLeft => Mathf.Max(0f, readyAt - Time.time);
-
-        /// <summary>Uses the class's active skill; false if there is none, it is recharging, or it has no target.</summary>
-        public bool UseActive(Vector3 forward)
-        {
-            if (!HasActive || CooldownLeft > 0f) return false;
+            if (!HasActiveIn(slot) || CooldownLeftIn(slot) > 0f) return false;
             HealthComponent health = GetComponent<HealthComponent>();
             if (health != null && !health.IsAlive) return false;
             switch (Class)
             {
                 case HeroClass.Tank:
                     health.Heal(Mathf.Max(1, Mathf.RoundToInt(health.MaxHealth * HealShare)));
-                    readyAt = Time.time + GameBalance.HealCooldown;
+                    readyAt[slot] = Time.time + GameBalance.HealCooldown;
                     return true;
                 case HeroClass.Mage:
                     if (Combat == null) return false;
+                    if (slot == 0)
+                    {
+                        Vector3 dir = forward;
+                        CastLikeAnAttack(() => CastFireFan(dir));
+                        readyAt[slot] = Time.time + GameBalance.FireFanCooldown;
+                        return true;
+                    }
                     int enemy = UnitSpatialGrid.FindNearest(transform.position, Combat.AttackRange, Combat.EnemyTeam);
                     if (enemy < 0) return false;
-                    MeteorStrike.Drop(Combat, UnitSpatialGrid.Position(enemy));
-                    readyAt = Time.time + GameBalance.MeteorCooldown;
+                    Vector3 spot = UnitSpatialGrid.Position(enemy);
+                    CastLikeAnAttack(() => MeteorStrike.Drop(Combat, spot));
+                    readyAt[slot] = Time.time + GameBalance.MeteorCooldown;
                     return true;
                 case HeroClass.Dd:
-                    if (Combat != null) Combat.Boost(DashFactor, GameBalance.DashSeconds);
-                    readyAt = Time.time + GameBalance.DashCooldown;
+                    if (Combat == null) return false;
+                    if (slot == 0) { Combat.Boost(DashFactor, GameBalance.DashSeconds); readyAt[slot] = Time.time + GameBalance.DashCooldown; }
+                    else { Combat.NextHitCritical = true; readyAt[slot] = Time.time + GameBalance.CritCooldown; }
                     return true;
             }
             return false;
+        }
+
+        /// <summary>A spell is cast like the mage's attack: it goes off after the wind-up and the mage stands meanwhile and a moment after.</summary>
+        private void CastLikeAnAttack(System.Action effect)
+        {
+            float windup = GameBalance.MageWindup;
+            Combat.Recover(windup + GameBalance.RangedRootSeconds, rooted: true);
+            Combat.TriggerAttackAnimation();
+            if (windup <= 0f || !Application.isPlaying) { effect(); return; }
+            PendingHits.AddAction(windup, () => { if (this != null && Combat != null) effect(); });
         }
 
         private static readonly int[] found = new int[256];

@@ -25,6 +25,7 @@ namespace BattleOfAges.Combat
         }
 
         private static readonly List<Hit> hits = new List<Hit>(64);
+        private static readonly List<(float at, System.Action act)> actions = new List<(float, System.Action)>(16);
         public static int Count => hits.Count;
 
         public static void Add(CombatUnit striker, HealthComponent target, int damage, bool bolts, float windup, float reach)
@@ -33,11 +34,21 @@ namespace BattleOfAges.Combat
                                Reach = reach, From = striker.transform.position });
         }
 
+        /// <summary>Runs an effect after its wind-up (a skill cast like an attack: the fan, the meteor).</summary>
+        public static void AddAction(float delay, System.Action act) => actions.Add((Time.time + delay, act));
+
         /// <summary>Lands every swing whose wind-up is over.</summary>
         public static void Tick() => Tick(Time.time);
 
         public static void Tick(float now)
         {
+            for (int i = 0; i < actions.Count; i++)
+            {
+                if (actions[i].at > now) continue;
+                System.Action act = actions[i].act;
+                actions.RemoveAt(i--);
+                act();
+            }
             for (int i = 0; i < hits.Count; i++)
             {
                 if (hits[i].At > now) continue;
@@ -56,11 +67,12 @@ namespace BattleOfAges.Combat
             Vector3 from = h.Striker != null ? h.Striker.transform.position : h.From;
             if (Vector3.Distance(from, h.Target.transform.position) > h.Reach + 1f + ReachSlack) return; // it got away
             if (h.Striker == null) { h.Target.TakeDamage(h.Damage); return; }
-            if (h.Bolts) MageBolt.Volley(h.Striker, h.Target, h.Damage);
-            else h.Striker.DeliverHit(h.Target, h.Damage, ignoreArmor: false);
+            if (h.Bolts) { MageBolt.Volley(h.Striker, h.Target, h.Damage); return; }
+            h.Striker.DeliverHit(h.Target, h.Damage, ignoreArmor: false);
+            if (h.Striker.IsRanged && h.Striker.PierceShare > 0f) h.Striker.PierceBehind(h.Target, h.Damage); // the archer's Piercing arrow
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => hits.Clear();
+        private static void ResetStatics() { hits.Clear(); actions.Clear(); }
     }
 }

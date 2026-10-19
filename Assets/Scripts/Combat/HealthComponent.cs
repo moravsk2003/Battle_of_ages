@@ -55,13 +55,12 @@ namespace BattleOfAges.Combat
         public int IgnoreEveryNthHit { get; set; }
         private int hitCounter;
 
-        /// <summary>A hit; armour (DamageReduction) absorbs its share unless the attack goes through armour (the mage), less the share an arrow pierces.</summary>
-        public void TakeDamage(int damage, bool ignoreArmor = false, float armorPierce = 0f)
+        /// <summary>A hit; armour (DamageReduction) absorbs its share unless the attack goes through armour (the mage).</summary>
+        public void TakeDamage(int damage, bool ignoreArmor = false)
         {
             if (!IsAlive || damage <= 0) return;
             if (IgnoreEveryNthHit > 0 && ++hitCounter >= IgnoreEveryNthHit) { hitCounter = 0; return; }
-            if (!ignoreArmor && DamageReduction > 0f)
-                damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, GameBalance.MaxDamageReduction) * (1f - Mathf.Clamp01(armorPierce)))));
+            if (!ignoreArmor && DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, GameBalance.MaxDamageReduction))));
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             OnTakeDamage?.Invoke(damage);

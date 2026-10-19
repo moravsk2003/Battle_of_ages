@@ -176,18 +176,22 @@ namespace BattleOfAges.PlayModeTests
         }
 
         /// <summary>The class's active skill when it pays: the tank heals below half HP, the mage casts its fan at a target in
-        /// range (a meteor; the fan casts itself), the DD dashes at a target still far away.</summary>
+        /// range (the meteor, else the fan), the DD dashes at a target still far away and makes its next swing critical.</summary>
         private static void UseSkill(Unit me, Unit target, float d)
         {
             HeroSkills skills = me.Combat.GetComponent<HeroSkills>();
-            if (skills == null || !skills.HasActive || skills.CooldownLeft > 0f) return;
+            if (skills == null || !skills.HasActive) return;
             HeroProgress hero = me.Combat.GetComponent<HeroProgress>();
             Vector3 to = target.Combat.transform.position - me.Combat.transform.position;
+            float reach = me.Combat.AttackRange;
             switch (hero.Class)
             {
-                case HeroClass.Tank: if (me.Hp.CurrentHealth < me.Hp.MaxHealth / 2) skills.UseActive(to); break;
-                case HeroClass.Mage: if (d <= me.Combat.AttackRange) skills.UseActive(to); break;
-                case HeroClass.Dd: if (d > me.Combat.AttackRange + 3f) skills.UseActive(to); break;
+                case HeroClass.Tank: if (me.Hp.CurrentHealth < me.Hp.MaxHealth / 2) skills.UseActive(0, to); break;
+                case HeroClass.Mage: if (d <= reach && !skills.UseActive(1, to)) skills.UseActive(0, to); break; // meteor, else the fan
+                case HeroClass.Dd:
+                    if (d > reach + 3f) skills.UseActive(0, to);                          // dash in
+                    else if (d <= reach + 0.5f && me.Combat.CanAttack) skills.UseActive(1, to); // the next swing is a critical one
+                    break;
             }
         }
 

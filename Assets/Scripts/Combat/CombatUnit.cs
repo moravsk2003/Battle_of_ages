@@ -83,9 +83,8 @@ namespace BattleOfAges.Combat
             recoveryUntil = Time.time + windup + (IsRanged ? GameBalance.RangedRootSeconds : GameBalance.MeleeSlowSeconds);
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
-            if (CritEveryNth > 0 && ++swings % CritEveryNth == 0) finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); // the DD's critical hit
+            if (NextHitCritical) { finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); NextHitCritical = false; } // the DD's Critical hit
             PendingHits.Add(this, target, finalDamage, FiresBolts, windup, attackRange);
-            AttackLaunched?.Invoke(target);
 
             TriggerAttackAnimation();
             return true;
@@ -101,13 +100,41 @@ namespace BattleOfAges.Combat
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
         public bool FiresBolts { get; set; }
 
-        /// <summary>Raised when a swing starts at a target (the mage's fan casts itself with it).</summary>
-        public event Action<HealthComponent> AttackLaunched;
-        /// <summary>Share of the target's armour this unit's arrows go through (the archer's Piercing arrow).</summary>
-        public float ArmorPierce { get; set; }
-        /// <summary>Every Nth swing hits for double (the DD's Critical hit; 0: off).</summary>
-        public int CritEveryNth { get; set; }
-        private int swings;
+        /// <summary>Share of an arrow's damage that goes on through to the enemy behind the target (the archer's Piercing arrow).</summary>
+        public float PierceShare { get; set; }
+        /// <summary>The next swing hits for double (the DD's Critical hit, used on R).</summary>
+        public bool NextHitCritical { get; set; }
+
+        /// <summary>Slowed (or rooted) for a while, as after an attack: skills cast like an attack use it.</summary>
+        public void Recover(float seconds, bool rooted)
+        {
+            recoveryFactor = rooted ? 0f : GameBalance.MeleeSlowFactor;
+            recoveryUntil = Mathf.Max(recoveryUntil, Time.time + seconds);
+        }
+
+        private static readonly int[] behind = new int[64];
+
+        /// <summary>The arrow goes on through: the nearest enemy behind the target, close to the line of the shot, takes
+        /// PierceShare of the damage.</summary>
+        public void PierceBehind(HealthComponent target, int damage)
+        {
+            Vector3 from = transform.position, at = target.transform.position;
+            Vector3 line = at - from; line.y = 0f;
+            if (line.sqrMagnitude < 1e-4f) return;
+            line.Normalize();
+            int n = RTS.UnitSpatialGrid.Query(at, GameBalance.PierceReach, EnemyTeam, behind);
+            HealthComponent next = null; float best = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                HealthComponent h = RTS.UnitSpatialGrid.Health(behind[i]);
+                if (h == null || h == target || !h.IsAlive) continue;
+                Vector3 off = h.transform.position - at; off.y = 0f;
+                float along = Vector3.Dot(off, line);
+                if (along <= 0f || (off - line * along).magnitude > GameBalance.PierceWidth) continue; // not behind, or off the line
+                if (along < best) { best = along; next = h; }
+            }
+            if (next != null) DeliverHit(next, Mathf.Max(1, Mathf.RoundToInt(damage * PierceShare)), ignoreArmor: false);
+        }
 
         /// <summary>Share of the damage dealt that heals this unit (the Vampiric artifact).</summary>
         public float LifeSteal { get; set; }
@@ -118,7 +145,7 @@ namespace BattleOfAges.Combat
             if (target == null || !target.IsAlive) return;
             target.LastAttacker = this;
             int before = target.CurrentHealth;
-            target.TakeDamage(damage, ignoreArmor, IsRanged && !FiresBolts ? ArmorPierce : 0f); // arrows may pierce armour
+            target.TakeDamage(damage, ignoreArmor);
             if (LifeSteal > 0f) GetComponent<HealthComponent>()?.Heal(Mathf.RoundToInt((before - target.CurrentHealth) * LifeSteal)); // the Vampiric artifact
 
             // Battle experience (docs/GAME_DESIGN.md §11.1); heroes count kills for their own levels (Killed)

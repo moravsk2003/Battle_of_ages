@@ -122,7 +122,7 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
-        public void ArcherPiercingArrow_NeedsLongShot_And10To50PercentOfArmour()
+        public void ArcherPiercingArrow_NeedsLongShot_HitsTheEnemyBehind()
         {
             hero.ChooseClass(HeroClass.Archer);
             Assert.IsFalse(skills.LearnPierce(), "Long shot first.");
@@ -133,47 +133,60 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(0.40f, skills.PierceShare, 1e-5f, "+5% a point.");
 
             heroObj.GetComponent<Equipment>().Equip(new Item(ItemType.Bow, 1));
-            HealthComponent target = Enemy(new Vector3(0f, 0f, 5f));
-            target.DamageReduction = 0.5f;
             CombatUnit combat = heroObj.GetComponent<CombatUnit>();
-            combat.DeliverHit(target, 100, ignoreArmor: false);
-            Assert.AreEqual(1000 - 70, target.CurrentHealth, "50% armour, 40% of it pierced: the arrow loses 30%.");
+            HealthComponent front = Enemy(new Vector3(0f, 0f, 8f));
+            HealthComponent behind = Enemy(new Vector3(0.5f, 0f, 12f)); // on the line, 4 m further
+            HealthComponent aside = Enemy(new Vector3(6f, 0f, 12f));    // behind, but off the line
+            Assert.IsTrue(combat.TryAttack(front));
+            PendingHits.FlushAll();
+            int dmg = combat.AttackDamage;
+            Assert.AreEqual(1000 - dmg, front.CurrentHealth);
+            Assert.AreEqual(1000 - Mathf.RoundToInt(dmg * 0.40f), behind.CurrentHealth, "The arrow goes on through: 40% to the one behind.");
+            Assert.AreEqual(1000, aside.CurrentHealth);
         }
 
         [Test]
-        public void DdCriticalHit_NeedsDash_EveryFifthHitIsDouble()
+        public void DdCriticalHit_NeedsDash_OnR_TheNextHitIsDouble()
         {
             hero.ChooseClass(HeroClass.Dd);
             Assert.IsFalse(skills.LearnCriticalHit(), "Dash first.");
             Assert.IsTrue(skills.LearnDash());
             Assert.IsTrue(skills.LearnCriticalHit());
+            Assert.IsTrue(skills.HasActiveIn(1), "Critical hit is the DD's second skill (R).");
             CombatUnit combat = heroObj.GetComponent<CombatUnit>();
             HealthComponent target = Enemy(new Vector3(0f, 0f, 1f));
             int dmg = combat.AttackDamage;
-            for (int i = 1; i <= 5; i++)
+
+            Assert.IsTrue(skills.UseActive(1, Vector3.forward));
+            Assert.IsFalse(skills.UseActive(1, Vector3.forward), "Then 40 s to recharge.");
+            for (int i = 1; i <= 2; i++)
             {
-                combat.InitializeCombatStats(dmg, 0f, combat.AttackRange); // no cooldown for the test
+                combat.InitializeCombatStats(dmg, 0f, combat.AttackRange); // no attack cooldown for the test
                 int before = target.CurrentHealth;
                 Assert.IsTrue(combat.TryAttack(target));
                 PendingHits.FlushAll();
-                Assert.AreEqual(i == 5 ? dmg * 2 : dmg, before - target.CurrentHealth, $"Hit {i}.");
+                Assert.AreEqual(i == 1 ? dmg * 2 : dmg, before - target.CurrentHealth, i == 1 ? "The next hit is double." : "Only that one.");
             }
         }
 
         [Test]
-        public void MageFan_CastsItselfWithTheAttack_MeteorNeedsTheFan()
+        public void MageFanOnQ_MeteorOnR_CastLikeAnAttack()
         {
             hero.ChooseClass(HeroClass.Mage);
             Assert.IsFalse(skills.LearnMeteor(), "The fan first.");
             Assert.IsTrue(skills.LearnFireFan());
             Assert.IsTrue(skills.LearnMeteor());
-            Assert.IsTrue(skills.HasActive, "The meteor is the mage's Q.");
+            Assert.IsTrue(skills.HasActiveIn(0) && skills.HasActiveIn(1), "Fan on Q, meteor on R.");
 
             CombatUnit combat = heroObj.GetComponent<CombatUnit>();
-            HealthComponent near = Enemy(new Vector3(0f, 0f, 5f));
-            HealthComponent side = Enemy(new Vector3(2f, 0f, 8f)); // in the fan, not the target
-            Assert.IsTrue(combat.TryAttack(near));
-            Assert.Less(side.CurrentHealth, 1000, "The fan went off with the attack.");
+            HealthComponent target = Enemy(new Vector3(0f, 0f, 5f));
+            float speed = combat.MoveSpeed;
+            Assert.IsTrue(skills.UseActive(0, Vector3.forward));
+            Assert.Less(target.CurrentHealth, 1000, "The fan hits (edit mode: at once; in play after the wind-up).");
+            Assert.AreEqual(0f, combat.MoveSpeed, 1e-5f, "The mage stands while casting and a moment after.");
+            Assert.Greater(speed, 0f);
+            Assert.IsTrue(skills.UseActive(1, Vector3.forward), "The meteor has a target in range.");
+            foreach (MeteorStrike m in Object.FindObjectsByType<MeteorStrike>(FindObjectsSortMode.None)) extra.Add(m.gameObject);
         }
 
         [Test]

@@ -120,15 +120,18 @@ namespace BattleOfAges.Player
                 PerformPlayerAttack();
             }
 
-            // The class's active skill (Q): heal, fire fan or dash where the hero looks
-            if (KeybindsManager.GetKeyDown(KeyAction.Ability))
-            {
-                EnsureCameraReference();
-                HeroSkills skills = GetComponent<HeroSkills>();
-                if (skills != null && !skills.UseActive(fpsCamera != null ? fpsCamera.transform.forward : transform.forward)
-                    && skills.HasActive)
-                    StrategyHud.Notify($"Уміння перезаряджається: {skills.CooldownLeft:0} с");
-            }
+            // The class's active skills: the first on Q, the second on R (fire fan / meteor, dash / critical hit, heal)
+            if (KeybindsManager.GetKeyDown(KeyAction.Ability)) UseSkill(0);
+            if (KeybindsManager.GetKeyDown(KeyAction.Ability2)) UseSkill(1);
+        }
+
+        private void UseSkill(int slot)
+        {
+            EnsureCameraReference();
+            HeroSkills skills = GetComponent<HeroSkills>();
+            if (skills == null || !skills.HasActiveIn(slot)) return;
+            if (!skills.UseActive(slot, fpsCamera != null ? fpsCamera.transform.forward : transform.forward) && skills.CooldownLeftIn(slot) > 0f)
+                StrategyHud.Notify($"Уміння перезаряджається: {skills.CooldownLeftIn(slot):0} с");
         }
 
         private void PerformPlayerAttack()
