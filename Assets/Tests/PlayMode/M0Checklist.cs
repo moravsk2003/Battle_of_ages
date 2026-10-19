@@ -290,6 +290,7 @@ namespace BattleOfAges.PlayModeTests
         private IEnumerator SkillOnQ()
         {
             HeroSkills skills = Of<HeroSkills>();
+            Assert.IsTrue(skills.LearnRegenStart() && skills.LearnRegenMax(), "Regeneration first (the branch rule)");
             Assert.IsTrue(skills.LearnHeal(), "no skill point");
             HealthComponent hp = Player.GetComponent<HealthComponent>();
             hp.SetCurrentHealth(100);

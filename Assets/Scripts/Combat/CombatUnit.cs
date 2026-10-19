@@ -83,7 +83,9 @@ namespace BattleOfAges.Combat
             recoveryUntil = Time.time + windup + (IsRanged ? GameBalance.RangedRootSeconds : GameBalance.MeleeSlowSeconds);
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
+            if (CritEveryNth > 0 && ++swings % CritEveryNth == 0) finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); // the DD's critical hit
             PendingHits.Add(this, target, finalDamage, FiresBolts, windup, attackRange);
+            AttackLaunched?.Invoke(target);
 
             TriggerAttackAnimation();
             return true;
@@ -99,6 +101,14 @@ namespace BattleOfAges.Combat
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
         public bool FiresBolts { get; set; }
 
+        /// <summary>Raised when a swing starts at a target (the mage's fan casts itself with it).</summary>
+        public event Action<HealthComponent> AttackLaunched;
+        /// <summary>Share of the target's armour this unit's arrows go through (the archer's Piercing arrow).</summary>
+        public float ArmorPierce { get; set; }
+        /// <summary>Every Nth swing hits for double (the DD's Critical hit; 0: off).</summary>
+        public int CritEveryNth { get; set; }
+        private int swings;
+
         /// <summary>Share of the damage dealt that heals this unit (the Vampiric artifact).</summary>
         public float LifeSteal { get; set; }
 
@@ -108,7 +118,7 @@ namespace BattleOfAges.Combat
             if (target == null || !target.IsAlive) return;
             target.LastAttacker = this;
             int before = target.CurrentHealth;
-            target.TakeDamage(damage, ignoreArmor);
+            target.TakeDamage(damage, ignoreArmor, IsRanged && !FiresBolts ? ArmorPierce : 0f); // arrows may pierce armour
             if (LifeSteal > 0f) GetComponent<HealthComponent>()?.Heal(Mathf.RoundToInt((before - target.CurrentHealth) * LifeSteal)); // the Vampiric artifact
 
             // Battle experience (docs/GAME_DESIGN.md §11.1); heroes count kills for their own levels (Killed)

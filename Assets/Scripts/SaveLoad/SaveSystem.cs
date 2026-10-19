@@ -164,6 +164,7 @@ namespace BattleOfAges.SaveLoad
                 {
                     d.Player.RegenStart = skills.RegenStart; d.Player.RegenMaxPoints = skills.RegenMaxPoints; d.Player.RegenCurrentPoints = skills.RegenCurrentPoints;
                     d.Player.HealLevel = skills.HealLevel; d.Player.LongShot = skills.LongShot; d.Player.FireFan = skills.FireFan; d.Player.DashLevel = skills.DashLevel;
+                    d.Player.PierceLevel = skills.PierceLevel; d.Player.Meteor = skills.Meteor; d.Player.CriticalHit = skills.CriticalHit;
                 }
             }
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
@@ -414,7 +415,8 @@ namespace BattleOfAges.SaveLoad
                 HeroProgress hero = player.GetComponent<HeroProgress>();
                 if (hero != null) hero.Restore(d.Player.Level, d.Player.Xp, d.Player.AttributePoints, d.Player.SkillPoints, d.Player.StrengthPoints, d.Player.HealthPoints, (HeroClass)d.Player.Class);
                 HeroSkills skills = player.GetComponent<HeroSkills>();
-                if (skills != null) skills.Restore(d.Player.RegenStart, d.Player.RegenMaxPoints, d.Player.RegenCurrentPoints, d.Player.HealLevel, d.Player.LongShot, d.Player.FireFan, d.Player.DashLevel);
+                if (skills != null) skills.Restore(d.Player.RegenStart, d.Player.RegenMaxPoints, d.Player.RegenCurrentPoints, d.Player.HealLevel, d.Player.LongShot, d.Player.FireFan, d.Player.DashLevel,
+                                                   d.Player.PierceLevel, d.Player.Meteor, d.Player.CriticalHit);
                 player.GetComponent<HeroArtifacts>()?.Restore(d.Player.Artifacts, d.Player.Shards, d.Player.StartArtifactChosen);
                 CentralEmpire.WorldEpoch = d.WorldEpoch;
                 foreach (ArtifactPickup p in new List<ArtifactPickup>(ArtifactPickup.Active)) UnityEngine.Object.Destroy(p.gameObject);

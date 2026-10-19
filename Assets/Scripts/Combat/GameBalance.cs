@@ -76,6 +76,14 @@ namespace BattleOfAges.Combat
         /// <summary>DD Dash: x(1 + level) run speed for DashSeconds, levels 1..DashMaxLevel (x2..x5).</summary>
         public static float DashSeconds = 1f, DashCooldown = 20f;
         public static int DashMaxLevel = 4;
+        /// <summary>Archer Piercing arrow: share of armour ignored at level 1, + step per level, up to PierceMaxLevel (50%).</summary>
+        public static float PierceFirst = 0.10f, PierceStep = 0.05f;
+        public static int PierceMaxLevel = 9;
+        /// <summary>DD Critical hit: every Nth hit deals this many times the damage.</summary>
+        public static int CritEveryNth = 5;
+        public static float CritMultiplier = 2f;
+        /// <summary>Mage Meteor: fall time, radius, damage (x the mage's), cooldown.</summary>
+        public static float MeteorDelay = 1f, MeteorRadius = 4f, MeteorDamageFactor = 3f, MeteorCooldown = 20f;
 
         // ------------------------------------------------------------------ attack recovery (§11.1)
 

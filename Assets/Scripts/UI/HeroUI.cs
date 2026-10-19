@@ -140,16 +140,19 @@ namespace BattleOfAges.UI
                             SkillButton(ref used, $"Реген +1% макс ({s.RegenMaxShare * 100f:0}%)", s.LearnRegenMax);
                             SkillButton(ref used, $"Реген +2% пот. ({s.RegenCurrentShare * 100f:0}%)", s.LearnRegenCurrent);
                         }
-                        if (s.HealLevel < GameBalance.HealMaxLevel) SkillButton(ref used, $"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", s.LearnHeal);
+                        if (s.HealLevel < GameBalance.HealMaxLevel && s.CanLearnHeal) SkillButton(ref used, $"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", s.LearnHeal);
                         break;
                     case HeroClass.Archer:
                         if (!s.LongShot) SkillButton(ref used, $"Далекий постріл ({GameBalance.LongShotCost})", s.LearnLongShot);
+                        else if (s.PierceLevel < GameBalance.PierceMaxLevel) SkillButton(ref used, $"Пробивна стріла {(s.PierceShare + (s.PierceLevel == 0 ? GameBalance.PierceFirst : GameBalance.PierceStep)) * 100f:0}%", s.LearnPierce);
                         break;
                     case HeroClass.Mage:
                         if (!s.FireFan) SkillButton(ref used, "Вогняне віяло (1)", s.LearnFireFan);
+                        else if (!s.Meteor) SkillButton(ref used, "Метеор (1)", s.LearnMeteor);
                         break;
                     case HeroClass.Dd:
                         if (s.DashLevel < GameBalance.DashMaxLevel) SkillButton(ref used, $"Ривок ×{s.DashFactor + 1f:0}", s.LearnDash);
+                        if (s.DashLevel > 0 && !s.CriticalHit) SkillButton(ref used, "Критичний удар (1)", s.LearnCriticalHit);
                         break;
                 }
             }

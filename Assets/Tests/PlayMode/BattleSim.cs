@@ -74,8 +74,8 @@ namespace BattleOfAges.PlayModeTests
 
         /// <summary>
         /// A hero of this level with its points spent the usual way: attributes - the tank all into HP, the classless
-        /// hero by turns, the others all into strength; skills - the tank Instant heal to the top, then Regeneration;
-        /// the archer Long shot; the mage Fire fan; the DD Dash.
+        /// hero by turns, the others all into strength; skills - the tank Regeneration (start and a point), Instant heal to the top, then Regeneration;
+        /// the archer Long shot, then Piercing arrow; the mage Fire fan, then Meteor; the DD Dash, then Critical hit.
         /// </summary>
         public static void Develop(GameObject go, HeroClass cls, int level)
         {
@@ -93,10 +93,10 @@ namespace BattleOfAges.PlayModeTests
             {
                 bool learnt = cls switch
                 {
-                    HeroClass.Tank => skills.LearnHeal() || skills.LearnRegenStart() || skills.LearnRegenMax(),
-                    HeroClass.Archer => skills.LearnLongShot(),
-                    HeroClass.Mage => skills.LearnFireFan(),
-                    HeroClass.Dd => skills.LearnDash(),
+                    HeroClass.Tank => skills.LearnRegenStart() || (!skills.CanLearnHeal && skills.LearnRegenMax()) || skills.LearnHeal() || skills.LearnRegenMax(),
+                    HeroClass.Archer => skills.LearnLongShot() || skills.LearnPierce(),
+                    HeroClass.Mage => skills.LearnFireFan() || skills.LearnMeteor(),
+                    HeroClass.Dd => skills.LearnDash() || skills.LearnCriticalHit(),
                     _ => false
                 };
                 if (!learnt) break;
@@ -176,7 +176,7 @@ namespace BattleOfAges.PlayModeTests
         }
 
         /// <summary>The class's active skill when it pays: the tank heals below half HP, the mage casts its fan at a target in
-        /// range, the DD dashes at a target still far away.</summary>
+        /// range (a meteor; the fan casts itself), the DD dashes at a target still far away.</summary>
         private static void UseSkill(Unit me, Unit target, float d)
         {
             HeroSkills skills = me.Combat.GetComponent<HeroSkills>();
