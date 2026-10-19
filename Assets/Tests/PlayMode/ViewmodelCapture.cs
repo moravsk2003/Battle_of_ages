@@ -77,6 +77,48 @@ namespace BattleOfAges.PlayModeTests
             capture.Finish();
         }
 
+        /// <summary>The bow (CAPTURE_DIR): the player's view through a shot, and an arrow in flight from the side.</summary>
+        [UnityTest]
+        public IEnumerator CaptureBow()
+        {
+            string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
+            if (string.IsNullOrEmpty(dir)) dir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), ".agent_vision", "bow");
+            yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);
+            yield return new WaitForSeconds(1.5f);
+
+            var player = UnityEngine.Object.FindFirstObjectByType<PlayerCombatController>();
+            player.EquipItem(BattleOfAges.Crafting.ItemType.Bow, 1);
+            FpsViewmodelAnimation arms = UnityEngine.Object.FindFirstObjectByType<FpsViewmodelAnimation>();
+            arms.enabled = false;
+            Camera main = Camera.main;
+            var shots = new (string name, float t)[] { ("bow_ready", -1f), ("bow_aim_in", 0.12f), ("bow_full_draw", 0.49f), ("bow_release", 0.53f), ("bow_down", 0.85f) };
+            var capture = new CaptureRenderer(dir, shots.Length + 1, 60f, drawGrass: true);
+            capture.Camera.cullingMask |= 1 << LayerMask.NameToLayer("Viewmodel");
+            capture.Camera.nearClipPlane = 0.01f;
+            for (int j = 0; j < shots.Length; j++)
+            {
+                arms.PoseShot(shots[j].t);
+                yield return null;
+                capture.Shoot(j, shots[j].name, main.transform.position, main.transform.position + main.transform.forward);
+                yield return null;
+            }
+
+            // An arrow in flight, seen from the side
+            var target = new GameObject("BowTarget", typeof(BattleOfAges.Combat.HealthComponent));
+            target.transform.position = player.transform.position + player.transform.forward * 20f;
+            target.GetComponent<BattleOfAges.Combat.HealthComponent>().InitializeHealth(1000);
+            BattleOfAges.Combat.ArrowShot.Fire(player.GetComponent<BattleOfAges.Combat.CombatUnit>(), target.GetComponent<BattleOfAges.Combat.HealthComponent>(), 1, false);
+            yield return new WaitForSeconds(0.2f);
+            Time.timeScale = 0f;
+            var arrow = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.Combat.ArrowShot>();
+            Vector3 at = arrow != null ? arrow.transform.position : target.transform.position;
+            capture.Camera.cullingMask &= ~(1 << LayerMask.NameToLayer("Viewmodel"));
+            capture.Shoot(shots.Length, "arrow_flight", at + player.transform.right * 1.6f + Vector3.up * 0.3f, at);
+            yield return null;
+            Time.timeScale = 1f;
+            capture.Finish();
+        }
+
         private static Transform FindDeep(Transform t, string name)
         {
             if (t.name == name) return t;

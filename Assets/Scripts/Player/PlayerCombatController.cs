@@ -140,10 +140,11 @@ namespace BattleOfAges.Player
 
             EnsureCameraReference();
 
-            // Trigger 1st person punch animation
+            // First-person: a swing, or with a bow a shot drawn over the wind-up
             if (viewmodelAnimation != null)
             {
-                viewmodelAnimation.PlayPunchAnimation();
+                if (!Gear[EquipSlot.Weapon].IsEmpty && Gear[EquipSlot.Weapon].Type == ItemType.Bow) viewmodelAnimation.PlayShotAnimation(combatUnit.Windup);
+                else viewmodelAnimation.PlayPunchAnimation();
             }
 
             // Raycast forward from FPS camera

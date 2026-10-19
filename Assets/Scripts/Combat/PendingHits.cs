@@ -68,8 +68,8 @@ namespace BattleOfAges.Combat
             if (Vector3.Distance(from, h.Target.transform.position) > h.Reach + 1f + ReachSlack) return; // it got away
             if (h.Striker == null) { h.Target.TakeDamage(h.Damage); return; }
             if (h.Bolts) { MageBolt.Volley(h.Striker, h.Target, h.Damage); return; }
+            if (h.Striker.IsRanged) { ArrowShot.Fire(h.Striker, h.Target, h.Damage, h.Piercing); return; } // the draw is over: the arrow flies, the hit lands on arrival
             h.Striker.DeliverHit(h.Target, h.Damage, ignoreArmor: false);
-            if (h.Piercing) h.Striker.PierceBehind(h.Target, Mathf.RoundToInt(h.Damage / GameBalance.PierceShotMultiplier)); // on through (shares of a normal shot)
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

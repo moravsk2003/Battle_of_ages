@@ -24,6 +24,11 @@ namespace BattleOfAges.Utils
         private static readonly Quaternion SwordRot = Quaternion.Euler(-28f, -12f, -8f);
         private static readonly Vector3 ShieldPos = new Vector3(-0.12f, 0.13f, 0.46f);
         private static readonly Quaternion ShieldRot = Quaternion.Euler(90f, -22f, 0f);
+        /// <summary>The bow in the left fist (left pivot space): upright, the top canted a little right, the grip in the fist.</summary>
+        public static readonly Vector3 BowPos = new Vector3(-0.12f, 0.13f, 0.46f);
+        public static readonly Quaternion BowRot = Quaternion.Euler(-6f, 4f, -12f);
+        /// <summary>How far back (bow space) the string is drawn at full draw, and its rest depth behind the grip.</summary>
+        public const float BowDrawLength = 0.36f, BowStringRest = 0.07f;
 
         private static readonly Color Gambeson = new Color(0.12f, 0.26f, 0.62f);
         private static readonly Color Steel = new Color(0.78f, 0.80f, 0.84f);
@@ -487,6 +492,24 @@ namespace BattleOfAges.Utils
             return kit.ToMesh($"ViewmodelWeapon_{type}_{level}");
         }
 
+        /// <summary>The bow for the left fist (left pivot space, BowPos/BowRot), without its string (drawn apart, it bends).</summary>
+        public static Mesh BuildBowLeft(int level)
+        {
+            var kit = new MeshKit();
+            HeldBow(kit, Matrix4x4.TRS(BowPos, BowRot, Vector3.one) * Matrix4x4.Translate(new Vector3(0f, 0f, -BowStringRest)), level, withString: false);
+            Refinish(kit, level);
+            return kit.ToMesh($"ViewmodelBow_{level}");
+        }
+
+        /// <summary>The string's ends (top, bottom) and its nock at this draw (0..1), in left pivot space.</summary>
+        public static void BowString(int level, float draw, out Vector3 top, out Vector3 nock, out Vector3 bottom)
+        {
+            float tip = (level >= 3 ? -0.035f : 0f) - BowStringRest;
+            top = BowPos + BowRot * new Vector3(0f, 0.55f, tip);
+            bottom = BowPos + BowRot * new Vector3(0f, -0.55f, tip);
+            nock = BowPos + BowRot * new Vector3(0f, 0f, -BowStringRest - Mathf.Clamp01(draw) * BowDrawLength);
+        }
+
         /// <summary>The worn shield on the left fist (left pivot space), finished for its level.</summary>
         public static Mesh BuildShield(int level)
         {
@@ -560,7 +583,7 @@ namespace BattleOfAges.Utils
             kit.Box(m * Matrix4x4.Translate(new Vector3(0f, pick ? 0.47f : 0.46f, 0f)), new Vector3(0.036f, 0.07f, 0.032f), 0.005f, BrassS, _ => Brass);
         }
 
-        private static void HeldBow(MeshKit kit, Matrix4x4 m, int level)
+        private static void HeldBow(MeshKit kit, Matrix4x4 m, int level, bool withString = true)
         {
             // Upright through the fist, limbs bending forward (+Z), string on the near side
             const int N = 21;
@@ -586,7 +609,7 @@ namespace BattleOfAges.Utils
                 Vector3 off = (u * Mathf.Cos(j * Mathf.PI * 0.5f) + w * Mathf.Sin(j * Mathf.PI * 0.5f)) * 0.0012f;
                 str[0, j] = bottom + off; str[1, j] = top + off;
             }
-            kit.Grid(str, true, ClothS, (i, j) => Thread);
+            if (withString) kit.Grid(str, true, ClothS, (i, j) => Thread);
             if (level >= 3)
                 foreach (float s in new[] { -1f, 1f })
                     kit.Box(m * Matrix4x4.Translate(new Vector3(0f, s * 0.53f, -0.03f)), new Vector3(0.016f, 0.04f, 0.022f), 0.003f, SteelS, _ => Steel);
