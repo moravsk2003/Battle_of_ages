@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Combat
 {
@@ -72,6 +73,10 @@ namespace BattleOfAges.Combat
             if (shard) owner = null;
             name = shard ? "ArtifactShard" : "Artifact";
             if (visual != null) Destroy(visual.gameObject);
+            Material look = RuntimeShaders.UnlitMaterial(Artifacts.Tier(type) == ArtifactTier.WorldChanging ? new Color(0.8f, 0.2f, 1f)
+                                                       : Artifacts.Tier(type) == ArtifactTier.Legendary ? new Color(1f, 0.75f, 0.2f)
+                                                       : new Color(0.6f, 0.9f, 1f));
+            if (look == null) return; // still picked up, just not drawn
             GameObject v = GameObject.CreatePrimitive(shard ? PrimitiveType.Cube : PrimitiveType.Sphere);
             v.name = "Look";
             Collider c = v.GetComponent<Collider>();
@@ -79,10 +84,7 @@ namespace BattleOfAges.Combat
             v.transform.SetParent(transform, false);
             v.transform.localScale = Vector3.one * (shard ? 0.3f : 0.45f);
             var r = v.GetComponent<MeshRenderer>();
-            Shader s = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
-            r.sharedMaterial = new Material(s) { color = Artifacts.Tier(type) == ArtifactTier.WorldChanging ? new Color(0.8f, 0.2f, 1f)
-                                                       : Artifacts.Tier(type) == ArtifactTier.Legendary ? new Color(1f, 0.75f, 0.2f)
-                                                       : new Color(0.6f, 0.9f, 1f) };
+            r.sharedMaterial = look;
             visual = v.transform;
         }
 

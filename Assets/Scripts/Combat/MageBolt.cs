@@ -1,4 +1,5 @@
 using UnityEngine;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Combat
 {
@@ -9,7 +10,6 @@ namespace BattleOfAges.Combat
     public sealed class MageBolt : MonoBehaviour
     {
         private const float Speed = 24f, HitDistance = 0.6f, MaxLife = 4f;
-        private static Material material;
 
         private CombatUnit caster;
         private HealthComponent target;
@@ -35,19 +35,19 @@ namespace BattleOfAges.Combat
 
         private static void Create(CombatUnit caster, HealthComponent target, int damage, Vector3 origin, Vector3 velocity)
         {
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            // The look first: without its shader the bolt still flies and hits, it is just not drawn
+            Material look = RuntimeShaders.UnlitMaterial(new Color(0.55f, 0.75f, 1f));
+            GameObject go = look != null ? GameObject.CreatePrimitive(PrimitiveType.Sphere) : new GameObject();
             go.name = "MageBolt";
-            Object.Destroy(go.GetComponent<Collider>());
+            if (look != null)
+            {
+                Object.Destroy(go.GetComponent<Collider>());
+                var r = go.GetComponent<MeshRenderer>();
+                r.sharedMaterial = look;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
             go.transform.position = origin;
             go.transform.localScale = Vector3.one * 0.22f;
-            if (material == null)
-            {
-                Shader s = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
-                material = new Material(s) { color = new Color(0.55f, 0.75f, 1f) };
-            }
-            var r = go.GetComponent<MeshRenderer>();
-            r.sharedMaterial = material;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             MageBolt b = go.AddComponent<MageBolt>();
             b.caster = caster;
             b.target = target;

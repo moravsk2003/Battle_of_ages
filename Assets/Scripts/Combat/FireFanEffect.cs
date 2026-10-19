@@ -1,4 +1,5 @@
 using UnityEngine;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Combat
 {
@@ -6,18 +7,14 @@ namespace BattleOfAges.Combat
     public sealed class FireFanEffect : MonoBehaviour
     {
         private const float Life = 0.5f;
-        private static Material material;
         private Vector3 velocity;
         private float age;
 
         public static void Spawn(Vector3 origin, Vector3 forward, float range)
         {
             if (!Application.isPlaying) return; // only a look
-            if (material == null)
-            {
-                Shader s = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
-                material = new Material(s) { color = new Color(1f, 0.55f, 0.15f) };
-            }
+            Material look = RuntimeShaders.UnlitMaterial(new Color(1f, 0.55f, 0.15f));
+            if (look == null) return; // no shader in this build: no flames rather than magenta blobs
             const int blobs = 14;
             for (int i = 0; i < blobs; i++)
             {
@@ -29,7 +26,7 @@ namespace BattleOfAges.Combat
                 go.transform.position = origin;
                 go.transform.localScale = Vector3.one * 0.5f;
                 var r = go.GetComponent<MeshRenderer>();
-                r.sharedMaterial = material;
+                r.sharedMaterial = look;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 go.AddComponent<FireFanEffect>().velocity = dir * (range / Life) * Random.Range(0.8f, 1f);
             }
