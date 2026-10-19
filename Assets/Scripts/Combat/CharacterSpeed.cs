@@ -4,7 +4,7 @@ namespace BattleOfAges.Combat
 {
     /// <summary>
     /// Movement speed of every character (player, workers, knights, raiders; not wildlife), docs/GAME_DESIGN.md §11.1:
-    /// speed = Global x SpeedModifier x sqrt(Strength). SpeedModifier is a per-character characteristic (person 7,
+    /// speed = Global x SpeedModifier x sqrt(Strength / 2) + 1.5. SpeedModifier is a per-character characteristic (person 7,
     /// warrior / knight / general 6, hero 5, see UnitRanks) and Strength is the character's strength characteristic
     /// (CombatUnit.Strength; its damage is strength x weapon modifier, so a better sword does not change the speed).
     /// </summary>
@@ -18,7 +18,8 @@ namespace BattleOfAges.Combat
         public static float HeroModifier => GameBalance.SpeedModifierHero;
         public static int DefaultStrength => GameBalance.RankStrength[(int)UnitRank.Person];
 
-        public static float Of(float modifier, float strength) => Global * modifier * Mathf.Sqrt(Mathf.Max(0f, strength));
+        public static float Of(float modifier, float strength) =>
+            Global * modifier * Mathf.Sqrt(Mathf.Max(0f, strength) / GameBalance.SpeedStrengthDivisor) + GameBalance.SpeedFlat;
 
         public static float Of(CombatUnit combat) =>
             combat != null ? Of(combat.SpeedModifier, combat.SpeedStrength) : Of(DefaultModifier, DefaultStrength);

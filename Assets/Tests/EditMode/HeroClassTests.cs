@@ -64,7 +64,7 @@ namespace BattleOfAges.Tests
 
             gear.Equip(new Item(ItemType.Bow, 1));
             Assert.AreEqual(100f, combat.Strength, 1e-3f, "A bow doubles the archer's strength.");
-            float speed = 0.25f * 5f * Mathf.Sqrt(100f); // 12.5 m/s
+            float speed = 0.25f * 5f * Mathf.Sqrt(100f / 2f) + 1.5f; // 10.3 m/s
             Assert.AreEqual(speed, combat.MoveSpeed, 1e-3f, "... and through sqrt(strength) the archer runs faster.");
             Assert.AreEqual(speed * 3f, combat.AttackRange, 1e-3f, "Range = the distance run in 3 s.");
             Assert.AreEqual(swordCooldown / 2f * 1.7f / 0.85f, combat.AttackCooldown, 1e-3f,
@@ -76,8 +76,8 @@ namespace BattleOfAges.Tests
         {
             hero.ChooseClass(HeroClass.Mage);
             Assert.IsTrue(combat.FiresBolts);
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(40f) * 3f, combat.AttackRange, 1e-3f, "~23.7 m: the mage runs like strength 40.");
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(40f), combat.MoveSpeed, 1e-3f, "A hero general mage runs 7.9 m/s.");
+            Assert.AreEqual((0.25f * 5f * Mathf.Sqrt(40f / 2f) + 1.5f) * 3f, combat.AttackRange, 1e-3f, "~21 m: the mage runs like strength 40.");
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(40f / 2f) + 1.5f, combat.MoveSpeed, 1e-3f, "A hero general mage runs 7.1 m/s.");
 
             Assert.AreEqual(12f, HeroClassRules.Range(2.5f), 1e-4f, "A hero person runs 7.5 m in 3 s: the minimum 12 m.");
         }
@@ -117,14 +117,6 @@ namespace BattleOfAges.Tests
                 Assert.AreEqual(0f, combat.MoveSpeed, 1e-5f, "A ranged shot roots the shooter.");
             }
             finally { Object.DestroyImmediate(victim); }
-        }
-
-        [Test]
-        public void Chasers_RunFivePercentFaster()
-        {
-            float speed = combat.MoveSpeed;
-            combat.Pursuing = true;
-            Assert.AreEqual(speed * 1.05f, combat.MoveSpeed, 1e-3f);
         }
 
         [Test]

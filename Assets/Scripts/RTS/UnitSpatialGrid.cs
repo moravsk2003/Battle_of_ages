@@ -30,6 +30,10 @@ namespace BattleOfAges.RTS
         private static int builtFrame = -1;
 
         public static int Count => capacity - freeCount;
+        /// <summary>Ids in [0, Capacity) are agents or free slots (IsAlive tells).</summary>
+        public static int Capacity => capacity;
+        /// <summary>Re-reads every agent's position now (normally done once per frame on the first query).</summary>
+        public static void Refresh() { builtFrame = -1; EnsureBuilt(); }
 
         public static int Register(Component owner, HealthComponent health, int team, float radius)
         {

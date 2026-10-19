@@ -57,7 +57,7 @@ namespace BattleOfAges.PlayModeTests
             report.AppendLine("# M0 — чек-лист у SampleScene").AppendLine();
             report.AppendLine("| # | Пункт | Результат | Деталі |").AppendLine("|---|---|---|---|");
 
-            yield return Check("1", "Ранги: герой-генерал 500 HP / сила 50 / 8,8 м/с; рицарі, селяни, моби — база свого рангу", Ranks());
+            yield return Check("1", "Ранги: герой-генерал 500 HP / сила 50 / 7,75 м/с; рицарі, селяни, моби — база свого рангу", Ranks());
             yield return Check("2", "Один тип юніта: у всіх HP, бій, робота, ранг; рицарі стоять, селяни працюють; стеля рахує всіх", OneKindOfUnit());
             yield return Check("3", "Ратуша: стелі 6/15/25/40/60/85, побудова 10 дерева, апгрейди 30/60/100/160", HallTable());
             yield return Check("4", "Ігровий годинник: 1 хв = 1 ігрова година", Clock());
@@ -130,7 +130,7 @@ namespace BattleOfAges.PlayModeTests
             UnitProgress p = Of<UnitProgress>();
             Assert.AreEqual(UnitRank.General, p.Rank); Assert.IsTrue(p.IsHero);
             Assert.AreEqual(500, Of<Equipment>().BaseHealth);
-            Assert.AreEqual(8.84f, Of<CombatUnit>().MoveSpeed, 0.05f, "hero speed");
+            Assert.AreEqual(7.75f, Of<CombatUnit>().MoveSpeed, 0.05f, "hero speed");
             int knights = 0, people = 0;
             foreach (RtsUnit u in OwnUnits())
             {

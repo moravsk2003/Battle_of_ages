@@ -165,7 +165,6 @@ namespace BattleOfAges.RTS
         {
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
             if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
-            if (combatUnit != null) combatUnit.Pursuing = false; // set again below while running after a target
 
             // Soldiers engage raiders that come near on their own (idle or after a fight), not workers or the hero.
             if (!isPlayerControlled && !IsWorking && combatUnit != null && attackTarget == null && !hasTarget)
@@ -213,7 +212,6 @@ namespace BattleOfAges.RTS
                     else
                     {
                         // Move closer to attack target
-                        if (combatUnit != null) combatUnit.Pursuing = true;
                         targetPosition = attackTarget.transform.position;
                         hasTarget = true;
                     }
@@ -278,12 +276,13 @@ namespace BattleOfAges.RTS
                 }
 
                 // 3. Movement: the hero uses CharacterController physics, units the kinematic ground motor
-                Vector3 moveVelocity = moveDir * MoveSpeed;
+                float speed = MoveSpeed * BattleFront.Factor(UnitSpatialGrid.TeamPlayer, moveDir); // the pull of a battle
+                Vector3 moveVelocity = moveDir * speed;
                 moveVelocity.y = -9.81f;
 
                 if (!isPlayerControlled)
                 {
-                    GroundMotor.Move(transform, gridId, moveDir * MoveSpeed, radius, Time.deltaTime);
+                    GroundMotor.Move(transform, gridId, moveDir * speed, radius, Time.deltaTime);
                 }
                 else if (characterController != null)
                 {
@@ -291,7 +290,7 @@ namespace BattleOfAges.RTS
                 }
                 else
                 {
-                    Vector3 nextPos = Vector3.MoveTowards(currentPos, destPos, MoveSpeed * Time.deltaTime);
+                    Vector3 nextPos = Vector3.MoveTowards(currentPos, destPos, speed * Time.deltaTime);
                     nextPos.y = GetTerrainHeight(nextPos);
                     transform.position = nextPos;
                 }

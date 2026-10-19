@@ -9,6 +9,7 @@ namespace BattleOfAges.Combat
         {
             WorldClock.Advance(Time.deltaTime);
             PendingHits.Tick(); // swings land after their wind-up, also for strikers that fell meanwhile
+            BattleFront.Tick(); // which way each side's battle pulls
         }
     }
 }

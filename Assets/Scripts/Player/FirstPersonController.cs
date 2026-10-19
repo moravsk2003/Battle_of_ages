@@ -115,6 +115,7 @@ namespace BattleOfAges.Player
 
             if (combat == null) combat = GetComponent<CombatUnit>();
             float speed = combat != null ? combat.MoveSpeed : moveSpeed; // CharacterSpeed formula (hero modifier 5)
+            speed *= BattleFront.Factor(RTS.UnitSpatialGrid.TeamPlayer, move); // the pull of a battle
             characterController.Move(move * speed * Time.deltaTime);
 
             if (UniversalInput.IsJumpPressed() && isGrounded)

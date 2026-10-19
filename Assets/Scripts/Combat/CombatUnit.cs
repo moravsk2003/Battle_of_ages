@@ -31,10 +31,7 @@ namespace BattleOfAges.Combat
         /// <summary>Speed characteristic (person 7, soldiers 6, hero 5; see UnitRanks, CharacterSpeed).</summary>
         public float SpeedModifier { get => speedModifier; set => speedModifier = value; }
         /// <summary>Global x SpeedModifier x sqrt(strength).</summary>
-        public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor * (Pursuing ? 1f + GameBalance.PursuitBonus : 1f);
-
-        /// <summary>Running after a target to attack it: a little faster than one fleeing (§11.1), set by the AI.</summary>
-        public bool Pursuing { get; set; }
+        public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor;
 
         private float boostFactor = 1f, boostUntil = float.NegativeInfinity;
         /// <summary>Runs this many times faster for a while (the DD's Dash).</summary>

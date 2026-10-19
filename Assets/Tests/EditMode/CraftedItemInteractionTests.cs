@@ -182,7 +182,7 @@ namespace BattleOfAges.Tests
             gear.Equip(new Item(ItemType.Sword, 0));
             Assert.AreEqual(PlayerCombatController.BaseDamage, cu.AttackDamage, "Level 0 sword: damage = strength.");
             float speed = cu.MoveSpeed;
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(50f), speed, 1e-3f, "Speed = global 0.25 x hero modifier 5 x sqrt(strength 50).");
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(50f / 2f) + 1.5f, speed, 1e-3f, "Speed = 0.25 x hero modifier 5 x sqrt(strength 50 / 2) + 1.5.");
 
             gear.Equip(new Item(ItemType.Sword, 5));
             Assert.AreEqual(PlayerCombatController.BaseDamage * 2, cu.AttackDamage);

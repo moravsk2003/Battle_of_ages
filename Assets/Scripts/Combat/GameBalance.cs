@@ -88,8 +88,8 @@ namespace BattleOfAges.Combat
         /// <summary>Wind-up: seconds from the start of a swing to its hit (a started swing lands even if the striker falls).</summary>
         public static float MeleeWindup = 0.35f, BowWindup = 0.5f, MageWindup = 0.2f;
         public static float RangedRootSeconds = 0.5f;
-        /// <summary>A unit chasing its target runs this much faster (the one fleeing is caught in the end).</summary>
-        public static float PursuitBonus = 0.05f;
+        /// <summary>The pull of a battle (BattleFront): 5% faster towards the enemy, slower away, checked this often within this radius.</summary>
+        public static float BattlePull = 0.05f, BattleFrontSeconds = 10f, BattleRadius = 30f;
         /// <summary>A hit enemy goes after its attacker for this long, past its usual leash.</summary>
         public static float ProvokedSeconds = 15f;
 
@@ -108,8 +108,8 @@ namespace BattleOfAges.Combat
 
         // ------------------------------------------------------------------ speed (§11.1)
 
-        /// <summary>speed = SpeedGlobal x modifier x sqrt(strength), metres per second.</summary>
-        public static float SpeedGlobal = 0.25f;
+        /// <summary>speed = SpeedGlobal x modifier x sqrt(strength / SpeedStrengthDivisor) + SpeedFlat, metres per second.</summary>
+        public static float SpeedGlobal = 0.25f, SpeedStrengthDivisor = 2f, SpeedFlat = 1.5f;
         public static float SpeedModifierPerson = 7f;
         public static float SpeedModifierSoldier = 6f; // warrior, knight, general
         public static float SpeedModifierHero = 5f;
