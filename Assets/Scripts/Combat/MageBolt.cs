@@ -56,10 +56,19 @@ namespace BattleOfAges.Combat
             b.velocity = velocity;
         }
 
+        /// <summary>The nearest living enemy of the caster within its range of this bolt, or null.</summary>
+        private HealthComponent NextTarget()
+        {
+            if (caster == null) return null;
+            int id = RTS.UnitSpatialGrid.FindNearest(transform.position, caster.AttackRange, caster.EnemyTeam);
+            return id >= 0 ? RTS.UnitSpatialGrid.Health(id) : null;
+        }
+
         private void Update()
         {
             life += Time.deltaTime;
-            if (target == null || !target.IsAlive || life > MaxLife) { Destroy(gameObject); return; }
+            if (target == null || !target.IsAlive) target = NextTarget(); // the target fell: fly on to the nearest enemy
+            if (target == null || life > MaxLife) { Destroy(gameObject); return; }
 
             Vector3 aim = target.transform.position + Vector3.up;
             Vector3 to = aim - transform.position;

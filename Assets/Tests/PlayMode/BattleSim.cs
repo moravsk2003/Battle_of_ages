@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Combat;
 using BattleOfAges.Crafting;
+using BattleOfAges.RTS;
 
 namespace BattleOfAges.PlayModeTests
 {
@@ -33,14 +34,16 @@ namespace BattleOfAges.PlayModeTests
         public const float SideDistance = 30f, Spacing = 2f;
         private readonly List<Unit> units = new List<Unit>();
         private readonly List<GameObject> spawned = new List<GameObject>();
+        private readonly List<int> gridIds = new List<int>();
 
         /// <summary>Real units of a rank; a hero gets its class and a weapon (the archer a bow, others a sword I).</summary>
         public Unit Add(int side, UnitRank rank, bool hero = false, HeroClass cls = HeroClass.None, bool kite = false, bool weapon = false)
         {
             int index = units.FindAll(u => u.Side == side).Count;
             var go = new GameObject(side == 0 ? "SideA" : "SideB", typeof(HealthComponent), typeof(CombatUnit));
-            float x = (index - 2) * Spacing;
-            go.transform.position = new Vector3(x, 0f, side == 0 ? -SideDistance * 0.5f : SideDistance * 0.5f);
+            // Ranks of ten, the front rank SideDistance from the enemy's
+            float x = (index % 10 - 4.5f) * Spacing, back = (index / 10) * Spacing;
+            go.transform.position = new Vector3(x, 0f, side == 0 ? -SideDistance * 0.5f - back : SideDistance * 0.5f + back);
             Equipment gear = go.AddComponent<Equipment>();
             UnitProgress.Setup(go, rank, hero);
             if (hero)
@@ -53,6 +56,9 @@ namespace BattleOfAges.PlayModeTests
             hp.InitializeHealth(hp.MaxHealth);
             spawned.Add(go);
             var unit = new Unit { Combat = go.GetComponent<CombatUnit>(), Hp = hp, Side = side, Kite = kite };
+            // In the unit grid like real units, so the mage's bolts can fly on to the next enemy
+            unit.Combat.Team = side == 0 ? UnitSpatialGrid.TeamPlayer : UnitSpatialGrid.TeamHostile;
+            gridIds.Add(UnitSpatialGrid.Register(unit.Combat, hp, unit.Combat.Team, 0.4f));
             units.Add(unit);
             return unit;
         }
@@ -91,6 +97,8 @@ namespace BattleOfAges.PlayModeTests
             foreach (GameObject g in spawned) if (g != null) UnityEngine.Object.Destroy(g);
             foreach (MageBolt b in UnityEngine.Object.FindObjectsByType<MageBolt>(FindObjectsSortMode.None)) UnityEngine.Object.Destroy(b.gameObject);
             PendingHits.FlushAll();
+            foreach (int id in gridIds) UnitSpatialGrid.Unregister(id);
+            gridIds.Clear();
             spawned.Clear();
             units.Clear();
         }

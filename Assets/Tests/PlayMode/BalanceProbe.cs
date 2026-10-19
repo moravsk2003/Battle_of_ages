@@ -14,27 +14,28 @@ namespace BattleOfAges.PlayModeTests
     /// Balance tool (not a regular test), docs/GAME_DESIGN.md §8.1, §11.1. In real fights (BattleSim):
     /// 1. ranks: how many of a weaker rank it takes to beat one of a stronger one (no gear);
     /// 2. hero classes one on one: every class against every class (hero generals, sword I / archer bow I);
-    /// 3. a hero of each class against generals: the biggest pack it still beats.
+    /// 3. a hero of each class against every rank: the biggest pack it still beats.
     /// Writes balance_report.md to CAPTURE_DIR.
     /// </summary>
     [Explicit("Balance tool, run on demand")]
     public class BalanceProbe
     {
-        private const float MaxSeconds = 180f;
+        private const float MaxSeconds = 600f;
         private const int MaxPack = 40;
+        private const int MaxHorde = 300; // a hero against weak ranks
         private static readonly UnitRank[] Ranks = { UnitRank.Person, UnitRank.Warrior, UnitRank.Knight, UnitRank.General };
         private static readonly HeroClass[] Classes = { HeroClass.None, HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
         private readonly BattleSim sim = new BattleSim();
         private readonly StringBuilder report = new StringBuilder();
 
-        [UnityTest]
+        [UnityTest, Timeout(3600000)] // a long run of fights
         public IEnumerator PlayBalance()
         {
             LogAssert.ignoreFailingMessages = true;
             string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
             if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
             Directory.CreateDirectory(dir);
-            Time.timeScale = 10f;
+            Time.timeScale = 50f; // steps stay small: maximumDeltaTime
             Time.maximumDeltaTime = 0.1f;
 
             report.AppendLine("# Баланс: ранги й класи в бою\n");
@@ -78,20 +79,29 @@ namespace BattleOfAges.PlayModeTests
             }
             report.AppendLine("\n✅ N% — рядок переміг, у нього лишилось N% HP; ❌ — програв.");
 
-            // 3. a hero against generals ----------------------------------------------------------------------------
-            report.AppendLine("\n## 3. Скількох генералів (без спорядження) перемагає герой кожного класу\n");
-            report.AppendLine("| Клас | перемагає генералів | HP лишилось | програє проти |\n|---|---|---|---|");
+            // 3. a hero against every rank --------------------------------------------------------------------------
+            report.AppendLine("\n## 3. Скількох юнітів кожного рангу (без спорядження) перемагає герой-генерал\n");
+            var head3 = new StringBuilder("| Клас |");
+            var line3 = new StringBuilder("|---|");
+            foreach (UnitRank rank in Ranks) { head3.Append($" {HeroUI.RankName(rank)} |"); line3.Append("---|"); }
+            report.AppendLine(head3.ToString()).AppendLine(line3.ToString());
             foreach (HeroClass c in Classes)
             {
-                int best = 0; float left = 0f;
-                HeroClass cls = c;
-                // The smallest pack that beats the hero; the hero beats one general fewer
-                int beaten = -1;
-                yield return Smallest(n => HeroFight(cls, n), (n, r) => beaten = n, sideWins: 1);
-                best = beaten > 0 ? beaten - 1 : MaxPack;
-                if (best > 0) { BattleSim.Result r = default; yield return HeroFight(cls, best, x => r = x); left = r.HpLeft[0]; }
-                report.AppendLine($"| {HeroClassRules.Name(c)} | {best} | {left * 100f:0}% | {best + 1} |");
+                var row = new StringBuilder($"| {HeroClassRules.Name(c)} |");
+                foreach (UnitRank rank in Ranks)
+                {
+                    HeroClass cls = c; UnitRank enemy = rank;
+                    // The smallest pack that beats the hero; the hero beats one fewer
+                    int beaten = -1;
+                    yield return Smallest(k => HeroFight(cls, k, enemy), (k, r) => beaten = k, sideWins: 1, max: MaxHorde);
+                    int best = beaten > 0 ? beaten - 1 : MaxHorde;
+                    float left = 0f;
+                    if (best > 0) { BattleSim.Result r = default; yield return HeroFight(cls, best, enemy, x => r = x); left = r.HpLeft[0]; }
+                    row.Append(beaten > 0 ? $" {best} ({left * 100f:0}% HP) |" : $" ≥ {MaxHorde} |");
+                }
+                report.AppendLine(row.ToString());
             }
+            report.AppendLine("\nN (M% HP) — герой перемагає N юнітів цього рангу, у нього лишається M% HP; N + 1 його вбивають.");
 
             Time.timeScale = 1f;
             Time.maximumDeltaTime = 1f / 3f;
@@ -111,11 +121,11 @@ namespace BattleOfAges.PlayModeTests
             done?.Invoke(r);
         }
 
-        /// <summary>A hero of the class (side 0) against n generals (side 1).</summary>
-        private IEnumerator HeroFight(HeroClass c, int n, Action<BattleSim.Result> done = null)
+        /// <summary>A hero of the class (side 0) against n units of a rank (side 1).</summary>
+        private IEnumerator HeroFight(HeroClass c, int n, UnitRank enemy, Action<BattleSim.Result> done = null)
         {
             AddHero(0, c);
-            for (int i = 0; i < n; i++) sim.Add(1, UnitRank.General);
+            for (int i = 0; i < n; i++) sim.Add(1, enemy);
             BattleSim.Result r = default;
             yield return sim.Run(MaxSeconds, x => r = x);
             last = r;
@@ -128,7 +138,7 @@ namespace BattleOfAges.PlayModeTests
         /// The smallest n (1..MaxPack) for which the fight is won by sideWins: doubling, then halving the gap
         /// (a few fights instead of one per n). Calls found(n, result of that fight), or nothing if none wins.
         /// </summary>
-        private IEnumerator Smallest(Func<int, IEnumerator> fight, Action<int, BattleSim.Result> found, int sideWins = 0)
+        private IEnumerator Smallest(Func<int, IEnumerator> fight, Action<int, BattleSim.Result> found, int sideWins = 0, int max = MaxPack)
         {
             int lo = 0, hi = 1;
             BattleSim.Result hiResult = default;
@@ -137,8 +147,8 @@ namespace BattleOfAges.PlayModeTests
                 yield return fight(hi);
                 if (last.Winner == sideWins) { hiResult = last; break; }
                 lo = hi;
-                if (hi >= MaxPack) yield break;
-                hi = Mathf.Min(hi * 2, MaxPack);
+                if (hi >= max) yield break;
+                hi = Mathf.Min(hi * 2, max);
             }
             while (hi - lo > 1)
             {

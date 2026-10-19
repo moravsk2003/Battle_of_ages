@@ -97,6 +97,7 @@ namespace BattleOfAges.AI
         protected virtual void OnEnable()
         {
             if (gridId < 0) gridId = UnitSpatialGrid.Register(this, Health, GridTeam, CharacterCtrl != null ? CharacterCtrl.radius : 0.5f);
+            if (Combat != null) Combat.Team = GridTeam; // its bolts (an NPC mage) look for its enemies
         }
 
         protected virtual void OnDisable()

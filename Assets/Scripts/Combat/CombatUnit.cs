@@ -87,6 +87,10 @@ namespace BattleOfAges.Combat
         }
 
         /// <summary>Time from the start of a swing to the hit: a sword swing, a bow draw, the mage's cast.</summary>
+        /// <summary>Side in the unit grid (own units by default; hostile AI sets its own): bolts look for its enemies.</summary>
+        public int Team { get; set; } = RTS.UnitSpatialGrid.TeamPlayer;
+        public int EnemyTeam => Team == RTS.UnitSpatialGrid.TeamPlayer ? RTS.UnitSpatialGrid.TeamHostile : RTS.UnitSpatialGrid.TeamPlayer;
+
         public float Windup => FiresBolts ? GameBalance.MageWindup : IsRanged ? GameBalance.BowWindup : GameBalance.MeleeWindup;
 
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>

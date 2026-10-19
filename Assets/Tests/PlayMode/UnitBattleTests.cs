@@ -26,6 +26,8 @@ namespace BattleOfAges.PlayModeTests
             Time.timeScale = 1f;
             foreach (GameObject g in spawned) if (g != null) Object.Destroy(g);
             spawned.Clear();
+            foreach (int id in gridIds) UnitSpatialGrid.Unregister(id);
+            gridIds.Clear();
         }
 
         [UnityTest]
@@ -140,6 +142,36 @@ namespace BattleOfAges.PlayModeTests
             yield return Wait(1f);
             Assert.IsFalse(warriorHp.IsAlive);
             Assert.AreEqual(heroHp.MaxHealth - warrior.AttackDamage, heroHp.CurrentHealth, "Its swing still landed: a trade.");
+        }
+
+        [UnityTest]
+        public IEnumerator MageBolts_FlyOnToTheNextEnemy_WhenTheTargetFalls()
+        {
+            GameObject heroObj = Track(new GameObject("TestMage", typeof(HealthComponent), typeof(CombatUnit)));
+            heroObj.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
+            heroObj.AddComponent<HeroProgress>().ChooseClass(HeroClass.Mage);
+            HealthComponent weak = Enemy(new Vector3(10f, 0f, 0f), 1);
+            HealthComponent next = Enemy(new Vector3(12f, 0f, 2f), 10000);
+            yield return null;
+
+            int each = Mathf.RoundToInt(heroObj.GetComponent<CombatUnit>().AttackDamage * GameBalance.MageBoltShare);
+            Assert.IsTrue(heroObj.GetComponent<CombatUnit>().TryAttack(weak));
+            yield return Wait(2f);
+            Assert.IsFalse(weak.IsAlive, "The first bolt kills the weak target...");
+            Assert.AreEqual(10000 - (GameBalance.MageBolts - 1) * each, next.CurrentHealth, "... the other four fly on to the next enemy.");
+        }
+
+        private readonly List<int> gridIds = new List<int>();
+
+        private HealthComponent Enemy(Vector3 position, int hp)
+        {
+            GameObject go = Track(new GameObject("TestEnemy", typeof(HealthComponent)));
+            go.transform.position = position;
+            HealthComponent h = go.GetComponent<HealthComponent>();
+            h.InitializeHealth(hp);
+            gridIds.Add(UnitSpatialGrid.Register(h, h, UnitSpatialGrid.TeamHostile, 0.4f));
+            return h;
         }
 
         [UnityTest]

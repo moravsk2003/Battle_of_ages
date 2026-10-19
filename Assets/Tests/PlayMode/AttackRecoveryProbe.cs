@@ -22,7 +22,7 @@ namespace BattleOfAges.PlayModeTests
         private readonly BattleSim sim = new BattleSim();
         private readonly StringBuilder report = new StringBuilder();
 
-        [UnityTest]
+        [UnityTest, Timeout(3600000)] // a long run of fights
         public IEnumerator PlayHitAndRun()
         {
             LogAssert.ignoreFailingMessages = true;
