@@ -14,6 +14,19 @@ namespace BattleOfAges.Utils
         private static readonly int SpeedId = Animator.StringToHash("Speed");
         private static readonly int AttackId = Animator.StringToHash("Attack");
         private static readonly int DeadId = Animator.StringToHash("Dead");
+        private static readonly int LocoRateId = Animator.StringToHash("LocoRate");
+
+        /// <summary>Ground speeds the walk and run clips were made for (m/s).</summary>
+        public const float WalkClipSpeed = 1.4f, RunClipSpeed = 4.2f;
+
+        /// <summary>
+        /// Playback rate that keeps the feet on the ground (docs/GAME_DESIGN.md §11.1): the movement speed over the speed
+        /// the clip was made for (never below half speed).
+        /// </summary>
+        public static float ClipRate(float speed, float clipSpeed) => clipSpeed <= 0f ? 1f : Mathf.Max(0.5f, speed / clipSpeed);
+
+        /// <summary>The Animator blends idle-walk-run up to the run clip's speed; faster units play the locomotion faster.</summary>
+        public static float AnimatorLocoRate(float speed) => speed > RunClipSpeed ? speed / RunClipSpeed : 1f;
 
         private Animator animator;
 
@@ -25,6 +38,8 @@ namespace BattleOfAges.Utils
         private float attackLength = 0.9f;
         private float upperWeight;
         private float sentSpeed = -1f;
+        private float sentRate = 1f;
+        private bool hasRate;
         private const int UpperBodyLayer = 1;
 
         /// <summary>When set (e.g. for screenshots), overrides the measured speed.</summary>
@@ -49,6 +64,7 @@ namespace BattleOfAges.Utils
             {
                 foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
                     if (clip.name == "Attack") attackLength = clip.length;
+                foreach (AnimatorControllerParameter p in animator.parameters) if (p.nameHash == LocoRateId) hasRate = true;
             }
         }
 
@@ -86,6 +102,11 @@ namespace BattleOfAges.Utils
             if (!animator.enabled) return; // drawn on the GPU meanwhile (GpuSkinnedCharacter)
             float speed = SpeedOverride ?? smoothedSpeed;
             if (Mathf.Abs(speed - sentSpeed) > 0.02f || (speed == 0f && sentSpeed != 0f)) { animator.SetFloat(SpeedId, speed); sentSpeed = speed; } // 1000 units: only on change
+            if (hasRate)
+            {
+                float rate = AnimatorLocoRate(speed);
+                if (Mathf.Abs(rate - sentRate) > 0.03f) { animator.SetFloat(LocoRateId, rate); sentRate = rate; }
+            }
 
             // Upper-body swing layer: quick blend in, hold for the clip, blend out over the follow-through.
             if (animator.layerCount > UpperBodyLayer)

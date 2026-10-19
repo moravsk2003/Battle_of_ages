@@ -37,6 +37,15 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void Locomotion_PlaysAtTheGroundSpeed()
+        {
+            Assert.AreEqual(1f, Utils.CharacterAnimationDriver.AnimatorLocoRate(3f), 1e-5f, "Up to the run clip the blend tree is enough.");
+            Assert.AreEqual(7.5f / 4.2f, Utils.CharacterAnimationDriver.AnimatorLocoRate(7.5f), 1e-4f, "A general runs 1.8x the clip.");
+            Assert.AreEqual(2f, Utils.CharacterAnimationDriver.ClipRate(2.8f, 1.4f), 1e-5f);
+            Assert.AreEqual(0.5f, Utils.CharacterAnimationDriver.ClipRate(0.1f, 1.4f), 1e-5f, "Never below half speed.");
+        }
+
+        [Test]
         public void Apply_SetsBaseStatsUnderTheWornKit()
         {
             var unit = new GameObject("RankedUnit", typeof(HealthComponent), typeof(CombatUnit));

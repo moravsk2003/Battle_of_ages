@@ -92,6 +92,34 @@ namespace BattleOfAges.EditorTools
             importer.SaveAndReimport();
         }
 
+        /// <summary>
+        /// Locomotion plays faster than its clips when the unit runs faster than the run clip (docs/GAME_DESIGN.md §11.1):
+        /// the "LocoRate" parameter (CharacterAnimationDriver) multiplies the locomotion state's speed, so the feet do not slide.
+        /// Patches the existing controllers without rebuilding the models.
+        /// </summary>
+        [MenuItem("Battle of Ages/Add Locomotion Rate To Animators")]
+        public static void AddLocomotionRateToAnimators()
+        {
+            foreach (string path in new[] { $"{ControllerDir}/KnightAnimator.controller", $"{ControllerDir}/VillagerAnimator.controller" })
+            {
+                var ctrl = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+                if (ctrl == null) continue;
+                AnimatorState loco = ctrl.layers[0].stateMachine.states.Select(s => s.state).FirstOrDefault(s => s.name == "Locomotion");
+                if (loco != null) AddLocomotionRate(ctrl, loco);
+                EditorUtility.SetDirty(ctrl);
+            }
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Battle of Ages] LocoRate added to the animators");
+        }
+
+        private static void AddLocomotionRate(AnimatorController ctrl, AnimatorState locomotion)
+        {
+            if (!ctrl.parameters.Any(p => p.name == "LocoRate"))
+                ctrl.AddParameter(new AnimatorControllerParameter { name = "LocoRate", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
+            locomotion.speedParameter = "LocoRate";
+            locomotion.speedParameterActive = true;
+        }
+
         private static AnimatorController BuildController(string path, string modelPath)
         {
             AnimationClip Clip(string name) => AssetDatabase.LoadAllAssetsAtPath(modelPath).OfType<AnimationClip>().FirstOrDefault(c => c.name == name);
@@ -111,6 +139,7 @@ namespace BattleOfAges.EditorTools
             tree.AddChild(Clip("Walk"), 1.4f);
             tree.AddChild(Clip("Run"), 4.2f);
             sm.defaultState = locomotion;
+            AddLocomotionRate(ctrl, locomotion);
 
             // Attack plays on an upper-body layer (torso, arms, head) whose weight CharacterAnimationDriver raises
             // for the swing, so the legs keep walking / running underneath.

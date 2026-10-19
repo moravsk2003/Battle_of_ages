@@ -274,8 +274,23 @@ namespace BattleOfAges.Utils
         private void FollowLocomotion()
         {
             GpuSkinBake.Clip clip = LocomotionClip();
-            if (clip.FirstRow == locoClip.FirstRow) return;
-            CrossFade(clip, Now);
+            if (clip.FirstRow != locoClip.FirstRow) { CrossFade(clip, Now); return; }
+            // Same clip, new pace: keep the phase, change the rate (the feet follow the ground speed, §11.1)
+            float fps = GpuSkinBake.FramesPerSecond * LocoRate(clip);
+            if (dead || loco.z <= 0f || Mathf.Abs(fps / loco.z - 1f) < 0.08f) return;
+            float frames = (Now - loco.w) * loco.z;
+            loco.z = fps;
+            loco.w = Now - frames / fps;
+            Push();
+        }
+
+        /// <summary>Playback rate of a locomotion clip for the current speed (walk and run clips have their own ground speed).</summary>
+        private float LocoRate(GpuSkinBake.Clip clip)
+        {
+            float speed = driver != null ? driver.Speed : 0f;
+            if (clip.FirstRow == bake.Walk.FirstRow) return CharacterAnimationDriver.ClipRate(speed, CharacterAnimationDriver.WalkClipSpeed);
+            if (clip.FirstRow == bake.Run.FirstRow) return CharacterAnimationDriver.ClipRate(speed, CharacterAnimationDriver.RunClipSpeed);
+            return 1f;
         }
 
         private void CrossFade(GpuSkinBake.Clip clip, float start)
@@ -283,6 +298,7 @@ namespace BattleOfAges.Utils
             prev = loco;
             locoClip = clip;
             loco = clip.Play(start);
+            if (!dead) loco.z *= LocoRate(clip);
             fade = new Vector4(Now, FadeTime, 0f, 0f);
             Push();
         }
