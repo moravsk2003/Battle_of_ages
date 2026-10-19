@@ -10,12 +10,13 @@ namespace BattleOfAges.Combat
     /// gives one attribute point (+5 strength or +50 HP) and one skill point. The hero's rank never changes (UnitProgress).
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class HeroProgress : MonoBehaviour
+    public sealed class HeroProgress : MonoBehaviour, IStatModifier
     {
         [SerializeField] private int level = 1;
         [SerializeField] private int xp;
         [SerializeField] private int attributePoints, skillPoints;
         [SerializeField] private int strengthPoints, healthPoints; // attribute points spent on each
+        [SerializeField] private HeroClass heroClass;
 
         public int Level => level;
         public int Xp => xp;
@@ -24,6 +25,9 @@ namespace BattleOfAges.Combat
         public int StrengthPoints => strengthPoints;
         public int HealthPoints => healthPoints;
         public int XpToNextLevel => XpForLevelUp(level);
+        public HeroClass Class => heroClass;
+        /// <summary>Extra share of range for a ranged class (the archer's Long shot).</summary>
+        public float RangeBonus { get; set; }
 
         /// <summary>Raised after any change (XP, level, points).</summary>
         public event Action<HeroProgress> Changed;
@@ -74,6 +78,31 @@ namespace BattleOfAges.Combat
             Changed?.Invoke(this);
         }
 
+
+        // ------------------------------------------------------------------ class (§8.1)
+
+        /// <summary>Picks the class once (the player at the start, NPC heroes at random); false if it is already set.</summary>
+        public bool ChooseClass(HeroClass c)
+        {
+            if (heroClass != HeroClass.None || c == HeroClass.None) return false;
+            heroClass = c;
+            ApplyStats();
+            Changed?.Invoke(this);
+            return true;
+        }
+
+        float IStatModifier.HealthFactor => HeroClassRules.HealthFactor(heroClass);
+        float IStatModifier.StrengthFactor(bool bow) => HeroClassRules.StrengthFactor(heroClass, bow);
+        float IStatModifier.CooldownFactor(bool bow) => HeroClassRules.CooldownFactor(heroClass, bow);
+
+        float IStatModifier.Range(float range, bool bow, float strength)
+        {
+            if (!HeroClassRules.IsRanged(heroClass, bow)) return range;
+            if (combat == null) combat = GetComponent<CombatUnit>();
+            float speed = CharacterSpeed.Of(combat != null ? combat.SpeedModifier : CharacterSpeed.HeroModifier, strength);
+            return HeroClassRules.Range(speed, RangeBonus);
+        }
+
         /// <summary>Spends an attribute point on strength (+5: damage, and speed through sqrt(strength)).</summary>
         public bool SpendOnStrength() => Spend(ref strengthPoints);
 
@@ -106,6 +135,9 @@ namespace BattleOfAges.Combat
             Equipment gear = GetComponent<Equipment>();
             if (rank == null || gear == null) return;
             HealthComponent health = GetComponent<HealthComponent>();
+            if (health != null) health.IgnoreEveryNthHit = HeroClassRules.IgnoredHitEvery(heroClass);
+            CombatUnit attack = GetComponent<CombatUnit>();
+            if (attack != null) attack.FiresBolts = heroClass == HeroClass.Mage;
             float share = health != null && health.MaxHealth > 0 ? (float)health.CurrentHealth / health.MaxHealth : 1f;
             int hp = UnitRanks.Health(rank.Rank, hero: true) + healthPoints * GameBalance.HealthPerPoint;
             int strength = UnitRanks.Strength(rank.Rank, hero: true) + strengthPoints * GameBalance.StrengthPerPoint;
@@ -114,8 +146,9 @@ namespace BattleOfAges.Combat
         }
 
         /// <summary>A loaded save.</summary>
-        public void Restore(int savedLevel, int savedXp, int freeAttributes, int freeSkills, int strengthSpent, int healthSpent)
+        public void Restore(int savedLevel, int savedXp, int freeAttributes, int freeSkills, int strengthSpent, int healthSpent, HeroClass savedClass)
         {
+            heroClass = savedClass;
             level = Mathf.Max(1, savedLevel);
             xp = Mathf.Max(0, savedXp);
             attributePoints = Mathf.Max(0, freeAttributes);

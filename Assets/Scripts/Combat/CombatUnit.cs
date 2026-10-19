@@ -65,7 +65,21 @@ namespace BattleOfAges.Combat
             nextAttackTime = Time.time + attackCooldown;
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
-            target.TakeDamage(finalDamage);
+            if (FiresBolts) MageBolt.Volley(this, target, finalDamage);
+            else DeliverHit(target, finalDamage, ignoreArmor: false);
+
+            TriggerAttackAnimation();
+            return true;
+        }
+
+        /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
+        public bool FiresBolts { get; set; }
+
+        /// <summary>Lands a hit of this unit (directly or from one of its bolts): damage, battle experience, kill.</summary>
+        public void DeliverHit(HealthComponent target, int damage, bool ignoreArmor)
+        {
+            if (target == null || !target.IsAlive) return;
+            target.TakeDamage(damage, ignoreArmor);
 
             // Battle experience (docs/GAME_DESIGN.md §11.1); heroes count kills for their own levels (Killed)
             if (progress == null) progress = GetComponent<UnitProgress>();
@@ -75,9 +89,6 @@ namespace BattleOfAges.Combat
                 if (progress != null) progress.OnKill();
                 Killed?.Invoke(target);
             }
-
-            TriggerAttackAnimation();
-            return true;
         }
 
         public void TriggerAttackAnimation()

@@ -147,7 +147,7 @@ namespace BattleOfAges.SaveLoad
                 {
                     d.Player.Level = hero.Level; d.Player.Xp = hero.Xp;
                     d.Player.AttributePoints = hero.AttributePoints; d.Player.SkillPoints = hero.SkillPoints;
-                    d.Player.StrengthPoints = hero.StrengthPoints; d.Player.HealthPoints = hero.HealthPoints;
+                    d.Player.StrengthPoints = hero.StrengthPoints; d.Player.HealthPoints = hero.HealthPoints; d.Player.Class = (int)hero.Class;
                 }
             }
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
@@ -396,7 +396,7 @@ namespace BattleOfAges.SaveLoad
                 Place(player.gameObject, d.Player.Position, d.Player.Yaw);
                 player.Gear.LoadSlots(d.Player.Gear);
                 HeroProgress hero = player.GetComponent<HeroProgress>();
-                if (hero != null) hero.Restore(d.Player.Level, d.Player.Xp, d.Player.AttributePoints, d.Player.SkillPoints, d.Player.StrengthPoints, d.Player.HealthPoints);
+                if (hero != null) hero.Restore(d.Player.Level, d.Player.Xp, d.Player.AttributePoints, d.Player.SkillPoints, d.Player.StrengthPoints, d.Player.HealthPoints, (HeroClass)d.Player.Class);
                 HealthComponent hp = player.GetComponent<HealthComponent>();
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }

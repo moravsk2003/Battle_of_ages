@@ -31,6 +31,16 @@ namespace BattleOfAges.Combat
         /// <summary>Unranked beasts give 1 XP per this much of their max HP.</summary>
         public static int WildlifeHpPerXp = 10;
 
+        // ------------------------------------------------------------------ hero classes (§8.1)
+
+        public static float TankHealthBonus = 0.2f, ArcherHealthPenalty = 0.2f;
+        public static int TankIgnoreEveryNthHit = 10;
+        /// <summary>Archer and mage shoot as far as they run in this many seconds, but never less than MinClassRange.</summary>
+        public static float ClassRangeRunSeconds = 3f, MinClassRange = 12f;
+        /// <summary>The mage's attack: this many homing bolts, each this share of the damage, through armour.</summary>
+        public static int MageBolts = 5;
+        public static float MageBoltShare = 0.2f;
+
         // ------------------------------------------------------------------ promotions (§11.1)
 
         /// <summary>Battle XP to leave the rank: person -> warrior, warrior -> knight, knight -> general.</summary>

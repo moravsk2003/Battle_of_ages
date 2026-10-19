@@ -31,6 +31,7 @@ namespace BattleOfAges.Crafting
         private float baseCooldown = 2f, baseRange = 3f;
         private HealthComponent health;
         private CombatUnit combat;
+        private IStatModifier modifier;
         private bool lootHooked;
 
         public Item this[EquipSlot slot] => Slots[(int)slot];
@@ -62,18 +63,24 @@ namespace BattleOfAges.Crafting
             }
         }
 
-        public int MaxHealth { get { EnsureBase(); return Mathf.RoundToInt(baseHealth * HealthFactor()); } }
-        public int Damage { get { EnsureBase(); return Mathf.Max(1, Mathf.RoundToInt(baseDamage * DamageFactor())); } }
-        public float Cooldown { get { EnsureBase(); return baseCooldown * CooldownFactor(); } }
+        public int MaxHealth { get { EnsureBase(); return Mathf.RoundToInt(baseHealth * HealthFactor() * (Modifier != null ? Modifier.HealthFactor : 1f)); } }
+        /// <summary>Strength in effect: the base, times what the hero's class gives (the archer's bow doubles it).</summary>
+        public float EffectiveStrength { get { EnsureBase(); return baseDamage * (Modifier != null ? Modifier.StrengthFactor(HasBow) : 1f); } }
+        public int Damage => Mathf.Max(1, Mathf.RoundToInt(EffectiveStrength * DamageFactor()));
+        public float Cooldown { get { EnsureBase(); return baseCooldown * CooldownFactor() * (Modifier != null ? Modifier.CooldownFactor(HasBow) : 1f); } }
         public float Range
         {
             get
             {
                 EnsureBase();
-                return this[EquipSlot.Weapon].Type == ItemType.Bow && !this[EquipSlot.Weapon].IsEmpty
-                    ? Mathf.Max(baseRange, ItemStatCalculator.BOW_RANGE) : baseRange;
+                float range = HasBow ? Mathf.Max(baseRange, ItemStatCalculator.BOW_RANGE) : baseRange;
+                return Modifier != null ? Modifier.Range(range, HasBow, EffectiveStrength) : range;
             }
         }
+
+        public bool HasBow => !this[EquipSlot.Weapon].IsEmpty && this[EquipSlot.Weapon].Type == ItemType.Bow;
+        /// <summary>A hero's class changes what the gear gives (none on ordinary units).</summary>
+        private IStatModifier Modifier { get { Resolve(); return modifier; } }
 
         private float HealthFactor() => 1f + ItemStatCalculator.HealthBonus(this[EquipSlot.Chest]);
         private float DamageFactor() => ItemStatCalculator.WeaponDamageMultiplier(this[EquipSlot.Weapon]);
@@ -154,6 +161,7 @@ namespace BattleOfAges.Crafting
 
         private void Resolve()
         {
+            if (modifier == null) modifier = GetComponent<IStatModifier>();
             if (health == null) health = GetComponent<HealthComponent>();
             if (combat == null) combat = GetComponent<CombatUnit>();
         }
@@ -177,7 +185,7 @@ namespace BattleOfAges.Crafting
             }
             if (combat != null)
             {
-                combat.Strength = baseDamage; // the characteristic; damage = strength x weapon
+                combat.Strength = EffectiveStrength; // the characteristic; damage = strength x weapon
                 combat.InitializeCombatStats(Damage, Cooldown, Range);
             }
             CharacterGear gear = GetComponentInChildren<CharacterGear>(true);

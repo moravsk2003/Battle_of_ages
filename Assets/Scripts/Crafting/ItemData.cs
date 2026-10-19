@@ -238,7 +238,7 @@ namespace BattleOfAges.Crafting
             switch (item.Type)
             {
                 case ItemType.Sword: return 0.85f;
-                case ItemType.Bow: return 0.75f;
+                case ItemType.Bow: return 1.7f; // twice as slow as a sword for everyone (docs/GAME_DESIGN.md §8.1)
                 case ItemType.Gloves: return 1f - 0.03f * l;
                 default: return 1f;
             }

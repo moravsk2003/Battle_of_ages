@@ -48,10 +48,16 @@ namespace BattleOfAges.Combat
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
         }
 
-        public void TakeDamage(int damage)
+        /// <summary>Every Nth hit does nothing (the tank, §8.1; 0: off). A counter, no chance.</summary>
+        public int IgnoreEveryNthHit { get; set; }
+        private int hitCounter;
+
+        /// <summary>A hit; armour (DamageReduction) absorbs its share unless the attack goes through armour (the mage).</summary>
+        public void TakeDamage(int damage, bool ignoreArmor = false)
         {
             if (!IsAlive || damage <= 0) return;
-            if (DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, 0.8f))));
+            if (IgnoreEveryNthHit > 0 && ++hitCounter >= IgnoreEveryNthHit) { hitCounter = 0; return; }
+            if (!ignoreArmor && DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, 0.8f))));
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             OnTakeDamage?.Invoke(damage);

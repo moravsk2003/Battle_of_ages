@@ -21,6 +21,7 @@ namespace BattleOfAges.UI
         private Text header, body, points;
         private Image xpFill;
         private Button strengthButton, healthButton;
+        private GameObject classPicker;
         private HeroProgress hero;
         private bool open, dirty;
 
@@ -102,12 +103,13 @@ namespace BattleOfAges.UI
             xpFill.fillAmount = hero.XpToNextLevel > 0 ? (float)hero.Xp / hero.XpToNextLevel : 0f;
             body.text =
                 $"Досвід: {hero.Xp} / {hero.XpToNextLevel}\n" +
-                $"Тип: {RankName(rank != null ? rank.Rank : UnitRank.General)}\n" +
+                $"Тип: {RankName(rank != null ? rank.Rank : UnitRank.General)}   Клас: {HeroClassRules.Name(hero.Class)}\n" +
                 $"HP: {(hp != null ? hp.CurrentHealth : 0)} / {(hp != null ? hp.MaxHealth : 0)}   (вкладено: {hero.HealthPoints} × 50)\n" +
                 $"Сила: {(combat != null ? combat.Strength : 0f):0}   (вкладено: {hero.StrengthPoints} × 5)\n" +
                 $"Урон: {(combat != null ? combat.AttackDamage : 0)}   Швидкість: {(combat != null ? combat.MoveSpeed : 0f):0.0} м/с";
             points.text = $"Очки характеристик: {hero.AttributePoints}     Очки навиків: {hero.SkillPoints}";
             strengthButton.interactable = healthButton.interactable = hero.AttributePoints > 0;
+            classPicker.SetActive(hero.Class == HeroClass.None);
         }
 
         public static string RankName(UnitRank rank)
@@ -152,6 +154,17 @@ namespace BattleOfAges.UI
                 () => { if (hero != null) hero.SpendOnStrength(); }, 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
                 () => { if (hero != null) hero.SpendOnHealth(); }, 22);
+            // The class is picked once (docs/GAME_DESIGN.md §8.1)
+            RectTransform pick = UiTheme.Rect(panel, "ClassPicker", new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(520f, 50f));
+            classPicker = pick.gameObject;
+            HeroClass[] classes = { HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
+            for (int i = 0; i < classes.Length; i++)
+            {
+                HeroClass c = classes[i];
+                UiTheme.TextButton(pick, "Class" + c, HeroClassRules.Name(c), new Vector2(0f, 0.5f), new Vector2(10f + i * 128f, 0f), new Vector2(120f, 46f),
+                    () => { if (hero != null) hero.ChooseClass(c); }, 19);
+            }
+
         }
     }
 }

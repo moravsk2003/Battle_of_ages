@@ -116,6 +116,30 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator MageVolley_HomesInAndGoesThroughArmour()
+        {
+            GameObject heroObj = Track(new GameObject("TestMage", typeof(HealthComponent), typeof(CombatUnit)));
+            heroObj.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
+            HeroProgress mage = heroObj.AddComponent<HeroProgress>();
+            mage.ChooseClass(HeroClass.Mage);
+            GameObject victim = Track(new GameObject("TestRaider", typeof(HealthComponent), typeof(CombatUnit)));
+            victim.AddComponent<Crafting.Equipment>();
+            UnitProgress.Setup(victim, UnitRank.General);
+            victim.transform.position = new Vector3(10f, 0f, 0f);
+            yield return null;
+
+            HealthComponent target = victim.GetComponent<HealthComponent>();
+            target.DamageReduction = 0.5f;
+            int damage = heroObj.GetComponent<CombatUnit>().AttackDamage;
+            Assert.IsTrue(heroObj.GetComponent<CombatUnit>().TryAttack(target), "10 m is within the mage's range.");
+            Assert.AreEqual(target.MaxHealth, target.CurrentHealth, "Bolts take time to fly.");
+            yield return Wait(1.5f);
+            Assert.AreEqual(target.MaxHealth - 5 * Mathf.RoundToInt(damage * 0.2f), target.CurrentHealth,
+                "Five bolts of 20% each, armour ignored.");
+        }
+
+        [UnityTest]
         public IEnumerator AttackCommand_IsKept_AndDamagesTheTarget()
         {
             CreateGround();
