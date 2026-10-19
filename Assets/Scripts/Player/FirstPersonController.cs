@@ -114,7 +114,7 @@ namespace BattleOfAges.Player
             }
 
             if (combat == null) combat = GetComponent<CombatUnit>();
-            float speed = combat != null ? combat.MoveSpeed : moveSpeed; // CharacterSpeed formula (hero modifier 2)
+            float speed = combat != null ? combat.MoveSpeed : moveSpeed; // CharacterSpeed formula (hero modifier 5)
             characterController.Move(move * speed * Time.deltaTime);
 
             if (UniversalInput.IsJumpPressed() && isGrounded)

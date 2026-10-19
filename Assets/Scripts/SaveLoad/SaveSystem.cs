@@ -149,6 +149,12 @@ namespace BattleOfAges.SaveLoad
                     d.Player.AttributePoints = hero.AttributePoints; d.Player.SkillPoints = hero.SkillPoints;
                     d.Player.StrengthPoints = hero.StrengthPoints; d.Player.HealthPoints = hero.HealthPoints; d.Player.Class = (int)hero.Class;
                 }
+                HeroSkills skills = player.GetComponent<HeroSkills>();
+                if (skills != null)
+                {
+                    d.Player.RegenStart = skills.RegenStart; d.Player.RegenMaxPoints = skills.RegenMaxPoints; d.Player.RegenCurrentPoints = skills.RegenCurrentPoints;
+                    d.Player.HealLevel = skills.HealLevel; d.Player.LongShot = skills.LongShot; d.Player.FireFan = skills.FireFan; d.Player.DashLevel = skills.DashLevel;
+                }
             }
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
             if (modes != null) d.Player.Mode = (int)modes.CurrentMode;
@@ -397,6 +403,8 @@ namespace BattleOfAges.SaveLoad
                 player.Gear.LoadSlots(d.Player.Gear);
                 HeroProgress hero = player.GetComponent<HeroProgress>();
                 if (hero != null) hero.Restore(d.Player.Level, d.Player.Xp, d.Player.AttributePoints, d.Player.SkillPoints, d.Player.StrengthPoints, d.Player.HealthPoints, (HeroClass)d.Player.Class);
+                HeroSkills skills = player.GetComponent<HeroSkills>();
+                if (skills != null) skills.Restore(d.Player.RegenStart, d.Player.RegenMaxPoints, d.Player.RegenCurrentPoints, d.Player.HealLevel, d.Player.LongShot, d.Player.FireFan, d.Player.DashLevel);
                 HealthComponent hp = player.GetComponent<HealthComponent>();
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }

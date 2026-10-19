@@ -44,6 +44,7 @@ namespace BattleOfAges.SaveLoad
         public Vector3 MapCameraPosition;
         public bool HasMapCamera;
         public int Level = 1, Xp, AttributePoints, SkillPoints, StrengthPoints, HealthPoints, Class; // HeroProgress
+        public bool RegenStart, LongShot, FireFan; public int RegenMaxPoints, RegenCurrentPoints, HealLevel, DashLevel; // HeroSkills
     }
 
     [Serializable]

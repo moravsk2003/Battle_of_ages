@@ -41,6 +41,22 @@ namespace BattleOfAges.Combat
         public static int MageBolts = 5;
         public static float MageBoltShare = 0.2f;
 
+        // ------------------------------------------------------------------ class skills (§8.1)
+
+        /// <summary>Tank Regeneration: the start gives one step of each; every further point one more step of one.</summary>
+        public static float RegenStepMax = 0.01f, RegenStepCurrent = 0.02f;
+        /// <summary>Tank Instant heal: share of max HP at level 1, + step per level, up to HealMaxLevel; cooldown in seconds.</summary>
+        public static float HealFirst = 0.05f, HealStep = 0.04f, HealCooldown = 12f * 60f;
+        public static int HealMaxLevel = 6;
+        /// <summary>Archer Long shot (passive).</summary>
+        public static int LongShotCost = 2;
+        public static float LongShotRangeBonus = 0.05f;
+        /// <summary>Mage Fire fan: cone angle, damage share at the edge of the range, cooldown.</summary>
+        public static float FireFanAngle = 60f, FireFanEdgeDamage = 0.5f, FireFanCooldown = 10f;
+        /// <summary>DD Dash: x(1 + level) run speed for DashSeconds, levels 1..DashMaxLevel (x2..x5).</summary>
+        public static float DashSeconds = 1f, DashCooldown = 20f;
+        public static int DashMaxLevel = 4;
+
         // ------------------------------------------------------------------ promotions (§11.1)
 
         /// <summary>Battle XP to leave the rank: person -> warrior, warrior -> knight, knight -> general.</summary>

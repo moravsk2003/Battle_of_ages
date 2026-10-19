@@ -64,6 +64,7 @@ namespace BattleOfAges.Player
             // The hero is a general with x2 stats; its rank never changes (docs/GAME_DESIGN.md §7.1)
             UnitProgress.Setup(gameObject, UnitRank.General, hero: true);
             if (GetComponent<HeroProgress>() == null) gameObject.AddComponent<HeroProgress>();
+            if (GetComponent<HeroSkills>() == null) gameObject.AddComponent<HeroSkills>();
         }
 
         /// <summary>Wears the item (no store involved); returns what was worn in that slot.</summary>
@@ -114,6 +115,16 @@ namespace BattleOfAges.Player
             if (UniversalInput.GetMouseButtonDown(0))
             {
                 PerformPlayerAttack();
+            }
+
+            // The class's active skill (Q): heal, fire fan or dash where the hero looks
+            if (KeybindsManager.GetKeyDown(KeyAction.Ability))
+            {
+                EnsureCameraReference();
+                HeroSkills skills = GetComponent<HeroSkills>();
+                if (skills != null && !skills.UseActive(fpsCamera != null ? fpsCamera.transform.forward : transform.forward)
+                    && skills.HasActive)
+                    StrategyHud.Notify($"Уміння перезаряджається: {skills.CooldownLeft:0} с");
             }
         }
 

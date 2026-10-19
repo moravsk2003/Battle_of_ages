@@ -22,6 +22,7 @@ namespace BattleOfAges.UI
         private Image xpFill;
         private Button strengthButton, healthButton;
         private GameObject classPicker;
+        private readonly Button[] skillButtons = new Button[4];
         private HeroProgress hero;
         private bool open, dirty;
 
@@ -110,6 +111,51 @@ namespace BattleOfAges.UI
             points.text = $"Очки характеристик: {hero.AttributePoints}     Очки навиків: {hero.SkillPoints}";
             strengthButton.interactable = healthButton.interactable = hero.AttributePoints > 0;
             classPicker.SetActive(hero.Class == HeroClass.None);
+            RefreshSkills();
+        }
+
+
+        /// <summary>The class skills that can be learnt now, one button each (docs/GAME_DESIGN.md §8.1).</summary>
+        private void RefreshSkills()
+        {
+            HeroSkills s = hero.GetComponent<HeroSkills>();
+            int used = 0;
+            if (s != null)
+            {
+                switch (hero.Class)
+                {
+                    case HeroClass.Tank:
+                        if (!s.RegenStart) SkillButton(ref used, "Регенерація (1)", s.LearnRegenStart);
+                        else
+                        {
+                            SkillButton(ref used, $"Реген +1% макс ({s.RegenMaxShare * 100f:0}%)", s.LearnRegenMax);
+                            SkillButton(ref used, $"Реген +2% пот. ({s.RegenCurrentShare * 100f:0}%)", s.LearnRegenCurrent);
+                        }
+                        if (s.HealLevel < GameBalance.HealMaxLevel) SkillButton(ref used, $"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", s.LearnHeal);
+                        break;
+                    case HeroClass.Archer:
+                        if (!s.LongShot) SkillButton(ref used, $"Далекий постріл ({GameBalance.LongShotCost})", s.LearnLongShot);
+                        break;
+                    case HeroClass.Mage:
+                        if (!s.FireFan) SkillButton(ref used, "Вогняне віяло (1)", s.LearnFireFan);
+                        break;
+                    case HeroClass.Dd:
+                        if (s.DashLevel < GameBalance.DashMaxLevel) SkillButton(ref used, $"Ривок ×{s.DashFactor + 1f:0}", s.LearnDash);
+                        break;
+                }
+            }
+            for (int i = used; i < skillButtons.Length; i++) skillButtons[i].gameObject.SetActive(false);
+        }
+
+        private void SkillButton(ref int index, string label, System.Func<bool> learn)
+        {
+            if (index >= skillButtons.Length) return;
+            Button b = skillButtons[index++];
+            b.gameObject.SetActive(true);
+            b.GetComponentInChildren<Text>().text = label;
+            b.interactable = hero.SkillPoints > 0;
+            b.onClick.RemoveAllListeners();
+            b.onClick.AddListener(() => learn());
         }
 
         public static string RankName(UnitRank rank)
@@ -154,6 +200,10 @@ namespace BattleOfAges.UI
                 () => { if (hero != null) hero.SpendOnStrength(); }, 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
                 () => { if (hero != null) hero.SpendOnHealth(); }, 22);
+            // Class skills share the row with the class picker (shown once the class is chosen)
+            for (int i = 0; i < skillButtons.Length; i++)
+                skillButtons[i] = UiTheme.TextButton(panel, "Skill" + i, "", new Vector2(0f, 0f), new Vector2(20f + i * 130f, 150f), new Vector2(124f, 46f), null, 14);
+
             // The class is picked once (docs/GAME_DESIGN.md §8.1)
             RectTransform pick = UiTheme.Rect(panel, "ClassPicker", new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(520f, 50f));
             classPicker = pick.gameObject;

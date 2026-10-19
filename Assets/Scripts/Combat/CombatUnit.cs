@@ -28,7 +28,11 @@ namespace BattleOfAges.Combat
         /// <summary>Speed characteristic (person 7, soldiers 6, hero 5; see UnitRanks, CharacterSpeed).</summary>
         public float SpeedModifier { get => speedModifier; set => speedModifier = value; }
         /// <summary>Global x SpeedModifier x sqrt(strength).</summary>
-        public float MoveSpeed => CharacterSpeed.Of(this);
+        public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f);
+
+        private float boostFactor = 1f, boostUntil = float.NegativeInfinity;
+        /// <summary>Runs this many times faster for a while (the DD's Dash).</summary>
+        public void Boost(float factor, float seconds) { boostFactor = factor; boostUntil = Time.time + seconds; }
         public bool CanAttack => Time.time >= nextAttackTime;
 
         /// <summary>Raised when an attack swing starts (rigged characters play their attack clip).</summary>
