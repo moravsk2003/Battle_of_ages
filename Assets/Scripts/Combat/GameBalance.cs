@@ -85,7 +85,7 @@ namespace BattleOfAges.Combat
         public static float MeleeSlowFactor = 0.5f, MeleeSlowSeconds = 1f;
         /// <summary>Wind-up: seconds from the start of a swing to its hit (a started swing lands even if the striker falls).</summary>
         public static float MeleeWindup = 0.35f, BowWindup = 0.5f, MageWindup = 0.2f;
-        public static float RangedRootSeconds = 1f;
+        public static float RangedRootSeconds = 0.5f;
 
         // ------------------------------------------------------------------ promotions (§11.1)
 
