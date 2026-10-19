@@ -178,6 +178,7 @@ namespace BattleOfAges.SaveLoad
                 if (hp != null && hp.MaxHealth > 0 && !hp.IsAlive) continue;
                 NpcResourceGatherer g = u.GetComponent<NpcResourceGatherer>();
                 Equipment gear = u.GetComponent<Equipment>();
+                UnitProgress progress = u.GetComponent<UnitProgress>();
                 var s = new UnitSave
                 {
                     Name = u.name,
@@ -186,7 +187,9 @@ namespace BattleOfAges.SaveLoad
                     Yaw = u.transform.eulerAngles.y,
                     Health = hp != null ? hp.CurrentHealth : 0,
                     Gear = gear != null ? gear.SlotsCopy() : new Item[6],
-                    Directive = g != null ? (int)g.CurrentDirective : 0
+                    Directive = g != null ? (int)g.CurrentDirective : 0,
+                    Rank = progress != null ? (int)progress.Rank : -1,
+                    BattleXp = progress != null ? progress.BattleXp : 0
                 };
                 if (g != null && g.IsInsideMine && g.AssignedMine != null)
                     s.InsideMine = buildings.FindIndex(b => b.gameObject == g.AssignedMine.gameObject);
@@ -361,6 +364,7 @@ namespace BattleOfAges.SaveLoad
                 if (go == null) continue;
                 Place(go, s.Position, s.Yaw);
                 ApplyGear(go, s.Gear);
+                if (s.Rank >= 0) UnitProgress.Restore(go, (UnitRank)s.Rank, s.BattleXp);
                 HealthComponent hp = go.GetComponent<HealthComponent>();
                 if (hp != null && s.Health > 0) hp.SetCurrentHealth(s.Health);
                 NpcResourceGatherer g = go.GetComponent<NpcResourceGatherer>();

@@ -79,6 +79,8 @@ namespace BattleOfAges.SaveLoad
         public int Directive;            // GatherDirective
         public int InsideMine = -1;      // index into Buildings
         public int AtBench = -1;         // index into Buildings
+        public int Rank = -1;            // UnitRank (-1: older saves, the model decides)
+        public int BattleXp;
     }
 
     /// <summary>Changes to the generated world (it is rebuilt from its seed, then these are applied).</summary>

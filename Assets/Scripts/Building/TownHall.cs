@@ -101,9 +101,39 @@ namespace BattleOfAges.Building
             return born;
         }
 
+        private float promotionClock;
+
+        /// <summary>
+        /// Once per game hour every working person may become a warrior (docs/GAME_DESIGN.md §11.1): the same as
+        /// Binomial(working people, p) promotions, one cheap roll per worker per hour, never per frame.
+        /// </summary>
+        public static int PromoteWorkers(float chance)
+        {
+            int promoted = 0;
+            var workers = WorkerRegistry.ActiveWorkers;
+            for (int i = workers.Count - 1; i >= 0; i--)
+            {
+                NpcResourceGatherer w = workers[i];
+                if (w == null || !w.IsWorking) continue;
+                UnitProgress p = w.GetComponent<UnitProgress>();
+                if (p == null || p.Rank != UnitRank.Person || Random.value >= chance) continue;
+                p.Promote();
+                promoted++;
+            }
+            return promoted;
+        }
+
         private void Update()
         {
-            int born = Births(ref birthCarry, WorldClock.HoursOf(Time.deltaTime), Population, PopulationCap);
+            float hours = WorldClock.HoursOf(Time.deltaTime);
+            promotionClock += hours;
+            if (promotionClock >= 1f)
+            {
+                promotionClock -= 1f;
+                if (PromoteWorkers(GameBalance.WorkPromotionPerHour) > 0) StrategyHud.Notify("Робота загартувала: новий воїн");
+            }
+
+            int born = Births(ref birthCarry, hours, Population, PopulationCap);
             for (int i = 0; i < born; i++)
             {
                 Vector2 ring = Random.insideUnitCircle.normalized * 6f;

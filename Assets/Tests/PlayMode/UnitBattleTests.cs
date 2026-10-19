@@ -84,6 +84,20 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator Work_TurnsPeopleIntoWarriors_NotIdleSoldiers()
+        {
+            CreateGround();
+            GameObject villager = Track(Building.BuildingNode.CreateWorkerNpc(OnGround(Vector3.zero), "TestVillager"));
+            RtsUnit knight = CreateKnight(new Vector3(5f, 0f, 0f));
+            yield return null;
+
+            Building.TownHall.PromoteWorkers(1f); // every working person this hour
+            Assert.AreEqual(UnitRank.Warrior, villager.GetComponent<UnitProgress>().Rank, "Work hardens a person into a warrior.");
+            Assert.AreEqual(UnitRank.Knight, knight.GetComponent<UnitProgress>().Rank, "Only working people are promoted by work.");
+            Assert.AreEqual(UnitRanks.Health(UnitRank.Warrior), villager.GetComponent<Crafting.Equipment>().BaseHealth);
+        }
+
+        [UnityTest]
         public IEnumerator AttackCommand_IsKept_AndDamagesTheTarget()
         {
             CreateGround();

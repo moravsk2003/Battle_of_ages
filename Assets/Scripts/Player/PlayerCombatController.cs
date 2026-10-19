@@ -60,6 +60,9 @@ namespace BattleOfAges.Player
             Equipment g = Gear;
             if (g[EquipSlot.Weapon].IsEmpty) g.Equip(new Item(ItemType.Sword, 0));
             if (g[EquipSlot.Shield].IsEmpty) g.Equip(new Item(ItemType.Shield, 1));
+
+            // The hero is a general with x2 stats; its rank never changes (docs/GAME_DESIGN.md §7.1)
+            UnitProgress.Setup(gameObject, UnitRank.General, hero: true);
         }
 
         /// <summary>Wears the item (no store involved); returns what was worn in that slot.</summary>

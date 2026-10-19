@@ -94,14 +94,12 @@ namespace BattleOfAges.RTS
         /// </summary>
         private void EnsureStartingKit()
         {
-            if (GetComponent<Equipment>() != null) return;
             var visual = GetComponentInChildren<CharacterGear>(true);
             var type = visual != null ? visual.Type
                 : name.Contains("Knight") ? HumanoidModelBuilder.HumanType.KnightGuard : HumanoidModelBuilder.HumanType.Villager;
-            Equipment gear = gameObject.AddComponent<Equipment>();
-            gear.LoadSlots(StartingKits.For(type));
-            UnitRanks.Apply(gameObject, type == HumanoidModelBuilder.HumanType.KnightGuard ? UnitRank.Knight : UnitRank.Person,
-                            cooldown: combat != null ? combat.AttackCooldown : 2f, range: combat != null ? combat.AttackRange : 3f);
+            if (GetComponent<Equipment>() == null) gameObject.AddComponent<Equipment>().LoadSlots(StartingKits.For(type));
+            if (GetComponent<UnitProgress>() != null) return;
+            UnitProgress.Setup(gameObject, type == HumanoidModelBuilder.HumanType.KnightGuard ? UnitRank.Knight : UnitRank.Person);
             if (health != null) health.InitializeHealth(health.MaxHealth);
         }
 
@@ -185,6 +183,8 @@ namespace BattleOfAges.RTS
                 if (!attackTarget.IsAlive)
                 {
                     attackTarget = null;
+                    UnitProgress progress = GetComponent<UnitProgress>();
+                    if (progress != null) progress.OnFightSurvived();
                 }
                 else
                 {

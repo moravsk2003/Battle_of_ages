@@ -33,6 +33,9 @@ namespace BattleOfAges.Combat
 
         /// <summary>Raised when an attack swing starts (rigged characters play their attack clip).</summary>
         public event Action OnAttackStarted;
+        /// <summary>Raised when one of this unit's hits killed the target.</summary>
+        public event Action<HealthComponent> Killed;
+        private UnitProgress progress;
 
         private void Awake()
         {
@@ -63,6 +66,15 @@ namespace BattleOfAges.Combat
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
             target.TakeDamage(finalDamage);
+
+            // Battle experience (docs/GAME_DESIGN.md §11.1); heroes count kills for their own levels (Killed)
+            if (progress == null) progress = GetComponent<UnitProgress>();
+            if (progress != null) progress.OnHit();
+            if (!target.IsAlive)
+            {
+                if (progress != null) progress.OnKill();
+                Killed?.Invoke(target);
+            }
 
             TriggerAttackAnimation();
             return true;

@@ -38,6 +38,8 @@ namespace BattleOfAges.Crafting
         /// <summary>Strength: the unit's own damage before the weapon (also sets its speed, see CharacterSpeed).</summary>
         public float Strength { get { EnsureBase(); return baseDamage; } }
         public int BaseDamage { get { EnsureBase(); return Mathf.RoundToInt(baseDamage); } }
+        public float BaseCooldown { get { EnsureBase(); return baseCooldown; } }
+        public float BaseRange { get { EnsureBase(); return baseRange; } }
 
         private Item[] Slots
         {

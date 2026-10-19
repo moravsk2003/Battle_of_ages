@@ -22,6 +22,16 @@ namespace BattleOfAges.Combat
         /// <summary>A hero has this many times the HP and strength of its rank (§7.1).</summary>
         public static float HeroStatMultiplier = 2f;
 
+        // ------------------------------------------------------------------ promotions (§11.1)
+
+        /// <summary>Battle XP to leave the rank: person -> warrior, warrior -> knight, knight -> general.</summary>
+        public static int[] PromotionXp = { 30, 100, 500 };
+        public static int XpPerHit = 1, XpPerKill = 10, XpPerSurvival = 5;
+        /// <summary>Survival XP is given at most once per this many seconds (one fight, not every target).</summary>
+        public static float SurvivalAwardWindow = 30f;
+        /// <summary>Chance per worked game hour that a working person becomes a warrior.</summary>
+        public static float WorkPromotionPerHour = 0.005f;
+
         // ------------------------------------------------------------------ speed (§11.1)
 
         /// <summary>speed = SpeedGlobal x modifier x sqrt(strength), metres per second.</summary>
