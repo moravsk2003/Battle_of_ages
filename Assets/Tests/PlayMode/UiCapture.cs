@@ -93,7 +93,15 @@ namespace BattleOfAges.PlayModeTests
                     EquipmentUI.Instance.OpenDefault();
                     return Wait(0.3f);
                 }),
-                ("pause", () => { EquipmentUI.Instance.Close(); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
+                ("hero", () =>
+                {
+                    EquipmentUI.Instance.Close();
+                    var hero = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.Combat.HeroProgress>();
+                    if (hero != null) hero.AddXp(100 + 200 + 150);
+                    HeroUI.Instance?.Open();
+                    return Wait(0.3f);
+                }),
+                ("pause", () => { HeroUI.Instance?.Close(); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
                 ("settings", () => { PauseMenuController.Instance?.OpenSettings(); return Wait(0.3f); }),
             };
 

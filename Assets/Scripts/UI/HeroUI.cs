@@ -172,6 +172,7 @@ namespace BattleOfAges.UI
         private void Build()
         {
             Canvas canvas = UiTheme.CreateCanvas("HeroCanvas", 121);
+            canvas.transform.SetParent(transform, false); // survives scene loads with this object
             window = canvas.gameObject;
             RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, Size);
             UiTheme.PanelImage(panel);
@@ -182,7 +183,7 @@ namespace BattleOfAges.UI
 
             RectTransform bar = UiTheme.Rect(panel, "XpBar", new Vector2(0.5f, 1f), new Vector2(0f, -76f), new Vector2(500f, 18f));
             UiTheme.PanelImage(bar, UiTheme.BarSprite, new Color(0f, 0f, 0f, 0.55f));
-            RectTransform fill = UiTheme.Child(bar, "Fill", Vector2.zero, Vector2.one);
+            RectTransform fill = UiTheme.Child(bar, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             xpFill = fill.gameObject.AddComponent<Image>();
             xpFill.sprite = UiTheme.BarSprite;
             xpFill.type = Image.Type.Filled;
