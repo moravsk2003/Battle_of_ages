@@ -39,6 +39,11 @@ namespace BattleOfAges.Combat
             originalLocalPos = transform.localPosition;
         }
 
+        // Every fighter heals naturally on the world clock (builders may add the HealthComponent after this one: Start retries)
+        private void OnEnable() => WorldClock.RegisterFighter(GetComponent<HealthComponent>());
+        private void Start() => WorldClock.RegisterFighter(GetComponent<HealthComponent>());
+        private void OnDisable() => WorldClock.UnregisterFighter(GetComponent<HealthComponent>());
+
         public void InitializeCombatStats(int damage, float cooldown = 2.0f, float range = 3.0f)
         {
             attackDamage = damage;

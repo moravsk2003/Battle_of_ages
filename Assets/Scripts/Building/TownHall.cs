@@ -79,6 +79,40 @@ namespace BattleOfAges.Building
             return true;
         }
 
+        // ------------------------------------------------------------------ population growth (§10.3)
+
+        private float birthCarry;
+
+        /// <summary>Births per game hour for this population: base + per-capita share.</summary>
+        public static float GrowthPerHour(int population) =>
+            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population;
+
+        /// <summary>
+        /// Accumulates births over the elapsed game hours and returns how many people are born now (never above the
+        /// room under the cap; with no room the growth waits instead of piling up).
+        /// </summary>
+        public static int Births(ref float carry, float gameHours, int population, int cap)
+        {
+            int room = cap - population;
+            if (room <= 0) { carry = Mathf.Min(carry, 1f); return 0; }
+            carry += GrowthPerHour(population) * gameHours;
+            int born = Mathf.Min((int)carry, room);
+            carry -= born;
+            return born;
+        }
+
+        private void Update()
+        {
+            int born = Births(ref birthCarry, WorldClock.HoursOf(Time.deltaTime), Population, PopulationCap);
+            for (int i = 0; i < born; i++)
+            {
+                Vector2 ring = Random.insideUnitCircle.normalized * 6f;
+                Vector3 pos = transform.position + new Vector3(ring.x, 0f, ring.y);
+                pos.y = RtsUnit.GetTerrainHeight(pos);
+                BuildingNode.CreateWorkerNpc(pos, $"NPC_Villager_{WorkerRegistry.WorkerCount + 1}");
+            }
+        }
+
         private void OnEnable() { if (!active.Contains(this)) active.Add(this); }
         private void OnDisable() => active.Remove(this);
 

@@ -12,6 +12,7 @@ namespace BattleOfAges.SaveLoad
         public int Version = 1;
         public long SavedAtTicks;
         public float PlaySeconds;
+        public double GameHours;          // WorldClock
 
         public int Wood;
         public List<TierCount> Ore = new List<TierCount>();

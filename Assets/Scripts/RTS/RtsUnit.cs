@@ -53,7 +53,13 @@ namespace BattleOfAges.RTS
             isPlayerControlled = GetComponent<FirstPersonController>() != null;
             health = GetComponent<HealthComponent>();
             combat = GetComponent<CombatUnit>();
-            if (!isPlayerControlled) UnitCorpse.AttachTo(gameObject);
+            if (!isPlayerControlled)
+            {
+                // Every unit can fight (docs/GAME_DESIGN.md §11.1), also villagers placed in the scene
+                if (health == null) health = gameObject.AddComponent<HealthComponent>();
+                if (combat == null) combat = gameObject.AddComponent<CombatUnit>();
+                UnitCorpse.AttachTo(gameObject);
+            }
             engageTimer = Random.value * EngageInterval; // stagger the searches across frames
             characterController = GetComponent<CharacterController>();
             if (characterController != null)

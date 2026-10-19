@@ -123,7 +123,7 @@ namespace BattleOfAges.SaveLoad
 
         public static SaveData Capture()
         {
-            var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds };
+            var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours };
 
             ResourceManager res = ResourceManager.Instance;
             if (res != null)
@@ -181,7 +181,7 @@ namespace BattleOfAges.SaveLoad
                 var s = new UnitSave
                 {
                     Name = u.name,
-                    Villager = g != null,
+                    Villager = IsVillager(u),
                     Position = u.transform.position,
                     Yaw = u.transform.eulerAngles.y,
                     Health = hp != null ? hp.CurrentHealth : 0,
@@ -255,6 +255,7 @@ namespace BattleOfAges.SaveLoad
             if (pending != null)
             {
                 playSecondsAtLoad = pending.PlaySeconds;
+                WorldClock.GameHours = pending.GameHours;
                 runner.StartCoroutine(ApplyWhenReady(pending));
                 pending = null;
                 return;
@@ -352,7 +353,7 @@ namespace BattleOfAges.SaveLoad
             foreach (RtsUnit u in UnityEngine.Object.FindObjectsByType<RtsUnit>(FindObjectsSortMode.None))
             {
                 if (u == null || u.GetComponent<FirstPersonController>() != null) continue;
-                if (u.GetComponent<NpcResourceGatherer>() != null || !savedNames.Contains(u.name)) { u.gameObject.SetActive(false); UnityEngine.Object.Destroy(u.gameObject); }
+                if (IsVillager(u) || !savedNames.Contains(u.name)) { u.gameObject.SetActive(false); UnityEngine.Object.Destroy(u.gameObject); }
             }
             foreach (UnitSave s in d.Units)
             {
@@ -391,6 +392,9 @@ namespace BattleOfAges.SaveLoad
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
             if (modes != null) modes.SetGameMode((GameMode)d.Player.Mode);
         }
+
+        /// <summary>Villagers are rebuilt on load (CreateWorkerNpc names them); other own units are scene units matched by name.</summary>
+        private static bool IsVillager(RtsUnit u) => u.name.StartsWith("NPC_Villager");
 
         private static GameObject FindUnit(string name)
         {

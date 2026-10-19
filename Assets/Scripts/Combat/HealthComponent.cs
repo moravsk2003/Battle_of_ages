@@ -65,6 +65,26 @@ namespace BattleOfAges.Combat
             }
         }
 
+        /// <summary>Extra healing per game hour as shares of max and of current HP (the tank's Regeneration, §8.1).</summary>
+        public float RegenMaxPerHour { get; set; }
+        public float RegenCurrentPerHour { get; set; }
+        private float regenCarry; // HP is whole: fractions wait here
+
+        /// <summary>
+        /// Heals for the elapsed game hours: natural regeneration from the current HP (docs/GAME_DESIGN.md §11.2), so the
+        /// badly wounded heal slowly, plus any extra regeneration. Works in battle too.
+        /// </summary>
+        public void Regenerate(float gameHours)
+        {
+            if (!IsAlive || currentHealth >= maxHealth || gameHours <= 0f) { regenCarry = 0f; return; }
+            regenCarry += (currentHealth * (GameBalance.NaturalRegenCurrentPerHour + RegenCurrentPerHour)
+                           + maxHealth * RegenMaxPerHour) * gameHours;
+            int whole = (int)regenCarry;
+            if (whole <= 0) return;
+            regenCarry -= whole;
+            Heal(whole);
+        }
+
         public void Heal(int amount)
         {
             if (!IsAlive || amount <= 0) return;

@@ -30,6 +30,17 @@ namespace BattleOfAges.Combat
         public static float SpeedModifierSoldier = 6f; // warrior, knight, general
         public static float SpeedModifierHero = 5f;
 
+        // ------------------------------------------------------------------ healing (§11.2)
+
+        /// <summary>Natural regeneration of every unit and hero: share of the current HP per game hour.</summary>
+        public static float NaturalRegenCurrentPerHour = 0.01f;
+
+        // ------------------------------------------------------------------ population (§10.3)
+
+        /// <summary>Births per settlement per game hour: base + per-capita share of the population.</summary>
+        public static float GrowthBasePerHour = 0.5f;
+        public static float GrowthPerCapitaPerHour = 0.0075f;
+
         // ------------------------------------------------------------------ town hall (§10.4)
 
         /// <summary>Population cap without a hall (index 0) and for hall levels I..V.</summary>
