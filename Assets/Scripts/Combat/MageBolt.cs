@@ -35,6 +35,7 @@ namespace BattleOfAges.Combat
 
         private static void Create(CombatUnit caster, HealthComponent target, int damage, Vector3 origin, Vector3 velocity)
         {
+            if (!Application.isPlaying) { caster.DeliverHit(target, damage, ignoreArmor: true); return; } // edit-mode tests: hit at once
             // The look first: without its shader the bolt still flies and hits, it is just not drawn
             Material look = RuntimeShaders.UnlitMaterial(new Color(0.55f, 0.75f, 1f));
             GameObject go = look != null ? GameObject.CreatePrimitive(PrimitiveType.Sphere) : new GameObject();

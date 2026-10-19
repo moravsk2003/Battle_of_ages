@@ -90,6 +90,35 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void AfterAMeleeHit_TheAttackerIsSlowed()
+        {
+            var victim = new GameObject("Victim", typeof(HealthComponent));
+            try
+            {
+                victim.GetComponent<HealthComponent>().InitializeHealth(100000);
+                float speed = combat.MoveSpeed;
+                Assert.IsTrue(combat.TryAttack(victim.GetComponent<HealthComponent>()));
+                Assert.AreEqual(speed * GameBalance.MeleeSlowFactor, combat.MoveSpeed, 1e-3f, "A melee hit slows the attacker (no hit-and-run).");
+            }
+            finally { Object.DestroyImmediate(victim); }
+        }
+
+        [Test]
+        public void AfterARangedShot_TheShooterIsRooted()
+        {
+            var victim = new GameObject("Victim", typeof(HealthComponent));
+            try
+            {
+                victim.GetComponent<HealthComponent>().InitializeHealth(100000);
+                hero.ChooseClass(HeroClass.Mage);
+                Assert.IsTrue(combat.IsRanged);
+                Assert.IsTrue(combat.TryAttack(victim.GetComponent<HealthComponent>()));
+                Assert.AreEqual(0f, combat.MoveSpeed, 1e-5f, "A ranged shot roots the shooter.");
+            }
+            finally { Object.DestroyImmediate(victim); }
+        }
+
+        [Test]
         public void ArmourIsIgnored_ByAttacksThroughIt()
         {
             hp.DamageReduction = 0.5f;

@@ -75,6 +75,29 @@ namespace BattleOfAges.Combat
         public static float DashSeconds = 1f, DashCooldown = 20f;
         public static int DashMaxLevel = 4;
 
+        // ------------------------------------------------------------------ attack recovery (§11.1)
+
+        /// <summary>
+        /// After a melee hit the attacker runs at this share of its speed for a while (no hit-and-run kiting); after a
+        /// ranged shot (a bow or the mage's bolts) it cannot move at all for RangedRootSeconds. Test 1, 2 or 3 s:
+        /// start the game with "-attackslow 1 -rangedroot 2" to try values without a rebuild.
+        /// </summary>
+        public static float MeleeSlowFactor = 0.5f, MeleeSlowSeconds = 1f;
+        public static float RangedRootSeconds = 2f;
+
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void ReadCommandLine()
+        {
+            string[] args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < args.Length; i++)
+            {
+                if (!float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v)) continue;
+                if (args[i] == "-attackslow") MeleeSlowSeconds = v;
+                else if (args[i] == "-attackslowfactor") MeleeSlowFactor = v;
+                else if (args[i] == "-rangedroot") RangedRootSeconds = v;
+            }
+        }
+
         // ------------------------------------------------------------------ promotions (§11.1)
 
         /// <summary>Battle XP to leave the rank: person -> warrior, warrior -> knight, knight -> general.</summary>
