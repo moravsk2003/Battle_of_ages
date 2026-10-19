@@ -159,6 +159,8 @@ namespace BattleOfAges.SaveLoad
                 foreach (ArtifactPickup p in ArtifactPickup.Active)
                     d.Pickups.Add(new ArtifactSave { Type = (int)p.Type, Shard = p.IsShard, Position = p.transform.position, OwnedByPlayer = p.Owner != null });
                 d.WorldEpoch = CentralEmpire.WorldEpoch;
+                d.KingdomsFounded = true;
+                foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.Kingdoms.Add(k.ToSave());
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null)
                 {
@@ -288,10 +290,25 @@ namespace BattleOfAges.SaveLoad
                 return;
             }
             playSecondsAtLoad = 0f;
+            bool found = newGamePending || !Application.isBatchMode; // (batch test runs open the scene for other things)
             if (!newGamePending) WorldPersistence.Clear(); // the scene was opened directly (editor, tests)
             if (newGamePending && ResourceManager.Instance != null) ResourceManager.Instance.ResetToInitial();
             newGamePending = false;
             runner.StartCoroutine(RegisterSceneTreesLater());
+            if (found) runner.StartCoroutine(FoundKingdomsLater());
+        }
+
+        private static IEnumerator FoundKingdomsLater()
+        {
+            yield return null; // the player is in place
+            if (AI.NpcKingdom.All.Count == 0) FoundKingdoms();
+        }
+
+        /// <summary>The NPC kings of a new game around the player (docs/GAME_DESIGN.md §12, M0).</summary>
+        private static void FoundKingdoms()
+        {
+            GameObject player = GameObject.Find("Player");
+            AI.NpcKingdom.FoundAround(player != null ? player.transform.position : Vector3.zero);
         }
 
         private static IEnumerator RegisterSceneTreesLater()
@@ -425,6 +442,9 @@ namespace BattleOfAges.SaveLoad
                 HealthComponent hp = player.GetComponent<HealthComponent>();
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }
+            AI.NpcKingdom.RemoveAll();
+            if (d.KingdomsFounded) foreach (KingdomSave k in d.Kingdoms) AI.NpcKingdom.FromSave(k);
+            else FoundKingdoms(); // a save from before the NPC kings
             var mapCam = UnityEngine.Object.FindFirstObjectByType<RtsMapCameraController>();
             if (mapCam != null && d.Player.HasMapCamera) mapCam.transform.position = d.Player.MapCameraPosition;
             GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();

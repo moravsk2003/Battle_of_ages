@@ -146,5 +146,30 @@ namespace BattleOfAges.Combat
         public static int[] TownHallWood = { 0, 10, 30, 60, 100, 160 };
         /// <summary>Ore pieces for the same steps; the minimum ore tier is level - 1.</summary>
         public static int[] TownHallOre = { 0, 5, 10, 12, 15, 20 };
+
+        // ------------------------------------------------------------------ NPC kingdoms (§12, M0)
+
+        /// <summary>NPC kings around the player at a new game, this far from the player's start.</summary>
+        public static int KingdomCount = 3;
+        public static float KingdomDistance = 600f;
+        /// <summary>The start of every NPC king: a hero (a general, like the player) and this many people and wood, no hall.</summary>
+        public static int KingdomStartPeople = 5, KingdomStartWood = 10;
+        /// <summary>What one person of an NPC kingdom brings in per game hour of work at home (no walking to the trees).</summary>
+        public static float KingdomWoodPerWorkerHour = 2f, KingdomOrePerWorkerHour = 0.5f;
+        /// <summary>People within this of the hall work; enemies within DefendRadius are fought by everyone at home.</summary>
+        public static float KingdomHomeRadius = 30f, KingdomDefendRadius = 40f;
+        /// <summary>
+        /// A raid goes when the army (warriors and up and the hero) is this many times stronger than what guards the
+        /// target (strength = total HP x total damage per second, as in Lanchester's square law), not before
+        /// KingdomFirstRaidHours and RaidCooldownHours after the last one; everyone goes (one kind of unit: people fight
+        /// too) but this share, the weakest, who stay home; a raid that lost RaidRetreatLosses turns back. The hall is
+        /// raised once the people nearly fill it (KingdomHallRoom places left), as a player would.
+        /// </summary>
+        public static float KingdomRaidPowerRatio = 1.5f, KingdomFirstRaidHours = 8f, KingdomRaidCooldownHours = 4f, KingdomGarrisonShare = 0.3f, KingdomRaidRetreatLosses = 0.5f;
+        /// <summary>Raiders look for something to fight this far from where they are; the guards of a target count within GuardRadius.</summary>
+        public static float KingdomRaidSearchRadius = 40f, KingdomGuardRadius = 40f;
+        /// <summary>HP of an NPC hall of level I..V (level 0 is a camp fire that cannot be destroyed).</summary>
+        public static int KingdomHallHealthPerLevel = 1000;
+        public static int KingdomHallRoom = 2;
     }
 }

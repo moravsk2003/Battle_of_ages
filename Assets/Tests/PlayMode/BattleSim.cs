@@ -73,34 +73,15 @@ namespace BattleOfAges.PlayModeTests
         }
 
         /// <summary>
-        /// A hero of this level with its points spent the usual way: attributes - the tank all into HP, the classless
-        /// hero by turns, the others all into strength; skills - the tank Regeneration (start and a point), Instant heal to the top, then Regeneration;
-        /// the archer Long shot, then Piercing arrow; the mage Fire fan, then Meteor; the DD Dash, then Critical hit.
+        /// A hero of this level with its points spent the usual way of its class (HeroAutoPilot, as NPC heroes do).
         /// </summary>
         public static void Develop(GameObject go, HeroClass cls, int level)
         {
             HeroProgress hero = go.GetComponent<HeroProgress>();
-            HeroSkills skills = go.GetComponent<HeroSkills>();
             int xp = 0;
             for (int l = 1; l < level; l++) xp += HeroProgress.XpForLevelUp(l);
             hero.AddXp(xp);
-            for (int i = 0; hero.AttributePoints > 0; i++)
-            {
-                bool health = cls == HeroClass.Tank || (cls == HeroClass.None && i % 2 == 1);
-                if (health) hero.SpendOnHealth(); else hero.SpendOnStrength();
-            }
-            for (int guard = 0; hero.SkillPoints > 0 && guard < 50; guard++)
-            {
-                bool learnt = cls switch
-                {
-                    HeroClass.Tank => skills.LearnRegenStart() || (!skills.CanLearnHeal && skills.LearnRegenMax()) || skills.LearnHeal() || skills.LearnRegenMax(),
-                    HeroClass.Archer => skills.LearnLongShot() || skills.LearnPierce(),
-                    HeroClass.Mage => skills.LearnFireFan() || skills.LearnMeteor(),
-                    HeroClass.Dd => skills.LearnDash() || skills.LearnCriticalHit(),
-                    _ => false
-                };
-                if (!learnt) break;
-            }
+            HeroAutoPilot.SpendPoints(go);
         }
 
         /// <summary>Plays until one side is gone or the time is up (game seconds; run with a raised Time.timeScale).</summary>
@@ -175,25 +156,10 @@ namespace BattleOfAges.PlayModeTests
             else if (d > c.AttackRange * 0.9f) Move(c, target.Combat.transform.position - c.transform.position);
         }
 
-        /// <summary>The class's active skill when it pays: the tank heals below half HP, the mage casts its fan at a target in
-        /// range (the meteor, else the fan), the DD dashes at a target still far away and makes its next swing critical.</summary>
+        /// <summary>The class's active skill when it pays (HeroAutoPilot, as NPC heroes do).</summary>
         private static void UseSkill(Unit me, Unit target, float d)
         {
-            HeroSkills skills = me.Combat.GetComponent<HeroSkills>();
-            if (skills == null || !skills.HasActive) return;
-            HeroProgress hero = me.Combat.GetComponent<HeroProgress>();
-            Vector3 to = target.Combat.transform.position - me.Combat.transform.position;
-            float reach = me.Combat.AttackRange;
-            switch (hero.Class)
-            {
-                case HeroClass.Tank: if (me.Hp.CurrentHealth < me.Hp.MaxHealth / 2) skills.UseActive(0, to); break;
-                case HeroClass.Mage: if (d <= reach && !skills.UseActive(1, to)) skills.UseActive(0, to); break; // meteor, else the fan
-                case HeroClass.Archer: if (d <= reach + 0.5f && me.Combat.CanAttack) skills.UseActive(0, to); break; // the next shot pierces
-                case HeroClass.Dd:
-                    if (d > reach + 3f) skills.UseActive(0, to);                          // dash in
-                    else if (d <= reach + 0.5f && me.Combat.CanAttack) skills.UseActive(1, to); // the next swing is a critical one
-                    break;
-            }
+            HeroAutoPilot.UseSkills(me.Combat, me.Hp, target.Hp);
         }
 
         private Unit Nearest(Unit me, out float distance)

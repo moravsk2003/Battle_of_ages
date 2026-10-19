@@ -37,7 +37,7 @@ namespace BattleOfAges.AI
 
         public HostileMobType MobType => mobType;
         public float AggroRadius => aggroRadius;
-        public float AttackRange => attackRange;
+        public float AttackRange => Combat != null ? Mathf.Max(attackRange, Combat.AttackRange) : attackRange; // a bow or a class shoots further
         public float RetreatHealthPercent => retreatHealthPercent;
         public float RetreatHealPerSecond => retreatHealPerSecond;
         public Vector3 GuardOrigin => guardOriginLocked ? guardOrigin : transform.position;
@@ -89,6 +89,21 @@ namespace BattleOfAges.AI
             ApplyMobStats();
         }
 
+        private UnitRank? subjectRank;
+        private Item[] subjectKit;
+        private bool subjectHero;
+        /// <summary>The NPC kingdom this unit lives in (null: a mob of a camp or a deserter).</summary>
+        public NpcKingdom Kingdom { get; set; }
+
+        /// <summary>A unit of an NPC kingdom (docs/GAME_DESIGN.md §12): its own rank and kit instead of the mob type's.</summary>
+        public void InitializeAsSubject(UnitRank rank, Item[] kit, bool hero = false)
+        {
+            subjectRank = rank;
+            subjectKit = kit;
+            subjectHero = hero;
+            ApplyMobStats();
+        }
+
         public void SetGuardOrigin(Vector3 origin)
         {
             guardOrigin = origin;
@@ -107,9 +122,10 @@ namespace BattleOfAges.AI
             Equipment gear = GetComponent<Equipment>();
             if (gear == null) gear = gameObject.AddComponent<Equipment>();
             gear.DropsLoot = true;
-            gear.LoadSlots(StartingKits.For(mobType));
-            UnitRanks.Apply(gameObject, RankOf(mobType), range: attackRange);
-            UnitProgress.Setup(gameObject, RankOf(mobType));
+            gear.LoadSlots(subjectKit ?? StartingKits.For(mobType));
+            UnitRank rank = subjectRank ?? RankOf(mobType);
+            UnitRanks.Apply(gameObject, rank, subjectHero, range: attackRange);
+            UnitProgress.Setup(gameObject, rank, subjectHero);
             if (Health != null) Health.InitializeHealth(Health.MaxHealth); // spawn at full health
         }
 

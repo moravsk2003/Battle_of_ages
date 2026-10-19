@@ -24,8 +24,29 @@ namespace BattleOfAges.SaveLoad
         public WorldSave World = new WorldSave();
         public List<ArtifactSave> Pickups = new List<ArtifactSave>(); // artifacts and shards on the ground
         public int WorldEpoch;
+        public List<KingdomSave> Kingdoms = new List<KingdomSave>(); // NPC kings (§12)
+        public bool KingdomsFounded;  // false in saves from before the NPC kings: they are founded on load
 
         public int OreTotal { get { int n = 0; foreach (TierCount t in Ore) n += t.Count; return n; } }
+    }
+
+    [Serializable]
+    public class KingdomSave
+    {
+        public string Name;
+        public Vector3 Home;
+        public int Hall, HallHealth;
+        public float Wood, Ore, Births, Age, Interregnum;
+        public bool Defeated;
+        public SubjectSave King = new SubjectSave(); public bool HasKing; public int KingClass, KingTotalXp;
+        public List<SubjectSave> Subjects = new List<SubjectSave>();
+    }
+
+    [Serializable]
+    public class SubjectSave
+    {
+        public int Rank, BattleXp, Health;
+        public Vector3 Position;
     }
 
     [Serializable]
