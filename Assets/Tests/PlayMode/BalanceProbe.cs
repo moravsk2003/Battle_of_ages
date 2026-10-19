@@ -69,15 +69,18 @@ namespace BattleOfAges.PlayModeTests
                 foreach (HeroClass b in Classes)
                 {
                     if (a == b) { row.Append(" — |"); continue; }
-                    AddHero(0, a);
-                    AddHero(1, b);
-                    BattleSim.Result r = default;
-                    yield return sim.Run(MaxSeconds, x => r = x);
-                    row.Append(r.Winner == 0 ? $" ✅ {r.HpLeft[0] * 100f:0}% |" : r.Winner == 1 ? $" ❌ |" : " нічия |");
+                    // Both ways round: who moves first in a frame must not decide a close fight
+                    BattleSim.Result first = default, second = default;
+                    AddHero(0, a); AddHero(1, b);
+                    yield return sim.Run(MaxSeconds, x => first = x);
+                    AddHero(0, b); AddHero(1, a);
+                    yield return sim.Run(MaxSeconds, x => second = x);
+                    row.Append($" {Duel(first, 0, second, 1)} |");
                 }
                 report.AppendLine(row.ToString());
             }
-            report.AppendLine("\n✅ N% — рядок переміг, у нього лишилось N% HP; ❌ — програв.");
+            report.AppendLine("\nКожна пара грає двічі, помінявшись сторонами. ✅ N% — рядок переміг обидва рази (у середньому лишилось N% HP); " +
+                              "❌ — програв обидва; ≈ — по-різному (дуже близький бій); 💀 — обидва загинули (обмін ударами); ⏱ — вийшов час.");
 
             // 3. a hero against every rank --------------------------------------------------------------------------
             report.AppendLine("\n## 3. Скількох юнітів кожного рангу (без спорядження) перемагає герой-генерал\n");
@@ -106,6 +109,17 @@ namespace BattleOfAges.PlayModeTests
             Time.timeScale = 1f;
             Time.maximumDeltaTime = 1f / 3f;
             File.WriteAllText(Path.Combine(dir, "balance_report.md"), report.ToString(), new UTF8Encoding(true));
+        }
+
+        /// <summary>One cell of the duel table from the two fights (the row's hero was on side1, then on side2).</summary>
+        private static string Duel(BattleSim.Result r1, int side1, BattleSim.Result r2, int side2)
+        {
+            string Mark(BattleSim.Result r, int side) =>
+                r.Winner == side ? "✅" : r.Winner == 1 - side ? "❌" : r.Alive[0] == 0 && r.Alive[1] == 0 ? "💀" : "⏱";
+            string m1 = Mark(r1, side1), m2 = Mark(r2, side2);
+            if (m1 == "✅" && m2 == "✅") return $"✅ {(r1.HpLeft[side1] + r2.HpLeft[side2]) * 50f:0}%";
+            if (m1 == m2) return m1;
+            return $"≈ ({m1}/{m2})";
         }
 
         // ------------------------------------------------------------------ fights and the search
