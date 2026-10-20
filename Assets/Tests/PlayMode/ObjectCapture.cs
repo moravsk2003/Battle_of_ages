@@ -198,5 +198,98 @@ namespace BattleOfAges.PlayModeTests
             SkinnedMeshLod.ViewerOverride = null;
             capture.Finish();
         }
+
+        /// <summary>
+        /// The trees (CAPTURE_DIR): the four broadleaf and four pine variants in a row with a knight for scale, then close-ups
+        /// of the bark, the crown from below and from above, the forest from afar (LOD) and a felled tree (stump and logs).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CaptureTrees()
+        {
+            string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
+            if (string.IsNullOrEmpty(dir)) dir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), ".agent_vision", "trees");
+            yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);
+            yield return new WaitForSeconds(1f);
+
+            Light sun = RenderSettings.sun;
+            Vector3 toSun = sun != null ? -sun.transform.forward : Vector3.back;
+            toSun.y = 0f;
+            Quaternion facing = Quaternion.LookRotation(toSun.sqrMagnitude > 1e-4f ? toSun.normalized : Vector3.back);
+            Vector3 fwd = facing * Vector3.forward, right = facing * Vector3.right;
+            Vector3 Ground(Vector3 p) => new Vector3(p.x, InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), p.z);
+            Vector3 origin = new Vector3(20f, 0f, -34f);
+
+            var stage = new List<Vector3>();
+            var trees = new List<GameObject>();
+            for (int i = 0; i < 8; i++)
+            {
+                GameObject t = i < 4 ? SteppeTreeBuilder.CreateSteppeTree("Cap_Tree_" + i, i) : SteppeTreeBuilder.CreatePineTree("Cap_Pine_" + i, i - 4);
+                Vector3 p = Ground(origin + right * ((i - 3.5f) * 9f));
+                t.transform.SetPositionAndRotation(p, facing * Quaternion.Euler(0f, i * 40f, 0f));
+                trees.Add(t);
+                stage.Add(p);
+            }
+            GameObject felled = SteppeTreeBuilder.CreateSteppeTree("Cap_Felled", 1);
+            Vector3 fp = Ground(origin - fwd * 12f);
+            felled.transform.SetPositionAndRotation(fp, facing);
+            felled.GetComponent<ResourceNodeTree>().ConvertToWoodPile();
+            stage.Add(fp);
+            GameObject knight = HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.KnightGuard, "Cap_Scale");
+            knight.transform.SetPositionAndRotation(Ground(trees[1].transform.position + right * 3.5f + fwd * 1.5f), facing);
+            // A small grove far off for the distant look
+            for (int i = 0; i < 24; i++)
+            {
+                Vector3 p = Ground(origin - fwd * (70f + (i % 6) * 7f) + right * ((i / 6) * 9f - 14f + (i % 2) * 3f));
+                GameObject g = (i % 3 == 0) ? SteppeTreeBuilder.CreatePineTree("Cap_Grove_" + i, i) : SteppeTreeBuilder.CreateSteppeTree("Cap_Grove_" + i, i);
+                g.transform.SetPositionAndRotation(p, Quaternion.Euler(0f, i * 57f, 0f));
+                stage.Add(p);
+            }
+            ModelCapture.ClearStage(stage.ToArray(), 6f);
+            yield return null;
+            ModelCapture.Pose(new List<GameObject> { knight }, "Locomotion", 0f);
+            yield return null;
+
+            Bounds B(GameObject g)
+            {
+                var b = new Bounds(g.transform.position, Vector3.one * 0.5f);
+                foreach (Renderer r in g.GetComponentsInChildren<Renderer>()) if (r.enabled) b.Encapsulate(r.bounds);
+                return b;
+            }
+            (Vector3, Vector3) Look(GameObject g, float side, float dist, float height, float lookY = 0.5f)
+            {
+                Bounds b = B(g);
+                float size = Mathf.Max(b.size.x, b.size.y);
+                Vector3 c = Ground(g.transform.position) + Vector3.up * b.size.y * lookY;
+                Vector3 d = (fwd + right * side).normalized;
+                return (c + d * size * dist + Vector3.up * size * height, c);
+            }
+            var views = new List<(string, Func<(Vector3, Vector3)>)>
+            {
+                ("lineup", () => (Ground(origin) + fwd * 42f + Vector3.up * 7f, Ground(origin) + Vector3.up * 4f)),
+                ("broadleaf_0", () => Look(trees[0], -0.4f, 1.3f, 0.05f)),
+                ("broadleaf_1_knight", () => Look(trees[1], 0.3f, 1.3f, 0.05f)),
+                ("broadleaf_2", () => Look(trees[2], -0.4f, 1.3f, 0.05f)),
+                ("broadleaf_3", () => Look(trees[3], 0.4f, 1.3f, 0.05f)),
+                ("pine_0", () => Look(trees[4], -0.4f, 1.2f, 0.05f)),
+                ("pine_1", () => Look(trees[5], 0.4f, 1.2f, 0.05f)),
+                ("pine_2", () => Look(trees[6], -0.4f, 1.2f, 0.05f)),
+                ("pine_3", () => Look(trees[7], 0.4f, 1.2f, 0.05f)),
+                ("bark_closeup", () => (Ground(trees[1].transform.position) + fwd * 1.6f + right * 0.4f + Vector3.up * 1.4f, Ground(trees[1].transform.position) + Vector3.up * 1.1f)),
+                ("crown_from_below", () => (Ground(trees[2].transform.position) + fwd * 4.5f + right * 1f + Vector3.up * 1.3f, Ground(trees[2].transform.position) + Vector3.up * 4.2f)),
+                ("crown_from_above", () => Look(trees[1], -0.3f, 0.9f, 1.1f, 0.7f)),
+                ("felled", () => (fp + fwd * 3.2f + right * 1.2f + Vector3.up * 1.6f, fp + Vector3.up * 0.3f)),
+                ("forest_far", () => (Ground(origin) + fwd * 8f + Vector3.up * 9f, Ground(origin - fwd * 85f) + Vector3.up * 3f)),
+            };
+            var capture = new CaptureRenderer(dir, views.Count, 50f, drawGrass: true);
+            for (int j = 0; j < views.Count; j++)
+            {
+                (Vector3 pos, Vector3 target) = views[j].Item2();
+                capture.Camera.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(target - pos));
+                yield return null;
+                capture.Shoot(j, views[j].Item1, pos, target);
+                yield return null;
+            }
+            capture.Finish();
+        }
     }
 }

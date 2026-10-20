@@ -35,6 +35,9 @@ namespace BattleOfAges.Resources
         private float wobbleVelocity = 0f;
         private float wobbleAngle = 0f;
 
+        /// <summary>Trunk radius at the ground: the stump of the felled tree is sized by it (SteppeTreeBuilder).</summary>
+        public float StumpRadius { get; set; } = 0.42f;
+
         public TreeState CurrentState => currentState;
         public int WoodRemaining => currentWoodRemaining;
         public int MaxWoodCapacity => maxWoodCapacity;
@@ -163,17 +166,10 @@ namespace BattleOfAges.Resources
                 if (child == null) continue;
 
                 string cName = child.name.ToLower();
-                if (cName.Contains("crown") || cName.Contains("foliage") || cName.Contains("leaves"))
+                if (cName.Contains("crown") || cName.Contains("foliage") || cName.Contains("leaves") || cName.Contains("trunk")) // every LOD of it
                 {
                     child.gameObject.SetActive(false);
                 }
-            }
-
-            // Replace tall trunk with low stump
-            Transform trunk = transform.Find("StylizedTrunk") ?? transform.Find("Trunk");
-            if (trunk != null)
-            {
-                trunk.gameObject.SetActive(false);
             }
 
             CreateStumpAndWoodPileVisuals();
@@ -192,51 +188,36 @@ namespace BattleOfAges.Resources
 
         private void CreateStumpAndWoodPileVisuals()
         {
+            // A ringed stump and a few logs (SteppeTreeBuilder meshes on the shared prop material)
+            Material wood = Utils.MeshKit.PropMaterial();
             if (stumpObj == null)
             {
-                stumpObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                stumpObj.name = "TreeStump";
+                stumpObj = new GameObject("TreeStump");
                 stumpObj.transform.SetParent(transform, false);
-                stumpObj.transform.localPosition = new Vector3(0f, 0.22f, 0f);
-                stumpObj.transform.localScale = new Vector3(0.85f, 0.22f, 0.85f);
-
-                Material barkMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Bark, new Color(0.32f, 0.20f, 0.10f), 0f, 0.22f);
-                stumpObj.GetComponent<MeshRenderer>().sharedMaterial = barkMat;
-
-                Collider sc = stumpObj.GetComponent<Collider>();
-                if (sc != null) DestroyImmediate(sc);
+                float k = StumpRadius / 0.42f;
+                stumpObj.transform.localScale = new Vector3(k, Mathf.Lerp(1f, k, 0.5f), k);
+                stumpObj.AddComponent<MeshFilter>().sharedMesh = Utils.SteppeTreeBuilder.StumpMesh;
+                stumpObj.AddComponent<MeshRenderer>().sharedMaterial = wood;
             }
 
             if (woodPileObj == null)
             {
                 woodPileObj = new GameObject("WoodPileLogs");
                 woodPileObj.transform.SetParent(transform, false);
-
-                Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.38f, 0.24f, 0.12f), 0f, 0.25f);
-                Material cutEndMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.72f, 0.55f, 0.32f), 0f, 0.20f);
-
-                // Stacked 4 fallen logs next to the stump
                 Vector3[] logOffsets = {
-                    new Vector3(0.55f, 0.18f, 0.2f),
-                    new Vector3(0.55f, 0.18f, -0.25f),
-                    new Vector3(-0.5f, 0.18f, 0.05f),
-                    new Vector3(0.55f, 0.42f, -0.05f)
+                    new Vector3(0.75f, 0.17f, 0.25f),
+                    new Vector3(0.75f, 0.17f, -0.12f),
+                    new Vector3(-0.8f, 0.17f, 0.05f),
+                    new Vector3(0.75f, 0.45f, 0.06f)
                 };
-
                 for (int i = 0; i < 4; i++)
                 {
-                    GameObject log = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    log.name = $"FallenLog_{i}";
+                    var log = new GameObject($"FallenLog_{i}");
                     log.transform.SetParent(woodPileObj.transform, false);
                     log.transform.localPosition = logOffsets[i];
-                    log.transform.localScale = new Vector3(0.34f, 0.85f, 0.34f);
-                    log.transform.localRotation = Quaternion.Euler(0f, 15f + i * 25f, 90f);
-
-                    MeshRenderer mr = log.GetComponent<MeshRenderer>();
-                    mr.sharedMaterial = woodMat;
-
-                    Collider col = log.GetComponent<Collider>();
-                    if (col != null) DestroyImmediate(col);
+                    log.transform.localRotation = Quaternion.Euler(0f, 75f + i * 12f + (i == 2 ? 40f : 0f), 0f);
+                    log.AddComponent<MeshFilter>().sharedMesh = Utils.SteppeTreeBuilder.LogMesh;
+                    log.AddComponent<MeshRenderer>().sharedMaterial = wood;
                 }
             }
         }
