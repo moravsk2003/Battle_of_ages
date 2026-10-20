@@ -106,6 +106,17 @@ namespace BattleOfAges.AI
             gridId = -1;
         }
 
+        /// <summary>Moves the unit to its current GridTeam in the unit grid (a team given after it was spawned).</summary>
+        protected void RefreshGridTeam()
+        {
+            if (gridId >= 0)
+            {
+                UnitSpatialGrid.Unregister(gridId);
+                gridId = UnitSpatialGrid.Register(this, Health, GridTeam, CharacterCtrl != null ? CharacterCtrl.radius : 0.5f);
+            }
+            if (Combat != null) Combat.Team = GridTeam;
+        }
+
         protected virtual void Start()
         {
             // Movement is kinematic (GroundMotor), so there is no CharacterController.Move that could snap back to a stale

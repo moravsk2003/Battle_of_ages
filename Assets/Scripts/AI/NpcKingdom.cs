@@ -30,6 +30,10 @@ namespace BattleOfAges.AI
         public static event Action<NpcKingdom, HealthComponent> RaidStarted;
 
         public string KingdomName = "Королівство";
+        /// <summary>Its side in the unit grid: hostile to the player (an NPC king), or the player's (a kingdom on the player's side, the session sim).</summary>
+        public int Team { get; private set; } = UnitSpatialGrid.TeamHostile;
+        public int EnemyTeam => Team == UnitSpatialGrid.TeamHostile ? UnitSpatialGrid.TeamPlayer : UnitSpatialGrid.TeamHostile;
+        public bool AgainstPlayer => Team == UnitSpatialGrid.TeamHostile;
         public readonly KingdomEconomy Economy = new KingdomEconomy();
         public HostileMobAI King { get; private set; }
         public bool IsDefeated { get; private set; }
@@ -38,6 +42,8 @@ namespace BattleOfAges.AI
         public bool InInterregnum => InterregnumLeft > 0f;
         /// <summary>Game hours since the kingdom was founded.</summary>
         public float Age { get; set; }
+        /// <summary>Age of its first raid: kings do not all set off at once (KingdomFirstRaidHours .. twice that).</summary>
+        public float FirstRaidAt { get; set; } = GameBalance.KingdomFirstRaidHours;
         /// <summary>Age when the last raid came home (the next waits KingdomRaidCooldownHours).</summary>
         public float LastRaidEnd { get; set; } = float.NegativeInfinity;
         public HealthComponent Hall { get; private set; }
@@ -67,7 +73,7 @@ namespace BattleOfAges.AI
         // ------------------------------------------------------------------ founding
 
         /// <summary>A new kingdom here: a king (a general hero, like the player) and its starting people and wood, no hall.</summary>
-        public static NpcKingdom Found(Vector3 centre, string name, int people = -1, int wood = -1, HeroClass kingClass = HeroClass.None)
+        public static NpcKingdom Found(Vector3 centre, string name, int people = -1, int wood = -1, HeroClass kingClass = HeroClass.None, int team = -1)
         {
             centre.y = RtsUnit.GetTerrainHeight(centre);
             var root = new GameObject("NpcKingdom_" + name);
@@ -75,6 +81,8 @@ namespace BattleOfAges.AI
             NpcKingdom k = root.AddComponent<NpcKingdom>();
             if (!all.Contains(k)) all.Add(k); // (OnEnable does not run in edit mode)
             k.KingdomName = name;
+            if (team >= 0) k.Team = team;
+            k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * Random.Range(1f, 2f);
             k.Economy.Wood = wood >= 0 ? wood : GameBalance.KingdomStartWood;
             k.BuildHall();
             k.Crown(k.AddSubject(UnitRank.General, k.Spot()), kingClass == HeroClass.None ? RandomClass() : kingClass);
@@ -120,6 +128,7 @@ namespace BattleOfAges.AI
             go.AddComponent<CombatUnit>();
             HostileMobAI mob = go.AddComponent<HostileMobAI>();
             mob.InitializeAsSubject(rank, KitFor(rank));
+            mob.Team = Team;
             mob.Kingdom = this;
             mob.SetGuardOrigin(Home);
             if (withModel && Application.isPlaying)
@@ -200,7 +209,7 @@ namespace BattleOfAges.AI
                 float share = Hall.MaxHealth > 0 && Hall.CurrentHealth > 0 ? (float)Hall.CurrentHealth / Hall.MaxHealth : 1f;
                 Hall.InitializeHealth(GameBalance.KingdomHallHealthPerLevel * Economy.HallLevel);
                 Hall.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(share * Hall.MaxHealth)));
-                if (hallGridId < 0) hallGridId = UnitSpatialGrid.Register(this, Hall, UnitSpatialGrid.TeamHostile, 2.5f); // the player's units can storm it
+                if (hallGridId < 0) hallGridId = UnitSpatialGrid.Register(this, Hall, Team, 2.5f); // its enemies can storm it
             }
             else Hall.InitializeHealth(1); // a camp: nothing to destroy (it is not in the grid)
         }
@@ -276,7 +285,7 @@ namespace BattleOfAges.AI
         {
             if (IsDefeated) return;
             if (Economy.HallLevel == 0 || Population >= Economy.Cap - GameBalance.KingdomHallRoom) TryUpgradeHall(); // only when it needs the room
-            if (!Raiding && !InInterregnum && Age >= GameBalance.KingdomFirstRaidHours && Age >= LastRaidEnd + GameBalance.KingdomRaidCooldownHours) ConsiderRaid();
+            if (!Raiding && !InInterregnum && Age >= FirstRaidAt && !UnderRaid() && Age >= LastRaidEnd + GameBalance.KingdomRaidCooldownHours) ConsiderRaid();
         }
 
         private bool AtHome(HostileMobAI m) => (m.transform.position - Home).sqrMagnitude <= GameBalance.KingdomHomeRadius * GameBalance.KingdomHomeRadius;
@@ -335,41 +344,64 @@ namespace BattleOfAges.AI
             return party;
         }
 
-        /// <summary>What a raid would go after: the player's hall, or else the player's hero.</summary>
-        public static HealthComponent PlayerTarget()
+        /// <summary>The player's hero, if alive.</summary>
+        private static HealthComponent PlayerHero()
         {
-            TownHall hall = TownHall.Current;
-            if (hall != null)
-            {
-                HealthComponent h = hall.GetComponent<HealthComponent>();
-                if (h != null && h.IsAlive) return h;
-            }
             GameObject player = GameObject.Find("Player");
             HealthComponent p = player != null ? player.GetComponent<HealthComponent>() : null;
             return p != null && p.IsAlive ? p : null;
         }
 
-        /// <summary>What guards this place: the player's units and hero near it.</summary>
-        public static List<HealthComponent> GuardsOf(Vector3 place)
+        /// <summary>
+        /// What a raid would go after, the nearest of: an enemy kingdom's hall (its king or people while it has no hall),
+        /// and against the player the player's hall, or else the player's hero.
+        /// </summary>
+        public HealthComponent RaidTarget()
+        {
+            HealthComponent best = null;
+            float bestD = float.MaxValue;
+            void Consider(HealthComponent h)
+            {
+                if (h == null || !h.IsAlive) return;
+                float d = (h.transform.position - Home).sqrMagnitude;
+                if (d < bestD) { best = h; bestD = d; }
+            }
+            foreach (NpcKingdom k in all)
+            {
+                if (k == null || k == this || k.IsDefeated || k.Team != EnemyTeam) continue;
+                if (k.Economy.HallLevel > 0) Consider(k.Hall);
+                else if (k.King != null && k.King.Health.IsAlive) Consider(k.King.Health);
+                else if (k.Population > 0) Consider(k.subjects[0].Health);
+            }
+            if (AgainstPlayer)
+            {
+                TownHall hall = TownHall.Current;
+                HealthComponent h = hall != null ? hall.GetComponent<HealthComponent>() : null;
+                Consider(h != null && h.IsAlive ? h : PlayerHero());
+            }
+            return best;
+        }
+
+        /// <summary>What guards this place: the enemy's units (and the player's hero) near it.</summary>
+        public List<HealthComponent> GuardsOf(Vector3 place)
         {
             var guards = new List<HealthComponent>();
-            int n = UnitSpatialGrid.Query(place, GameBalance.KingdomGuardRadius, UnitSpatialGrid.TeamPlayer, buffer);
+            int n = UnitSpatialGrid.Query(place, GameBalance.KingdomGuardRadius, EnemyTeam, buffer);
             for (int i = 0; i < n; i++)
             {
                 HealthComponent h = UnitSpatialGrid.Health(buffer[i]);
                 if (h != null && h.IsAlive && !guards.Contains(h)) guards.Add(h);
             }
-            GameObject player = GameObject.Find("Player");
-            HealthComponent p = player != null ? player.GetComponent<HealthComponent>() : null;
-            if (p != null && p.IsAlive && !guards.Contains(p) && (p.transform.position - place).sqrMagnitude <= GameBalance.KingdomGuardRadius * GameBalance.KingdomGuardRadius)
+            HealthComponent p = AgainstPlayer ? PlayerHero() : null;
+            if (p != null && !guards.Contains(p) && (p.transform.position - place).sqrMagnitude <= GameBalance.KingdomGuardRadius * GameBalance.KingdomGuardRadius)
                 guards.Add(p);
             return guards;
         }
 
-        /// <summary>Sends a raid at the player when the party is strong enough for its guards; returns whether it went.</summary>
+        /// <summary>Sends a raid at the enemy when the party is strong enough for its guards; returns whether it went.</summary>
         public bool ConsiderRaid(HealthComponent target = null)
         {
-            if (target == null) target = PlayerTarget();
+            if (target == null) target = RaidTarget();
             if (target == null) return false;
             List<HostileMobAI> party = RaidParty();
             if (party.Count == 0) return false;
@@ -395,6 +427,17 @@ namespace BattleOfAges.AI
         private void LeadRaid()
         {
             if (raidSize > 0 && raiders.Count <= raidSize * (1f - GameBalance.KingdomRaidRetreatLosses)) { EndRaid(retreat: true); return; }
+            // On the march the raid keeps together at the pace of its slowest one; near the enemy everyone runs
+            bool marching = true;
+            float slowest = float.MaxValue;
+            foreach (HostileMobAI m in raiders)
+            {
+                slowest = Mathf.Min(slowest, m.Combat != null ? m.Combat.MoveSpeed : slowest);
+                if (NearestEnemyUnit(m.transform.position, GameBalance.KingdomRaidSearchRadius) != null ||
+                    (raidTarget != null && (raidTarget.transform.position - m.transform.position).sqrMagnitude <= GameBalance.KingdomRaidSearchRadius * GameBalance.KingdomRaidSearchRadius))
+                    marching = false;
+            }
+            foreach (HostileMobAI m in raiders) m.SpeedCap = marching ? slowest : float.MaxValue;
             bool anyFighting = false;
             foreach (HostileMobAI m in raiders)
             {
@@ -407,6 +450,18 @@ namespace BattleOfAges.AI
             if (!anyFighting) EndRaid(retreat: false);
         }
 
+        /// <summary>An enemy raid is on its way to this kingdom: the king keeps everyone home.</summary>
+        public bool UnderRaid()
+        {
+            foreach (NpcKingdom k in all)
+            {
+                if (k == null || k == this || !k.Raiding || k.raidTarget == null) continue;
+                if (k.raidTarget == Hall || (King != null && k.raidTarget == King.Health)) return true;
+                foreach (HostileMobAI m in subjects) if (k.raidTarget == m.Health) return true;
+            }
+            return false;
+        }
+
         /// <summary>The raid is over: everyone goes home.</summary>
         public void EndRaid(bool retreat)
         {
@@ -414,6 +469,7 @@ namespace BattleOfAges.AI
             {
                 if (m == null || !m.Health.IsAlive) continue;
                 m.SetTarget(null);
+                m.SpeedCap = float.MaxValue;
                 m.ChangeState(AIStateType.Retreat); // walks home and gets its breath back
             }
             if (retreat) StrategyHud.Notify($"{KingdomName} відступає з набігу");
@@ -423,14 +479,12 @@ namespace BattleOfAges.AI
             raidTarget = null;
         }
 
-        /// <summary>The nearest of the player's units, hero and buildings within this radius.</summary>
-        public static HealthComponent NearestEnemy(Vector3 from, float radius)
+        /// <summary>The nearest enemy unit, enemy hall (and against the player: the player's hero and buildings) within this radius.</summary>
+        public HealthComponent NearestEnemy(Vector3 from, float radius)
         {
-            int id = UnitSpatialGrid.FindNearest(from, radius, UnitSpatialGrid.TeamPlayer);
-            if (id >= 0 && UnitSpatialGrid.Health(id) != null && UnitSpatialGrid.Health(id).IsAlive) return UnitSpatialGrid.Health(id);
-            GameObject player = GameObject.Find("Player");
-            HealthComponent p = player != null ? player.GetComponent<HealthComponent>() : null;
-            if (p != null && p.IsAlive && (p.transform.position - from).sqrMagnitude <= radius * radius) return p;
+            HealthComponent unit = NearestEnemyUnit(from, radius);
+            if (unit != null) return unit;
+            if (!AgainstPlayer) return null;
             HealthComponent best = null;
             float bestD = radius * radius;
             foreach (BuildingNode b in BuildingNode.Active)
@@ -454,13 +508,12 @@ namespace BattleOfAges.AI
             if (King != null && King.Health.IsAlive && !raiders.Contains(King) && King.CurrentCombatTarget == null) King.OrderAttack(enemy);
         }
 
-        private static HealthComponent NearestEnemyUnit(Vector3 from, float radius)
+        private HealthComponent NearestEnemyUnit(Vector3 from, float radius)
         {
-            int id = UnitSpatialGrid.FindNearest(from, radius, UnitSpatialGrid.TeamPlayer);
+            int id = UnitSpatialGrid.FindNearest(from, radius, EnemyTeam);
             if (id >= 0 && UnitSpatialGrid.Health(id) != null && UnitSpatialGrid.Health(id).IsAlive) return UnitSpatialGrid.Health(id);
-            GameObject player = GameObject.Find("Player");
-            HealthComponent p = player != null ? player.GetComponent<HealthComponent>() : null;
-            return p != null && p.IsAlive && (p.transform.position - from).sqrMagnitude <= radius * radius ? p : null;
+            HealthComponent p = AgainstPlayer ? PlayerHero() : null;
+            return p != null && (p.transform.position - from).sqrMagnitude <= radius * radius ? p : null;
         }
 
         // ------------------------------------------------------------------ a new game and saves
@@ -631,7 +684,8 @@ namespace BattleOfAges.AI
             if (hallGridId >= 0) { UnitSpatialGrid.Unregister(hallGridId); hallGridId = -1; }
             StrategyHud.Notify($"{KingdomName} впало: {why}");
             Defeated?.Invoke(this);
-            if (all.TrueForAll(k => k == null || k.IsDefeated)) StrategyHud.Notify("Перемога! Усі сусідні королівства впали");
+            if (!AgainstPlayer) StrategyHud.Notify("Поразка: королівство гравця впало");
+            else if (all.TrueForAll(k => k == null || k.IsDefeated || !k.AgainstPlayer)) StrategyHud.Notify("Перемога! Усі сусідні королівства впали");
         }
     }
 }

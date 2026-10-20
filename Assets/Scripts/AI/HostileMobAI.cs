@@ -81,7 +81,10 @@ namespace BattleOfAges.AI
             }
         }
 
-        protected override float CurrentMoveSpeed => Combat != null ? Combat.MoveSpeed : moveSpeed;
+        /// <summary>A raid marches at the pace of its slowest member (NpcKingdom): no faster than this.</summary>
+        public float SpeedCap { get; set; } = float.MaxValue;
+
+        protected override float CurrentMoveSpeed => Mathf.Min(SpeedCap, Combat != null ? Combat.MoveSpeed : moveSpeed);
 
         public void InitializeMob(HostileMobType type)
         {
@@ -92,6 +95,17 @@ namespace BattleOfAges.AI
         private UnitRank? subjectRank;
         private Item[] subjectKit;
         private bool subjectHero;
+        private int team = UnitSpatialGrid.TeamHostile;
+        /// <summary>Its side: hostile to the player (camps, raiders, NPC kings), or the player's (a kingdom on the player's side).</summary>
+        public int Team
+        {
+            get => team;
+            set { if (team == value) return; team = value; RefreshGridTeam(); }
+        }
+        protected override int GridTeam => team;
+        private int EnemySide => team == UnitSpatialGrid.TeamHostile ? UnitSpatialGrid.TeamPlayer : UnitSpatialGrid.TeamHostile;
+        private bool AgainstPlayer => team == UnitSpatialGrid.TeamHostile;
+
         /// <summary>The NPC kingdom this unit lives in (null: a mob of a camp or a deserter).</summary>
         public NpcKingdom Kingdom { get; set; }
 
@@ -166,7 +180,7 @@ namespace BattleOfAges.AI
 
         public void AlertNearbyAllies(HealthComponent target)
         {
-            int count = UnitSpatialGrid.Query(transform.position, AllyAlertRadius, UnitSpatialGrid.TeamHostile, gridBuffer, GridId);
+            int count = UnitSpatialGrid.Query(transform.position, AllyAlertRadius, team, gridBuffer, GridId);
             for (int i = 0; i < count; i++)
             {
                 HostileMobAI allyMob = UnitSpatialGrid.Owner(gridBuffer[i]) as HostileMobAI;
@@ -191,7 +205,7 @@ namespace BattleOfAges.AI
         public HealthComponent FindNearestTarget()
         {
             // 1. High Priority: Vulnerable Player Villagers / Gatherers / soldiers (spatial grid: constant cost per query)
-            int nearest = UnitSpatialGrid.FindNearest(transform.position, aggroRadius, UnitSpatialGrid.TeamPlayer);
+            int nearest = UnitSpatialGrid.FindNearest(transform.position, aggroRadius, EnemySide);
             if (nearest >= 0)
             {
                 HealthComponent unitHp = UnitSpatialGrid.Health(nearest);
@@ -200,6 +214,8 @@ namespace BattleOfAges.AI
                     return unitHp;
                 }
             }
+
+            if (!AgainstPlayer) return null; // on the player's side: only enemy units
 
             // 2. Medium Priority: Player Character
             HealthComponent playerHp = GetPlayerHealth();
