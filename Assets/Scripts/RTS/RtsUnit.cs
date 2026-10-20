@@ -35,6 +35,9 @@ namespace BattleOfAges.RTS
         private NpcResourceGatherer gatherer;
         /// <summary>Busy with a job: working units do not go looking for fights (soldiers are units without a job).</summary>
         private bool IsWorking => gatherer != null && gatherer.IsWorking;
+        public bool IsHero => isPlayerControlled;
+        public bool IsAlive => health == null || health.IsAlive;
+        public bool InsideMine => gatherer != null && gatherer.IsInsideMine;
         private int gridId = -1;
         private Vector3 steerDir, steerDesired;
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
@@ -166,14 +169,16 @@ namespace BattleOfAges.RTS
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
             if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
 
-            // Soldiers engage raiders that come near on their own (idle or after a fight), not workers or the hero.
-            if (!isPlayerControlled && !IsWorking && combatUnit != null && attackTarget == null && !hasTarget)
+            // Soldiers (and everyone during an alarm) engage raiders that come near on their own; a worker goes for an
+            // enemy close to it (one kind of unit: people fight too), even on the way to work. Not the hero, not in a mine.
+            bool soldier = !IsWorking || SettlementAlarm.Active;
+            if (!isPlayerControlled && !InsideMine && combatUnit != null && attackTarget == null && (!hasTarget || !soldier))
             {
                 engageTimer -= Time.deltaTime;
                 if (engageTimer <= 0f)
                 {
                     engageTimer = EngageInterval;
-                    int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, EngageRadius, UnitSpatialGrid.TeamPlayer);
+                    int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, soldier ? EngageRadius : GameBalance.WorkerEngageRadius, UnitSpatialGrid.TeamPlayer);
                     if (enemy >= 0) attackTarget = UnitSpatialGrid.Health(enemy);
                 }
             }

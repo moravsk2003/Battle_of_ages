@@ -105,6 +105,15 @@ namespace BattleOfAges.Combat
         public static float BattlePull = 0.05f, BattleFrontSeconds = 10f, BattleRadius = 30f;
         /// <summary>A hit enemy goes after its attacker for this long, past its usual leash.</summary>
         public static float ProvokedSeconds = 15f;
+        /// <summary>
+        /// The player's people (one kind of unit: they work and fight): a hit worker fights back unless its HP is below
+        /// WorkerFleeShare (then it runs to the chest); a worker goes for an enemy within WorkerEngageRadius of it. The alarm
+        /// (key T, or by itself when an enemy comes within AlarmTriggerRadius of the hall) sends everyone at the enemies
+        /// within AlarmRadius of the hall, and stands down AlarmStandDownSeconds after the last one is gone.
+        /// </summary>
+        public static float WorkerFleeShare = 0.25f, WorkerEngageRadius = 8f;
+        public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f;
+        public static bool AutoAlarm = true;
 
         // ------------------------------------------------------------------ promotions (§11.1)
 

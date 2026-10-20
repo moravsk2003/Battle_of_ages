@@ -154,6 +154,25 @@ namespace BattleOfAges.UI
             minimapCam.targetTexture = minimapRt;
             minimapCam.enabled = false;
             minimapImage.texture = minimapRt;
+
+            // The call to arms, over the minimap
+            alarmButton = UiTheme.TextButton(rtsGroup, "Alarm", "", new Vector2(0f, 0f), new Vector2(18f, MinimapPx + 24f + 30f), new Vector2(MinimapPx + 24f, 46f), SettlementAlarm.Toggle, 16);
+            alarmText = alarmButton.GetComponentInChildren<Text>();
+        }
+
+        private Button alarmButton;
+        private Text alarmText;
+        private bool alarmShown;
+
+        private void UpdateAlarmButton()
+        {
+            if (alarmText == null) return;
+            bool on = SettlementAlarm.Active;
+            if (on == alarmShown && alarmText.text.Length > 0) return;
+            alarmShown = on;
+            string key = InputSystem.KeybindsManager.GetKeyDisplayString(InputSystem.KeybindsManager.GetKey(InputSystem.KeyAction.Alarm));
+            alarmText.text = on ? $"Відбій ({key})" : $"Тривога: до зброї ({key})";
+            alarmText.color = on ? UiTheme.Bad : UiTheme.Ink;
         }
 
         // ------------------------------------------------------------------ update
@@ -165,6 +184,7 @@ namespace BattleOfAges.UI
             if (commander == null) commander = FindFirstObjectByType<RtsUnitCommander>();
             if (playerHealth == null) { GameObject p = GameObject.Find("Player"); if (p != null) playerHealth = p.GetComponent<HealthComponent>(); }
             bool map = modes != null && modes.CurrentMode == GameMode.RtsMap;
+            UpdateAlarmButton();
 
             ResourceManager res = ResourceManager.Instance;
             int wood = res != null ? res.WoodCount : 0, ore = res != null ? res.OreCount : 0;

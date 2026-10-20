@@ -15,7 +15,8 @@ namespace BattleOfAges.InputSystem
         Equipment,
         Hero,
         Ability,
-        Ability2
+        Ability2,
+        Alarm
     }
 
     /// <summary>
@@ -36,7 +37,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.Equipment,       KeyCode.C },
             { KeyAction.Hero,            KeyCode.H },
             { KeyAction.Ability,         KeyCode.Q },
-            { KeyAction.Ability2,        KeyCode.R }
+            { KeyAction.Ability2,        KeyCode.R },
+            { KeyAction.Alarm,           KeyCode.T }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -50,7 +52,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.Equipment,       "Спорядження" },
             { KeyAction.Hero,            "Герой" },
             { KeyAction.Ability,         "Уміння класу" },
-            { KeyAction.Ability2,        "Друге вміння класу" }
+            { KeyAction.Ability2,        "Друге вміння класу" },
+            { KeyAction.Alarm,           "🔔 Тривога (захист поселення)" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

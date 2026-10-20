@@ -67,6 +67,7 @@ namespace BattleOfAges.RTS
         public bool IsWorking => currentDirective != GatherDirective.Idle;
 
         private HealthComponent healthComponent;
+        private bool interrupted;
 
         private void Awake()
         {
@@ -89,9 +90,19 @@ namespace BattleOfAges.RTS
         private void HandleDamageTaken(int damage)
         {
             // A soldier (no job) or a unit ordered to fight holds its ground
-            if (!IsWorking || (rtsUnit != null && rtsUnit.HasAttackTarget)) return;
+            if (!IsWorking || rtsUnit == null || rtsUnit.HasAttackTarget || healthComponent == null || !healthComponent.IsAlive) return;
 
-            // Self-preservation: a worker drops its job and flees towards the base chest
+            // One kind of unit: a worker fights back whoever hit it, while it is not badly hurt (docs/GAME_DESIGN.md §11.1)
+            CombatUnit attacker = healthComponent.LastAttacker;
+            HealthComponent attackerHp = attacker != null ? attacker.GetComponent<HealthComponent>() : null;
+            bool hurt = healthComponent.CurrentHealth < healthComponent.MaxHealth * GameBalance.WorkerFleeShare;
+            if (!hurt && attackerHp != null && attackerHp.IsAlive && !IsInsideMine)
+            {
+                rtsUnit.IssueAttackCommand(attackerHp);
+                return;
+            }
+
+            // Badly hurt: it drops its job and flees towards the base chest
             ClearCurrentTargets();
             Vector3 safePos = StorageChestNode.GetNearestChestDepositPosition(transform.position);
             if (rtsUnit != null)
@@ -232,8 +243,19 @@ namespace BattleOfAges.RTS
                 return;
             }
 
-            // Pause AI logic if worker is selected by player in RTS mode, or while it fights
-            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget)) return;
+            // Pause AI logic if worker is selected by player in RTS mode, while it fights or the alarm sounds;
+            // afterwards it looks for its work again (the fight took it away from where it was going)
+            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active))
+            {
+                if (!rtsUnit.IsSelected) interrupted = true;
+                return;
+            }
+            if (interrupted)
+            {
+                interrupted = false;
+                ClearCurrentTargets();
+                currentState = GathererState.FindingResource;
+            }
 
             if (currentState == GathererState.MovingToResource || currentState == GathererState.DeliveringToChest)
             {
