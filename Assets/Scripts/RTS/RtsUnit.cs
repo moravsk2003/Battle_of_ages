@@ -173,7 +173,7 @@ namespace BattleOfAges.RTS
                 if (engageTimer <= 0f)
                 {
                     engageTimer = EngageInterval;
-                    int enemy = UnitSpatialGrid.FindNearest(transform.position, EngageRadius, UnitSpatialGrid.TeamHostile);
+                    int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, EngageRadius, UnitSpatialGrid.TeamPlayer);
                     if (enemy >= 0) attackTarget = UnitSpatialGrid.Health(enemy);
                 }
             }

@@ -98,7 +98,7 @@ namespace BattleOfAges.Tests
         {
             NpcKingdom k = NpcKingdom.Found(Vector3.zero, "Test", 3, 10);
             k.SetHallLevel(1);
-            Assert.AreEqual(GameBalance.KingdomHallHealthPerLevel, k.Hall.MaxHealth);
+            Assert.AreEqual(GameBalance.TownHallHealth[1], k.Hall.MaxHealth);
             HostileMobAI king = k.King;
             k.Hall.TakeDamage(100000, ignoreArmor: true);
             Assert.IsTrue(k.IsDefeated);
@@ -167,6 +167,40 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(30, hero.Xp);
             Assert.AreEqual(HeroClass.Archer, hero.Class);
             Assert.AreEqual(0, hero.AttributePoints, "spent again its usual way");
+        }
+
+        [Test]
+        public void Kingdoms_AreEachTheirOwnSide_AndRaidEachOther()
+        {
+            NpcKingdom a = NpcKingdom.Found(Vector3.zero, "A", 0, 10);
+            NpcKingdom b = NpcKingdom.Found(new Vector3(300f, 0f, 0f), "B", 0, 10);
+            Assert.AreNotEqual(a.Team, b.Team);
+            Assert.IsTrue(UnitSpatialGrid.Hostile(a.Team, b.Team), "kings fight each other");
+            Assert.IsTrue(UnitSpatialGrid.Hostile(a.Team, UnitSpatialGrid.TeamPlayer), "and the player");
+            Assert.IsFalse(UnitSpatialGrid.Hostile(a.Team, UnitSpatialGrid.TeamHostile), "camps leave them alone");
+            Assert.IsFalse(UnitSpatialGrid.Hostile(a.Team, UnitSpatialGrid.TeamNeutral), "and wildlife");
+            Assert.AreEqual(a.Team, a.King.Team);
+
+            for (int i = 0; i < 6; i++) a.AddSubject(UnitRank.Warrior, a.Spot(), withModel: false);
+            Assert.IsTrue(a.ConsiderRaid(), "the nearest enemy is the other king");
+            Assert.IsTrue(new List<HealthComponent>(a.RaidTargets()).Contains(b.King.Health));
+        }
+
+        [Test]
+        public void HallHealth_GrowsWithItsLevel_PlayerAndKingAlike()
+        {
+            NpcKingdom k = NpcKingdom.Found(Vector3.zero, "Test", 0, 10);
+            k.SetHallLevel(3);
+            Assert.AreEqual(GameBalance.TownHallHealth[3], k.Hall.MaxHealth);
+            GameObject hall = Building.TownHall.CreatePrefab("TestHall");
+            extra.Add(hall);
+            Building.TownHall th = hall.GetComponent<Building.TownHall>();
+            HealthComponent hp = hall.GetComponent<HealthComponent>();
+            Assert.AreEqual(GameBalance.TownHallHealth[1], hp.MaxHealth);
+            hp.TakeDamage(hp.MaxHealth / 2, ignoreArmor: true);
+            th.Level = 3;
+            Assert.AreEqual(GameBalance.TownHallHealth[3], hp.MaxHealth);
+            Assert.AreEqual(hp.MaxHealth / 2, hp.CurrentHealth, 2, "the same share of HP");
         }
 
         /// <summary>The tempo of an NPC kingdom on its own (§10.3): people, hall and soldiers over a 60-minute session.</summary>

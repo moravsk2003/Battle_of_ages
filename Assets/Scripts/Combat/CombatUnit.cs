@@ -93,9 +93,8 @@ namespace BattleOfAges.Combat
         }
 
         /// <summary>Time from the start of a swing to the hit: a sword swing, a bow draw, the mage's cast.</summary>
-        /// <summary>Side in the unit grid (own units by default; hostile AI sets its own): bolts look for its enemies.</summary>
+        /// <summary>Side in the unit grid (own units by default; hostile AI sets its own): its arrows, bolts and spells look for the sides hostile to it (UnitSpatialGrid.Hostile).</summary>
         public int Team { get; set; } = RTS.UnitSpatialGrid.TeamPlayer;
-        public int EnemyTeam => Team == RTS.UnitSpatialGrid.TeamPlayer ? RTS.UnitSpatialGrid.TeamHostile : RTS.UnitSpatialGrid.TeamPlayer;
 
         public float Windup => FiresBolts ? GameBalance.MageWindup : IsRanged ? GameBalance.BowWindup : GameBalance.MeleeWindup;
 
@@ -138,7 +137,7 @@ namespace BattleOfAges.Combat
         private HealthComponent NextBehind(HealthComponent from, Vector3 line)
         {
             Vector3 at = from.transform.position;
-            int n = RTS.UnitSpatialGrid.Query(at, GameBalance.PierceReach, EnemyTeam, behind);
+            int n = RTS.UnitSpatialGrid.QueryEnemies(at, GameBalance.PierceReach, Team, behind);
             HealthComponent next = null; float best = float.MaxValue;
             for (int i = 0; i < n; i++)
             {

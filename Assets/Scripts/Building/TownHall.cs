@@ -32,7 +32,17 @@ namespace BattleOfAges.Building
         }
 
         [SerializeField, Range(1, MaxLevel)] private int level = 1;
-        public int Level { get => level; set => level = Mathf.Clamp(value, 1, MaxLevel); }
+        public int Level { get => level; set { level = Mathf.Clamp(value, 1, MaxLevel); ApplyLevelHealth(); } }
+
+        /// <summary>The hall's HP follows its level (GameBalance.TownHallHealth); the same share of it is kept.</summary>
+        private void ApplyLevelHealth()
+        {
+            HealthComponent hp = GetComponent<HealthComponent>();
+            if (hp == null || !hp.IsAlive) return;
+            float share = hp.MaxHealth > 0 ? (float)hp.CurrentHealth / hp.MaxHealth : 1f;
+            hp.InitializeHealth(GameBalance.TownHallHealth[level]);
+            hp.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(share * hp.MaxHealth)));
+        }
 
         public static int CapForLevel(int lvl) => GameBalance.TownHallCaps[Mathf.Clamp(lvl, 0, MaxLevel)];
         public static int PopulationCap => Current != null ? CapForLevel(Current.level) : CapWithoutHall;
@@ -76,6 +86,7 @@ namespace BattleOfAges.Building
                 rm.ConsumeOreAtLeast(tier, ore);
             }
             level++;
+            ApplyLevelHealth();
             StrategyHud.Notify($"Ратуша {ItemTypeNames.Roman(level)}: населення до {CapForLevel(level)}");
             return true;
         }

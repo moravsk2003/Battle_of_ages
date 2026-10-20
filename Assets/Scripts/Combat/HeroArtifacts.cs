@@ -83,8 +83,8 @@ namespace BattleOfAges.Combat
             else
             {
                 CombatUnit combat = GetComponent<CombatUnit>();
-                int enemy = UnitSpatialGrid.FindNearest(transform.position, GameBalance.LightningRange,
-                                                        combat != null ? combat.EnemyTeam : UnitSpatialGrid.TeamHostile);
+                int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, GameBalance.LightningRange,
+                                                        combat != null ? combat.Team : UnitSpatialGrid.TeamPlayer);
                 if (enemy < 0) { UI.StrategyHud.Notify("Немає ворога поблизу"); return false; }
                 HealthComponent target = UnitSpatialGrid.Health(enemy);
                 if (combat != null) combat.DeliverHit(target, GameBalance.LightningDamage, ignoreArmor: true);

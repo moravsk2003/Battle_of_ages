@@ -12,7 +12,7 @@ namespace BattleOfAges.Combat
     /// </summary>
     public static class BattleFront
     {
-        private const int Teams = 3; // UnitSpatialGrid.TeamPlayer, TeamHostile, TeamNeutral
+        private const int Teams = 64; // the player, camps, wildlife and the NPC kingdoms' sides (UnitSpatialGrid.TeamKingdomFirst..)
         private static readonly bool[] inBattle = new bool[Teams];
         private static readonly Vector3[] front = new Vector3[Teams];
         private static float nextCheck;
@@ -49,9 +49,8 @@ namespace BattleOfAges.Combat
                 if (!UnitSpatialGrid.IsAlive(id)) continue;
                 int team = UnitSpatialGrid.Team(id);
                 if (team == UnitSpatialGrid.TeamNeutral || team < 0 || team >= Teams) continue;
-                int enemyTeam = team == UnitSpatialGrid.TeamPlayer ? UnitSpatialGrid.TeamHostile : UnitSpatialGrid.TeamPlayer;
                 Vector3 p = UnitSpatialGrid.Position(id);
-                int enemy = UnitSpatialGrid.FindNearest(p, GameBalance.BattleRadius, enemyTeam);
+                int enemy = UnitSpatialGrid.FindNearestEnemy(p, GameBalance.BattleRadius, team);
                 if (enemy < 0) continue;
                 Vector3 to = UnitSpatialGrid.Position(enemy) - p;
                 to.y = 0f;

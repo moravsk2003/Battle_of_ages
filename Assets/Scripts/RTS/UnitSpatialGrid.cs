@@ -12,6 +12,19 @@ namespace BattleOfAges.RTS
     public static class UnitSpatialGrid
     {
         public const int TeamPlayer = 0, TeamHostile = 1, TeamNeutral = 2;
+        /// <summary>NPC kingdoms get their own sides from here up: each one is its own side (docs/GAME_DESIGN.md §12.1).</summary>
+        public const int TeamKingdomFirst = 3;
+
+        /// <summary>
+        /// Do these sides fight? Wildlife (neutral) fights nobody; camps (TeamHostile) and NPC kingdoms leave each other
+        /// alone and both fight the player; NPC kingdoms fight each other.
+        /// </summary>
+        public static bool Hostile(int a, int b)
+        {
+            if (a == b || a < 0 || b < 0 || a == TeamNeutral || b == TeamNeutral) return false;
+            if ((a == TeamHostile && b >= TeamKingdomFirst) || (b == TeamHostile && a >= TeamKingdomFirst)) return false;
+            return true;
+        }
 
         private const float CellSize = 4f;
         private const int TableSize = 4096; // power of two
@@ -96,6 +109,51 @@ namespace BattleOfAges.RTS
                 }
             }
             return best;
+        }
+
+        /// <summary>Nearest living enemy of this side (Hostile) within maxDistance (ground distance), or -1.</summary>
+        public static int FindNearestEnemy(Vector3 point, float maxDistance, int myTeam, int excludeId = -1)
+        {
+            EnsureBuilt();
+            int best = -1;
+            float bestSqr = maxDistance * maxDistance;
+            int r = Mathf.CeilToInt(maxDistance / CellSize);
+            int cx = Cell(point.x), cz = Cell(point.z);
+            for (int dz = -r; dz <= r; dz++)
+            for (int dx = -r; dx <= r; dx++)
+            {
+                for (int id = cellHead[Hash(cx + dx, cz + dz)]; id >= 0; id = next[id])
+                {
+                    if (id == excludeId || !Hostile(teams[id], myTeam) || !IsAlive(id)) continue;
+                    Vector3 d = positions[id] - point;
+                    float sqr = d.x * d.x + d.z * d.z;
+                    if (sqr < bestSqr) { bestSqr = sqr; best = id; }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Living enemies of this side (Hostile) within radius into buffer; returns the count.</summary>
+        public static int QueryEnemies(Vector3 point, float radius, int myTeam, int[] buffer, int excludeId = -1)
+        {
+            EnsureBuilt();
+            int count = 0;
+            float sqrR = radius * radius;
+            int r = Mathf.CeilToInt(radius / CellSize);
+            int cx = Cell(point.x), cz = Cell(point.z);
+            for (int dz = -r; dz <= r; dz++)
+            for (int dx = -r; dx <= r; dx++)
+            {
+                for (int id = cellHead[Hash(cx + dx, cz + dz)]; id >= 0; id = next[id])
+                {
+                    if (id == excludeId || !Hostile(teams[id], myTeam) || !IsAlive(id)) continue;
+                    Vector3 d = positions[id] - point;
+                    if (d.x * d.x + d.z * d.z > sqrR) continue;
+                    buffer[count++] = id;
+                    if (count == buffer.Length) return count;
+                }
+            }
+            return count;
         }
 
         /// <summary>Living agents within radius (any team when team &lt; 0) into buffer; returns the count.</summary>

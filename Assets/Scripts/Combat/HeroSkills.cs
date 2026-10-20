@@ -125,7 +125,7 @@ namespace BattleOfAges.Combat
                         readyAt[slot] = Time.time + GameBalance.FireFanCooldown;
                         return true;
                     }
-                    int enemy = UnitSpatialGrid.FindNearest(transform.position, Combat.AttackRange, Combat.EnemyTeam);
+                    int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, Combat.AttackRange, Combat.Team);
                     if (enemy < 0) return false;
                     Vector3 spot = UnitSpatialGrid.Position(enemy);
                     CastLikeAnAttack(() => MeteorStrike.Drop(Combat, spot));
@@ -164,7 +164,7 @@ namespace BattleOfAges.Combat
             forward.y = 0f;
             forward = forward.sqrMagnitude > 1e-4f ? forward.normalized : transform.forward;
             float range = Combat.AttackRange;
-            int n = UnitSpatialGrid.Query(transform.position, range, Combat.EnemyTeam, found); // the caster's enemies, whichever side it is on
+            int n = UnitSpatialGrid.QueryEnemies(transform.position, range, Combat.Team, found); // the caster's enemies, whichever side it is on
             int hits = 0;
             for (int i = 0; i < n; i++)
             {

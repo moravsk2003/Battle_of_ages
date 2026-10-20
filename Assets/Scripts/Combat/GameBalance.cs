@@ -146,6 +146,8 @@ namespace BattleOfAges.Combat
         public static int[] TownHallWood = { 0, 10, 30, 60, 100, 160 };
         /// <summary>Ore pieces for the same steps; the minimum ore tier is level - 1.</summary>
         public static int[] TownHallOre = { 0, 5, 10, 12, 15, 20 };
+        /// <summary>HP of the hall of level I..V, the player's and an NPC king's alike (index 0: no hall; an NPC camp cannot be destroyed).</summary>
+        public static int[] TownHallHealth = { 0, 1500, 2250, 3000, 3750, 4500 };
 
         // ------------------------------------------------------------------ NPC kingdoms (§12, M0)
 
@@ -168,8 +170,6 @@ namespace BattleOfAges.Combat
         public static float KingdomRaidPowerRatio = 1.5f, KingdomFirstRaidHours = 8f, KingdomRaidCooldownHours = 4f, KingdomGarrisonShare = 0.3f, KingdomRaidRetreatLosses = 0.5f;
         /// <summary>Raiders look for something to fight this far from where they are; the guards of a target count within GuardRadius.</summary>
         public static float KingdomRaidSearchRadius = 40f, KingdomGuardRadius = 40f;
-        /// <summary>HP of an NPC hall of level I..V (level 0 is a camp fire that cannot be destroyed).</summary>
-        public static int KingdomHallHealthPerLevel = 1000;
         public static int KingdomHallRoom = 2;
     }
 }

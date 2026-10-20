@@ -60,7 +60,7 @@ namespace BattleOfAges.Combat
         private HealthComponent NextTarget()
         {
             if (caster == null) return null;
-            int id = RTS.UnitSpatialGrid.FindNearest(transform.position, caster.AttackRange, caster.EnemyTeam);
+            int id = RTS.UnitSpatialGrid.FindNearestEnemy(transform.position, caster.AttackRange, caster.Team);
             return id >= 0 ? RTS.UnitSpatialGrid.Health(id) : null;
         }
 

@@ -103,7 +103,7 @@ namespace BattleOfAges.Building
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
                 Size = new Vector3(5.6f, 5.0f, 5.6f),
-                MaxHealth = 1500
+                MaxHealth = GameBalance.TownHallHealth[1] // grows with the level (TownHall)
             }
         };
 

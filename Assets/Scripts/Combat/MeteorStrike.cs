@@ -52,7 +52,7 @@ namespace BattleOfAges.Combat
         {
             if (caster == null) return 0;
             int damage = Mathf.RoundToInt(caster.AttackDamage * GameBalance.MeteorDamageFactor);
-            int n = UnitSpatialGrid.Query(spot, GameBalance.MeteorRadius, caster.EnemyTeam, found);
+            int n = UnitSpatialGrid.QueryEnemies(spot, GameBalance.MeteorRadius, caster.Team, found);
             int hits = 0;
             for (int i = 0; i < n; i++)
             {

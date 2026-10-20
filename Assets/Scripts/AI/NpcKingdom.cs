@@ -30,10 +30,15 @@ namespace BattleOfAges.AI
         public static event Action<NpcKingdom, HealthComponent> RaidStarted;
 
         public string KingdomName = "Королівство";
-        /// <summary>Its side in the unit grid: hostile to the player (an NPC king), or the player's (a kingdom on the player's side, the session sim).</summary>
-        public int Team { get; private set; } = UnitSpatialGrid.TeamHostile;
-        public int EnemyTeam => Team == UnitSpatialGrid.TeamHostile ? UnitSpatialGrid.TeamPlayer : UnitSpatialGrid.TeamHostile;
-        public bool AgainstPlayer => Team == UnitSpatialGrid.TeamHostile;
+        /// <summary>
+        /// Its side in the unit grid: an NPC kingdom is its own side (UnitSpatialGrid.TeamKingdomFirst..), at war with the
+        /// player and every other kingdom (docs/GAME_DESIGN.md §12.1); a kingdom on the player's side (the session sim) is TeamPlayer.
+        /// </summary>
+        public int Team { get; private set; } = UnitSpatialGrid.TeamKingdomFirst;
+        public bool AgainstPlayer => Team != UnitSpatialGrid.TeamPlayer;
+        private static int nextTeam = UnitSpatialGrid.TeamKingdomFirst;
+        /// <summary>A side of its own for a new NPC kingdom.</summary>
+        private static int NewSide() => nextTeam++;
         public readonly KingdomEconomy Economy = new KingdomEconomy();
         public HostileMobAI King { get; private set; }
         public bool IsDefeated { get; private set; }
@@ -68,7 +73,7 @@ namespace BattleOfAges.AI
         private void OnDestroy() { if (hallGridId >= 0) UnitSpatialGrid.Unregister(hallGridId); }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { all.Clear(); Defeated = null; RaidStarted = null; }
+        private static void ResetStatics() { all.Clear(); nextTeam = UnitSpatialGrid.TeamKingdomFirst; Defeated = null; RaidStarted = null; }
 
         // ------------------------------------------------------------------ founding
 
@@ -81,7 +86,7 @@ namespace BattleOfAges.AI
             NpcKingdom k = root.AddComponent<NpcKingdom>();
             if (!all.Contains(k)) all.Add(k); // (OnEnable does not run in edit mode)
             k.KingdomName = name;
-            if (team >= 0) k.Team = team;
+            k.Team = team >= 0 ? team : NewSide();
             k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * Random.Range(1f, 2f);
             k.Economy.Wood = wood >= 0 ? wood : GameBalance.KingdomStartWood;
             k.BuildHall();
@@ -207,7 +212,7 @@ namespace BattleOfAges.AI
             if (Economy.HallLevel > 0)
             {
                 float share = Hall.MaxHealth > 0 && Hall.CurrentHealth > 0 ? (float)Hall.CurrentHealth / Hall.MaxHealth : 1f;
-                Hall.InitializeHealth(GameBalance.KingdomHallHealthPerLevel * Economy.HallLevel);
+                Hall.InitializeHealth(GameBalance.TownHallHealth[Economy.HallLevel]);
                 Hall.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(share * Hall.MaxHealth)));
                 if (hallGridId < 0) hallGridId = UnitSpatialGrid.Register(this, Hall, Team, 2.5f); // its enemies can storm it
             }
@@ -353,22 +358,16 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>
-        /// What a raid would go after, the nearest of: an enemy kingdom's hall (its king or people while it has no hall),
+        /// What a raid could go after, nearest first: every enemy kingdom's hall (its king or people while it has no hall),
         /// and against the player the player's hall, or else the player's hero.
         /// </summary>
-        public HealthComponent RaidTarget()
+        public List<HealthComponent> RaidTargets()
         {
-            HealthComponent best = null;
-            float bestD = float.MaxValue;
-            void Consider(HealthComponent h)
-            {
-                if (h == null || !h.IsAlive) return;
-                float d = (h.transform.position - Home).sqrMagnitude;
-                if (d < bestD) { best = h; bestD = d; }
-            }
+            var targets = new List<HealthComponent>();
+            void Consider(HealthComponent h) { if (h != null && h.IsAlive) targets.Add(h); }
             foreach (NpcKingdom k in all)
             {
-                if (k == null || k == this || k.IsDefeated || k.Team != EnemyTeam) continue;
+                if (k == null || k == this || k.IsDefeated || !UnitSpatialGrid.Hostile(k.Team, Team)) continue;
                 if (k.Economy.HallLevel > 0) Consider(k.Hall);
                 else if (k.King != null && k.King.Health.IsAlive) Consider(k.King.Health);
                 else if (k.Population > 0) Consider(k.subjects[0].Health);
@@ -379,14 +378,15 @@ namespace BattleOfAges.AI
                 HealthComponent h = hall != null ? hall.GetComponent<HealthComponent>() : null;
                 Consider(h != null && h.IsAlive ? h : PlayerHero());
             }
-            return best;
+            targets.Sort((a, b) => (a.transform.position - Home).sqrMagnitude.CompareTo((b.transform.position - Home).sqrMagnitude));
+            return targets;
         }
 
-        /// <summary>What guards this place: the enemy's units (and the player's hero) near it.</summary>
+        /// <summary>What guards this place against this kingdom: its enemies' units (and the player's hero) near it.</summary>
         public List<HealthComponent> GuardsOf(Vector3 place)
         {
             var guards = new List<HealthComponent>();
-            int n = UnitSpatialGrid.Query(place, GameBalance.KingdomGuardRadius, EnemyTeam, buffer);
+            int n = UnitSpatialGrid.QueryEnemies(place, GameBalance.KingdomGuardRadius, Team, buffer);
             for (int i = 0; i < n; i++)
             {
                 HealthComponent h = UnitSpatialGrid.Health(buffer[i]);
@@ -398,18 +398,22 @@ namespace BattleOfAges.AI
             return guards;
         }
 
-        /// <summary>Sends a raid at the enemy when the party is strong enough for its guards; returns whether it went.</summary>
+        /// <summary>
+        /// Sends a raid at this target, or else at the nearest enemy its party is strong enough for (KingdomRaidPowerRatio
+        /// times its guards); returns whether it went.
+        /// </summary>
         public bool ConsiderRaid(HealthComponent target = null)
         {
-            if (target == null) target = RaidTarget();
-            if (target == null) return false;
             List<HostileMobAI> party = RaidParty();
             if (party.Count == 0) return false;
             float ours = PowerOf(party.ConvertAll(m => m.Health));
-            float theirs = PowerOf(GuardsOf(target.transform.position));
-            if (ours < GameBalance.KingdomRaidPowerRatio * theirs) return false;
-            StartRaid(party, target);
-            return true;
+            foreach (HealthComponent t in target != null ? new List<HealthComponent> { target } : RaidTargets())
+            {
+                if (ours < GameBalance.KingdomRaidPowerRatio * PowerOf(GuardsOf(t.transform.position))) continue;
+                StartRaid(party, t);
+                return true;
+            }
+            return false;
         }
 
         public void StartRaid(List<HostileMobAI> party, HealthComponent target)
@@ -510,7 +514,7 @@ namespace BattleOfAges.AI
 
         private HealthComponent NearestEnemyUnit(Vector3 from, float radius)
         {
-            int id = UnitSpatialGrid.FindNearest(from, radius, EnemyTeam);
+            int id = UnitSpatialGrid.FindNearestEnemy(from, radius, Team);
             if (id >= 0 && UnitSpatialGrid.Health(id) != null && UnitSpatialGrid.Health(id).IsAlive) return UnitSpatialGrid.Health(id);
             HealthComponent p = AgainstPlayer ? PlayerHero() : null;
             return p != null && (p.transform.position - from).sqrMagnitude <= radius * radius ? p : null;
@@ -546,6 +550,7 @@ namespace BattleOfAges.AI
                 Kill(k.gameObject);
             }
             all.Clear();
+            nextTeam = UnitSpatialGrid.TeamKingdomFirst;
         }
 
         private static SaveLoad.SubjectSave SaveOf(HostileMobAI m)
@@ -587,6 +592,7 @@ namespace BattleOfAges.AI
             NpcKingdom k = root.AddComponent<NpcKingdom>();
             if (!all.Contains(k)) all.Add(k);
             k.KingdomName = s.Name;
+            k.Team = NewSide();
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
             k.Age = s.Age;
             k.BuildHall();

@@ -96,15 +96,14 @@ namespace BattleOfAges.AI
         private Item[] subjectKit;
         private bool subjectHero;
         private int team = UnitSpatialGrid.TeamHostile;
-        /// <summary>Its side: hostile to the player (camps, raiders, NPC kings), or the player's (a kingdom on the player's side).</summary>
+        /// <summary>Its side: camps and raiders (TeamHostile), an NPC kingdom's own side, or the player's (a kingdom on the player's side).</summary>
         public int Team
         {
             get => team;
             set { if (team == value) return; team = value; RefreshGridTeam(); }
         }
         protected override int GridTeam => team;
-        private int EnemySide => team == UnitSpatialGrid.TeamHostile ? UnitSpatialGrid.TeamPlayer : UnitSpatialGrid.TeamHostile;
-        private bool AgainstPlayer => team == UnitSpatialGrid.TeamHostile;
+        private bool AgainstPlayer => team != UnitSpatialGrid.TeamPlayer; // camps and NPC kingdoms
 
         /// <summary>The NPC kingdom this unit lives in (null: a mob of a camp or a deserter).</summary>
         public NpcKingdom Kingdom { get; set; }
@@ -205,7 +204,7 @@ namespace BattleOfAges.AI
         public HealthComponent FindNearestTarget()
         {
             // 1. High Priority: Vulnerable Player Villagers / Gatherers / soldiers (spatial grid: constant cost per query)
-            int nearest = UnitSpatialGrid.FindNearest(transform.position, aggroRadius, EnemySide);
+            int nearest = UnitSpatialGrid.FindNearestEnemy(transform.position, aggroRadius, team);
             if (nearest >= 0)
             {
                 HealthComponent unitHp = UnitSpatialGrid.Health(nearest);
