@@ -129,6 +129,8 @@ namespace BattleOfAges.RTS
         }
 
         public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
+        /// <summary>Works in a mine (inside, or on the way in): the job window leaves it there; the mine's button brings it out.</summary>
+        public bool IsMiner => assignedMine != null;
         public MineNode AssignedMine => assignedMine;
 
         /// <summary>Puts the worker straight inside the mine (a loaded save).</summary>
@@ -371,7 +373,7 @@ namespace BattleOfAges.RTS
 
             if (currentDirective == GatherDirective.HaulOreFromMineToChest)
             {
-                // Directive is strictly hauling from mine, stay idle if no mine has ore
+                WaitAtMine(myPos);
                 return;
             }
 
@@ -488,6 +490,31 @@ namespace BattleOfAges.RTS
             {
                 currentState = GathererState.FindingResource;
             }
+        }
+
+        private float haulWaitTimer;
+
+        /// <summary>
+        /// A hauler with no ore anywhere waits by the nearest mine's door (a player report: the haulers stood wherever
+        /// they were, as if gone), each at its own spot, and takes the ore as soon as there is some.
+        /// </summary>
+        private void WaitAtMine(Vector3 myPos)
+        {
+            haulWaitTimer -= Time.deltaTime;
+            if (haulWaitTimer > 0f) return;
+            haulWaitTimer = 1f;
+            MineNode nearest = null;
+            float best = float.MaxValue;
+            foreach (MineNode m in MineNode.ActiveMines)
+            {
+                if (m == null || !m.gameObject.activeInHierarchy) continue;
+                float d = (m.transform.position - myPos).sqrMagnitude;
+                if (d < best) { best = d; nearest = m; }
+            }
+            if (nearest == null || rtsUnit == null) return;
+            float a = (GetInstanceID() & 1023) * 0.37f;
+            Vector3 spot = nearest.GetOutputDepositPosition() + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 2.5f;
+            if ((spot - myPos).sqrMagnitude > 2.5f * 2.5f) rtsUnit.IssueMoveCommand(spot);
         }
 
         private void HandleMovingToMineState()

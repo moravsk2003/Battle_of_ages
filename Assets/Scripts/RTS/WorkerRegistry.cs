@@ -16,6 +16,9 @@ namespace BattleOfAges.RTS
         public static int WorkerCount => activeWorkers.Count;
         /// <summary>Units with a job (soldiers on stand-by are not counted): what the job window distributes.</summary>
         public static int WorkingCount { get { int n = 0; foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking) n++; return n; } }
+        /// <summary>Units with a job outside the mines: the miners stay at the mine until its button sends them out (a player report: the job window pulled them out).</summary>
+        public static int DistributableCount { get { int n = 0; foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking && !w.IsMiner) n++; return n; } }
+        public static int MinerCount { get { int n = 0; foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsMiner) n++; return n; } }
 
         public static void Register(NpcResourceGatherer worker)
         {
@@ -39,7 +42,7 @@ namespace BattleOfAges.RTS
             for (int i = 0; i < count; i++)
             {
                 NpcResourceGatherer worker = activeWorkers[i];
-                if (worker != null && worker.IsWorking && worker.gameObject.activeInHierarchy)
+                if (worker != null && worker.IsWorking && !worker.IsMiner && worker.gameObject.activeInHierarchy)
                 {
                     worker.SetGatherDirective(directive);
                 }
@@ -51,7 +54,7 @@ namespace BattleOfAges.RTS
             int count = 0;
             for (int i = 0; i < activeWorkers.Count; i++)
             {
-                if (activeWorkers[i] != null && activeWorkers[i].gameObject.activeInHierarchy)
+                if (activeWorkers[i] != null && !activeWorkers[i].IsMiner && activeWorkers[i].gameObject.activeInHierarchy)
                 {
                     if (activeWorkers[i].CurrentDirective == directive) count++;
                 }
@@ -61,11 +64,11 @@ namespace BattleOfAges.RTS
 
         private static readonly List<NpcResourceGatherer> workingBuffer = new List<NpcResourceGatherer>(64);
 
-        /// <summary>Splits the units that have a job between the jobs (soldiers on stand-by keep standing by).</summary>
+        /// <summary>Splits the units that have a job between the jobs (soldiers on stand-by keep standing by, miners keep mining).</summary>
         public static void ApplyJobDistribution(int branchesCount, int chopCount, int pebblesCount, int haulCount, int autoCount)
         {
             workingBuffer.Clear();
-            foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking) workingBuffer.Add(w);
+            foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking && !w.IsMiner) workingBuffer.Add(w);
 
             int index = 0;
             index = Assign(index, branchesCount, GatherDirective.WoodGatherBranchesOnly);
