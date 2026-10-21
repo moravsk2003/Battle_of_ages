@@ -1,16 +1,19 @@
 Shader "Custom/GrassBlades"
 {
-    // GPU-instanced grass clumps drawn by GrassFieldRenderer. Colour follows the terrain shader's grass tone
-    // (same biome tint and noise fields) so blades grow out of the ground seamlessly; tips are lighter, wind
-    // sways the upper part, blades shrink into the ground towards the edge of the draw radius.
+    // GPU-instanced grass clumps and wild flowers drawn by GrassFieldRenderer. Colour follows the terrain shader's
+    // grass tone (same biome tint and noise fields) so blades grow out of the ground seamlessly; tips are lighter,
+    // some clumps are dry, wind sways the upper part, blades shrink into the ground towards the edge of the draw
+    // radius. Everything but the shadow is worked out per vertex (the noise is the same for the whole clump), so a
+    // pixel costs one shadow lookup: grass covers half the screen, and an integrated GPU has to fill it.
     Properties
     {
         _BiomeTint ("Biome Tint (set by script)", Color) = (0.35, 0.55, 0.22, 1)
         _TipColor ("Tip Highlight", Color) = (0.80, 0.86, 0.45, 1)
+        _DryColor ("Dry Clumps", Color) = (0.78, 0.70, 0.36, 1)
         _WindStrength ("Wind Strength", Float) = 0.14
         _WindSpeed ("Wind Speed", Float) = 1.7
-        _FadeStart ("Fade Start Distance", Float) = 28
-        _FadeEnd ("Fade End Distance", Float) = 38
+        _FadeStart ("Fade Start Distance (set by script)", Float) = 28
+        _FadeEnd ("Fade End Distance (set by script)", Float) = 38
         _Translucency ("Back-light Translucency", Range(0, 1)) = 0.35
     }
 
@@ -36,7 +39,7 @@ Shader "Custom/GrassBlades"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _BiomeTint, _TipColor;
+                float4 _BiomeTint, _TipColor, _DryColor;
                 float _WindStrength, _WindSpeed, _FadeStart, _FadeEnd, _Translucency;
             CBUFFER_END
 
@@ -44,7 +47,8 @@ Shader "Custom/GrassBlades"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
-                float4 color : COLOR;     // r: height along blade (0 root .. 1 tip), g: per-blade random
+                float4 color : COLOR;     // r: height along blade (0 root .. 1 tip), g: per-blade random,
+                                          // b: part (0 blade / stem, 0.5 flower centre, 1 petal), a: flower colour pick
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -52,10 +56,9 @@ Shader "Custom/GrassBlades"
             {
                 float4 positionCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
-                float3 normalWS : TEXCOORD1;
-                float2 bladeData : TEXCOORD2;
-                float3 rootWS : TEXCOORD3;
-                float fogFactor : TEXCOORD4;
+                half3 lit : TEXCOORD1;      // albedo x sun x (diffuse + back light): scaled by the shadow per pixel
+                half3 ambient : TEXCOORD2;
+                half fogFactor : TEXCOORD3;
             };
 
             // Same noise as Custom/StylizedTerrain so the grass tone matches the ground under it.
@@ -67,6 +70,14 @@ Shader "Custom/GrassBlades"
                 return lerp(lerp(hash21(i), hash21(i + float2(1, 0)), f.x), lerp(hash21(i + float2(0, 1)), hash21(i + float2(1, 1)), f.x), f.y);
             }
             float fbm3(float2 p) { return noise2D(p) * 0.55 + noise2D(p * 2.07 + 13.1) * 0.30 + noise2D(p * 4.13 + 71.7) * 0.15; }
+
+            float3 FlowerColour(float pick)
+            {
+                if (pick < 0.35) return float3(0.96, 0.94, 0.86);   // chamomile white
+                if (pick < 0.65) return float3(1.00, 0.80, 0.22);   // buttercup yellow
+                if (pick < 0.85) return float3(0.62, 0.46, 0.92);   // bellflower violet
+                return float3(0.92, 0.36, 0.30);                    // poppy red
+            }
 
             Varyings vert(Attributes input)
             {
@@ -90,40 +101,45 @@ Shader "Custom/GrassBlades"
                 posWS.z += sin(phase * 1.3) * bend * 0.5;
                 posWS.y -= abs(gust) * bend * 0.25;
 
+                // Ground tone (as in the terrain shader), then a lighter, slightly yellow tip; some clumps dry
+                float2 uv = rootWS.xz;
+                float m1 = fbm3(uv * 0.012);
+                float m2 = fbm3(uv * 0.05 + float2(31.7, 7.3));
+                float m3 = noise2D(uv * 0.33 + float2(5.1, 9.9));
+                float3 ground = _BiomeTint.rgb * lerp(0.78, 1.10, m1);
+                ground = lerp(ground, ground * float3(1.16, 1.07, 0.80), smoothstep(0.52, 0.78, m2) * 0.45);
+                ground *= lerp(0.86, 1.08, m3);
+                float dry = smoothstep(0.80, 0.97, hash21(floor(uv * 0.9) + 0.37)) * 0.55;
+                ground = lerp(ground, _DryColor.rgb * dot(ground, float3(0.4, 0.5, 0.1)) * 2.2, dry);
+                float3 albedo = ground * lerp(0.62, 1.0, saturate(h * 1.4));                        // darker at the root (AO)
+                albedo = lerp(albedo, _TipColor.rgb * ground * 2.0, smoothstep(0.55, 1.0, h) * 0.35);
+                albedo *= lerp(0.88, 1.12, input.color.g);                                           // per-blade variation
+                if (input.color.b > 0.25)                                                            // a flower head
+                {
+                    float3 petal = FlowerColour(frac(input.color.a + hash21(uv) * 0.3));
+                    albedo = input.color.b > 0.75 ? petal : float3(0.95, 0.72, 0.18) * 0.8;
+                }
+                float edge = smoothstep(_FadeStart * 0.6, _FadeEnd, dist);                         // towards the edge of the field
+                albedo = lerp(albedo, ground, edge * 0.85);                                          // the blades take the ground tone...
+
+                Light sun = GetMainLight();
+                float3 n = normalize(lerp(float3(0, 1, 0), TransformObjectToWorldNormal(input.normalOS), 0.45 * (1.0 - edge))); // ...and its light
+                float ndl = saturate(dot(n, sun.direction) * 0.6 + 0.4);
+                float3 viewDir = normalize(_WorldSpaceCameraPos.xyz - posWS);
+                float backLit = pow(saturate(dot(-viewDir, sun.direction)), 4.0) * _Translucency * h;
+
                 o.positionWS = posWS;
                 o.positionCS = TransformWorldToHClip(posWS);
-                o.normalWS = normalize(lerp(float3(0, 1, 0), TransformObjectToWorldNormal(input.normalOS), 0.35));
-                o.bladeData = input.color.rg;
-                o.rootWS = rootWS;
+                o.lit = albedo * sun.color * (ndl + backLit);
+                o.ambient = albedo * SampleSH(float3(0, 1, 0)) * lerp(0.55, 1.0, h);
                 o.fogFactor = ComputeFogFactor(o.positionCS.z);
                 return o;
             }
 
-            half4 frag(Varyings i, bool isFront : SV_IsFrontFace) : SV_Target
+            half4 frag(Varyings i) : SV_Target
             {
-                float2 uv = i.rootWS.xz;
-                float m1 = fbm3(uv * 0.012);
-                float m2 = fbm3(uv * 0.05 + float2(31.7, 7.3));
-                float m3 = noise2D(uv * 0.33 + float2(5.1, 9.9));
-
-                // Ground tone (as in the terrain shader), then a lighter, slightly yellow tip
-                float3 ground = _BiomeTint.rgb * lerp(0.78, 1.10, m1);
-                ground = lerp(ground, ground * float3(1.16, 1.07, 0.80), smoothstep(0.52, 0.78, m2) * 0.45);
-                ground *= lerp(0.86, 1.08, m3);
-                float h = i.bladeData.x;
-                float3 albedo = ground * lerp(0.62, 1.0, saturate(h * 1.4));                       // darker at the root (AO)
-                albedo = lerp(albedo, _TipColor.rgb * ground * 2.0, smoothstep(0.55, 1.0, h) * 0.35);
-                albedo *= lerp(0.88, 1.12, i.bladeData.y);                                           // per-blade variation
-
-                Light mainLight = GetMainLight(TransformWorldToShadowCoord(i.positionWS));
-                float3 n = normalize(i.normalWS);
-                float ndl = saturate(dot(n, mainLight.direction) * 0.6 + 0.4);
-                float3 viewDir = GetWorldSpaceNormalizeViewDir(i.positionWS);
-                float backLit = pow(saturate(dot(-viewDir, mainLight.direction)), 4.0) * _Translucency * h;
-                float shadow = mainLight.shadowAttenuation;
-
-                float3 color = albedo * mainLight.color * (ndl + backLit) * shadow;
-                color += albedo * SampleSH(float3(0, 1, 0)) * lerp(0.55, 1.0, h);
+                half shadow = MainLightRealtimeShadow(TransformWorldToShadowCoord(i.positionWS));
+                half3 color = i.lit * shadow + i.ambient;
                 color = MixFog(color, i.fogFactor);
                 return half4(color, 1.0);
             }

@@ -102,8 +102,9 @@ namespace BattleOfAges.Managers
                     a.mainLightShadowmapResolution = 1024;
                     a.maxAdditionalLightsCount = 1;
                     QualitySettings.lodBias = 0.8f;
-                    GrassFieldRenderer.DrawRadius = 22f;
-                    GrassFieldRenderer.Stride = 2;
+                    GrassFieldRenderer.DrawRadius = 24f;
+                    GrassFieldRenderer.NearRadius = 7f;
+                    GrassFieldRenderer.Stride = 1;
                     break;
                 case Level.Medium:
                     a.supportsHDR = true;
@@ -113,6 +114,7 @@ namespace BattleOfAges.Managers
                     a.maxAdditionalLightsCount = 2;
                     QualitySettings.lodBias = 1.3f;
                     GrassFieldRenderer.DrawRadius = 30f;
+                    GrassFieldRenderer.NearRadius = 10f;
                     GrassFieldRenderer.Stride = 1;
                     break;
                 default:
@@ -123,6 +125,7 @@ namespace BattleOfAges.Managers
                     a.maxAdditionalLightsCount = original.maxAdditionalLightsCount;
                     QualitySettings.lodBias = lodBiasBefore;
                     GrassFieldRenderer.DrawRadius = GrassFieldRenderer.FullDrawRadius;
+                    GrassFieldRenderer.NearRadius = GrassFieldRenderer.FullNearRadius;
                     GrassFieldRenderer.Stride = 1;
                     break;
             }
