@@ -311,7 +311,7 @@ namespace BattleOfAges.Building
             torchLight.color = new Color(1.0f, 0.72f, 0.28f);
             torchLight.intensity = 1.4f;
             torchLight.range = 6.0f;
-            torchLight.shadows = LightShadows.Soft;
+            torchLight.shadows = LightShadows.None; // a shadowed point light renders the scene six more times per wall (BuildingProbe)
 
             // Remove any unwanted loose child colliders except the main structural and ramp colliders
             BoxCollider wallCol = root.AddComponent<BoxCollider>();

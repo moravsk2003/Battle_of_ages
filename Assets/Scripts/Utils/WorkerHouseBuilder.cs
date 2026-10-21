@@ -39,21 +39,72 @@ namespace BattleOfAges.Utils
         private static readonly Vector3 IronS = new Vector3(3f, 0.75f, 0.4f);
         private static readonly Vector3 DarkS = new Vector3(1f, 0f, 0.05f);
 
-        private static Mesh mesh;
+        private static Mesh mesh, farMesh;
 
-        /// <summary>The cottage mesh (house space), built on first use.</summary>
+        /// <summary>The cottage mesh (house space), built on first use: ~21k triangles of beams, stones and thatch.</summary>
         public static Mesh Mesh => mesh != null ? mesh : (mesh = Build());
+        /// <summary>The same cottage as a few hundred triangles (walls, posts, gables, roof, chimney, door), for afar.</summary>
+        public static Mesh FarMesh => farMesh != null ? farMesh : (farMesh = BuildFar());
 
-        /// <summary>Adds the cottage model under the building root.</summary>
+        /// <summary>
+        /// Adds the cottage model under the building root: the full mesh near, the light one past ~30 m (a LODGroup;
+        /// a player report: "the houses load the PC" - every house drew all 21k triangles, and again in each shadow
+        /// cascade).
+        /// </summary>
         public static GameObject Attach(Transform root)
         {
             var go = new GameObject("HouseModel");
             go.transform.SetParent(root, false);
-            go.AddComponent<MeshFilter>().sharedMesh = Mesh;
+            Renderer near = Part(go.transform, "Near", Mesh);
+            Renderer far = Part(go.transform, "Far", FarMesh);
+            LODGroup lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(0.12f, new[] { near }), new LOD(0.004f, new[] { far }) });
+            lod.RecalculateBounds();
+            return go;
+        }
+
+        private static Renderer Part(Transform parent, string name, Mesh m)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = m;
             MeshRenderer mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = MeshKit.PropMaterial();
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-            return go;
+            return mr;
+        }
+
+        private static Mesh BuildFar()
+        {
+            kit = new MeshKit();
+            rng = new System.Random(4242);
+            B(new Vector3(0f, -0.06f, 0f), new Vector3(3.24f, 0.5f, 3.24f), Stone, StoneS, 0f);
+            B(new Vector3(0f, PlateTop * 0.5f, 0f), new Vector3(2 * W, PlateTop, 2 * D), Plaster, PlasterS, 0f, null, 0f,
+              p => Color.Lerp(Dirt, Plaster, Mathf.SmoothStep(0f, 1f, (p.y + 0.9f) / 0.9f)));
+            for (int i = 0; i < 4; i++)
+            {
+                float x = (i & 1) == 0 ? -1f : 1f, z = (i & 2) == 0 ? -1f : 1f;
+                B(new Vector3(x * (W + 0.02f), PlateTop * 0.5f, z * (D + 0.02f)), new Vector3(0.18f, PlateTop, 0.18f), Oak, WoodS, 0f);
+            }
+            B(new Vector3(0f, PlateTop - 0.07f, 0f), new Vector3(2 * W + 0.2f, 0.14f, 2 * D + 0.2f), Oak, WoodS, 0f);
+            B(new Vector3(0f, SillTop - 0.065f, 0f), new Vector3(2 * W + 0.2f, 0.13f, 2 * D + 0.2f), Oak, WoodS, 0f);
+            foreach (float x in new[] { -W, W }) // the gables
+                kit.Polygon(new[] { new Vector3(x, PlateTop, -D), new Vector3(x, PlateTop, D), new Vector3(x, Ridge, 0f) }, new Vector3(0f, PlateTop, 0f), PlasterS, _ => Plaster);
+            float c45 = Mathf.Sqrt(0.5f), U = (D + Eave) / c45;
+            foreach (float s in new[] { 1f, -1f }) // the thatch, one slab a side
+            {
+                Vector3 down = new Vector3(0f, -c45, s * c45), outN = new Vector3(0f, c45, s * c45);
+                Vector3 c = new Vector3(0f, Ridge, 0f) + down * (U * 0.5f - 0.05f) + outN * (Thatch * 0.5f);
+                B(c, new Vector3(2 * (W + Verge), Thatch, U + 0.1f), Straw, StrawS, 0f, Quaternion.LookRotation(down, outN), 0f,
+                  p => Color.Lerp(StrawOld, Straw, 0.5f + 0.5f * p.y));
+            }
+            B(new Vector3(0f, Ridge + Thatch * 0.75f, 0f), new Vector3(2 * (W + Verge), 0.22f, 0.3f), StrawOld, StrawS, 0f);
+            float top = Ridge + 0.62f;
+            B(new Vector3(0.78f, (top - 0.15f) * 0.5f, -(D + 0.27f)), new Vector3(0.62f, top + 0.15f, 0.48f), Stone, StoneS, 0f);
+            B(new Vector3(0f, (SillTop + 2.14f) * 0.5f, BeamFace - 0.02f), new Vector3(0.86f, 2.14f - SillTop, 0.06f), Plank, WoodS, 0f);
+            Mesh m = kit.ToMesh("WorkerHouseFar");
+            kit = null;
+            return m;
         }
 
         private static MeshKit kit;
