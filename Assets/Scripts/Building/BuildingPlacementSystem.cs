@@ -32,6 +32,8 @@ namespace BattleOfAges.Building
         private bool isPlacing = false;
 
         public bool IsPlacing => isPlacing;
+        /// <summary>The frame a placement was last cancelled (that Escape is not also the pause or the way out of the map).</summary>
+        public int CancelledFrame { get; private set; } = -1;
 
         private void Awake()
         {
@@ -121,6 +123,7 @@ namespace BattleOfAges.Building
 
         public void CancelPlacement()
         {
+            if (isPlacing) CancelledFrame = Time.frameCount;
             isPlacing = false;
             if (ghostPreview != null)
             {

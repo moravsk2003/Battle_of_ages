@@ -198,6 +198,16 @@ namespace BattleOfAges.UI
                     GameWindows.CloseAllModals();
                     return;
                 }
+                // Escape cancels a building being placed (BuildingPlacementSystem) and takes the map back to the first
+                // person view; only there it pauses
+                var placement = Building.BuildingPlacementSystem.Instance;
+                if (placement != null && (placement.IsPlacing || placement.CancelledFrame == Time.frameCount)) return;
+                if (!isPaused && gameModeManager != null && gameModeManager.CurrentMode == GameMode.RtsMap)
+                {
+                    gameModeManager.SetGameMode(GameMode.FirstPerson);
+                    return;
+                }
+
 
                 TogglePause();
             }

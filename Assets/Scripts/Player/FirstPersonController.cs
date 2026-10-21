@@ -91,13 +91,14 @@ namespace BattleOfAges.Player
 
         private void Update()
         {
-            if (!isControlEnabled || GameWindows.BlockGameplay) return;
-
-            HandleMovement();
-            HandleMouseLook();
+            // Gravity goes on while a window is open or the map is up (the player used to hang in the air); only the
+            // input stops. A pause freezes the time, so the fall too.
+            bool input = isControlEnabled && !GameWindows.BlockGameplay;
+            HandleMovement(input);
+            if (input) HandleMouseLook();
         }
 
-        private void HandleMovement()
+        private void HandleMovement(bool input)
         {
             isGrounded = characterController.isGrounded;
             if (isGrounded && velocity.y < 0f)
@@ -105,7 +106,7 @@ namespace BattleOfAges.Player
                 velocity.y = GROUND_STICK_FORCE;
             }
 
-            Vector2 inputMove = UniversalInput.GetMoveInput();
+            Vector2 inputMove = input ? UniversalInput.GetMoveInput() : Vector2.zero;
             Vector3 move = transform.right * inputMove.x + transform.forward * inputMove.y;
             
             if (move.sqrMagnitude > 1.0f)
@@ -118,7 +119,7 @@ namespace BattleOfAges.Player
             speed *= BattleFront.Factor(RTS.UnitSpatialGrid.TeamPlayer, move); // the pull of a battle
             characterController.Move(move * speed * Time.deltaTime);
 
-            if (UniversalInput.IsJumpPressed() && isGrounded)
+            if (input && UniversalInput.IsJumpPressed() && isGrounded)
             {
                 velocity.y = Mathf.Sqrt(jumpHeight * -2.0f * gravity);
             }
