@@ -71,7 +71,7 @@ namespace BattleOfAges.PlayModeTests
                 if (made.Count == 0) continue;
                 yield return null;
                 yield return null;
-                if (type == BuildingType.WorkerHouse || type == BuildingType.TownHall) Shot(Path.Combine(dir, $"buildings_{type}.png"));
+                Shot(Path.Combine(dir, $"buildings_{type}.png"));
                 if (type == BuildingType.WorkerHouse)
                 {
                     float bias = QualitySettings.lodBias;

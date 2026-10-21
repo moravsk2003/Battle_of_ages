@@ -128,6 +128,8 @@ namespace BattleOfAges.Resources
                 }
             }
 
+            StaticMeshMerger.Merge(visual, "StorageChest"); // 21 parts, 4 materials: 4 renderers
+
             BoxCollider col = root.AddComponent<BoxCollider>();
             col.center = new Vector3(0f, 0.55f, 0f);
             col.size = new Vector3(1.5f, 1.1f, 1.1f);

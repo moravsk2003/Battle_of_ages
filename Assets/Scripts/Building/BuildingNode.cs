@@ -326,6 +326,8 @@ namespace BattleOfAges.Building
                 }
             }
 
+            StaticMeshMerger.Merge(root, "CastleWall"); // 20 parts, 4 materials: 4 renderers (the torch light stays)
+
             return root;
         }
 
