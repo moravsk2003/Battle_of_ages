@@ -52,7 +52,7 @@ namespace BattleOfAges.UI
             RectTransform pr = (RectTransform)panel.transform;
             pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(1f, 1f);
             pr.anchoredPosition = new Vector2(-12f, -12f);
-            pr.sizeDelta = new Vector2(GraphFrames * 2f + 16f, GraphHeight + 84f);
+            pr.sizeDelta = new Vector2(GraphFrames * 2f + 16f, GraphHeight + 104f);
             Image bg = panel.AddComponent<Image>();
             bg.color = new Color(0f, 0f, 0f, 0.55f);
             bg.raycastTarget = false;
@@ -62,7 +62,7 @@ namespace BattleOfAges.UI
             RectTransform tr = (RectTransform)textObj.transform;
             tr.anchorMin = new Vector2(0f, 1f); tr.anchorMax = new Vector2(1f, 1f); tr.pivot = new Vector2(0.5f, 1f);
             tr.anchoredPosition = new Vector2(0f, -4f);
-            tr.sizeDelta = new Vector2(-16f, 74f);
+            tr.sizeDelta = new Vector2(-16f, 94f);
             label = textObj.AddComponent<Text>();
             label.font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             label.fontSize = 17;
@@ -112,7 +112,8 @@ namespace BattleOfAges.UI
             foreach (float t in hitchTimes) if (t > 0f && Time.unscaledTime - t < 10f) hitches++;
             label.text = $"<color={Grade(fps)}><b>FPS {fps:0}</b></color>  {avgMs:0.0} мс\n" +
                          $"найгірший кадр за 1 с: <color={GradeMs(worstMs)}>{worstMs:0.0} мс</color>\n" +
-                         $"лаги (>{HitchMs:0} мс) за 10 с: <color={(hitches > 0 ? "#ff5050" : "#7CFC7C")}>{hitches}</color>";
+                         $"лаги (>{HitchMs:0} мс) за 10 с: <color={(hitches > 0 ? "#ff5050" : "#7CFC7C")}>{hitches}</color>\n" +
+                         $"графіка: {BattleOfAges.Managers.GraphicsQuality.Names[(int)BattleOfAges.Managers.GraphicsQuality.Current]} · {BattleOfAges.Managers.GraphicsQuality.Scale * 100f:0}%";
             refreshTimer = 0f;
             accumulated = 0f;
             accumulatedFrames = 0;

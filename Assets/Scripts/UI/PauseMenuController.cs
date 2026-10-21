@@ -351,6 +351,7 @@ namespace BattleOfAges.UI
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.content = contentRect;
 
+            CreateGraphicsRow(contentObj.transform, font);
             // Create rows for each KeyAction
             foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
             {
@@ -386,7 +387,25 @@ namespace BattleOfAges.UI
 
         private void CreateKeybindRow(Transform parent, Font font, KeyAction action)
         {
-            GameObject rowObj = new GameObject($"Row_{action}", typeof(RectTransform));
+            KeyAction capturedAction = action;
+            keybindButtonTexts[action] = CreateRow(parent, font, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(capturedAction));
+        }
+
+        /// <summary>The graphics preset (GraphicsQuality): a click goes to the next one.</summary>
+        private void CreateGraphicsRow(Transform parent, Font font)
+        {
+            Text value = null;
+            value = CreateRow(parent, font, "Row_Graphics", "🖥 Графіка", () =>
+            {
+                GraphicsQuality.Cycle();
+                value.text = GraphicsQuality.Names[(int)GraphicsQuality.Current];
+            });
+            value.text = GraphicsQuality.Names[(int)GraphicsQuality.Current];
+        }
+
+        private static Text CreateRow(Transform parent, Font font, string name, string label, UnityEngine.Events.UnityAction onClick)
+        {
+            GameObject rowObj = new GameObject(name, typeof(RectTransform));
             rowObj.transform.SetParent(parent, false);
 
             LayoutElement element = rowObj.AddComponent<LayoutElement>();
@@ -400,7 +419,7 @@ namespace BattleOfAges.UI
             RectTransform labelRect = UiTheme.Child(rowObj.transform, "Label", new Vector2(0.03f, 0f), new Vector2(0.65f, 1f), Vector2.zero, Vector2.zero);
             GameObject labelObj = labelRect.gameObject;
 
-            Text labelTxt = UiTheme.PlainText(labelObj, font, 14, TextAnchor.MiddleLeft, Color.white, KeybindsManager.GetActionDisplayName(action), style: FontStyle.Bold);
+            Text labelTxt = UiTheme.PlainText(labelObj, font, 14, TextAnchor.MiddleLeft, Color.white, label, style: FontStyle.Bold);
 
             // Key Button
             RectTransform btnRect = UiTheme.Child(rowObj.transform, "KeyBtn", new Vector2(0.67f, 0.10f), new Vector2(0.97f, 0.90f), Vector2.zero, Vector2.zero);
@@ -410,15 +429,13 @@ namespace BattleOfAges.UI
             btnBg.color = new Color(0.18f, 0.35f, 0.55f, 0.95f);
 
             Button btn = btnObj.AddComponent<Button>();
-            KeyAction capturedAction = action;
-            btn.onClick.AddListener(() => StartRebinding(capturedAction));
+            btn.onClick.AddListener(onClick);
 
             RectTransform txtRect = UiTheme.Child(btnObj.transform, "Text", Vector2.zero, Vector2.one);
             GameObject txtObj = txtRect.gameObject;
 
             Text keyTxt = UiTheme.PlainText(txtObj, font, 15, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), style: FontStyle.Bold);
-
-            keybindButtonTexts[action] = keyTxt;
+            return keyTxt;
         }
 
         private void StartRebinding(KeyAction action)

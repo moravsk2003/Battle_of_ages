@@ -14,7 +14,10 @@ namespace BattleOfAges.World
     {
         private const float TileSize = 8f;
         private const float Spacing = 0.55f;
-        private const float DrawRadius = 38f;
+        public const float FullDrawRadius = 38f;
+        /// <summary>How far grass is drawn and every how-many-th clump (the graphics preset sets them, GraphicsQuality).</summary>
+        public static float DrawRadius = FullDrawRadius;
+        public static int Stride = 1;
         private const int BatchSize = 1023;
 
         private Material material;
@@ -76,7 +79,7 @@ namespace BattleOfAges.World
                         tileCache[key] = tile;
                     }
 
-                    for (int i = 0; i < tile.Length; i++)
+                    for (int i = 0; i < tile.Length; i += Stride)
                     {
                         batch[filled++] = tile[i];
                         if (filled == BatchSize)

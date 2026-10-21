@@ -49,6 +49,8 @@ namespace BattleOfAges.PlayModeTests
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
             yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);
+            string gfx = Environment.GetEnvironmentVariable("PERF_GRAPHICS"); // Low | Medium | High: measure a graphics preset
+            if (!string.IsNullOrEmpty(gfx)) BattleOfAges.Managers.GraphicsQuality.Apply((BattleOfAges.Managers.GraphicsQuality.Level)Enum.Parse(typeof(BattleOfAges.Managers.GraphicsQuality.Level), gfx));
 
             mainThread = ProfilerRecorder.StartNew(ProfilerCategory.Internal, "Main Thread", 15);
             gcAlloc = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "GC Allocated In Frame", 15);
