@@ -17,25 +17,32 @@ namespace BattleOfAges.Managers
             public const string FPS_SENSITIVITY = "Settings_FpsSensitivity";
             public const string MAP_SENSITIVITY = "Settings_MapSensitivity";
             public const string MASTER_VOLUME = "Settings_MasterVolume";
+            public const string MAP_ZOOM_SENSITIVITY = "Settings_MapZoomSensitivity";
         }
 
         public const float MIN_SENSITIVITY = 0.1f;
         public const float MAX_SENSITIVITY = 8.0f;
         public const float MIN_VOLUME = 0.0f;
         public const float MAX_VOLUME = 1.0f;
+        /// <summary>The map camera has its own top (it pans a whole map), and its wheel zoom its own speed.</summary>
+        public const float MAX_MAP_SENSITIVITY = 12.0f;
+        public const float MIN_ZOOM_SENSITIVITY = 0.2f, MAX_ZOOM_SENSITIVITY = 5.0f;
 
         [Header("Default Settings")]
         [SerializeField, Range(MIN_SENSITIVITY, MAX_SENSITIVITY)] private float defaultFpsSensitivity = 1.0f;
-        [SerializeField, Range(MIN_SENSITIVITY, MAX_SENSITIVITY)] private float defaultMapSensitivity = 1.0f;
+        [SerializeField, Range(MIN_SENSITIVITY, MAX_MAP_SENSITIVITY)] private float defaultMapSensitivity = 1.0f;
         [SerializeField, Range(MIN_VOLUME, MAX_VOLUME)] private float defaultMasterVolume = 1.0f;
+        [SerializeField, Range(MIN_ZOOM_SENSITIVITY, MAX_ZOOM_SENSITIVITY)] private float defaultZoomSensitivity = 1.0f;
 
         public float FpsSensitivity { get; private set; }
         public float MapSensitivity { get; private set; }
         public float MasterVolume { get; private set; }
+        public float ZoomSensitivity { get; private set; }
 
         public event Action<float> OnFpsSensitivityChanged;
         public event Action<float> OnMapSensitivityChanged;
         public event Action<float> OnMasterVolumeChanged;
+        public event Action<float> OnZoomSensitivityChanged;
 
         private bool isDirty = false;
 
@@ -67,6 +74,7 @@ namespace BattleOfAges.Managers
             FpsSensitivity = PlayerPrefs.GetFloat(PlayerPrefsKeys.FPS_SENSITIVITY, defaultFpsSensitivity);
             MapSensitivity = PlayerPrefs.GetFloat(PlayerPrefsKeys.MAP_SENSITIVITY, defaultMapSensitivity);
             MasterVolume = PlayerPrefs.GetFloat(PlayerPrefsKeys.MASTER_VOLUME, defaultMasterVolume);
+            ZoomSensitivity = PlayerPrefs.GetFloat(PlayerPrefsKeys.MAP_ZOOM_SENSITIVITY, defaultZoomSensitivity);
 
             AudioListener.volume = MasterVolume;
         }
@@ -85,7 +93,7 @@ namespace BattleOfAges.Managers
 
         public void SetMapSensitivity(float value)
         {
-            float clamped = Mathf.Clamp(value, MIN_SENSITIVITY, MAX_SENSITIVITY);
+            float clamped = Mathf.Clamp(value, MIN_SENSITIVITY, MAX_MAP_SENSITIVITY);
             if (Mathf.Approximately(MapSensitivity, clamped)) return;
 
             MapSensitivity = clamped;
@@ -93,6 +101,18 @@ namespace BattleOfAges.Managers
             isDirty = true;
 
             OnMapSensitivityChanged?.Invoke(MapSensitivity);
+        }
+
+        public void SetZoomSensitivity(float value)
+        {
+            float clamped = Mathf.Clamp(value, MIN_ZOOM_SENSITIVITY, MAX_ZOOM_SENSITIVITY);
+            if (Mathf.Approximately(ZoomSensitivity, clamped)) return;
+
+            ZoomSensitivity = clamped;
+            PlayerPrefs.SetFloat(PlayerPrefsKeys.MAP_ZOOM_SENSITIVITY, ZoomSensitivity);
+            isDirty = true;
+
+            OnZoomSensitivityChanged?.Invoke(ZoomSensitivity);
         }
 
         public void SetMasterVolume(float value)

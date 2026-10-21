@@ -122,9 +122,10 @@ namespace BattleOfAges.UI
             if (mapSensSlider != null)
             {
                 mapSensSlider.minValue = SettingsManager.MIN_SENSITIVITY;
-                mapSensSlider.maxValue = SettingsManager.MAX_SENSITIVITY;
+                mapSensSlider.maxValue = SettingsManager.MAX_MAP_SENSITIVITY;
                 mapSensSlider.value = SettingsManager.Instance.MapSensitivity;
                 mapSensSlider.onValueChanged.AddListener(OnMapSensChanged);
+                AddZoomSlider();
             }
 
             if (volumeSlider != null)
@@ -134,6 +135,42 @@ namespace BattleOfAges.UI
                 volumeSlider.value = SettingsManager.Instance.MasterVolume;
                 volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
             }
+        }
+
+        /// <summary>
+        /// The map's wheel zoom speed: a copy of the map row (label and slider) under it; the rows close up to make room
+        /// (the panel is laid out by SetupPauseMenuTool with three rows).
+        /// </summary>
+        private void AddZoomSlider()
+        {
+            Transform panel = settingsPanel != null ? settingsPanel.transform : null;
+            Transform mapLabel = panel != null ? panel.Find("MapLabel") : null;
+            if (mapLabel == null || panel.Find("ZoomSlider") != null) return;
+
+            void Place(string name, float y)
+            {
+                Transform t = panel.Find(name);
+                if (t is RectTransform rt) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
+            }
+            Place("FpsLabel", 120f); Place("FpsSensSlider", 90f);
+            Place("MapLabel", 40f); Place("MapSensSlider", 10f);
+            Place("VolLabel", -120f); Place("VolSlider", -150f);
+
+            GameObject label = Instantiate(mapLabel.gameObject, panel);
+            label.name = "ZoomLabel";
+            ((RectTransform)label.transform).anchoredPosition = new Vector2(((RectTransform)mapLabel).anchoredPosition.x, -40f);
+            Text text = label.GetComponent<Text>();
+            if (text != null) text.text = "Колесо миші на мапі (швидкість зуму):";
+
+            GameObject slider = Instantiate(mapSensSlider.gameObject, panel);
+            slider.name = "ZoomSlider";
+            ((RectTransform)slider.transform).anchoredPosition = new Vector2(((RectTransform)mapSensSlider.transform).anchoredPosition.x, -70f);
+            Slider zoom = slider.GetComponent<Slider>();
+            zoom.onValueChanged = new Slider.SliderEvent();
+            zoom.minValue = SettingsManager.MIN_ZOOM_SENSITIVITY;
+            zoom.maxValue = SettingsManager.MAX_ZOOM_SENSITIVITY;
+            zoom.value = SettingsManager.Instance.ZoomSensitivity;
+            zoom.onValueChanged.AddListener(v => SettingsManager.Instance?.SetZoomSensitivity(v));
         }
 
         private void SetupButtonListeners()

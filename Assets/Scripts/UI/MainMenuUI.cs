@@ -96,14 +96,15 @@ namespace BattleOfAges.UI
             Big(menu, "Налаштування", ref y, () => ShowSettings(true));
             Big(menu, "Вихід", ref y, Quit);
 
-            settings = UiTheme.Rect(root, "Settings", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(620f, 460f));
+            settings = UiTheme.Rect(root, "Settings", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(620f, 520f));
             UiTheme.PanelImage(settings);
             RectTransform st = UiTheme.Rect(settings, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(500f, 44f));
             UiTheme.Label(st, "Text", "Налаштування", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             SettingsManager sm = SettingsManager.Instance;
-            SliderRow(settings, "Чутливість миші (від першої особи)", -100f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_SENSITIVITY, sm != null ? sm.FpsSensitivity : 1f, v => SettingsManager.Instance?.SetFpsSensitivity(v));
-            SliderRow(settings, "Чутливість камери мапи", -190f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_SENSITIVITY, sm != null ? sm.MapSensitivity : 1f, v => SettingsManager.Instance?.SetMapSensitivity(v));
-            SliderRow(settings, "Гучність", -280f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MasterVolume : 1f, v => SettingsManager.Instance?.SetMasterVolume(v));
+            SliderRow(settings, "Чутливість миші (від першої особи)", -90f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_SENSITIVITY, sm != null ? sm.FpsSensitivity : 1f, v => SettingsManager.Instance?.SetFpsSensitivity(v));
+            SliderRow(settings, "Чутливість камери мапи", -165f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_MAP_SENSITIVITY, sm != null ? sm.MapSensitivity : 1f, v => SettingsManager.Instance?.SetMapSensitivity(v));
+            SliderRow(settings, "Колесо миші на мапі (швидкість зуму)", -240f, SettingsManager.MIN_ZOOM_SENSITIVITY, SettingsManager.MAX_ZOOM_SENSITIVITY, sm != null ? sm.ZoomSensitivity : 1f, v => SettingsManager.Instance?.SetZoomSensitivity(v));
+            SliderRow(settings, "Гучність", -315f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MasterVolume : 1f, v => SettingsManager.Instance?.SetMasterVolume(v));
             RectTransform kb = UiTheme.Rect(settings, "Keys", new Vector2(0.5f, 0f), new Vector2(0f, 88f), new Vector2(560f, 26f));
             UiTheme.Label(kb, "Text", "Клавіші можна перепризначити в грі: Esc → Налаштування", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             UiTheme.TextButton(settings, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(220f, 52f), () => ShowSettings(false), 20);

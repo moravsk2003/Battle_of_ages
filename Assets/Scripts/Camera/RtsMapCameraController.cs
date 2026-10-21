@@ -21,12 +21,17 @@ namespace BattleOfAges.CameraSystem
         [Header("Pan Configuration")]
         [SerializeField] private float panSpeed = 28.0f;
         [SerializeField] private float dragSensitivity = 1.0f;
+        /// <summary>The settings slider at 1 moves the map this many times the old base (the base felt slow).</summary>
+        public const float SensitivityBase = 2.5f;
+        /// <summary>World units per screen pixel of a right-button drag at sensitivity 1 and the reference zoom (as the old drag at 60 FPS).</summary>
+        private const float DragPerPixel = 1f / 60f;
         [SerializeField] private float smoothTime = 0.05f;
 
         [Header("Zoom Configuration")]
         [SerializeField] private float minZoom = 10.0f;
         [SerializeField] private float maxZoom = 100.0f;
         [SerializeField] private float zoomSensitivity = 10.0f;
+        private float zoomSetting = 1.0f; // the wheel speed from the settings
 
         [Header("Rotation & Angle Configuration")]
         [SerializeField] private float rotationSpeed = 90.0f;
@@ -60,8 +65,10 @@ namespace BattleOfAges.CameraSystem
         {
             if (SettingsManager.Instance != null)
             {
-                dragSensitivity = SettingsManager.Instance.MapSensitivity;
+                dragSensitivity = SettingsManager.Instance.MapSensitivity * SensitivityBase;
+                zoomSetting = SettingsManager.Instance.ZoomSensitivity;
                 SettingsManager.Instance.OnMapSensitivityChanged += OnSensitivityChanged;
+                SettingsManager.Instance.OnZoomSensitivityChanged += OnZoomChanged;
             }
         }
 
@@ -70,13 +77,16 @@ namespace BattleOfAges.CameraSystem
             if (SettingsManager.Instance != null)
             {
                 SettingsManager.Instance.OnMapSensitivityChanged -= OnSensitivityChanged;
+                SettingsManager.Instance.OnZoomSensitivityChanged -= OnZoomChanged;
             }
         }
 
         private void OnSensitivityChanged(float newSensitivity)
         {
-            dragSensitivity = newSensitivity;
+            dragSensitivity = newSensitivity * SensitivityBase;
         }
+
+        private void OnZoomChanged(float value) => zoomSetting = value;
 
         private void Update()
         {
@@ -126,7 +136,7 @@ namespace BattleOfAges.CameraSystem
                 Vector3 moveDir = yawRotation * new Vector3(moveInput.x, 0f, moveInput.y).normalized;
 
                 float zoomScale = mapCamera.orthographicSize / BASE_ZOOM_REF;
-                targetPosition += moveDir * panSpeed * dragSensitivity * zoomScale * Time.deltaTime;
+                targetPosition += moveDir * panSpeed * (dragSensitivity / SensitivityBase) * zoomScale * Time.deltaTime; // the keys keep their speed
                 ClampTargetPosition();
             }
         }
@@ -146,7 +156,8 @@ namespace BattleOfAges.CameraSystem
                 float zoomScale = mapCamera.orthographicSize / BASE_ZOOM_REF;
 
                 Quaternion yawRotation = Quaternion.Euler(0f, currentYaw, 0f);
-                Vector3 move = yawRotation * new Vector3(-delta.x, 0f, -delta.y) * dragSensitivity * zoomScale * Time.deltaTime;
+                // the mouse moved this far since the last frame: no x deltaTime (that made the drag slower the higher the FPS)
+                Vector3 move = yawRotation * new Vector3(-delta.x, 0f, -delta.y) * dragSensitivity * zoomScale * DragPerPixel;
                 targetPosition += move;
                 lastMousePosition = currentMousePos;
 
@@ -160,7 +171,7 @@ namespace BattleOfAges.CameraSystem
             if (Mathf.Abs(scroll) > 0.001f)
             {
                 float zoomScale = mapCamera.orthographicSize / (BASE_ZOOM_REF * 0.5f);
-                mapCamera.orthographicSize -= scroll * zoomSensitivity * zoomScale;
+                mapCamera.orthographicSize -= scroll * zoomSensitivity * zoomSetting * zoomScale;
                 mapCamera.orthographicSize = Mathf.Clamp(mapCamera.orthographicSize, minZoom, maxZoom);
             }
         }
