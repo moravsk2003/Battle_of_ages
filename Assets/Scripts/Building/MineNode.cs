@@ -314,6 +314,8 @@ namespace BattleOfAges.Building
                 if (childCol != col) DestroyImmediate(childCol);
             }
 
+            StaticMeshMerger.Merge(root, "Mine"); // 11 parts, 4 materials: 4 renderers
+
             return root;
         }
     }

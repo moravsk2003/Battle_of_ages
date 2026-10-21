@@ -290,6 +290,8 @@ namespace BattleOfAges.Crafting
                 if (childCol != col) DestroyImmediate(childCol);
             }
 
+            StaticMeshMerger.Merge(root, "Workbench"); // 8 parts, one renderer per material
+
             return root;
         }
     }
