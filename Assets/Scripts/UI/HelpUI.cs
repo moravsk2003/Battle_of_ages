@@ -1,0 +1,144 @@
+using UnityEngine;
+using BattleOfAges.InputSystem;
+using BattleOfAges.Managers;
+
+namespace BattleOfAges.UI
+{
+    /// <summary>
+    /// The help window (F1): the controls of both views with the player's own key bindings, what the game has and what it
+    /// does not have yet (a player report: "the interface is unclear, it is unclear what there is"). Closes with F1, Esc
+    /// or the cross; the top bar's mode hint tells about it.
+    /// </summary>
+    public sealed class HelpUI : MonoBehaviour
+    {
+        private static HelpUI instance;
+        public static bool IsVisible => instance != null && instance.open;
+        public static HelpUI Instance => instance;
+
+        private GameObject window;
+        private UnityEngine.UI.Text controls, features;
+        private bool open;
+
+        private static readonly Vector2 Size = new Vector2(1420f, 860f);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void Boot()
+        {
+            if (instance == null) instance = new GameObject("HelpUI").AddComponent<HelpUI>();
+        }
+
+        private void Awake()
+        {
+            if (instance != null && instance != this) { Destroy(gameObject); return; }
+            instance = this;
+            Build();
+            window.SetActive(false);
+            DontDestroyOnLoad(gameObject);
+        }
+
+        private void OnDestroy() { if (instance == this) instance = null; }
+
+        public void Open()
+        {
+            open = true;
+            controls.text = ControlsText();
+            features.text = FeaturesText();
+            window.SetActive(true);
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+        public void Close()
+        {
+            open = false;
+            window.SetActive(false);
+            GameModeManager modes = FindFirstObjectByType<GameModeManager>();
+            if (!GameWindows.AnyModalOpen && !GameWindows.Paused && (modes == null || modes.CurrentMode == GameMode.FirstPerson))
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+        }
+
+        private void Update()
+        {
+            if (Time.frameCount < 2) return;
+            bool f1 = UniversalInput.IsKeyDown(KeyCode.F1);
+            if (open)
+            {
+                if (f1) Close(); // (Esc: the pause menu closes every window)
+                return;
+            }
+            if (f1 && !GameWindows.Paused)
+            {
+                GameWindows.CloseAllModals();
+                Open();
+            }
+        }
+
+        private static string Key(KeyAction a) => "<color=#f5cc73><b>" + KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(a)) + "</b></color>";
+        private static string K(string key) => "<color=#f5cc73><b>" + key + "</b></color>";
+        private static string Head(string text) => "<size=22><color=#f5cc73><b>" + text + "</b></color></size>";
+
+        private static string ControlsText()
+        {
+            return Head("Від першої особи") + "\n" +
+                   $"{K("W A S D")} — рух,  {K("Пробіл")} — стрибок,  миша — огляд\n" +
+                   $"{K("ЛКМ")} — удар або постріл\n" +
+                   $"{Key(KeyAction.InteractGather)} — зібрати, відкрити скриню, верстак, шахту\n" +
+                   $"{Key(KeyAction.ChopTree)} — рубати дерево\n" +
+                   $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — уміння класу героя\n" +
+                   $"{Key(KeyAction.Inventory)} — інвентар,  {Key(KeyAction.Equipment)} — спорядження,  {Key(KeyAction.Hero)} — герой\n" +
+                   $"{Key(KeyAction.BuildMenu)} — будівництво,  {Key(KeyAction.WorkerCommandUI)} — розподіл робіт\n" +
+                   $"{Key(KeyAction.Alarm)} — тривога: усі люди до зброї\n" +
+                   $"{Key(KeyAction.ToggleGameMode)} — мапа (вид зверху)\n\n" +
+                   Head("На мапі") + "\n" +
+                   $"{K("ЛКМ")} — вибрати людину, рамкою — кількох\n" +
+                   $"{K("ПКМ")} з вибраними — іти туди / бити ворога / працювати\n" +
+                   $"{K("ПКМ")} без вибраних — тягти мапу,  {K("W A S D")} — рухати мапу\n" +
+                   $"{K("Колесо")} — наближення,  {K("Q / E")} — повернути,  {K("R / F")} — нахил\n" +
+                   $"{K("Середня кнопка")} — крутити камеру\n" +
+                   $"{K("Esc")} — назад до виду від першої особи\n\n" +
+                   Head("Завжди") + "\n" +
+                   $"{K("F1")} — ця довідка,  {K("F3")} — FPS,  {K("Esc / P")} — пауза (спершу закриває вікна)\n" +
+                   "Пауза → Налаштування: чутливість миші й мапи, зум, графіка, клавіші";
+        }
+
+        private static string FeaturesText()
+        {
+            return Head("Що є в грі") + "\n" +
+                   $"• Збирай дерево й руду, неси в скриню. Люди з будинків працюють самі; {Key(KeyAction.WorkerCommandUI)} — хто що робить.\n" +
+                   $"• Будівлі ({Key(KeyAction.BuildMenu)}): ратуша (рівні I–V — більше людей), будинок, скриня, шахта (люди\n   працюють усередині, носії везуть руду в скриню), верстак (зброя й броня I–V), стіна.\n" +
+                   $"• Герой ({Key(KeyAction.Hero)}): досвід за вбивства, рівні, очки сили й здоров'я; клас — танк, лучник, маг\n   або ДД з уміннями на {Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)}.\n" +
+                   "• Люди і працюють, і б'ються: людина → воїн → лицар → генерал (підвищення в боях і роботі).\n" +
+                   "• Сусіди: три NPC-королі за ~600 м ростуть і ходять у набіги на тебе й один на одного;\n   табори бандитів із луками й мечами; дикі звірі.\n" +
+                   $"• Тривога ({Key(KeyAction.Alarm)}): люди кидають роботу й захищають дім; сама вмикається, коли ворог\n   підходить до ратуші, і вимикається після бою.\n" +
+                   "• Смерть героя: міжцарів'я, частина людей тікає, новим героєм стає найсильніший.\n" +
+                   "• Збереження: Пауза → Зберегти / Завантажити.\n\n" +
+                   Head("Чого ще немає") + "\n" +
+                   "• Їжі й полів, торгівлі, мультиплеєра, навчання.\n" +
+                   "• Ресурсів і будівництва в горах.\n" +
+                   "• Бігу на Shift: швидкість героя залежить від його сили.";
+        }
+
+        private void Build()
+        {
+            UnityEngine.Canvas canvas = UiTheme.CreateCanvas("HelpCanvas", 125);
+            canvas.transform.SetParent(transform, false); // survives scene loads with this object
+            window = canvas.gameObject;
+            RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, Size);
+            UiTheme.PanelImage(panel);
+
+            RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 48f));
+            UiTheme.Label(head, "Text", "Довідка", 32, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-16f, -14f), new Vector2(46f, 44f), Close, 28);
+
+            RectTransform left = UiTheme.Rect(panel, "Controls", new Vector2(0f, 1f), new Vector2(34f, -80f), new Vector2(640f, 740f));
+            controls = UiTheme.Label(left, "Text", "", 18, TextAnchor.UpperLeft, UiTheme.Ink);
+            controls.lineSpacing = 1.15f;
+            RectTransform right = UiTheme.Rect(panel, "Features", new Vector2(1f, 1f), new Vector2(-34f, -80f), new Vector2(700f, 740f));
+            features = UiTheme.Label(right, "Text", "", 18, TextAnchor.UpperLeft, UiTheme.Ink);
+            features.lineSpacing = 1.15f;
+        }
+    }
+}

@@ -5,7 +5,7 @@ using BattleOfAges.InputSystem;
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// On-screen performance meter (top-right, toggled with F3): average FPS and frame time, the worst frame of the last
+    /// On-screen performance meter (top-left, toggled with F3): average FPS and frame time, the worst frame of the last
     /// second, the number of hitches (frames over 50 ms) in the last 10 seconds, and a frame-time graph of the last
     /// 160 frames where every spike shows as a tall red bar. Created automatically in every scene.
     /// </summary>
@@ -50,8 +50,8 @@ namespace BattleOfAges.UI
             panel = new GameObject("Panel", typeof(RectTransform));
             panel.transform.SetParent(transform, false);
             RectTransform pr = (RectTransform)panel.transform;
-            pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(1f, 1f);
-            pr.anchoredPosition = new Vector2(-12f, -12f);
+            pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(0f, 1f); // top left under the mode hint (the minimap has the top right)
+            pr.anchoredPosition = new Vector2(12f, -70f);
             pr.sizeDelta = new Vector2(GraphFrames * 2f + 16f, GraphHeight + 104f);
             Image bg = panel.AddComponent<Image>();
             bg.color = new Color(0f, 0f, 0f, 0.55f);

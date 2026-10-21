@@ -35,6 +35,8 @@ namespace BattleOfAges.UI
         private float minimapTimer, dotTimer, pollTimer, hostileTimer;
         private HostileMobAI[] hostiles;
         private const float MinimapHalfSize = 90f, MinimapPx = 280f;
+        private RectTransform minimapFrame, heading;
+        private int minimapPlacedFor = -1;
         private readonly List<Image> dots = new List<Image>();
         private readonly List<(RectTransform bar, RectTransform fill)> unitBars = new List<(RectTransform, RectTransform)>();
         private readonly Dictionary<MineNode, (RectTransform rt, Text text, Button button)> mineLabels = new Dictionary<MineNode, (RectTransform, Text, Button)>();
@@ -74,7 +76,7 @@ namespace BattleOfAges.UI
             workerText = Entry(bar, UiTheme.Icon.Worker, "Робітники");
             armyText = Entry(bar, UiTheme.Icon.Army, "Військо");
 
-            RectTransform mode = UiTheme.Rect(root, "ModeHint", new Vector2(0f, 1f), new Vector2(14f, -14f), new Vector2(330f, 44f));
+            RectTransform mode = UiTheme.Rect(root, "ModeHint", new Vector2(0f, 1f), new Vector2(14f, -14f), new Vector2(470f, 44f));
             UiTheme.PanelImage(mode);
             modeText = UiTheme.Label(mode, "Text", "", 19, TextAnchor.MiddleCenter, UiTheme.InkDim);
         }
@@ -128,7 +130,8 @@ namespace BattleOfAges.UI
             rtsGroup = UiTheme.Rect(root, "Map", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             rtsGroup.anchorMin = Vector2.zero; rtsGroup.anchorMax = Vector2.one; rtsGroup.sizeDelta = Vector2.zero;
 
-            RectTransform frame = UiTheme.Rect(rtsGroup, "Minimap", new Vector2(0f, 0f), new Vector2(18f, 18f), new Vector2(MinimapPx + 24f, MinimapPx + 24f));
+            RectTransform frame = UiTheme.Rect(root, "Minimap", new Vector2(0f, 0f), new Vector2(18f, 18f), new Vector2(MinimapPx + 24f, MinimapPx + 24f));
+            minimapFrame = frame;
             UiTheme.PanelImage(frame);
             RectTransform view = UiTheme.Rect(frame, "View", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(MinimapPx, MinimapPx));
             view.gameObject.AddComponent<RectMask2D>();
@@ -136,6 +139,10 @@ namespace BattleOfAges.UI
             minimapImage.color = new Color(0.9f, 0.9f, 0.9f);
             minimapImage.raycastTarget = false;
             minimapDots = UiTheme.Rect(view, "Dots", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(MinimapPx, MinimapPx));
+            heading = UiTheme.Rect(minimapDots, "Heading", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(3f, 16f));
+            heading.pivot = new Vector2(0.5f, 0f);
+            var headingImg = heading.gameObject.AddComponent<Image>();
+            headingImg.sprite = UiTheme.BarSprite; headingImg.color = Color.white; headingImg.raycastTarget = false;
             RectTransform title = UiTheme.Rect(frame, "Title", new Vector2(0.5f, 1f), new Vector2(0f, 16f), new Vector2(120f, 30f));
             UiTheme.PanelImage(title, UiTheme.ButtonSprite);
             UiTheme.Label(title, "Text", "Мапа", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
@@ -153,6 +160,9 @@ namespace BattleOfAges.UI
             minimapCam.cullingMask = ~((vm >= 0 ? 1 << vm : 0) | (ui >= 0 ? 1 << ui : 0));
             minimapCam.targetTexture = minimapRt;
             minimapCam.enabled = false;
+            UnityEngine.Rendering.Universal.UniversalAdditionalCameraData mmData = UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(minimapCam);
+            mmData.renderShadows = false; // a map from above needs no shadows (a whole extra scene pass)
+            mmData.renderPostProcessing = false;
             minimapImage.texture = minimapRt;
 
             // The call to arms, over the minimap
@@ -194,10 +204,12 @@ namespace BattleOfAges.UI
             workerText.text = workers + "/" + TownHall.PopulationCap;
             workerText.color = workers >= TownHall.PopulationCap ? UiTheme.Bad : UiTheme.Ink;
             armyText.text = Mathf.Max(0, UnitRegistry.ActiveUnits.Count - workers).ToString();
-            modeText.text = map ? "Мапа  ·  M — від першої особи" : "Від першої особи  ·  M — мапа";
+            modeText.text = map ? "Мапа  ·  M — від першої особи  ·  F1 — довідка" : "Від першої особи  ·  M — мапа  ·  F1 — довідка";
 
             fpGroup.gameObject.SetActive(!map);
             rtsGroup.gameObject.SetActive(map);
+            PlaceMinimap(map);
+            UpdateMinimap(map);
             if (!map)
             {
                 crosshair.gameObject.SetActive(!Cursor.visible && Time.timeScale > 0f);
@@ -211,7 +223,6 @@ namespace BattleOfAges.UI
             }
             else
             {
-                UpdateMinimap();
                 UpdateUnitBars();
             }
 
@@ -253,14 +264,28 @@ namespace BattleOfAges.UI
             return sb.ToString();
         }
 
-        private void UpdateMinimap()
+        /// <summary>The minimap shows in both views: on the map at the bottom left, in first person smaller at the top right.</summary>
+        private void PlaceMinimap(bool map)
+        {
+            if (minimapFrame == null || minimapPlacedFor == (map ? 1 : 0)) return;
+            minimapPlacedFor = map ? 1 : 0;
+            Vector2 corner = map ? Vector2.zero : Vector2.one;
+            minimapFrame.anchorMin = minimapFrame.anchorMax = minimapFrame.pivot = corner;
+            minimapFrame.anchoredPosition = map ? new Vector2(18f, 18f) : new Vector2(-18f, -18f);
+            minimapFrame.localScale = Vector3.one * (map ? 1f : 0.72f);
+            minimapCentre = new Vector3(1e9f, 0f, 0f); // draw it again for the new view
+        }
+
+        private static float InfiniteGround(Vector3 p) => World.InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z);
+
+        private void UpdateMinimap(bool map)
         {
             Camera main = ViewCamera.Current;
             if (main == null) return;
-            // Centre: where the view looks at the ground
+            // Centre: in first person the player; on the map where the view looks at the ground
             Vector3 c = main.transform.position;
             Vector3 f = main.transform.forward;
-            if (f.y < -0.1f) c += f * Mathf.Min(300f, (c.y - 10f) / -f.y);
+            if (map && f.y < -0.1f) c += f * ((c.y - InfiniteGround(c)) / -f.y);
             c.y = 0f;
             minimapTimer -= Time.unscaledDeltaTime;
             if ((c - minimapCentre).sqrMagnitude > 12f * 12f || minimapTimer <= 0f)
@@ -273,6 +298,12 @@ namespace BattleOfAges.UI
                 minimapCam.Render();
                 RenderSettings.fog = fog;
             }
+
+            // Where the player looks (first person), every frame
+            Vector3 me = main.transform.position - minimapCentre;
+            heading.anchoredPosition = new Vector2(me.x, me.z) * (MinimapPx / (2f * MinimapHalfSize));
+            heading.localEulerAngles = new Vector3(0f, 0f, -main.transform.eulerAngles.y);
+            if (heading.gameObject.activeSelf != !map) heading.gameObject.SetActive(!map);
 
             dotTimer -= Time.unscaledDeltaTime;
             if (dotTimer > 0f) return;
