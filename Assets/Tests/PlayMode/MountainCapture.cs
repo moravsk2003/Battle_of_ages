@@ -68,6 +68,25 @@ namespace BattleOfAges.PlayModeTests
                     UnityEngine.Object.Destroy(tex);
                 }
             }
+            // And from above, on the map (the report was about this view)
+            var modes = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.Managers.GameModeManager>();
+            var mapCam = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.CameraSystem.RtsMapCameraController>(FindObjectsInactive.Include);
+            if (modes != null && mapCam != null)
+            {
+                modes.SetGameMode(BattleOfAges.Managers.GameMode.RtsMap);
+                mapCam.FocusOnPosition(best);
+                yield return new WaitForSecondsRealtime(1.5f);
+                Camera mc = mapCam.GetComponent<Camera>();
+                mc.targetTexture = rt;
+                mc.Render();
+                mc.targetTexture = null;
+                RenderTexture.active = rt;
+                var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+                RenderTexture.active = null;
+                File.WriteAllBytes(Path.Combine(dir, "mountain_map.png"), tex.EncodeToPNG());
+                Debug.Log($"[MountainCapture] map camera at {mapCam.transform.position}, far {mc.farClipPlane}, active {mapCam.isActiveAndEnabled}, control {typeof(BattleOfAges.CameraSystem.RtsMapCameraController).GetField("isControlEnabled", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(mapCam)}, lift {typeof(BattleOfAges.CameraSystem.RtsMapCameraController).GetField("lift", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(mapCam)}, fwd {mapCam.transform.forward}, lift now {typeof(BattleOfAges.CameraSystem.RtsMapCameraController).GetMethod("ClearanceLift", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(mapCam, null)}, h under {InfiniteWorldManager.GetSampledTerrainHeight(mapCam.transform.position.x, mapCam.transform.position.z)}, timeScale {Time.timeScale}");
+            }
             Assert.Greater(bestH, ProceduralBiomeChunk.SnowLineHeight - 20f, "found high ground");
         }
     }

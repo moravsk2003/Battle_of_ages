@@ -49,6 +49,8 @@ namespace BattleOfAges.CameraSystem
         private Vector3 targetPosition;
         private Vector3 currentVelocity;
         private bool isControlEnabled = false;
+        private Vector3 smoothPosition; // where the camera flies; the transform backs off from it by lift over hills
+        private float lift, liftTimer;
 
         private float currentYaw = 0.0f;      // Y-axis rotation (left/right)
         private float currentPitch = 60.0f;   // X-axis tilt (30° isometric to 90° top-down)
@@ -59,6 +61,7 @@ namespace BattleOfAges.CameraSystem
             mapCamera.orthographic = true;
             targetPosition = transform.position;
             transform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
+            smoothPosition = targetPosition;
         }
 
         private void Start()
@@ -178,7 +181,42 @@ namespace BattleOfAges.CameraSystem
 
         private void ApplySmoothMovement()
         {
-            transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref currentVelocity, smoothTime);
+            smoothPosition = Vector3.SmoothDamp(smoothPosition, targetPosition, ref currentVelocity, smoothTime);
+            liftTimer -= Time.unscaledDeltaTime;
+            if (liftTimer <= 0f) { liftTimer = 0.2f; lift = ClearanceLift(); }
+            transform.position = smoothPosition - transform.forward * lift;
+        }
+
+        /// <summary>
+        /// How far the camera backs off along its view to stay above every hill in the frame: it flies at cameraHeight,
+        /// the ridges reach ~130 m, and what is behind the near plane is cut away (a player report: "in the mountains
+        /// nothing shows from above"). The view is orthographic, so backing off changes nothing but the clipping.
+        /// </summary>
+        private float ClearanceLift()
+        {
+            // Every view ray starts on the near plane (a rectangle around the camera): a ray that starts inside a hill
+            // shows its inside. Back off until the starts of the rays over the frame are above the ground (a few times:
+            // backing off moves them over other ground).
+            Vector3 f = transform.forward, right = transform.right, up = transform.up;
+            float down = Mathf.Max(0.2f, -f.y);
+            float halfW = mapCamera.orthographicSize * mapCamera.aspect, halfH = mapCamera.orthographicSize;
+            float need = 0f;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                Vector3 eye = smoothPosition - f * need;
+                float more = 0f;
+                for (int i = -4; i <= 4; i++) // every ~1/8 of the frame: the ridges are narrow
+                    for (int j = -4; j <= 4; j++)
+                    {
+                        Vector3 o = eye + f * mapCamera.nearClipPlane + right * (halfW * i * 0.25f) + up * (halfH * j * 0.25f);
+                        float ground = World.InfiniteWorldManager.GetSampledTerrainHeight(o.x, o.z) + 8f; // (+ trees)
+                        if (ground > o.y) more = Mathf.Max(more, (ground - o.y) / down);
+                    }
+                if (more <= 0f) break;
+                need += more;
+            }
+            mapCamera.farClipPlane = Mathf.Max(mapCamera.farClipPlane, 1200f + need);
+            return need;
         }
 
         private void ClampTargetPosition()
@@ -194,6 +232,8 @@ namespace BattleOfAges.CameraSystem
         {
             targetPosition = new Vector3(worldPosition.x, cameraHeight, worldPosition.z);
             transform.position = targetPosition;
+            smoothPosition = targetPosition;
+            liftTimer = 0f;
             transform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0.0f);
         }
 
@@ -203,7 +243,7 @@ namespace BattleOfAges.CameraSystem
             gameObject.SetActive(enable);
             if (enable)
             {
-                targetPosition = transform.position;
+                targetPosition = smoothPosition;
             }
         }
 
