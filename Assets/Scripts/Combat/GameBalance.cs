@@ -180,5 +180,10 @@ namespace BattleOfAges.Combat
         /// <summary>Raiders look for something to fight this far from where they are; the guards of a target count within GuardRadius.</summary>
         public static float KingdomRaidSearchRadius = 40f, KingdomGuardRadius = 40f;
         public static int KingdomHallRoom = 2;
+        /// <summary>
+        /// Where the world puts settlements (BuildSite): a kingdom looks this far round its spot for ground rising at most
+        /// SiteMaxRise across its 7 m hall; a raider camp looks within its chunk across 14 m, and is not made if none is level.
+        /// </summary>
+        public static float KingdomSiteSearchRadius = 150f, KingdomSiteMaxRise = 1.2f, CampSiteSearchRadius = 24f, CampSiteMaxRise = 1.6f;
     }
 }

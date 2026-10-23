@@ -84,7 +84,7 @@ namespace BattleOfAges.PlayModeTests
         {
             NpcKingdom k = NpcKingdom.Found(Far, "Test", 4, 10, HeroClass.Tank);
             yield return null;
-            HealthComponent intruder = PlayerSide(Far + new Vector3(30f, 0f, 0f), UnitRank.General, "Intruder");
+            HealthComponent intruder = PlayerSide(k.Home + new Vector3(30f, 0f, 0f), UnitRank.General, "Intruder"); // (the kingdom settles on level ground near Far)
             yield return Until(() => intruder.CurrentHealth < intruder.MaxHealth, 30f);
             Assert.Less(intruder.CurrentHealth, intruder.MaxHealth, "the kingdom fought the intruder at 30 m");
             int fighting = 0;

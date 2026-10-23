@@ -28,6 +28,17 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void WorldSettlements_GoToTheNearestLevelGround()
+        {
+            // A 25-degree hillside with one level terrace, 40 m east of the wanted spot
+            System.Func<Vector3, float> ground = p => (p - new Vector3(40f, 0f, 0f)).magnitude < 12f ? 5f : p.z * Mathf.Tan(25f * Mathf.Deg2Rad) + 5f;
+            Assert.IsTrue(BuildSite.FindLevel(Vector3.zero, 7f, 150f, 1.2f, ground, out Vector3 site), "a level spot is found");
+            Assert.Less((site - new Vector3(40f, 5f, 0f)).magnitude, 12f, "on the terrace");
+            Assert.AreEqual(5f, site.y, 1e-3f);
+            Assert.IsFalse(BuildSite.FindLevel(Vector3.zero, 14f, 24f, 1.6f, Slope(25f), out _), "a camp on a bare hillside: none");
+        }
+
+        [Test]
         public void FlatGround_IsAllowed_AtItsHeight()
         {
             Assert.IsTrue(BuildingPlacementSystem.GroundLevel(Vector3.zero, HouseSize, p => 3f, out float h));

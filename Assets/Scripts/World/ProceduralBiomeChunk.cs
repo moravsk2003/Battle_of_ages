@@ -350,9 +350,13 @@ namespace BattleOfAges.World
             {
                 float campX = startX + size * 0.5f;
                 float campZ = startZ + size * 0.5f;
-                float campY = InfiniteWorldManager.GetSampledTerrainHeight(campX, campZ);
+                // On level ground within the chunk (a camp on a ridge stood on stilts and in the rock), or no camp here
+                bool level = Building.BuildSite.FindLevel(new Vector3(campX, 0f, campZ), 14f, Combat.GameBalance.CampSiteSearchRadius, Combat.GameBalance.CampSiteMaxRise,
+                                                          p => InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), out Vector3 site);
+                campX = site.x; campZ = site.z;
+                float campY = site.y;
 
-                if (campY < SnowLineHeight - 10f)
+                if (level)
                 {
                     GameObject camp = new GameObject($"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
                     camp.transform.SetParent(transform);

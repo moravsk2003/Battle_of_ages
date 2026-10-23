@@ -184,7 +184,11 @@ namespace BattleOfAges.Building
         /// </summary>
         public static bool GroundLevel(Vector3 position, Vector3 size, out float height) => GroundLevel(position, size, RtsUnit.GetTerrainHeight, out height);
 
-        public static bool GroundLevel(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height)
+        public static bool GroundLevel(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height) =>
+            GroundRise(position, size, groundAt, out height) <= MaxGroundRise;
+
+        /// <summary>How much the ground rises across the footprint, and the height to build at (see GroundLevel).</summary>
+        public static float GroundRise(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height)
         {
             float low = float.MaxValue, high = float.MinValue;
             for (int i = -2; i <= 2; i++)
@@ -195,7 +199,7 @@ namespace BattleOfAges.Building
                     low = Mathf.Min(low, h); high = Mathf.Max(high, h);
                 }
             height = Mathf.Lerp(low, high, 0.6f);
-            return high - low <= MaxGroundRise;
+            return high - low;
         }
 
         private bool CheckLocationValid(Vector3 position, Vector3 size)

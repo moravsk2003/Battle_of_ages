@@ -80,7 +80,8 @@ namespace BattleOfAges.AI
         /// <summary>A new kingdom here: a king (a general hero, like the player) and its starting people and wood, no hall.</summary>
         public static NpcKingdom Found(Vector3 centre, string name, int people = -1, int wood = -1, HeroClass kingClass = HeroClass.None, int team = -1)
         {
-            centre.y = RtsUnit.GetTerrainHeight(centre);
+            // On level ground near the spot, not on a hillside or a ridge (the most level one about if there is none)
+            Building.BuildSite.FindLevel(centre, 7f, GameBalance.KingdomSiteSearchRadius, GameBalance.KingdomSiteMaxRise, out centre);
             var root = new GameObject("NpcKingdom_" + name);
             root.transform.position = centre;
             NpcKingdom k = root.AddComponent<NpcKingdom>();
