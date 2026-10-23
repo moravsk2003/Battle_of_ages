@@ -187,6 +187,19 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void TwoKings_DoNotRaidTheSameTarget()
+        {
+            NpcKingdom a = NpcKingdom.Found(Vector3.zero, "A", 0, 10);
+            NpcKingdom b = NpcKingdom.Found(new Vector3(600f, 0f, 0f), "B", 0, 10);
+            NpcKingdom c = NpcKingdom.Found(new Vector3(300f, 0f, 400f), "C", 0, 10);
+            for (int i = 0; i < 6; i++) a.AddSubject(UnitRank.Warrior, a.Spot(), withModel: false);
+            Assert.IsTrue(a.ConsiderRaid(c.King.Health), "A goes for C");
+            Assert.IsTrue(a.Raiding);
+            Assert.IsFalse(new List<HealthComponent>(b.RaidTargets()).Contains(c.King.Health), "B leaves C to A's raid");
+            Assert.IsTrue(new List<HealthComponent>(b.RaidTargets()).Contains(a.King.Health), "and looks at the others");
+        }
+
+        [Test]
         public void HallHealth_GrowsWithItsLevel_PlayerAndKingAlike()
         {
             NpcKingdom k = NpcKingdom.Found(Vector3.zero, "Test", 0, 10);

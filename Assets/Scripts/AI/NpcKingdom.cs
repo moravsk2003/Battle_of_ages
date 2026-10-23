@@ -378,8 +378,21 @@ namespace BattleOfAges.AI
                 HealthComponent h = hall != null ? hall.GetComponent<HealthComponent>() : null;
                 Consider(h != null && h.IsAlive ? h : PlayerHero());
             }
+            // Not one that another king is already raiding: the player sits in the middle, the nearest for every king, and
+            // the kings took turns on it (the session sim: 1 against 3 again)
+            targets.RemoveAll(TakenByAnotherRaid);
             targets.Sort((a, b) => (a.transform.position - Home).sqrMagnitude.CompareTo((b.transform.position - Home).sqrMagnitude));
             return targets;
+        }
+
+        private bool TakenByAnotherRaid(HealthComponent target)
+        {
+            foreach (NpcKingdom k in all)
+            {
+                if (k == null || k == this || !k.Raiding || k.raidTarget == null) continue;
+                if ((k.raidTarget.transform.position - target.transform.position).sqrMagnitude <= GameBalance.KingdomGuardRadius * GameBalance.KingdomGuardRadius) return true;
+            }
+            return false;
         }
 
         /// <summary>What guards this place against this kingdom: its enemies' units (and the player's hero) near it.</summary>
@@ -441,6 +454,9 @@ namespace BattleOfAges.AI
                     (raidTarget != null && (raidTarget.transform.position - m.transform.position).sqrMagnitude <= GameBalance.KingdomRaidSearchRadius * GameBalance.KingdomRaidSearchRadius))
                     marching = false;
             }
+            // Still on the way and someone is coming for the home: back to defend it (the session sim: a king out on a raid
+            // lost its empty hall to another king)
+            if (marching && UnderRaid()) { EndRaid(retreat: true); return; }
             foreach (HostileMobAI m in raiders) m.SpeedCap = marching ? slowest : float.MaxValue;
             bool anyFighting = false;
             foreach (HostileMobAI m in raiders)
