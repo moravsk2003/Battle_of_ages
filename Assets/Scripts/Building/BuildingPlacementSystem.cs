@@ -182,14 +182,16 @@ namespace BattleOfAges.Building
         /// the middle of the ground's range, so the uphill side does not bury the walls (the foundation under the
         /// plinth covers the downhill side).
         /// </summary>
-        public static bool GroundLevel(Vector3 position, Vector3 size, out float height)
+        public static bool GroundLevel(Vector3 position, Vector3 size, out float height) => GroundLevel(position, size, RtsUnit.GetTerrainHeight, out height);
+
+        public static bool GroundLevel(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height)
         {
             float low = float.MaxValue, high = float.MinValue;
             for (int i = -2; i <= 2; i++)
                 for (int j = -2; j <= 2; j++)
                 {
                     if (Mathf.Abs(i) < 2 && Mathf.Abs(j) < 2 && (i != 0 || j != 0)) continue; // the rim and the middle
-                    float h = RtsUnit.GetTerrainHeight(position + new Vector3(size.x * 0.25f * i, 0f, size.z * 0.25f * j));
+                    float h = groundAt(position + new Vector3(size.x * 0.25f * i, 0f, size.z * 0.25f * j));
                     low = Mathf.Min(low, h); high = Mathf.Max(high, h);
                 }
             height = Mathf.Lerp(low, high, 0.6f);
