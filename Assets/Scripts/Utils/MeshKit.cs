@@ -171,6 +171,31 @@ namespace BattleOfAges.Utils
             Lathe(m, prof, 10, surface, (i, a) => color);
         }
 
+        /// <summary>
+        /// A prop model under root: the near mesh, and past nearScreenHeight (share of the screen height, x lodBias)
+        /// the far one (a LODGroup), both on the shared prop material and casting shadows.
+        /// </summary>
+        public static GameObject AttachWithLod(Transform root, string name, Mesh near, Mesh far, float nearScreenHeight)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root, false);
+            Renderer Part(string partName, Mesh m)
+            {
+                var p = new GameObject(partName);
+                p.transform.SetParent(go.transform, false);
+                p.AddComponent<MeshFilter>().sharedMesh = m;
+                MeshRenderer mr = p.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = PropMaterial();
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                return mr;
+            }
+            Renderer n = Part("Near", near), f = Part("Far", far);
+            LODGroup lod = go.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(nearScreenHeight, new[] { n }), new LOD(0.004f, new[] { f }) });
+            lod.RecalculateBounds();
+            return go;
+        }
+
         private static Material propMaterial;
 
         /// <summary>

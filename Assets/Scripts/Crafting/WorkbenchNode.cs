@@ -225,72 +225,18 @@ namespace BattleOfAges.Crafting
                 cachedLitShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
             }
 
-            Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.45f, 0.28f, 0.12f), 0f, 0.25f);
-            Material metalMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Metal, new Color(0.25f, 0.28f, 0.30f), 0.7f, 0.45f);
-            Material anvilMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Dark, new Color(0.12f, 0.14f, 0.16f), 0.85f, 0.55f);
+            // Oak bench with a tool board, a leg vise, an anvil on a stump and a bucket (one shared mesh, see WorkbenchBuilder)
+            WorkbenchBuilder.Attach(root.transform);
 
-            // 1. Table Top
-            GameObject tableTop = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            tableTop.name = "TableTop";
-            tableTop.transform.SetParent(root.transform, false);
-            tableTop.transform.localPosition = new Vector3(0f, 1.0f, 0f);
-            tableTop.transform.localScale = new Vector3(2.8f, 0.25f, 1.8f);
-            tableTop.GetComponent<MeshRenderer>().material = woodMat;
-
-            // 2. Table Legs (4 corners)
-            Vector3[] legPositions = new Vector3[]
-            {
-                new Vector3(-1.2f, 0.45f, -0.7f),
-                new Vector3(1.2f, 0.45f, -0.7f),
-                new Vector3(-1.2f, 0.45f, 0.7f),
-                new Vector3(1.2f, 0.45f, 0.7f)
-            };
-
-            for (int i = 0; i < 4; i++)
-            {
-                GameObject leg = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                leg.name = $"TableLeg_{i}";
-                leg.transform.SetParent(root.transform, false);
-                leg.transform.localPosition = legPositions[i];
-                leg.transform.localScale = new Vector3(0.25f, 0.9f, 0.25f);
-                leg.GetComponent<MeshRenderer>().material = woodMat;
-            }
-
-            // 3. Anvil on table
-            GameObject anvil = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            anvil.name = "Anvil";
-            anvil.transform.SetParent(root.transform, false);
-            anvil.transform.localPosition = new Vector3(-0.7f, 1.28f, 0.2f);
-            anvil.transform.localScale = new Vector3(0.6f, 0.35f, 0.45f);
-            anvil.GetComponent<MeshRenderer>().material = anvilMat;
-
-            // 4. Vise on table edge
-            GameObject vise = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            vise.name = "Vise";
-            vise.transform.SetParent(root.transform, false);
-            vise.transform.localPosition = new Vector3(0.8f, 1.22f, -0.6f);
-            vise.transform.localScale = new Vector3(0.35f, 0.25f, 0.35f);
-            vise.GetComponent<MeshRenderer>().material = metalMat;
-
-            // 5. Tool Rack / Shelf at back
-            GameObject rack = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            rack.name = "ToolRack";
-            rack.transform.SetParent(root.transform, false);
-            rack.transform.localPosition = new Vector3(0f, 1.6f, -0.8f);
-            rack.transform.localScale = new Vector3(2.6f, 1.0f, 0.15f);
-            rack.GetComponent<MeshRenderer>().material = woodMat;
-
-            // Root Collider
+            // Root Collider (the bench and the anvil beside it)
             BoxCollider col = root.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, 1.0f, 0f);
-            col.size = new Vector3(3.2f, 2.2f, 2.2f);
+            col.center = new Vector3(-0.38f, 1.0f, 0f);
+            col.size = new Vector3(3.95f, 2.0f, 1.5f);
 
             foreach (var childCol in root.GetComponentsInChildren<Collider>())
             {
                 if (childCol != col) DestroyImmediate(childCol);
             }
-
-            StaticMeshMerger.Merge(root, "Workbench"); // 8 parts, one renderer per material
 
             return root;
         }

@@ -51,28 +51,7 @@ namespace BattleOfAges.Utils
         /// a player report: "the houses load the PC" - every house drew all 21k triangles, and again in each shadow
         /// cascade).
         /// </summary>
-        public static GameObject Attach(Transform root)
-        {
-            var go = new GameObject("HouseModel");
-            go.transform.SetParent(root, false);
-            Renderer near = Part(go.transform, "Near", Mesh);
-            Renderer far = Part(go.transform, "Far", FarMesh);
-            LODGroup lod = go.AddComponent<LODGroup>();
-            lod.SetLODs(new[] { new LOD(0.12f, new[] { near }), new LOD(0.004f, new[] { far }) });
-            lod.RecalculateBounds();
-            return go;
-        }
-
-        private static Renderer Part(Transform parent, string name, Mesh m)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            go.AddComponent<MeshFilter>().sharedMesh = m;
-            MeshRenderer mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = MeshKit.PropMaterial();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-            return mr;
-        }
+        public static GameObject Attach(Transform root) => MeshKit.AttachWithLod(root, "HouseModel", Mesh, FarMesh, 0.12f);
 
         private static Mesh BuildFar()
         {
