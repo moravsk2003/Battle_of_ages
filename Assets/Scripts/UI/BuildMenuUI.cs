@@ -156,7 +156,7 @@ namespace BattleOfAges.UI
             menuPanelObj = panelRect.gameObject;
             panelRect.pivot = new Vector2(0.5f, 0f);
             panelRect.anchoredPosition = new Vector2(0f, 160f); // above the unit command panel
-            panelRect.sizeDelta = new Vector2(580f, 590f); // six buildings
+            panelRect.sizeDelta = new Vector2(580f, 740f); // eight buildings
 
             Image panelBg = menuPanelObj.AddComponent<Image>();
             panelBg.color = new Color(0.04f, 0.07f, 0.14f, 0.96f);
@@ -258,7 +258,7 @@ namespace BattleOfAges.UI
             UiTheme.Icon icon = def.Type == BuildingType.Mine ? UiTheme.Icon.Ore
                               : def.Type == BuildingType.StorageChest ? UiTheme.Icon.Wood
                               : def.Type == BuildingType.Workbench ? UiTheme.Icon.Hammer
-                              : def.Type == BuildingType.CastleWall ? UiTheme.Icon.Army
+                              : WallSegment.IsWall(def.Type) ? UiTheme.Icon.Army
                               : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
             UiTheme.IconImage(iconObj.transform, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
@@ -272,7 +272,7 @@ namespace BattleOfAges.UI
 
             Text costTxt = UiTheme.PlainText(costObj, font, 16, TextAnchor.MiddleLeft, new Color(0.85f, 0.80f, 0.55f));
 
-            string shortTierName = def.OreTierRequired == 0 ? "Руда рів. 0" : $"Руда рів. {def.OreTierRequired}";
+            string shortTierName = WallSegment.IsWall(def.Type) ? "руди (рівень: Tab)" : $"Руда рів. {def.OreTierRequired}";
             costTxt.text = $"Ціна: 🪵 {def.WoodCost} Дерево  +  🪨 {def.OreCost} {shortTierName}  |  {def.Description}";
         }
     }

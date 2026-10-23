@@ -116,10 +116,10 @@ namespace BattleOfAges.Tests
 
             Assert.IsNotNull(bNode, "Castle wall must have BuildingNode component.");
             Assert.IsNotNull(hp, "Castle wall must have HealthComponent component.");
-            Assert.AreEqual(600, hp.MaxHealth, "Castle wall must have 600 base HP.");
+            Assert.AreEqual(BuildingData.GetDefinition(BuildingType.CastleWall).MaxHealth, hp.MaxHealth, "A wall starts at its base HP (ore tier 0).");
 
             // Lethal damage
-            hp.TakeDamage(600);
+            hp.TakeDamage(hp.MaxHealth);
             Assert.AreEqual(0, hp.CurrentHealth);
             Assert.IsFalse(hp.IsAlive);
 

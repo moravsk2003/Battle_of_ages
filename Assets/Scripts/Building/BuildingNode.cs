@@ -13,7 +13,6 @@ namespace BattleOfAges.Building
     [DisallowMultipleComponent]
     public class BuildingNode : MonoBehaviour
     {
-        private static Shader cachedLitShader;
         private static Shader cachedUnlitShader;
 
         [SerializeField] private BuildingType buildingType = BuildingType.WorkerHouse;
@@ -82,9 +81,10 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(Type); // (a mine or workbench used to spawn a house's worker)
 
             Combat.HealthComponent hp = GetComponent<Combat.HealthComponent>();
+            WallSegment wall = GetComponent<WallSegment>();
             if (hp != null && def.MaxHealth > 0)
             {
-                hp.InitializeHealth(def.MaxHealth);
+                hp.InitializeHealth(wall != null ? WallSegment.MaxHealthFor(Type, wall.OreTier) : def.MaxHealth);
             }
 
             for (int i = 0; i < def.NpcSpawnCount && TownHall.HasRoom(); i++) // the town hall caps the population
@@ -177,157 +177,87 @@ namespace BattleOfAges.Building
             return root;
         }
 
-        public static GameObject CreateCastleWallPrefab(string name = "CastleWall")
+        public static GameObject CreateCastleWallPrefab(string name = "CastleWall") => CreateWallPrefab(BuildingType.CastleWall, name);
+
+        /// <summary>
+        /// A wall segment, the one with stairs or the gate (WallBuilder; §10.5): HP of ore tier 0 until it is built of
+        /// better ore (WallSegment.OreTier, applied in OnBuilt). Colliders: the solid body (its top is the walkway), the
+        /// breastwork, for the stairs a ramp with the climb assist, for the gate the jambs, the work over the arch and the
+        /// leaves on their hinges.
+        /// </summary>
+        public static GameObject CreateWallPrefab(BuildingType type, string name)
         {
             GameObject root = new GameObject(name);
             BuildingNode bNode = root.AddComponent<BuildingNode>();
-            bNode.buildingType = BuildingType.CastleWall;
+            bNode.buildingType = type;
+            root.AddComponent<Combat.HealthComponent>().InitializeHealth(BuildingData.GetDefinition(type).MaxHealth);
+            WallBuilder.Kind kind = WallSegment.KindOf(type);
+            root.AddComponent<WallSegment>().Kind = kind;
+            WallBuilder.Attach(root.transform, kind);
 
-            Combat.HealthComponent hp = root.AddComponent<Combat.HealthComponent>();
-            hp.InitializeHealth(600);
-
-            if (cachedLitShader == null)
+            float half = WallBuilder.LengthOf(kind) * 0.5f, t = WallBuilder.Thickness, walk = WallBuilder.WalkY;
+            void Box(string partName, Vector3 center, Vector3 size, Quaternion? rot = null, bool trigger = false)
             {
-                cachedLitShader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                var part = new GameObject(partName);
+                part.transform.SetParent(root.transform, false);
+                part.transform.SetLocalPositionAndRotation(center, rot ?? Quaternion.identity);
+                BoxCollider c = part.AddComponent<BoxCollider>();
+                c.size = size;
+                c.isTrigger = trigger;
+                if (trigger) part.AddComponent<CastleWallClimbTrigger>();
             }
 
-            Material stoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.42f, 0.44f, 0.46f), 0.05f, 0.22f);
-            Material darkStoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.30f, 0.32f, 0.34f), 0.08f, 0.25f);
-            Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.35f, 0.22f, 0.10f), 0f, 0.25f);
-            Material ironMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Metal, new Color(0.24f, 0.25f, 0.27f), 0.8f, 0.6f);
-
-            // 1. Main Stone Wall Section (Outer Front Face)
-            GameObject mainWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            mainWall.name = "WallBody";
-            mainWall.transform.SetParent(root.transform, false);
-            mainWall.transform.localPosition = new Vector3(0f, 1.5f, 0.15f);
-            mainWall.transform.localScale = new Vector3(4.0f, 3.0f, 0.75f);
-            mainWall.GetComponent<MeshRenderer>().sharedMaterial = stoneMat;
-
-            // 2. Left and Right Reinforcing Stone Pillars (Buttresses)
-            for (int i = -1; i <= 1; i += 2)
+            if (kind == WallBuilder.Kind.Gate)
             {
-                GameObject pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                pillar.name = (i < 0) ? "PillarLeft" : "PillarRight";
-                pillar.transform.SetParent(root.transform, false);
-                pillar.transform.localPosition = new Vector3(i * 1.95f, 1.7f, 0.1f);
-                pillar.transform.localScale = new Vector3(0.65f, 3.4f, 1.05f);
-                pillar.GetComponent<MeshRenderer>().sharedMaterial = darkStoneMat;
-
-                // Pillar stone cap
-                GameObject cap = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                cap.name = "PillarCap";
-                cap.transform.SetParent(pillar.transform, false);
-                cap.transform.localPosition = new Vector3(0f, 0.52f, 0f);
-                cap.transform.localScale = new Vector3(1.15f, 0.10f, 1.15f);
-                cap.GetComponent<MeshRenderer>().sharedMaterial = stoneMat;
-            }
-
-            // 3. Battlements / Merlons along top walkway (Outer Edge)
-            for (int i = -1; i <= 1; i++)
-            {
-                GameObject merlon = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                merlon.name = $"Merlon_{i + 2}";
-                merlon.transform.SetParent(root.transform, false);
-                merlon.transform.localPosition = new Vector3(i * 1.25f, 3.35f, 0.42f);
-                merlon.transform.localScale = new Vector3(0.75f, 0.65f, 0.28f);
-                merlon.GetComponent<MeshRenderer>().sharedMaterial = stoneMat;
-            }
-
-            // 4. Wooden Parapet Walkway Platform along inner side
-            GameObject walkway = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            walkway.name = "InnerWalkway";
-            walkway.transform.SetParent(root.transform, false);
-            walkway.transform.localPosition = new Vector3(0f, 2.65f, -0.35f);
-            walkway.transform.localScale = new Vector3(3.95f, 0.22f, 0.85f);
-            walkway.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-
-            // Decorative Wooden Support Brackets underneath walkway
-            for (int b = -1; b <= 1; b++)
-            {
-                GameObject bracket = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                bracket.name = $"SupportBracket_{b + 2}";
-                bracket.transform.SetParent(root.transform, false);
-                bracket.transform.localPosition = new Vector3(b * 1.35f, 2.3f, -0.35f);
-                bracket.transform.localScale = new Vector3(0.18f, 0.48f, 0.55f);
-                bracket.transform.localRotation = Quaternion.Euler(-30f, 0f, 0f);
-                bracket.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-            }
-
-            // 5. Compact Wooden Ladder / Stairs along the inner wall face
-            GameObject stairsRoot = new GameObject("Stairs");
-            stairsRoot.transform.SetParent(root.transform, false);
-            stairsRoot.transform.localPosition = new Vector3(1.15f, 0f, -0.45f);
-
-            int rungs = 7;
-            for (int r = 0; r < rungs; r++)
-            {
-                float t = (float)r / (rungs - 1);
-                GameObject step = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                step.name = $"LadderRung_{r + 1}";
-                step.transform.SetParent(stairsRoot.transform, false);
-                step.transform.localPosition = new Vector3(0f, t * 2.5f + 0.15f, -(1.0f - t) * 0.45f);
-                step.transform.localScale = new Vector3(0.95f, 0.12f, 0.22f);
-                step.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-            }
-
-            // 6. Smooth Gentle Walkable Incline Ramp Collider (Fits cleanly within wall footprint)
-            GameObject rampObj = new GameObject("StairsRampCollider");
-            rampObj.transform.SetParent(stairsRoot.transform, false);
-            rampObj.transform.localPosition = new Vector3(0f, 1.35f, -0.22f);
-            rampObj.transform.localRotation = Quaternion.Euler(65f, 0f, 0f);
-            BoxCollider rampCol = rampObj.AddComponent<BoxCollider>();
-            rampCol.size = new Vector3(1.05f, 0.20f, 2.85f);
-
-            // 7. Climb Assist Trigger for effortless player ascent
-            GameObject triggerObj = new GameObject("ClimbAssistTrigger");
-            triggerObj.transform.SetParent(stairsRoot.transform, false);
-            triggerObj.transform.localPosition = new Vector3(0f, 1.45f, -0.22f);
-            triggerObj.transform.localRotation = Quaternion.Euler(65f, 0f, 0f);
-            BoxCollider triggerCol = triggerObj.AddComponent<BoxCollider>();
-            triggerCol.isTrigger = true;
-            triggerCol.size = new Vector3(1.15f, 1.6f, 3.0f);
-            triggerObj.AddComponent<CastleWallClimbTrigger>();
-
-            // 8. Decorative Iron Wall Torch with Warm Ambient Glow
-            GameObject torchObj = new GameObject("WallTorch");
-            torchObj.transform.SetParent(root.transform, false);
-            torchObj.transform.localPosition = new Vector3(-1.95f, 2.2f, 0.65f);
-
-            GameObject sconce = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            sconce.name = "TorchSconce";
-            sconce.transform.SetParent(torchObj.transform, false);
-            sconce.transform.localScale = new Vector3(0.08f, 0.22f, 0.08f);
-            sconce.transform.localRotation = Quaternion.Euler(20f, 0f, 0f);
-            sconce.GetComponent<MeshRenderer>().sharedMaterial = ironMat;
-            Collider sc = sconce.GetComponent<Collider>();
-            if (sc != null) Object.DestroyImmediate(sc);
-
-            GameObject fireLightObj = new GameObject("TorchLight");
-            fireLightObj.transform.SetParent(torchObj.transform, false);
-            fireLightObj.transform.localPosition = new Vector3(0f, 0.25f, 0f);
-            Light torchLight = fireLightObj.AddComponent<Light>();
-            torchLight.type = LightType.Point;
-            torchLight.color = new Color(1.0f, 0.72f, 0.28f);
-            torchLight.intensity = 1.4f;
-            torchLight.range = 6.0f;
-            torchLight.shadows = LightShadows.None; // a shadowed point light renders the scene six more times per wall (BuildingProbe)
-
-            // Remove any unwanted loose child colliders except the main structural and ramp colliders
-            BoxCollider wallCol = root.AddComponent<BoxCollider>();
-            wallCol.center = new Vector3(0f, 1.6f, 0.05f);
-            wallCol.size = new Vector3(4.0f, 3.2f, 1.25f);
-
-            foreach (var col in root.GetComponentsInChildren<Collider>())
-            {
-                if (col != wallCol && col != rampCol && col != triggerCol)
+                float w = WallBuilder.GateHalfW, crown = WallBuilder.GateSpring + w, side = half - w;
+                Box("JambLeft", new Vector3(-(half + w) * 0.5f, walk * 0.5f, 0f), new Vector3(side, walk, t));
+                Box("JambRight", new Vector3((half + w) * 0.5f, walk * 0.5f, 0f), new Vector3(side, walk, t));
+                Box("OverArch", new Vector3(0f, (crown + walk) * 0.5f, 0f), new Vector3(w * 2f, walk - crown, t));
+                Transform Leaf(string leafName, float x, float mirror)
                 {
-                    DestroyImmediate(col);
+                    var leaf = new GameObject(leafName);
+                    leaf.transform.SetParent(root.transform, false);
+                    leaf.transform.localPosition = new Vector3(x, 0f, WallBuilder.GateLeafZ);
+                    var model = new GameObject("Model");
+                    model.transform.SetParent(leaf.transform, false);
+                    model.transform.localScale = new Vector3(mirror, 1f, 1f);
+                    model.AddComponent<MeshFilter>().sharedMesh = WallBuilder.LeafMesh;
+                    model.AddComponent<MeshRenderer>().sharedMaterial = MeshKit.PropMaterial();
+                    BoxCollider c = leaf.AddComponent<BoxCollider>();
+                    c.center = new Vector3(mirror * w * 0.5f, WallBuilder.GateSpring * 0.6f, 0f);
+                    c.size = new Vector3(w, WallBuilder.GateSpring * 1.2f, 0.14f);
+                    return leaf.transform;
                 }
+                root.AddComponent<WallGateDoors>().SetLeaves(Leaf("LeafLeft", -w, 1f), Leaf("LeafRight", w, -1f));
+
+                GameObject fireLightObj = new GameObject("TorchLight");
+                fireLightObj.transform.SetParent(root.transform, false);
+                fireLightObj.transform.localPosition = new Vector3(-w - 0.55f, 2.62f, -t * 0.5f - 0.25f);
+                Light torchLight = fireLightObj.AddComponent<Light>();
+                torchLight.type = LightType.Point;
+                torchLight.color = new Color(1.0f, 0.72f, 0.28f);
+                torchLight.intensity = 1.4f;
+                torchLight.range = 7.0f;
+                torchLight.shadows = LightShadows.None; // a shadowed point light renders the scene six more times (BuildingProbe)
             }
+            else Box("Body", new Vector3(0f, walk * 0.5f, 0f), new Vector3(half * 2f, walk, t));
 
-            StaticMeshMerger.Merge(root, "CastleWall"); // 20 parts, 4 materials: 4 renderers (the torch light stays)
+            float parapetH = WallBuilder.BreastH + WallBuilder.MerlonH + 0.12f;
+            Box("Parapet", new Vector3(0f, walk + parapetH * 0.5f, t * 0.5f - WallBuilder.ParapetT * 0.5f), new Vector3(half * 2f, parapetH, WallBuilder.ParapetT));
 
+            if (kind == WallBuilder.Kind.Stairs)
+            {
+                float run = (WallBuilder.StairsLowX - WallBuilder.StairsTopX) / WallBuilder.StairSteps;
+                float topX = WallBuilder.StairsTopX + run, zc = (WallBuilder.StairsInnerZ + WallBuilder.StairsOuterZ) * 0.5f, width = WallBuilder.StairsInnerZ - WallBuilder.StairsOuterZ;
+                Box("Landing", new Vector3((topX - half) * 0.5f, walk * 0.5f, zc), new Vector3(topX + half, walk, width));
+                // The flight: a ramp along the step noses (from the bottom step up to the landing), and the climb assist on it
+                Vector3 low = new Vector3(WallBuilder.StairsLowX, 0f, zc), high = new Vector3(topX, walk, zc);
+                Quaternion up = Quaternion.LookRotation(high - low, Vector3.up);
+                Vector3 normal = up * Vector3.up;
+                float slope = (high - low).magnitude;
+                Box("StairsRampCollider", (low + high) * 0.5f - normal * 0.1f, new Vector3(width, 0.2f, slope), up);
+                Box("ClimbAssistTrigger", (low + high) * 0.5f + normal * 0.6f, new Vector3(width + 0.1f, 1.4f, slope), up, true);
+            }
             return root;
         }
 
@@ -351,9 +281,13 @@ namespace BattleOfAges.Building
             {
                 ghost = WorkbenchNode.CreateWorkbenchPrefab("BuildGhost_Workbench");
             }
-            else if (type == BuildingType.CastleWall)
+            else if (WallSegment.IsWall(type))
             {
-                ghost = CreateCastleWallPrefab("BuildGhost_CastleWall");
+                ghost = CreateWallPrefab(type, "BuildGhost_" + type);
+                Object.DestroyImmediate(ghost.GetComponent<WallSegment>()); // not a wall yet: no end to snap to, no piers
+                Object.DestroyImmediate(ghost.GetComponent<WallGateDoors>());
+                float half = WallBuilder.LengthOf(WallSegment.KindOf(type)) * 0.5f;
+                foreach (float x in new[] { -half, half }) WallBuilder.AttachPier(ghost.transform).transform.localPosition = new Vector3(x, 0f, 0f);
             }
             else if (type == BuildingType.TownHall)
             {

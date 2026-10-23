@@ -27,6 +27,7 @@ namespace BattleOfAges.UI
         private HealthComponent playerHealth;
 
         private Text woodText, oreText, workerText, armyText, modeText, hpText;
+        private RectTransform mode;
         private RectTransform fpGroup, rtsGroup, crosshair, hpFill, minimapDots, toastColumn;
         private RawImage minimapImage;
         private Camera minimapCam;
@@ -76,7 +77,7 @@ namespace BattleOfAges.UI
             workerText = Entry(bar, UiTheme.Icon.Worker, "Робітники");
             armyText = Entry(bar, UiTheme.Icon.Army, "Військо");
 
-            RectTransform mode = UiTheme.Rect(root, "ModeHint", new Vector2(0f, 1f), new Vector2(14f, -14f), new Vector2(470f, 44f));
+            mode = UiTheme.Rect(root, "ModeHint", new Vector2(0f, 1f), new Vector2(14f, -14f), new Vector2(470f, 44f));
             UiTheme.PanelImage(mode);
             modeText = UiTheme.Label(mode, "Text", "", 19, TextAnchor.MiddleCenter, UiTheme.InkDim);
         }
@@ -204,7 +205,10 @@ namespace BattleOfAges.UI
             workerText.text = workers + "/" + TownHall.PopulationCap;
             workerText.color = workers >= TownHall.PopulationCap ? UiTheme.Bad : UiTheme.Ink;
             armyText.text = Mathf.Max(0, UnitRegistry.ActiveUnits.Count - workers).ToString();
-            modeText.text = map ? "Мапа  ·  M — від першої особи  ·  F1 — довідка" : "Від першої особи  ·  M — мапа  ·  F1 — довідка";
+            BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
+            bool placing = map && placer != null && placer.IsPlacing;
+            modeText.text = placing ? placer.Hint : map ? "Мапа  ·  M — від першої особи  ·  F1 — довідка" : "Від першої особи  ·  M — мапа  ·  F1 — довідка";
+            mode.sizeDelta = placing ? new Vector2(600f, 70f) : new Vector2(470f, 44f); // the placing hint takes two lines
 
             fpGroup.gameObject.SetActive(!map);
             rtsGroup.gameObject.SetActive(map);
@@ -460,6 +464,7 @@ namespace BattleOfAges.UI
             if (!show) return;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(root, sp, null, out Vector2 local);
             hallLabel.anchoredPosition = local;
+            UpdateWallRow(map);
             int pop = TownHall.Population, cap = TownHall.PopulationCap;
             hallText.text = $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
             bool max = hall.Level >= TownHall.MaxLevel;
@@ -470,6 +475,40 @@ namespace BattleOfAges.UI
             bool ok = hall.CanUpgrade(out _);
             hallButtonText.text = $"Покращити до {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
             hallButton.interactable = ok;
+        }
+
+        private RectTransform wallRow;
+        private Text wallText, wallButtonText;
+        private Button wallButton;
+
+        /// <summary>Under the hall's label on the map, once there are walls: their level and the button to raise it (§10.5).</summary>
+        private void UpdateWallRow(bool map)
+        {
+            bool show = map && WallSegment.Active.Count > 0;
+            if (wallRow == null)
+            {
+                if (!show) return;
+                wallRow = UiTheme.Rect(hallLabel, "WallRow", new Vector2(0.5f, 0f), new Vector2(0f, -4f), new Vector2(400f, 56f));
+                wallRow.pivot = new Vector2(0.5f, 1f);
+                UiTheme.PanelImage(wallRow, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f)).raycastTarget = false;
+                RectTransform tr = UiTheme.Rect(wallRow, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
+                wallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+                wallText.supportRichText = true;
+                wallButton = UiTheme.TextButton(wallRow, "UpgradeWalls", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 44f), () => Fortifications.TryUpgrade(), 13);
+                wallButtonText = wallButton.GetComponentInChildren<Text>();
+                wallButtonText.supportRichText = true;
+                wallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            }
+            if (wallRow.gameObject.activeSelf != show) wallRow.gameObject.SetActive(show);
+            if (!show) return;
+            int level = Fortifications.Level;
+            wallText.text = $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nурон зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>";
+            bool max = level >= Fortifications.MaxLevel;
+            if (wallButton.gameObject.activeSelf == max) wallButton.gameObject.SetActive(!max);
+            if (max) return;
+            Fortifications.UpgradeCost(level + 1, out int wood, out int ore, out int tier);
+            wallButtonText.text = $"Стіни до {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+            wallButton.interactable = Fortifications.CanUpgrade(out _);
         }
 
         private (RectTransform, Text, Button) MineLabel(MineNode mine)

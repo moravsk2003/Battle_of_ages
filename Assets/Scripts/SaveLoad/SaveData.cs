@@ -26,6 +26,7 @@ namespace BattleOfAges.SaveLoad
         public int WorldEpoch;
         public List<KingdomSave> Kingdoms = new List<KingdomSave>(); // NPC kings (§12)
         public bool KingdomsFounded;  // false in saves from before the NPC kings: they are founded on load
+        public int WallLevel;         // Fortifications (0 in old saves: level I)
 
         public int OreTotal { get { int n = 0; foreach (TierCount t in Ore) n += t.Count; return n; } }
     }
@@ -93,6 +94,7 @@ namespace BattleOfAges.SaveLoad
         public List<TaskSave> Queue = new List<TaskSave>();
         public int BenchWorkers;
         public int Level;                // town hall
+        public int OreTier;              // a wall: the ore it is built of
     }
 
     [Serializable]

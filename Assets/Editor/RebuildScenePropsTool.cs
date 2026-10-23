@@ -8,7 +8,7 @@ using BattleOfAges.Crafting;
 namespace BattleOfAges.EditorTools
 {
     /// <summary>
-    /// Replaces the props baked into SampleScene (the base workbench) with freshly built ones, each in the same place,
+    /// Replaces the props baked into SampleScene (the base workbench, the wall) with freshly built ones, each in the same place,
     /// parent, rotation, scale and name, after their builder changed (as RebuildSceneTreesTool does for the trees).
     /// Batch: -executeMethod BattleOfAges.EditorTools.RebuildScenePropsTool.Rebuild
     /// </summary>
@@ -19,6 +19,7 @@ namespace BattleOfAges.EditorTools
         private static readonly (string name, Func<string, GameObject> build)[] Props =
         {
             ("BaseWorkbench", WorkbenchNode.CreateWorkbenchPrefab),
+            ("FortressWall_1", Building.BuildingNode.CreateCastleWallPrefab),
         };
 
         [MenuItem("Battle of Ages/Rebuild Scene Props")]

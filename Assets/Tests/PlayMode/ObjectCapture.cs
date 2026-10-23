@@ -60,6 +60,12 @@ namespace BattleOfAges.PlayModeTests
             GameObject wall = Place(BuildingNode.CreateCastleWallPrefab("Cap_Wall"), Slot(9f));
             GameObject tree = Place(SteppeTreeBuilder.CreateSteppeTree("Cap_Tree", 1), Slot(20f));
             GameObject pine = Place(SteppeTreeBuilder.CreatePineTree("Cap_Pine", 2), Slot(28f));
+            // A line of wall: stairs, a segment, the gate, and a corner turning in (outside = toward the camera)
+            Vector3 wallAt = wall.transform.position;
+            GameObject wallStairs = Place(BuildingNode.CreateWallPrefab(BuildingType.WallStairs, "Cap_WallStairs"), Ground(wallAt - right * 4f));
+            GameObject gate = Place(BuildingNode.CreateWallPrefab(BuildingType.WallGate, "Cap_WallGate"), Ground(wallAt + right * 5f));
+            GameObject corner = Place(BuildingNode.CreateWallPrefab(BuildingType.CastleWall, "Cap_WallCorner"), Ground(wallAt + right * 8f - fwd * 2f), 90f);
+            foreach (GameObject g in new[] { wallStairs, wall, gate, corner }) g.transform.position = new Vector3(g.transform.position.x, wallAt.y, g.transform.position.z); // one walkway
             var pebbles = new List<GameObject>();
             for (int i = 0; i < 3; i++) pebbles.Add(Place(OrePebbleNode.CreatePebblePrefab("Cap_Pebble_" + i), Slot(-3f + i * 1.1f, -5f), i * 50f));
 
@@ -135,6 +141,10 @@ namespace BattleOfAges.PlayModeTests
                 ("scene_fortress_wall", () => Look(fortress, 0.5f, 1.0f, 0.3f)),
                 ("lineup_overview", () => (origin + fwd * 30f + Vector3.up * 14f, Ground(origin) + Vector3.up * 2f)),
                 ("house_detail", () => Look(house, 0.3f, 0.6f, 0.05f)),
+                ("wall_line_outside", () => (wallAt + fwd * 13f - right * 3f + Vector3.up * 6f, wallAt + right * 2.5f + Vector3.up * 2f)),
+                ("wall_line_inside", () => (wallAt - fwd * 13f + right * 1f + Vector3.up * 7f, wallAt + right * 2f + Vector3.up * 1.5f)),
+                ("wall_gate_close", () => (gate.transform.position + fwd * 6.5f - right * 1.5f + Vector3.up * 2.2f, gate.transform.position + Vector3.up * 2.2f)),
+                ("wall_walkway", () => (wallStairs.transform.position - fwd * 1.6f - right * 1.5f + Vector3.up * 5.4f, gate.transform.position + Vector3.up * 3.8f)),
             };
 
             // CAPTURE_FOCUS = house / chest / mine / workbench / wall / dummy: 14 views around that one object instead

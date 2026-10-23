@@ -7,6 +7,7 @@ using BattleOfAges.InputSystem;
 using BattleOfAges.Crafting;
 using BattleOfAges.UI;
 using BattleOfAges.World;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Building
 {
@@ -30,8 +31,29 @@ namespace BattleOfAges.Building
         private GameObject ghostPreview;
         private BuildingType currentBuildingType;
         private bool isPlacing = false;
+        /// <summary>The ghost's turn (Z / X) when it is not snapped to a wall's end.</summary>
+        private float ghostYaw;
+        /// <summary>The ore tier walls are built of (Tab picks another the player has enough of).</summary>
+        private int wallTier;
+        private bool snapped;
 
         public bool IsPlacing => isPlacing;
+        public const float TurnStep = 15f;
+
+        /// <summary>What the keys do now (the HUD's hint line while placing).</summary>
+        public string Hint
+        {
+            get
+            {
+                if (!isPlacing) return "";
+                BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
+                if (!WallSegment.IsWall(currentBuildingType)) return $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати";
+                return $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
+                     + (snapped ? "прилипла до стіни" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
+            }
+        }
+
+
         /// <summary>The frame a placement was last cancelled (that Escape is not also the pause or the way out of the map).</summary>
         public int CancelledFrame { get; private set; } = -1;
 
@@ -76,6 +98,10 @@ namespace BattleOfAges.Building
                 if (mapCamera == null) return;
             }
 
+            if (UniversalInput.IsKeyDown(KeyCode.Z)) ghostYaw -= TurnStep;
+            if (UniversalInput.IsKeyDown(KeyCode.X)) ghostYaw += TurnStep;
+            if (WallSegment.IsWall(currentBuildingType) && UniversalInput.IsKeyDown(KeyCode.Tab)) wallTier = NextWallTier(wallTier, BuildingData.GetDefinition(currentBuildingType).OreCost);
+
             UpdateGhostPosition();
 
             // Confirm placement on Left Mouse Button
@@ -112,6 +138,7 @@ namespace BattleOfAges.Building
 
             currentBuildingType = type;
             isPlacing = true;
+            if (WallSegment.IsWall(type) && !CanAffordTier(def, wallTier)) wallTier = NextWallTier(wallTier, def.OreCost);
 
             ghostPreview = BuildingNode.CreateGhostPreview(type);
             if (ghostPreview != null)
@@ -143,10 +170,16 @@ namespace BattleOfAges.Building
             {
                 Vector3 pos = hit.point;
                 BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
-                bool level = GroundLevel(pos, def.Size, out pos.y);
-                ghostPreview.transform.position = pos;
+                Quaternion rot = Quaternion.Euler(0f, ghostYaw, 0f);
+                float yaw = 0f, endY = 0f;
+                snapped = WallSegment.IsWall(currentBuildingType) && WallSegment.Snap(pos, def.Size.x, out pos, out yaw, out endY);
+                if (snapped) rot = Quaternion.Euler(0f, yaw, 0f);
+                bool level = FootprintLevel(currentBuildingType, pos, rot, out float h);
+                // A snapped segment keeps its neighbour's height (one walkway) while its foundation still reaches the ground
+                pos.y = snapped && Mathf.Abs(h - endY) <= SnapKeepHeight ? endY : h;
+                ghostPreview.transform.SetPositionAndRotation(pos, rot);
 
-                bool validLoc = level && CheckLocationValid(pos, def.Size);
+                bool validLoc = level && CheckLocationValid(pos, rot, def);
                 bool affordable = CanAfford(def) && IsAllowed(currentBuildingType, out _);
 
                 Color ghostColor = (validLoc && affordable)
@@ -187,29 +220,61 @@ namespace BattleOfAges.Building
         public static bool GroundLevel(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height) =>
             GroundRise(position, size, groundAt, out height) <= MaxGroundRise;
 
+        /// <summary>A snapped wall segment keeps the height of the end it joins if its own ground is within this of it.</summary>
+        public const float SnapKeepHeight = 0.35f;
+
+        /// <summary>Most the ground may rise across the type's footprint (walls have deeper foundations than houses).</summary>
+        public static float MaxRiseFor(BuildingType type) => WallSegment.IsWall(type) ? Combat.GameBalance.WallMaxGroundRise : MaxGroundRise;
+
+        /// <summary>GroundLevel for the type's footprint turned by rot (and offset by its FootprintCenter).</summary>
+        public static bool FootprintLevel(BuildingType type, Vector3 position, Quaternion rot, out float height) =>
+            FootprintLevel(type, position, rot, RtsUnit.GetTerrainHeight, out height);
+
+        public static bool FootprintLevel(BuildingType type, Vector3 position, Quaternion rot, System.Func<Vector3, float> groundAt, out float height)
+        {
+            BuildingDefinition def = BuildingData.GetDefinition(type);
+            return GroundRise(position, def.Size, rot, def.FootprintCenter, groundAt, out height) <= MaxRiseFor(type);
+        }
+
         /// <summary>How much the ground rises across the footprint, and the height to build at (see GroundLevel).</summary>
-        public static float GroundRise(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height)
+        public static float GroundRise(Vector3 position, Vector3 size, System.Func<Vector3, float> groundAt, out float height) =>
+            GroundRise(position, size, Quaternion.identity, Vector3.zero, groundAt, out height);
+
+        public static float GroundRise(Vector3 position, Vector3 size, Quaternion rot, Vector3 offset, System.Func<Vector3, float> groundAt, out float height)
         {
             float low = float.MaxValue, high = float.MinValue;
             for (int i = -2; i <= 2; i++)
                 for (int j = -2; j <= 2; j++)
                 {
                     if (Mathf.Abs(i) < 2 && Mathf.Abs(j) < 2 && (i != 0 || j != 0)) continue; // the rim and the middle
-                    float h = groundAt(position + new Vector3(size.x * 0.25f * i, 0f, size.z * 0.25f * j));
+                    float h = groundAt(position + rot * (offset + new Vector3(size.x * 0.25f * i, 0f, size.z * 0.25f * j)));
                     low = Mathf.Min(low, h); high = Mathf.Max(high, h);
                 }
             height = Mathf.Lerp(low, high, 0.6f);
             return high - low;
         }
 
-        private bool CheckLocationValid(Vector3 position, Vector3 size)
+        /// <summary>
+        /// The box checked for things in the way: the footprint with room round it for NPCs to pass; a wall segment's
+        /// without its ends (the piers and the neighbours it joins stand there) and with little room (walls are joined).
+        /// </summary>
+        public static void CheckBox(BuildingDefinition def, out Vector3 localCenter, out Vector3 size)
         {
-            float padding = (currentBuildingType == BuildingType.CastleWall) ? 0.2f : 0.8f;
-            Vector3 paddedSize = size + new Vector3(padding, 0f, padding);
-            Vector3 center = position + new Vector3(0f, paddedSize.y * 0.5f + 0.1f, 0f);
-            Vector3 halfExtents = paddedSize * 0.5f;
+            if (WallSegment.IsWall(def.Type))
+            {
+                size = new Vector3(Mathf.Max(0.5f, def.Size.x - WallBuilder.PierApothem * 2f - 0.1f), def.Size.y, def.Size.z + 0.2f);
+            }
+            else size = def.Size + new Vector3(0.8f, 0f, 0.8f);
+            localCenter = def.FootprintCenter + new Vector3(0f, size.y * 0.5f + 0.1f, 0f);
+        }
 
-            int hitCount = Physics.OverlapBoxNonAlloc(center, halfExtents, overlapBuffer, Quaternion.identity);
+        private bool CheckLocationValid(Vector3 position, Quaternion rot, BuildingDefinition def)
+        {
+            CheckBox(def, out Vector3 local, out Vector3 size);
+            Vector3 center = position + rot * local;
+            Vector3 halfExtents = size * 0.5f;
+
+            int hitCount = Physics.OverlapBoxNonAlloc(center, halfExtents, overlapBuffer, rot);
 
             for (int i = 0; i < hitCount; i++)
             {
@@ -259,6 +324,7 @@ namespace BattleOfAges.Building
         {
             BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
             Vector3 buildPos = (ghostPreview != null) ? ghostPreview.transform.position : transform.position;
+            Quaternion buildRot = (ghostPreview != null) ? ghostPreview.transform.rotation : Quaternion.identity;
 
             if (!IsAllowed(currentBuildingType, out string notAllowed))
             {
@@ -267,13 +333,13 @@ namespace BattleOfAges.Building
                 return;
             }
 
-            if (!GroundLevel(buildPos, def.Size, out _))
+            if (!FootprintLevel(currentBuildingType, buildPos, buildRot, out _))
             {
                 StrategyHud.Notify("Тут надто круто для будівлі");
                 return;
             }
 
-            if (!CheckLocationValid(buildPos, def.Size))
+            if (!CheckLocationValid(buildPos, buildRot, def))
             {
                 Debug.Log($"[Building] Неможливо побудувати тут: занадто близько до іншої будівлі або об'єкта! Потрібен прохід для NPC.");
                 return;
@@ -296,14 +362,16 @@ namespace BattleOfAges.Building
             if (!Combat.CentralEmpire.Active) // building is free for the Central Empire
             {
                 if (def.WoodCost > 0) rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
-                if (def.OreCost > 0) rm.ConsumeOre(def.OreTierRequired, def.OreCost);
+                if (def.OreCost > 0) rm.ConsumeOre(OreTierOf(def), def.OreCost);
             }
 
             GameObject building = CreateBuilding(currentBuildingType);
 
             if (building != null)
             {
-                building.transform.position = buildPos;
+                building.transform.SetPositionAndRotation(buildPos, buildRot);
+                WallSegment wall = building.GetComponent<WallSegment>();
+                if (wall != null) wall.OreTier = wallTier;
 
                 BuildingNode node = building.GetComponent<BuildingNode>();
                 if (node != null)
@@ -312,6 +380,7 @@ namespace BattleOfAges.Building
                 }
             }
 
+            if (WallSegment.IsWall(def.Type) && !CanAffordTier(def, wallTier)) wallTier = NextWallTier(wallTier, def.OreCost); // that ore ran out: go on with other
             if (!CanAfford(def))
             {
                 CancelPlacement();
@@ -342,22 +411,52 @@ namespace BattleOfAges.Building
                 case BuildingType.StorageChest: return StorageChestNode.CreateStorageChestPrefab("StorageChest");
                 case BuildingType.Mine: return MineNode.CreateMinePrefab("Mine");
                 case BuildingType.Workbench: return WorkbenchNode.CreateWorkbenchPrefab("Workbench");
-                case BuildingType.CastleWall: return BuildingNode.CreateCastleWallPrefab("CastleWall");
+                case BuildingType.CastleWall:
+                case BuildingType.WallStairs:
+                case BuildingType.WallGate: return BuildingNode.CreateWallPrefab(type, type.ToString());
                 case BuildingType.TownHall: return TownHall.CreatePrefab("TownHall");
                 default: return null;
             }
         }
 
+        /// <summary>The ore tier the building takes: a wall's is the one picked for it (its strength).</summary>
+        private int OreTierOf(BuildingDefinition def) => WallSegment.IsWall(def.Type) ? wallTier : def.OreTierRequired;
+
         private bool CanAfford(BuildingDefinition def)
+        {
+            if (WallSegment.IsWall(def.Type) && !isPlacing) return CanAffordTier(def, NextWallTier(wallTier, def.OreCost, true));
+            return CanAffordTier(def, OreTierOf(def));
+        }
+
+        private static bool CanAffordTier(BuildingDefinition def, int tier)
         {
             ResourceManager rm = ResourceManager.Instance;
             if (rm == null) return false;
             if (Combat.CentralEmpire.Active) return true;
 
             if (def.WoodCost > 0 && rm.WoodCount < def.WoodCost) return false;
-            if (def.OreCost > 0 && rm.GetOreTierCount(def.OreTierRequired) < def.OreCost) return false;
+            if (def.OreCost > 0 && rm.GetOreTierCount(tier) < def.OreCost) return false;
 
             return true;
+        }
+
+        /// <summary>
+        /// The next ore tier above current (round to the lowest) that the player has at least cost pieces of; current
+        /// itself if there is no other; with keep, current when it is still enough.
+        /// </summary>
+        public static int NextWallTier(int current, int cost, bool keep = false)
+        {
+            ResourceManager rm = ResourceManager.Instance;
+            if (rm == null) return current;
+            if (keep && rm.GetOreTierCount(current) >= cost) return current;
+            int first = -1, next = -1;
+            foreach (var pair in rm.OreTiers())
+            {
+                if (pair.Value < cost) continue;
+                if (first < 0 || pair.Key < first) first = pair.Key;
+                if (pair.Key > current && (next < 0 || pair.Key < next)) next = pair.Key;
+            }
+            return next >= 0 ? next : first >= 0 ? first : current;
         }
     }
 }

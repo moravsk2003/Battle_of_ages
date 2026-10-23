@@ -10,7 +10,9 @@ namespace BattleOfAges.Building
         Mine,
         Workbench,
         CastleWall,
-        TownHall
+        TownHall,
+        WallStairs,
+        WallGate
     }
 
     /// <summary>
@@ -26,7 +28,8 @@ namespace BattleOfAges.Building
         public int OreTierRequired; // which ore tier level is consumed
         public int NpcSpawnCount;   // how many NPC workers spawn on build
         public Vector3 Size;        // approximate footprint for ghost preview
-        public int MaxHealth;       // structure durability
+        public Vector3 FootprintCenter; // where the footprint's middle is in the building's frame (stairs stand inside a wall)
+        public int MaxHealth;       // structure durability (a wall's: at ore tier 0, see WallSegment)
     }
 
     public static class BuildingData
@@ -84,14 +87,39 @@ namespace BattleOfAges.Building
             new BuildingDefinition
             {
                 Type = BuildingType.CastleWall,
-                DisplayName = "Замкова Стіна",
-                Description = "Оборонний кам'яний мур для захисту від набігів",
+                DisplayName = "Стіна",
+                Description = "Сегмент муру з хідником; міцність від руди",
                 WoodCost = 2,
-                OreCost = 3,
+                OreCost = 4,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
-                Size = new Vector3(4.0f, 3.5f, 1.2f),
-                MaxHealth = 600
+                Size = new Vector3(4.0f, 4.9f, 1.8f),
+                MaxHealth = 1500
+            },
+            new BuildingDefinition
+            {
+                Type = BuildingType.WallStairs,
+                DisplayName = "Стіна зі сходами",
+                Description = "Сегмент муру; сходи зсередини на хідник",
+                WoodCost = 3,
+                OreCost = 6,
+                OreTierRequired = 0,
+                NpcSpawnCount = 0,
+                Size = new Vector3(4.0f, 4.9f, 3.0f),
+                FootprintCenter = new Vector3(0f, 0f, -0.6f),
+                MaxHealth = 1500
+            },
+            new BuildingDefinition
+            {
+                Type = BuildingType.WallGate,
+                DisplayName = "Ворота",
+                Description = "Прохід у мурі: відчиняються лише своїм",
+                WoodCost = 8,
+                OreCost = 6,
+                OreTierRequired = 0,
+                NpcSpawnCount = 0,
+                Size = new Vector3(6.0f, 4.9f, 1.8f),
+                MaxHealth = 1800
             },
             new BuildingDefinition
             {

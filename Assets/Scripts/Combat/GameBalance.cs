@@ -158,6 +158,22 @@ namespace BattleOfAges.Combat
         /// <summary>HP of the hall of level I..V, the player's and an NPC king's alike (index 0: no hall; an NPC camp cannot be destroyed).</summary>
         public static int[] TownHallHealth = { 0, 1500, 2250, 3000, 3750, 4500 };
 
+        // ------------------------------------------------------------------ walls (§10.5)
+
+        /// <summary>A wall's HP is its type's MaxHealth x (1 + this x the tier of the ore it is built of).</summary>
+        public static float WallHealthPerOreTier = 0.5f;
+        /// <summary>Walls may stand on ground rising this much across them (their foundation goes deeper than a house's).</summary>
+        public static float WallMaxGroundRise = 1.6f;
+        /// <summary>A new segment snaps to a free end of a wall within this of the cursor; turns go in these steps.</summary>
+        public static float WallSnapRadius = 3f, WallTurnStep = 15f;
+        /// <summary>Wood and ore pieces to raise the settlement's walls to levels II..V; the minimum ore tier is level - 1.</summary>
+        public static int[] WallLevelWood = { 0, 0, 20, 45, 80, 130 };
+        public static int[] WallLevelOre = { 0, 0, 8, 12, 16, 24 };
+        /// <summary>Extra damage of a unit fighting from a wall of level I..V (on top of the height bonus).</summary>
+        public static float[] WallLevelDamageBonus = { 0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f };
+        /// <summary>The gate opens for own units and the player within this.</summary>
+        public static float GateOpenRadius = 5f;
+
         // ------------------------------------------------------------------ NPC kingdoms (§12, M0)
 
         /// <summary>NPC kings around the player at a new game, this far from the player's start.</summary>

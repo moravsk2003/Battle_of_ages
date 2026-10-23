@@ -193,9 +193,9 @@ namespace BattleOfAges.Tests
         [Test]
         public void CastleWall_HasClimbAssistTrigger()
         {
-            GameObject wall = BuildingNode.CreateCastleWallPrefab("TestWall");
+            GameObject wall = BuildingNode.CreateWallPrefab(BuildingType.WallStairs, "TestWall");
             CastleWallClimbTrigger trigger = wall.GetComponentInChildren<CastleWallClimbTrigger>();
-            Assert.IsNotNull(trigger, "CastleWall prefab should contain CastleWallClimbTrigger component.");
+            Assert.IsNotNull(trigger, "The wall with stairs should contain CastleWallClimbTrigger component.");
 
             Object.DestroyImmediate(wall);
         }

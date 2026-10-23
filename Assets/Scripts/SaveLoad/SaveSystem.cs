@@ -159,6 +159,7 @@ namespace BattleOfAges.SaveLoad
                 foreach (ArtifactPickup p in ArtifactPickup.Active)
                     d.Pickups.Add(new ArtifactSave { Type = (int)p.Type, Shard = p.IsShard, Position = p.transform.position, OwnedByPlayer = p.Owner != null });
                 d.WorldEpoch = CentralEmpire.WorldEpoch;
+                d.WallLevel = Fortifications.Level;
                 d.KingdomsFounded = true;
                 foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.Kingdoms.Add(k.ToSave());
                 HeroSkills skills = player.GetComponent<HeroSkills>();
@@ -187,6 +188,8 @@ namespace BattleOfAges.SaveLoad
                 if (mine != null) foreach (var p in mine.OreStock()) s.MineOre.Add(new TierCount(p.Key, p.Value));
                 TownHall hall = b.GetComponent<TownHall>();
                 if (hall != null) s.Level = hall.Level;
+                WallSegment wall = b.GetComponent<WallSegment>();
+                if (wall != null) s.OreTier = wall.OreTier;
                 WorkbenchNode bench = b.GetComponent<WorkbenchNode>();
                 if (bench != null)
                 {
@@ -260,6 +263,7 @@ namespace BattleOfAges.SaveLoad
             AutosaveEnabled = true;
             WorldPersistence.Suspended = true;
             WorldPersistence.Clear();
+            Fortifications.Level = 1;
             Time.timeScale = 1f;
             SceneManager.LoadScene(GameScene);
         }
@@ -368,7 +372,9 @@ namespace BattleOfAges.SaveLoad
                 HealthComponent hp = go.GetComponent<HealthComponent>();
                 if (hp != null)
                 {
-                    if (!kept.Contains(s.SceneKey ?? "")) hp.InitializeHealth(BuildingData.GetDefinition((BuildingType)s.Type).MaxHealth);
+                    WallSegment wall = go.GetComponent<WallSegment>();
+                    if (wall != null) wall.OreTier = s.OreTier;
+                    if (!kept.Contains(s.SceneKey ?? "")) hp.InitializeHealth(wall != null ? WallSegment.MaxHealthFor((BuildingType)s.Type, s.OreTier) : BuildingData.GetDefinition((BuildingType)s.Type).MaxHealth);
                     if (s.Health > 0) hp.SetCurrentHealth(s.Health);
                 }
                 TownHall hall = go.GetComponent<TownHall>();
@@ -436,6 +442,7 @@ namespace BattleOfAges.SaveLoad
                                                    d.Player.PierceLevel, d.Player.Meteor, d.Player.CriticalHit);
                 player.GetComponent<HeroArtifacts>()?.Restore(d.Player.Artifacts, d.Player.Shards, d.Player.StartArtifactChosen);
                 CentralEmpire.WorldEpoch = d.WorldEpoch;
+                Fortifications.Level = d.WallLevel;
                 foreach (ArtifactPickup p in new List<ArtifactPickup>(ArtifactPickup.Active)) UnityEngine.Object.Destroy(p.gameObject);
                 foreach (ArtifactSave a in d.Pickups)
                     ArtifactPickup.Spawn((ArtifactType)a.Type, a.Position, a.Shard, a.OwnedByPlayer ? player.GetComponent<HeroSuccession>() : null);
