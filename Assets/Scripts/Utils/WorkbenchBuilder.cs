@@ -122,9 +122,9 @@ namespace BattleOfAges.Utils
             float z = -HalfD + 0.04f;
             foreach (float x in new[] { -HalfW + 0.1f, HalfW - 0.1f })
                 B(new Vector3(x, (TopY + 1.95f) * 0.5f + 0.1f, z), new Vector3(0.1f, 1.95f - TopY + 0.2f, 0.09f), OakDark, WoodS, 0.015f, null, 0f, Grain(OakDark, new Vector3(x, 1f, 0f)));
-            // Two boards overlapping a little (the world showed through a slit between them), and a rail with pegs over the top one
+            // Two boards, and a rail with pegs
             B(new Vector3(0f, 1.36f, z - 0.01f), new Vector3(HalfW * 2f - 0.1f, 0.34f, 0.035f), Oak * 0.92f, WoodS, 0.008f, null, 0f, Grain(Oak * 0.92f, new Vector3(5f, 0f, 0f)));
-            B(new Vector3(0f, 1.71f, z - 0.01f), new Vector3(HalfW * 2f - 0.1f, 0.38f, 0.035f), Oak * 0.86f, WoodS, 0.008f, null, 0f, Grain(Oak * 0.86f, new Vector3(6f, 0f, 0f)));
+            B(new Vector3(0f, 1.72f, z - 0.01f), new Vector3(HalfW * 2f - 0.1f, 0.34f, 0.035f), Oak * 0.86f, WoodS, 0.008f, null, 0f, Grain(Oak * 0.86f, new Vector3(6f, 0f, 0f)));
             B(new Vector3(0f, 1.93f, z + 0.01f), new Vector3(HalfW * 2f + 0.12f, 0.07f, 0.07f), OakDark, WoodS, 0.01f);
             for (int i = 0; i < 7; i++)
             {
