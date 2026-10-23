@@ -27,7 +27,9 @@ namespace BattleOfAges.Utils
         private static readonly Vector3 WoodS = new Vector3(4f, 0f, 0.22f);
         private static readonly Vector3 BarkS = new Vector3(4f, 0f, 0.1f);
         private static readonly Vector3 IronS = new Vector3(3f, 0.8f, 0.42f);
-        private static readonly Vector3 WornS = new Vector3(3f, 0.9f, 0.62f);
+        private static readonly Vector3 WornS = new Vector3(3f, 0.85f, 0.45f);
+        /// <summary>A flat blade: dull (a smooth one mirrors the sun over its whole face, a blinding glare with bloom).</summary>
+        private static readonly Vector3 BladeS = new Vector3(3f, 0.7f, 0.28f);
         private static readonly Vector3 DarkS = new Vector3(1f, 0f, 0.05f);
         private static readonly Vector3 WetS = new Vector3(1f, 0f, 0.85f);
 
@@ -163,7 +165,7 @@ namespace BattleOfAges.Utils
 
         private static void Saw(Vector3 at)
         {
-            B(at + new Vector3(0.12f, -0.12f, 0f), new Vector3(0.46f, 0.11f, 0.004f), IronBright, WornS, 0.002f, Quaternion.Euler(0f, 0f, -4f),
+            B(at + new Vector3(0.12f, -0.12f, 0f), new Vector3(0.46f, 0.11f, 0.004f), IronBright * 0.85f, BladeS, 0.002f, Quaternion.Euler(0f, 0f, -4f),
               0f, p => p.y < -0.04f ? IronBright * 0.75f : IronBright); // the teeth darker
             B(at + new Vector3(-0.15f, -0.08f, 0f), new Vector3(0.12f, 0.14f, 0.03f), Oak, WoodS, 0.02f);
         }
