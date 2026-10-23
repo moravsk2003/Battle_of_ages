@@ -30,56 +30,39 @@ namespace BattleOfAges.Utils
             root.SetActive(false);
             root.transform.position = campCenter;
 
-            Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.35f, 0.22f, 0.12f), 0f, 0.25f);
-            Material clothMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Dark, new Color(0.55f, 0.18f, 0.14f), 0f, 0.20f); // Crimson cloth
-            Material stoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.35f, 0.35f, 0.38f), 0f, 0.20f);
-            Material fireMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Gold, new Color(1.0f, 0.45f, 0.10f), 0.8f, 0.8f);
-
-            // 1. Central Campfire
-            GameObject fireRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            fireRing.name = "CampfireRing";
-            fireRing.transform.SetParent(root.transform, false);
-            fireRing.transform.localPosition = new Vector3(0f, 0.15f, 0f);
-            fireRing.transform.localScale = new Vector3(1.8f, 0.2f, 1.8f);
-            fireRing.GetComponent<MeshRenderer>().sharedMaterial = stoneMat;
-
-            GameObject fireEmber = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            fireEmber.name = "FireEmbers";
-            fireEmber.transform.SetParent(root.transform, false);
-            fireEmber.transform.localPosition = new Vector3(0f, 0.35f, 0f);
-            fireEmber.transform.localScale = new Vector3(0.9f, 0.6f, 0.9f);
-            fireEmber.GetComponent<MeshRenderer>().sharedMaterial = fireMat;
-
-            // 2. Three Raider Tents
-            Vector3[] tentPositions = new Vector3[]
+            // The camp's pieces (CampBuilder meshes), each set on the ground where it stands
+            Transform Piece(string pieceName, Mesh mesh, Vector3 local, float yaw, Mesh far = null)
             {
-                new Vector3(-4.5f, 0f, 2.5f),
-                new Vector3(4.5f, 0f, 3.0f),
-                new Vector3(0f, 0f, -5.0f)
-            };
-            float[] tentYaws = new float[] { 45f, -50f, 180f };
-
-            for (int i = 0; i < tentPositions.Length; i++)
-            {
-                BuildTent(root.transform, tentPositions[i], tentYaws[i], woodMat, clothMat);
+                Vector3 world = campCenter + local;
+                local.y = RtsUnit.GetTerrainHeight(world) - campCenter.y;
+                Transform t = CampBuilder.Attach(root.transform, pieceName, mesh, far).transform;
+                t.localPosition = local;
+                t.localRotation = Quaternion.Euler(0f, yaw, 0f);
+                return t;
             }
 
-            // 3. Spiked Barricades
-            Vector3[] barricadePositions = new Vector3[]
-            {
-                new Vector3(-6.5f, 0f, -2.5f),
-                new Vector3(6.5f, 0f, -2.0f),
-                new Vector3(-2.5f, 0f, 6.0f),
-                new Vector3(2.5f, 0f, 6.0f)
-            };
+            // 1. Central campfire
+            Piece("Campfire", CampBuilder.Fire, Vector3.zero, 0f);
 
-            for (int i = 0; i < barricadePositions.Length; i++)
+            // 2. Three raider tents, their doors to the fire; one solid volume each: the open A-frame let units walk in
+            // and get wedged (AI movement has no pathfinding)
+            Vector3[] tentPositions = { new Vector3(-4.5f, 0f, 2.5f), new Vector3(4.5f, 0f, 3.0f), new Vector3(0f, 0f, -5.0f) };
+            foreach (Vector3 tp in tentPositions)
             {
-                BuildSpikeBarricade(root.transform, barricadePositions[i], woodMat);
+                float yaw = Mathf.Atan2(-tp.x, -tp.z) * Mathf.Rad2Deg;
+                Transform tent = Piece("RaiderTent", CampBuilder.Tent, tp, yaw, CampBuilder.TentFar);
+                BoxCollider volume = tent.gameObject.AddComponent<BoxCollider>();
+                volume.center = new Vector3(0f, 1.1f, 0f);
+                volume.size = new Vector3(3.4f, 2.2f, 3.3f);
             }
 
-            // 4. War Standard / Skull Totem
-            BuildWarBanner(root.transform, new Vector3(1.8f, 0f, 1.8f), woodMat, clothMat);
+            // 3. Spiked barricades on the outskirts, facing out
+            Vector3[] barricadePositions = { new Vector3(-6.5f, 0f, -2.5f), new Vector3(6.5f, 0f, -2.0f), new Vector3(-2.5f, 0f, 6.0f), new Vector3(2.5f, 0f, 6.0f) };
+            foreach (Vector3 bp in barricadePositions) Piece("SpikeBarricade", CampBuilder.Barricade, bp, Mathf.Atan2(bp.x, bp.z) * Mathf.Rad2Deg + 90f);
+
+            // 4. War standard by the fire, and the camp's clutter by a tent
+            Piece("WarStandard", CampBuilder.Standard, new Vector3(1.8f, 0f, 1.8f), 30f);
+            Piece("CampClutter", CampBuilder.Clutter, new Vector3(-2.2f, 0f, -3.6f), 160f);
             yield return null;
 
             // 5. Spawn Warlord (Leader) & Raider Squad
@@ -124,79 +107,6 @@ namespace BattleOfAges.Utils
                 leaderComp.InitializeSquad(squad);
             }
             root.SetActive(true);
-        }
-
-        private static void BuildTent(Transform parent, Vector3 localPos, float yaw, Material woodMat, Material clothMat)
-        {
-            GameObject tentRoot = new GameObject("RaiderTent");
-            tentRoot.transform.SetParent(parent, false);
-            tentRoot.transform.localPosition = localPos;
-            tentRoot.transform.localRotation = Quaternion.Euler(0f, yaw, 0f);
-
-            // One solid volume for the whole tent: the A-frame roof plates alone leave an open tunnel that
-            // units can walk into and get wedged in (AI movement has no pathfinding).
-            BoxCollider tentVolume = tentRoot.AddComponent<BoxCollider>();
-            tentVolume.center = new Vector3(0f, 1.15f, 0f);
-            tentVolume.size = new Vector3(3.6f, 2.3f, 3.4f);
-
-            // Tent Triangular Roof
-            GameObject leftRoof = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            leftRoof.transform.SetParent(tentRoot.transform, false);
-            leftRoof.transform.localPosition = new Vector3(-1.0f, 1.3f, 0f);
-            leftRoof.transform.localScale = new Vector3(0.12f, 2.5f, 3.2f);
-            leftRoof.transform.localRotation = Quaternion.Euler(0f, 0f, -40f);
-            leftRoof.GetComponent<MeshRenderer>().sharedMaterial = clothMat;
-
-            GameObject rightRoof = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            rightRoof.transform.SetParent(tentRoot.transform, false);
-            rightRoof.transform.localPosition = new Vector3(1.0f, 1.3f, 0f);
-            rightRoof.transform.localScale = new Vector3(0.12f, 2.5f, 3.2f);
-            rightRoof.transform.localRotation = Quaternion.Euler(0f, 0f, 40f);
-            rightRoof.GetComponent<MeshRenderer>().sharedMaterial = clothMat;
-
-            // Ridge Pole
-            GameObject ridge = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            ridge.transform.SetParent(tentRoot.transform, false);
-            ridge.transform.localPosition = new Vector3(0f, 2.15f, 0f);
-            ridge.transform.localScale = new Vector3(0.12f, 1.8f, 0.12f);
-            ridge.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            ridge.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-        }
-
-        private static void BuildSpikeBarricade(Transform parent, Vector3 localPos, Material woodMat)
-        {
-            GameObject barricade = new GameObject("SpikeBarricade");
-            barricade.transform.SetParent(parent, false);
-            barricade.transform.localPosition = localPos;
-
-            for (int i = -1; i <= 1; i++)
-            {
-                GameObject spike = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                spike.transform.SetParent(barricade.transform, false);
-                spike.transform.localPosition = new Vector3(i * 0.7f, 0.85f, 0f);
-                spike.transform.localScale = new Vector3(0.18f, 1.1f, 0.18f);
-                spike.transform.localRotation = Quaternion.Euler(30f, i * 15f, 0f);
-                spike.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-            }
-        }
-
-        private static void BuildWarBanner(Transform parent, Vector3 localPos, Material woodMat, Material clothMat)
-        {
-            GameObject bannerObj = new GameObject("WarStandard");
-            bannerObj.transform.SetParent(parent, false);
-            bannerObj.transform.localPosition = localPos;
-
-            GameObject pole = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pole.transform.SetParent(bannerObj.transform, false);
-            pole.transform.localPosition = new Vector3(0f, 2.0f, 0f);
-            pole.transform.localScale = new Vector3(0.1f, 2.0f, 0.1f);
-            pole.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-
-            GameObject flag = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            flag.transform.SetParent(bannerObj.transform, false);
-            flag.transform.localPosition = new Vector3(0.6f, 3.2f, 0f);
-            flag.transform.localScale = new Vector3(1.2f, 1.0f, 0.05f);
-            flag.GetComponent<MeshRenderer>().sharedMaterial = clothMat;
         }
 
         public static GameObject CreateHostileMob(HostileMobType type, string name = "HostileMob")
