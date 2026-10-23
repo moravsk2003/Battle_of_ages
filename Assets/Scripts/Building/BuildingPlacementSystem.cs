@@ -142,11 +142,11 @@ namespace BattleOfAges.Building
             if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
             {
                 Vector3 pos = hit.point;
-                pos.y = RtsUnit.GetTerrainHeight(pos);
+                BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
+                bool level = GroundLevel(pos, def.Size, out pos.y);
                 ghostPreview.transform.position = pos;
 
-                BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
-                bool validLoc = CheckLocationValid(pos, def.Size);
+                bool validLoc = level && CheckLocationValid(pos, def.Size);
                 bool affordable = CanAfford(def) && IsAllowed(currentBuildingType, out _);
 
                 Color ghostColor = (validLoc && affordable)
@@ -172,6 +172,28 @@ namespace BattleOfAges.Building
                     renderers[i].SetPropertyBlock(ghostPropertyBlock);
                 }
             }
+        }
+
+        /// <summary>Most a footprint's ground may rise across it (a house on a hillside sank into it on one side and hung over it on the other).</summary>
+        public const float MaxGroundRise = 0.9f;
+
+        /// <summary>
+        /// Whether the ground under the footprint is level enough to build on, and the height to build at: a bit above
+        /// the middle of the ground's range, so the uphill side does not bury the walls (the foundation under the
+        /// plinth covers the downhill side).
+        /// </summary>
+        public static bool GroundLevel(Vector3 position, Vector3 size, out float height)
+        {
+            float low = float.MaxValue, high = float.MinValue;
+            for (int i = -2; i <= 2; i++)
+                for (int j = -2; j <= 2; j++)
+                {
+                    if (Mathf.Abs(i) < 2 && Mathf.Abs(j) < 2 && (i != 0 || j != 0)) continue; // the rim and the middle
+                    float h = RtsUnit.GetTerrainHeight(position + new Vector3(size.x * 0.25f * i, 0f, size.z * 0.25f * j));
+                    low = Mathf.Min(low, h); high = Mathf.Max(high, h);
+                }
+            height = Mathf.Lerp(low, high, 0.6f);
+            return high - low <= MaxGroundRise;
         }
 
         private bool CheckLocationValid(Vector3 position, Vector3 size)
@@ -236,6 +258,12 @@ namespace BattleOfAges.Building
             {
                 StrategyHud.Notify(notAllowed);
                 CancelPlacement();
+                return;
+            }
+
+            if (!GroundLevel(buildPos, def.Size, out _))
+            {
+                StrategyHud.Notify("Тут надто круто для будівлі");
                 return;
             }
 

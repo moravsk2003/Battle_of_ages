@@ -58,6 +58,7 @@ namespace BattleOfAges.Utils
             kit = new MeshKit();
             rng = new System.Random(4242);
             B(new Vector3(0f, -0.06f, 0f), new Vector3(3.24f, 0.5f, 3.24f), Stone, StoneS, 0f);
+            B(new Vector3(0f, -0.62f, 0f), new Vector3(3.18f, 0.8f, 3.18f), Stone * 0.72f, StoneS, 0f);
             B(new Vector3(0f, PlateTop * 0.5f, 0f), new Vector3(2 * W, PlateTop, 2 * D), Plaster, PlasterS, 0f, null, 0f,
               p => Color.Lerp(Dirt, Plaster, Mathf.SmoothStep(0f, 1f, (p.y + 0.9f) / 0.9f)));
             for (int i = 0; i < 4; i++)
@@ -93,6 +94,7 @@ namespace BattleOfAges.Utils
         {
             kit = new MeshKit();
             rng = new System.Random(4242);
+            Foundation();
             Plinth();
             Walls();
             Roof();
@@ -164,6 +166,16 @@ namespace BattleOfAges.Utils
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Rubble footing under the plinth, down to a metre below the floor: on a slope the house stands a little above
+        /// the middle of the ground (BuildingPlacementSystem.GroundLevel), and this fills the gap on the downhill side.
+        /// </summary>
+        private static void Foundation()
+        {
+            B(new Vector3(0f, -0.62f, 0f), new Vector3(3.18f, 0.8f, 3.18f), Stone * 0.72f, StoneS, 0.02f, null, 0.02f,
+              p => Stone * (0.62f + 0.14f * SdfCreature.Noise(p * 6f)));
         }
 
         private static void PlinthStone(int side, float u0, float u1, float y0, float h, float outer, float depth)
