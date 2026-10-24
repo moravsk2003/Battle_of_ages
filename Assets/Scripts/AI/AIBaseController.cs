@@ -226,7 +226,7 @@ namespace BattleOfAges.AI
             {
                 ResetStuckDetection();
                 // Idle: only get out of the way of overlapping neighbours; re-seat on the ground a few times a second.
-                GroundMotor.Move(transform, gridId, Vector3.zero, radius, Time.deltaTime);
+                GroundMotor.Move(transform, gridId, Vector3.zero, radius, Time.deltaTime, GridTeam == UnitSpatialGrid.TeamPlayer);
                 settleTimer -= Time.deltaTime;
                 if (settleTimer <= 0f) { settleTimer = 0.3f; GroundMotor.Settle(transform); }
                 return;
@@ -253,7 +253,7 @@ namespace BattleOfAges.AI
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
                 }
 
-                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed * BattleFront.Factor(GridTeam, moveDir), radius, Time.deltaTime);
+                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed * BattleFront.Factor(GridTeam, moveDir), radius, Time.deltaTime, GridTeam == UnitSpatialGrid.TeamPlayer);
             }
             else
             {

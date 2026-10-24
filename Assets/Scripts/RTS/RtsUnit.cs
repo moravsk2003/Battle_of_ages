@@ -236,7 +236,7 @@ namespace BattleOfAges.RTS
                     return;
                 }
                 // Idle unit: step aside for overlapping neighbours, stay on the ground
-                GroundMotor.Move(transform, gridId, Vector3.zero, radius, Time.deltaTime);
+                GroundMotor.Move(transform, gridId, Vector3.zero, radius, Time.deltaTime, true);
                 settleTimer -= Time.deltaTime;
                 if (settleTimer <= 0f) { settleTimer = 0.3f; GroundMotor.Settle(transform); }
                 return;
@@ -251,6 +251,14 @@ namespace BattleOfAges.RTS
 
             if (moveDir.sqrMagnitude > STOPPING_DISTANCE_SQR)
             {
+                bool inGateway = false;
+                if (!isPlayerControlled)
+                {
+                    // Across an own wall: by way of a gate (§10.5)
+                    Vector3 via = Building.WallBarriers.Route(currentPos, targetPosition, out inGateway), toVia = via - currentPos;
+                    toVia.y = 0f;
+                    if ((via.x != targetPosition.x || via.z != targetPosition.z) && toVia.sqrMagnitude > 0.04f) moveDir = toVia;
+                }
                 moveDir.Normalize();
 
                 // 1. Multi-whisker obstacle avoidance & anti-stuck steering (3 sphere casts): 10 times per second for
@@ -264,8 +272,8 @@ namespace BattleOfAges.RTS
                     steerTimer = SteerInterval;
                     steerElapsed = 0f;
                 }
-                moveDir = steerDir;
-                if (touchingSolidNearTarget)
+                if (!inGateway) moveDir = steerDir; // in a gateway the way is clear: no probes against the jambs
+                if (touchingSolidNearTarget && !inGateway)
                 {
                     touchingSolidNearTarget = false;
                     hasTarget = false;
@@ -287,7 +295,7 @@ namespace BattleOfAges.RTS
 
                 if (!isPlayerControlled)
                 {
-                    GroundMotor.Move(transform, gridId, moveDir * speed, radius, Time.deltaTime);
+                    GroundMotor.Move(transform, gridId, moveDir * speed, radius, Time.deltaTime, true);
                 }
                 else if (characterController != null)
                 {
@@ -366,7 +374,7 @@ namespace BattleOfAges.RTS
                     {
                         Vector3 lateralNudge = Vector3.Cross(Vector3.up, desiredDir).normalized * (avoidSideSign * 2.0f * elapsed);
                         if (isPlayerControlled && characterController != null) characterController.Move(lateralNudge);
-                        else GroundMotor.Move(transform, gridId, lateralNudge / Mathf.Max(elapsed, 1e-4f), characterController != null ? characterController.radius : 0.4f, elapsed);
+                        else GroundMotor.Move(transform, gridId, lateralNudge / Mathf.Max(elapsed, 1e-4f), characterController != null ? characterController.radius : 0.4f, elapsed, true);
                     }
                 }
             }

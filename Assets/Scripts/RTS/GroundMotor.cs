@@ -14,8 +14,11 @@ namespace BattleOfAges.RTS
         private const float MaxClimb = 1.43f;
         private const float SeparationStrength = 6f;
 
-        /// <summary>Moves the unit; returns the horizontal velocity actually applied.</summary>
-        public static Vector3 Move(Transform t, int gridId, Vector3 desiredVelocity, float radius, float dt)
+        /// <summary>
+        /// Moves the unit; returns the horizontal velocity actually applied. Walls stop it (it slides along them); own:
+        /// the player's side, for whom the gates are open.
+        /// </summary>
+        public static Vector3 Move(Transform t, int gridId, Vector3 desiredVelocity, float radius, float dt, bool own = false)
         {
             Vector3 p = t.position;
             Vector3 v = desiredVelocity;
@@ -26,7 +29,10 @@ namespace BattleOfAges.RTS
             float maxSpeed = Mathf.Max(desiredVelocity.magnitude * 1.25f, 2f);
             if (v.sqrMagnitude > maxSpeed * maxSpeed) v = v.normalized * maxSpeed;
 
-            Vector3 np = p + v * dt;
+            Vector3 step = Building.WallBarriers.Constrain(p, v * dt, radius, own);
+            if (step.sqrMagnitude < 1e-10f) return Vector3.zero;
+            v = step / dt;
+            Vector3 np = p + step;
             float ground = RtsUnit.GetTerrainHeight(np);
             float run = v.magnitude * dt;
             if (ground - p.y > run * MaxClimb + 0.05f)
