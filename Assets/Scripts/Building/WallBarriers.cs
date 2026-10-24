@@ -22,10 +22,12 @@ namespace BattleOfAges.Building
             /// <summary>The walkway's height: a unit up there (stage 4) is not stopped by its own wall.</summary>
             public float TopY;
             public Vector2 Min, Max;
+            /// <summary>The segment it belongs to (none for a pier).</summary>
+            public WallSegment Owner;
 
             public Barrier(Vector2 a, Vector2 b, float half, float topY, bool leaf = false)
             {
-                A = a; B = b; Half = half; TopY = topY; Leaf = leaf;
+                A = a; B = b; Half = half; TopY = topY; Leaf = leaf; Owner = null;
                 Min = Vector2.Min(a, b) - Vector2.one * half;
                 Max = Vector2.Max(a, b) + Vector2.one * half;
             }
@@ -56,7 +58,7 @@ namespace BattleOfAges.Building
             barriers.Clear();
             gates.Clear();
             foreach (WallSegment s in segments)
-                if (s != null) Add(s.transform, s.Kind);
+                if (s != null) Add(s.transform, s.Kind, s);
             foreach (WallPier p in WallPier.Active)
                 if (p != null)
                 {
@@ -66,8 +68,9 @@ namespace BattleOfAges.Building
         }
 
         /// <summary>The barriers of a segment of the kind at t (also used for a wall not registered yet).</summary>
-        private static void Add(Transform t, WallBuilder.Kind kind)
+        private static void Add(Transform t, WallBuilder.Kind kind, WallSegment owner)
         {
+            int first = barriers.Count;
             float half = WallBuilder.LengthOf(kind) * 0.5f, top = t.position.y + WallBuilder.WalkY, th = WallBuilder.Thickness * 0.5f;
             Vector2 P(float x, float z = 0f) => Flat(t.TransformPoint(new Vector3(x, 0f, z)));
             if (kind == WallBuilder.Kind.Gate)
@@ -77,14 +80,55 @@ namespace BattleOfAges.Building
                 barriers.Add(new Barrier(P(w), P(half), th, top));
                 barriers.Add(new Barrier(P(-w), P(w), th, top, true));
                 gates.Add((P(0f), (P(0f, 1f) - P(0f)).normalized, (P(1f) - P(0f)).normalized));
-                return;
             }
-            barriers.Add(new Barrier(P(-half), P(half), th, top));
-            if (kind == WallBuilder.Kind.Stairs)
+            else
             {
-                float zc = (WallBuilder.StairsInnerZ + WallBuilder.StairsOuterZ) * 0.5f, sw = (WallBuilder.StairsInnerZ - WallBuilder.StairsOuterZ) * 0.5f;
-                barriers.Add(new Barrier(P(-half, zc), P(WallBuilder.StairsLowX, zc), sw, top));
+                barriers.Add(new Barrier(P(-half), P(half), th, top));
+                if (kind == WallBuilder.Kind.Stairs)
+                {
+                    float zc = (WallBuilder.StairsInnerZ + WallBuilder.StairsOuterZ) * 0.5f, sw = (WallBuilder.StairsInnerZ - WallBuilder.StairsOuterZ) * 0.5f;
+                    barriers.Add(new Barrier(P(-half, zc), P(WallBuilder.StairsLowX, zc), sw, top));
+                }
             }
+            for (int i = first; i < barriers.Count; i++) { Barrier b = barriers[i]; b.Owner = owner; barriers[i] = b; }
+        }
+
+        /// <summary>
+        /// The wall segment the straight way from-to runs into first (for enemies: the gates shut), the point on its
+        /// middle line where it does (kept off the segment's ends, where the piers stand) and the side from comes from.
+        /// </summary>
+        public static bool FirstCrossing(Vector3 from, Vector3 to, out WallSegment segment, out Vector3 point, out Vector3 side)
+        {
+            Refresh();
+            segment = null; point = to; side = Vector3.zero;
+            Vector2 a = Flat(from), b = Flat(to), r = b - a;
+            float best = float.MaxValue;
+            Barrier hit = default;
+            for (int i = 0; i < barriers.Count; i++)
+            {
+                Barrier w = barriers[i];
+                if (w.Owner == null || !Applies(w, from.y, false)) continue;
+                Barrier g = Inflated(w, UnitRadius);
+                if (!Crosses(g, a, b)) continue;
+                // How far along the way: where it comes closest to the middle line
+                Vector2 c = Closest(Vector2.Lerp(a, b, 0.5f), w.A, w.B);
+                float along = Vector2.Dot(c - a, r.normalized);
+                if (along < best) { best = along; hit = w; segment = w.Owner; }
+            }
+            if (segment == null) return false;
+            Vector2 axis = hit.B - hit.A;
+            float len = axis.magnitude;
+            Vector2 dir = len > 1e-4f ? axis / len : Vector2.right, n = new Vector2(-dir.y, dir.x);
+            // Where the way meets the middle line, else the point of it nearest to from
+            float t = len;
+            float den = r.x * n.x + r.y * n.y;
+            Vector2 onLine = Mathf.Abs(den) > 1e-5f ? a + r * (Vector2.Dot(hit.A - a, n) / den) : Closest(a, hit.A, hit.B);
+            float u = Mathf.Clamp(Vector2.Dot(onLine - hit.A, dir), Mathf.Min(1.2f, t * 0.5f), Mathf.Max(t - 1.2f, t * 0.5f));
+            Vector2 p = hit.A + dir * u;
+            float s = Vector2.Dot(a - p, n) >= 0f ? 1f : -1f;
+            point = new Vector3(p.x, segment.transform.position.y, p.y);
+            side = new Vector3(n.x * s, 0f, n.y * s);
+            return true;
         }
 
         // ------------------------------------------------------------------ geometry
@@ -218,9 +262,9 @@ namespace BattleOfAges.Building
         private static Barrier Inflated(in Barrier w, float r)
         {
             Vector2 ab = w.B - w.A;
-            if (ab.sqrMagnitude < 1e-8f) return new Barrier(w.A, w.B, w.Half + r, w.TopY, w.Leaf);
+            if (ab.sqrMagnitude < 1e-8f) return new Barrier(w.A, w.B, w.Half + r, w.TopY, w.Leaf) { Owner = w.Owner };
             Vector2 d = ab.normalized * r;
-            return new Barrier(w.A - d, w.B + d, w.Half + r, w.TopY, w.Leaf);
+            return new Barrier(w.A - d, w.B + d, w.Half + r, w.TopY, w.Leaf) { Owner = w.Owner };
         }
 
         /// <summary>Whether the segment from a to b enters the barrier (a standing in it already does not count).</summary>

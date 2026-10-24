@@ -191,6 +191,111 @@ namespace BattleOfAges.AI
             }
         }
 
+        // ------------------------------------------------------------------ walls in the way (§10.5)
+
+        private bool climbing;
+        private float nextSiegeCheck;
+        private bool wallInWay;
+        private Building.WallSegment siegeWall;
+        private Vector3 siegePoint, siegeSide;
+        private Building.SiegeLadder ladder;
+
+        /// <summary>On a ladder or the wall: moved by the climb, not by the motor.</summary>
+        public bool IsClimbing => climbing;
+
+        protected override void ExecuteMovement()
+        {
+            if (climbing) return;
+            base.ExecuteMovement();
+        }
+
+        /// <summary>
+        /// While going for a target: if a wall stands in the way, the wall takes over (true). The strong (strength at
+        /// least GameBalance.WallBreachStrength) break it where it blocks them; the rest go to a ladder there (raising
+        /// one if there is none), wait their turn at its foot and climb over.
+        /// </summary>
+        public bool HandleWallInWay(Vector3 targetPos)
+        {
+            if (climbing) return true;
+            if (!AgainstPlayer) return false; // the player's side: the gates are open to it
+            if (Time.time >= nextSiegeCheck)
+            {
+                nextSiegeCheck = Time.time + 0.5f;
+                wallInWay = Building.WallBarriers.Blocked(transform.position, targetPos, false)
+                            && Building.WallBarriers.FirstCrossing(transform.position, targetPos, out siegeWall, out siegePoint, out siegeSide);
+            }
+            if (!wallInWay || siegeWall == null) { ladder = null; return false; }
+
+            float half = Utils.WallBuilder.Thickness * 0.5f;
+            if (Combat != null && Combat.CanHarmWalls)
+            {
+                Vector3 stand = siegePoint + siegeSide * (half + 0.6f);
+                if (FlatDistance(transform.position, stand) > stoppingDistance + 0.3f) { SetMoveDestination(stand); return true; } // (it stops within stoppingDistance)
+                StopMovement();
+                Face(siegePoint);
+                HealthComponent wallHp = siegeWall.GetComponent<HealthComponent>();
+                if (wallHp != null && wallHp.IsAlive && Combat.CanAttack) Combat.TryAttack(wallHp);
+                return true;
+            }
+
+            if (ladder == null || ladder.Wall != siegeWall) ladder = Building.SiegeLadder.Near(siegeWall, siegePoint, siegeSide);
+            Vector3 foot = ladder != null ? ladder.Foot : siegePoint + siegeSide * (half + Building.SiegeLadder.FootOut);
+            float toFoot = FlatDistance(transform.position, foot);
+            if (ladder == null)
+            {
+                if (toFoot > stoppingDistance + 0.3f) { SetMoveDestination(foot); return true; }
+                ladder = Building.SiegeLadder.Raise(siegeWall, siegePoint, siegeSide); // the first one there raises it
+            }
+            if (toFoot <= stoppingDistance + 0.6f && ladder.TryStartClimb(Health))
+            {
+                StartCoroutine(Climb(ladder));
+                return true;
+            }
+            // Wait for the turn round the foot, a little out from the wall
+            int id = Mathf.Abs(GetInstanceID());
+            Vector3 along = Vector3.Cross(Vector3.up, ladder.Side);
+            Vector3 wait = ladder.Foot + ladder.Side * (0.9f + (id % 3) * 0.6f) + along * (((id / 3) % 5) - 2) * 0.7f;
+            if (FlatDistance(transform.position, wait) > stoppingDistance + 0.2f) SetMoveDestination(wait); else StopMovement();
+            return true;
+        }
+
+        private static float FlatDistance(Vector3 a, Vector3 b) { a.y = b.y = 0f; return Vector3.Distance(a, b); }
+
+        private void Face(Vector3 p)
+        {
+            Vector3 d = p - transform.position;
+            d.y = 0f;
+            if (d.sqrMagnitude > 1e-4f) transform.rotation = Quaternion.LookRotation(d);
+        }
+
+        /// <summary>Up the ladder, over the breastwork, across the walkway and down inside (vulnerable all the way).</summary>
+        private System.Collections.IEnumerator Climb(Building.SiegeLadder l)
+        {
+            climbing = true;
+            StopMovement();
+            Vector3[] path = { l.Foot, l.Top, l.Walk, l.Inside };
+            float[] speed = { GameBalance.LadderClimbSpeed, 1.4f, 2.5f };
+            Face(l.Walk);
+            for (int leg = 0; leg < 3; leg++)
+            {
+                Vector3 a = leg == 0 ? transform.position : path[leg], b = path[leg + 1];
+                float time = Mathf.Max(0.2f, Vector3.Distance(a, b) / speed[leg]);
+                for (float t = 0f; t < time; t += Time.deltaTime)
+                {
+                    if (Health == null || !Health.IsAlive) { l.EndClimb(Health); climbing = false; yield break; }
+                    transform.position = Vector3.Lerp(a, b, t / time);
+                    yield return null;
+                }
+                transform.position = b;
+                if (leg == 0) l.EndClimb(Health); // up: the next may start
+                if (leg == 1) yield return new WaitForSeconds(0.3f);
+            }
+            climbing = false;
+            ladder = null;
+            wallInWay = false;
+            nextSiegeCheck = Time.time + 0.5f;
+        }
+
         public Vector3 GetFlankingDestination(Vector3 targetPos, float desiredRadius)
         {
             int id = Mathf.Abs(gameObject.GetInstanceID());
@@ -234,6 +339,7 @@ namespace BattleOfAges.AI
             {
                 Building.BuildingNode bNode = buildings[i];
                 if (bNode == null || (bNode.transform.position - transform.position).sqrMagnitude > wallRange * wallRange) continue;
+                if (Combat != null && !Combat.CanHarmWalls && bNode.GetComponent<Building.WallSegment>() != null) continue; // a wall is too much for it
                 HealthComponent bHp = bNode.GetComponent<HealthComponent>();
                 if (bHp != null && bHp.IsAlive)
                 {
@@ -336,11 +442,17 @@ namespace BattleOfAges.AI
                 return;
             }
 
-            if (dist <= mob.AttackRange)
+            bool shootsOver = mob.Combat != null && mob.Combat.IsRanged; // arrows and bolts fly over walls
+            if (dist <= mob.AttackRange && (shootsOver || !mob.IsClimbing))
             {
-                mob.ChangeState(AIStateType.Attack);
+                if (shootsOver || !Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false))
+                {
+                    mob.ChangeState(AIStateType.Attack);
+                    return;
+                }
             }
-            else
+            if (mob.HandleWallInWay(mob.CurrentCombatTarget.transform.position)) return;
+            if (dist > mob.AttackRange)
             {
                 Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget.transform.position, mob.AttackRange * 0.9f);
                 mob.SetMoveDestination(flankTarget);
@@ -375,10 +487,12 @@ namespace BattleOfAges.AI
                 return;
             }
 
+            if (mob.IsClimbing) return;
             float dist = Vector3.Distance(mob.transform.position, mob.CurrentCombatTarget.transform.position);
-            if (dist > mob.AttackRange + 1.8f)
+            bool melee = mob.Combat == null || !mob.Combat.IsRanged;
+            if (dist > mob.AttackRange + 1.8f || (melee && Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false)))
             {
-                mob.ChangeState(AIStateType.Chase);
+                mob.ChangeState(AIStateType.Chase); // out of reach, or a wall between (a sword does not reach over it)
                 return;
             }
 

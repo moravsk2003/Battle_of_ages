@@ -175,6 +175,59 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(Vector3.Distance(v.transform.position, target), 1.5f, $"arrived behind the wall (at {v.transform.position - Far}; track{track})");
         }
 
+        /// <summary>A mob outside (z +8) ordered at a target behind a plain wall (z -6), no gate near.</summary>
+        private (AI.HostileMobAI mob, HealthComponent wall, HealthComponent target) Siege(AI.HostileMobType type)
+        {
+            Ground();
+            WallSegment wall = Segment(BuildingType.CastleWall, OnGround(Far), 0f);
+            Segment(BuildingType.CastleWall, OnGround(Far + new Vector3(-4f, 0f, 0f)), 0f);
+            Segment(BuildingType.CastleWall, OnGround(Far + new Vector3(4f, 0f, 0f)), 0f);
+            var target = new GameObject("SiegeTarget");
+            target.transform.position = OnGround(Far + new Vector3(0f, 0f, -6f));
+            HealthComponent targetHp = target.AddComponent<HealthComponent>();
+            targetHp.InitializeHealth(100000);
+            spawned.Add(target);
+            GameObject m = Utils.HostileCampBuilder.CreateHostileMob(type, "Besieger");
+            CharacterController cc = m.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            m.transform.position = OnGround(Far + new Vector3(0.5f, 0f, 8f));
+            if (cc != null) cc.enabled = true;
+            spawned.Add(m);
+            return (m.GetComponent<AI.HostileMobAI>(), wall.GetComponent<HealthComponent>(), targetHp);
+        }
+
+        [UnityTest]
+        public IEnumerator WeakAttackers_ClimbALadder_IntoTheSettlement()
+        {
+            var (mob, wall, target) = Siege(AI.HostileMobType.Bandit);
+            yield return null;
+            yield return null;
+            mob.OrderAttack(target);
+            bool sawLadder = false;
+            float t = 0f;
+            for (; t < 40f && mob.transform.position.z > Far.z - 1.8f; t += Time.deltaTime)
+            {
+                sawLadder |= SiegeLadder.Active.Count > 0;
+                yield return null;
+            }
+            Assert.IsTrue(sawLadder, "a ladder was raised");
+            Assert.Less(mob.transform.position.z, Far.z - 1.7f, $"the bandit got inside (at {mob.transform.position - Far} after {t:0} s)");
+            Assert.AreEqual(wall.MaxHealth, wall.CurrentHealth, "and did not harm the wall");
+            foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator StrongAttackers_BreakTheWall()
+        {
+            var (mob, wall, target) = Siege(AI.HostileMobType.WarlordGuard);
+            yield return null;
+            yield return null;
+            mob.OrderAttack(target);
+            for (float t = 0f; t < 25f && wall.CurrentHealth == wall.MaxHealth; t += Time.deltaTime) yield return null;
+            Assert.Less(wall.CurrentHealth, wall.MaxHealth, $"the warlord strikes the wall (at {mob.transform.position - Far}, {mob.CurrentStateType}, strength {mob.Combat.Strength}, ranged {mob.Combat.IsRanged}, target {(mob.CurrentCombatTarget != null ? mob.CurrentCombatTarget.name : "none")})");
+            Assert.AreEqual(0, SiegeLadder.Active.Count, "no ladder for the strong");
+        }
+
         [UnityTest]
         public IEnumerator OwnUnits_GoRoundThroughTheGate()
         {

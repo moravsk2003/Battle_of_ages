@@ -383,6 +383,35 @@ namespace BattleOfAges.Utils
                       new[] { new Vector2(0f, 0f), new Vector2(0.03f, 0f), new Vector2(0.035f, 0.34f), new Vector2(0f, 0.34f) }, 6, WoodS, (i, a) => OakDark);
         }
 
+        // ------------------------------------------------------------------ siege ladder
+
+        /// <summary>Length of a siege ladder (its foot at the origin, the rails up local Y).</summary>
+        public const float LadderLength = 4.7f;
+        private static Mesh ladderMesh;
+        public static Mesh LadderMesh => ladderMesh != null ? ladderMesh : (ladderMesh = BuildLadder());
+
+        /// <summary>A rough siege ladder: two split-pole rails with the bark on, lashed rungs, the tops cut to rest on the wall.</summary>
+        private static Mesh BuildLadder()
+        {
+            kit = new MeshKit();
+            rng = new System.Random(4400);
+            Color pole = new Color(0.45f, 0.34f, 0.22f), rung = new Color(0.52f, 0.40f, 0.26f), rope = new Color(0.62f, 0.54f, 0.40f);
+            foreach (float x in new[] { -0.26f, 0.26f })
+                kit.Lathe(Matrix4x4.TRS(new Vector3(x, 0f, 0f), Quaternion.identity, Vector3.one),
+                          new[] { new Vector2(0f, 0f), new Vector2(0.05f, 0f), new Vector2(0.045f, LadderLength * 0.5f), new Vector2(0.038f, LadderLength), new Vector2(0f, LadderLength) },
+                          7, WoodS, (i, a) => pole * (0.85f + 0.15f * Mathf.Sin(a * 3f + x * 10f)));
+            for (float y = 0.35f; y < LadderLength - 0.2f; y += 0.36f)
+            {
+                kit.Lathe(Matrix4x4.TRS(new Vector3(-0.3f, y, 0f), Quaternion.Euler(0f, 0f, -90f), Vector3.one),
+                          new[] { new Vector2(0f, 0f), new Vector2(0.026f, 0f), new Vector2(0.026f, 0.6f), new Vector2(0f, 0.6f) }, 6, WoodS, (i, a) => rung * Rand(0.85f, 1.1f));
+                foreach (float x in new[] { -0.26f, 0.26f })
+                    B(new Vector3(x, y, 0f), new Vector3(0.12f, 0.05f, 0.12f), rope, new Vector3(1f, 0f, 0.1f), 0.015f);
+            }
+            Mesh m = kit.ToMesh("SiegeLadder");
+            kit = null;
+            return m;
+        }
+
         // ------------------------------------------------------------------ far
 
         private static Mesh BuildFar(Kind k)

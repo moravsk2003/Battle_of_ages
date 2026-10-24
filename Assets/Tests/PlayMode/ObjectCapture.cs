@@ -66,6 +66,7 @@ namespace BattleOfAges.PlayModeTests
             GameObject gate = Place(BuildingNode.CreateWallPrefab(BuildingType.WallGate, "Cap_WallGate"), Ground(wallAt + right * 5f));
             GameObject corner = Place(BuildingNode.CreateWallPrefab(BuildingType.CastleWall, "Cap_WallCorner"), Ground(wallAt + right * 8f - fwd * 2f), 90f);
             foreach (GameObject g in new[] { wallStairs, wall, gate, corner }) g.transform.position = new Vector3(g.transform.position.x, wallAt.y, g.transform.position.z); // one walkway
+            SiegeLadder.Raise(wall.GetComponent<WallSegment>(), wallAt + right * 0.6f, fwd).RaiseNow();
             var pebbles = new List<GameObject>();
             for (int i = 0; i < 3; i++) pebbles.Add(Place(OrePebbleNode.CreatePebblePrefab("Cap_Pebble_" + i), Slot(-3f + i * 1.1f, -5f), i * 50f));
 
@@ -144,6 +145,7 @@ namespace BattleOfAges.PlayModeTests
                 ("wall_line_outside", () => (wallAt + fwd * 13f - right * 3f + Vector3.up * 6f, wallAt + right * 2.5f + Vector3.up * 2f)),
                 ("wall_line_inside", () => (wallAt - fwd * 13f + right * 1f + Vector3.up * 7f, wallAt + right * 2f + Vector3.up * 1.5f)),
                 ("wall_gate_close", () => (gate.transform.position + fwd * 6.5f - right * 1.5f + Vector3.up * 2.2f, gate.transform.position + Vector3.up * 2.2f)),
+                ("wall_ladder", () => (wallAt + fwd * 6f + right * 4f + Vector3.up * 3f, wallAt + right * 0.6f + fwd * 0.8f + Vector3.up * 2.2f)),
                 ("wall_walkway", () => (wallStairs.transform.position - fwd * 1.6f - right * 1.5f + Vector3.up * 5.4f, gate.transform.position + Vector3.up * 3.8f)),
             };
 

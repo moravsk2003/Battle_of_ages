@@ -154,10 +154,14 @@ namespace BattleOfAges.Combat
         /// <summary>Share of the damage dealt that heals this unit (the Vampiric artifact).</summary>
         public float LifeSteal { get; set; }
 
+        /// <summary>Strong enough to break a wall (GameBalance.WallBreachStrength: a knight and up).</summary>
+        public bool CanHarmWalls => Strength >= GameBalance.WallBreachStrength;
+
         /// <summary>Lands a hit of this unit (directly or from one of its bolts): damage, battle experience, kill.</summary>
         public void DeliverHit(HealthComponent target, int damage, bool ignoreArmor)
         {
             if (target == null || !target.IsAlive) return;
+            if (!CanHarmWalls && target.GetComponent<Building.WallSegment>() != null) return; // a wall is too much for it (§10.5)
             target.LastAttacker = this;
             int before = target.CurrentHealth;
             target.TakeDamage(damage, ignoreArmor);

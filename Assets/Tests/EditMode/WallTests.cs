@@ -75,6 +75,29 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void OnlyTheStrong_HarmWalls()
+        {
+            GameObject wall = BuildingNode.CreateWallPrefab(BuildingType.CastleWall, "TestWall");
+            var striker = new GameObject("Striker");
+            try
+            {
+                HealthComponent hp = wall.GetComponent<HealthComponent>();
+                CombatUnit unit = striker.AddComponent<CombatUnit>();
+                unit.Strength = GameBalance.RankStrength[1]; // a warrior
+                unit.DeliverHit(hp, 50, false);
+                Assert.AreEqual(hp.MaxHealth, hp.CurrentHealth, "a warrior's blow does nothing to a wall");
+                unit.Strength = GameBalance.RankStrength[2]; // a knight
+                unit.DeliverHit(hp, 50, false);
+                Assert.Less(hp.CurrentHealth, hp.MaxHealth, "a knight's does");
+            }
+            finally
+            {
+                Object.DestroyImmediate(wall);
+                Object.DestroyImmediate(striker);
+            }
+        }
+
+        [Test]
         public void WallPrefabs_HaveTheirParts()
         {
             GameObject gate = BuildingNode.CreateWallPrefab(BuildingType.WallGate, "TestGate");

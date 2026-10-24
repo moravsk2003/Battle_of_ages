@@ -173,6 +173,14 @@ namespace BattleOfAges.Combat
         public static float[] WallLevelDamageBonus = { 0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f };
         /// <summary>The gate opens for own units and the player within this.</summary>
         public static float GateOpenRadius = 5f;
+        /// <summary>A blow harms a wall only from this strength up (a knight); siege engines will not need it (§11.3).</summary>
+        public static float WallBreachStrength = 10f;
+        /// <summary>
+        /// Ladders: the first attacker at a spot sets one up in LadderSetupSeconds; the attackers then go up one at a time
+        /// at LadderClimbSpeed m/s, over the breastwork onto the walkway and down inside. A ladder nobody used for
+        /// LadderLingerSeconds is taken away.
+        /// </summary>
+        public static float LadderSetupSeconds = 4f, LadderClimbSpeed = 1.1f, LadderLingerSeconds = 60f;
 
         // ------------------------------------------------------------------ NPC kingdoms (§12, M0)
 
