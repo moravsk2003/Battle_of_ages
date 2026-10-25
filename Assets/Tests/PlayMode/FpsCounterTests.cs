@@ -20,6 +20,10 @@ namespace BattleOfAges.PlayModeTests
             FpsCounter counter = Object.FindFirstObjectByType<FpsCounter>();
             Assert.IsNotNull(counter, "FPS counter must be created in every scene.");
             Assert.AreEqual(1, Object.FindObjectsByType<FpsCounter>(FindObjectsSortMode.None).Length, "Only one FPS counter.");
+            Assert.IsFalse(counter.Shown, "Hidden until F3.");
+            counter.Shown = true;
+            yield return null;
+            yield return null;
             string text = counter.GetComponentInChildren<Text>().text;
             StringAssert.Contains("FPS", text);
             StringAssert.Contains("мс", text);
@@ -33,6 +37,7 @@ namespace BattleOfAges.PlayModeTests
             yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);
             yield return new WaitForSecondsRealtime(2f);
             FpsCounter counter = Object.FindFirstObjectByType<FpsCounter>();
+            counter.Shown = true;
             Canvas canvas = counter.GetComponent<Canvas>();
             Camera cam = Camera.main;
             var rt = new RenderTexture(1280, 720, 24);

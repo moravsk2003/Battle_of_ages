@@ -122,13 +122,18 @@ namespace BattleOfAges.PlayModeTests
                     capture.Camera.orthographic = main.orthographic;
                     capture.Camera.orthographicSize = main.orthographicSize;
                 }
+                // Higher sorting order in front, all within a few cm of the camera (far planes went behind the world)
                 foreach (Canvas c in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
                 {
                     if (!c.isRootCanvas || c.renderMode != RenderMode.ScreenSpaceOverlay) continue;
                     c.renderMode = RenderMode.ScreenSpaceCamera;
                     c.worldCamera = capture.Camera;
-                    c.planeDistance = 0.2f + 0.01f * c.sortingOrder;
                 }
+                var stack = new List<Canvas>();
+                foreach (Canvas c in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+                    if (c.isRootCanvas && c.worldCamera == capture.Camera) stack.Add(c);
+                stack.Sort((a, b) => b.sortingOrder.CompareTo(a.sortingOrder));
+                for (int k = 0; k < stack.Count; k++) stack[k].planeDistance = 0.2f + 0.004f * k;
                 Canvas.ForceUpdateCanvases();
                 Vector3 pos = main != null ? main.transform.position : Vector3.up * 30f;
                 Vector3 target = main != null ? pos + main.transform.forward : Vector3.zero;

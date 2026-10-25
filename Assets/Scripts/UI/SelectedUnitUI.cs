@@ -203,7 +203,7 @@ namespace BattleOfAges.UI
             Image img = icon.gameObject.AddComponent<Image>();
             img.sprite = UiTheme.ItemSprite(ItemType.Helmet, 3); img.preserveAspect = true; img.raycastTarget = false;
             RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
-            UiTheme.Label(txt, "Text", "Спорядж. [C]", 16, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Label(txt, "Text", "Спорядж.", 16, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
         }
 
         private void CreateDirectiveButton(Transform parent, UiTheme.Icon icon, string label, UnityEngine.Events.UnityAction onClick)

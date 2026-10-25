@@ -69,6 +69,7 @@ namespace BattleOfAges.UI
 
             if (IsOpen)
             {
+                if (Time.frameCount % 15 == 0) RefreshRows();
                 if (UniversalInput.GetKeyDownEscape() || IsToggleKeyPressed())
                 {
                     CloseMenu();
@@ -102,6 +103,7 @@ namespace BattleOfAges.UI
             IsOpen = true;
             if (menuPanelObj != null) menuPanelObj.SetActive(true);
             UpdateHeaderText();
+            RefreshRows();
         }
 
         public void CloseMenu()
@@ -143,70 +145,31 @@ namespace BattleOfAges.UI
             if (scaler == null) scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
 
             if (gameObject.GetComponent<GraphicRaycaster>() == null)
             {
                 gameObject.AddComponent<GraphicRaycaster>();
             }
-
-            Font defaultFont = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
-
-            RectTransform panelRect = UiTheme.Child(transform, "BuildMenuPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
-            menuPanelObj = panelRect.gameObject;
-            panelRect.pivot = new Vector2(0.5f, 0f);
-            panelRect.anchoredPosition = new Vector2(0f, 160f); // above the unit command panel
-            panelRect.sizeDelta = new Vector2(580f, 740f); // eight buildings
-
-            Image panelBg = menuPanelObj.AddComponent<Image>();
-            panelBg.color = new Color(0.04f, 0.07f, 0.14f, 0.96f);
-
-            RectTransform headerRect = UiTheme.Child(menuPanelObj.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f));
-            GameObject headerObj = headerRect.gameObject;
-            headerRect.pivot = new Vector2(0.5f, 1f);
-            headerRect.sizeDelta = new Vector2(0f, 50f);
-
-            Image headerBg = headerObj.AddComponent<Image>();
-            headerBg.color = new Color(0.08f, 0.14f, 0.25f, 0.98f);
-
-            RectTransform titleRect = UiTheme.Child(headerObj.transform, "Title", Vector2.zero, Vector2.one, offsetMin: new Vector2(15f, 0f));
-            GameObject titleObj = titleRect.gameObject;
-
-            titleText = titleObj.AddComponent<Text>();
-            titleText.font = defaultFont;
-            titleText.fontSize = 22;
-            titleText.fontStyle = FontStyle.Bold;
-            titleText.alignment = TextAnchor.MiddleLeft;
-            titleText.color = new Color(0.3f, 0.95f, 1.0f);
-            UpdateHeaderText();
-
-            RectTransform statusRect = UiTheme.Child(menuPanelObj.transform, "StatusText", new Vector2(0f, 0f), new Vector2(1f, 0f));
-            GameObject statusObj = statusRect.gameObject;
-            statusRect.pivot = new Vector2(0.5f, 0f);
-            statusRect.sizeDelta = new Vector2(0f, 35f);
-            statusRect.anchoredPosition = new Vector2(0f, 5f);
-
-            statusText = statusObj.AddComponent<Text>();
-            statusText.font = defaultFont;
-            statusText.fontSize = 16;
-            statusText.alignment = TextAnchor.MiddleCenter;
-            statusText.color = new Color(0.7f, 0.8f, 0.9f);
-            statusText.text = "Оберіть споруду для будівництва";
-
-            RectTransform containerRect = UiTheme.Child(menuPanelObj.transform, "ButtonsContainer", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(15f, 45f), new Vector2(-15f, -55f));
-            GameObject btnContainer = containerRect.gameObject;
-
-            VerticalLayoutGroup layout = btnContainer.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8f;
-            layout.childControlWidth = true;
-            layout.childControlHeight = false;
-            layout.padding = new RectOffset(0, 0, 5, 5);
+            if (gameObject.GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
 
             BuildingDefinition[] defs = BuildingData.GetAllDefinitions();
+            const float rowH = 74f, gap = 6f;
+            float height = 58f + defs.Length * (rowH + gap) + 44f;
+            RectTransform panelRect = UiTheme.Rect(transform, "BuildMenuPanel", new Vector2(0.5f, 0f), new Vector2(0f, 160f), new Vector2(640f, height)); // above the unit command panel
+            menuPanelObj = panelRect.gameObject;
+            UiTheme.PanelImage(panelRect);
+
+            titleText = UiTheme.Label(UiTheme.Child(panelRect, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f), new Vector2(-22f, -6f)), "Title", "", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            UpdateHeaderText();
+
+            statusText = UiTheme.Label(UiTheme.Child(panelRect, "Status", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(16f, 8f), new Vector2(-16f, 42f)), "StatusText", "Оберіть споруду; ЛКМ ставить, ПКМ скасовує", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+
             for (int i = 0; i < defs.Length; i++)
             {
-                BuildingDefinition def = defs[i];
-                CreateBuildingButton(btnContainer.transform, defaultFont, def);
+                RectTransform row = UiTheme.Child(panelRect, $"Btn_{defs[i].Type}", new Vector2(0f, 1f), new Vector2(1f, 1f),
+                    new Vector2(16f, -58f - (i + 1) * (rowH + gap) + gap), new Vector2(-16f, -58f - i * (rowH + gap)));
+                rows[i] = CreateBuildingButton(row, defs[i]);
             }
 
             if (menuPanelObj != null) menuPanelObj.SetActive(false);
@@ -218,62 +181,62 @@ namespace BattleOfAges.UI
             {
                 KeyCode key = KeybindsManager.GetKey(KeyAction.BuildMenu);
                 string keyName = KeybindsManager.GetKeyDisplayString(key);
-                titleText.text = $"🏗 БУДІВНИЦТВО (Клавіша '{keyName}')";
+                titleText.text = $"Будівництво  <size=17><color=#B8A88E>[{keyName}]</color></size>";
             }
         }
 
-        private void CreateBuildingButton(Transform parent, Font font, BuildingDefinition def)
+        private struct Row { public BuildingType Type; public Button Button; public Text Cost, Description; public CanvasGroup Group; }
+        private readonly Row[] rows = new Row[BuildingData.GetAllDefinitions().Length];
+
+        private Row CreateBuildingButton(RectTransform rect, BuildingDefinition def)
         {
-            GameObject btnObj = new GameObject($"Btn_{def.Type}", typeof(RectTransform));
-            btnObj.transform.SetParent(parent, false);
-
-            RectTransform rect = btnObj.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(480f, 70f);
-
-            Image bg = btnObj.AddComponent<Image>();
-            bg.color = new Color(0.10f, 0.16f, 0.26f, 0.95f);
-
-            Button btn = btnObj.AddComponent<Button>();
+            UiTheme.PanelImage(rect, UiTheme.ButtonSprite);
+            Button btn = rect.gameObject.AddComponent<Button>();
             ColorBlock cb = btn.colors;
-            cb.normalColor = new Color(0.10f, 0.16f, 0.26f, 0.95f);
-            cb.highlightedColor = new Color(0.15f, 0.30f, 0.50f, 1.0f);
-            cb.pressedColor = new Color(0.10f, 0.45f, 0.75f, 1.0f);
-            cb.disabledColor = new Color(0.15f, 0.15f, 0.15f, 0.7f);
+            cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
+            cb.disabledColor = new Color(0.7f, 0.7f, 0.7f, 1f); cb.colorMultiplier = 1.25f;
             btn.colors = cb;
-
             BuildingType capturedType = def.Type;
             btn.onClick.AddListener(() => OnBuildButtonClicked(capturedType));
 
-            RectTransform iconRect = UiTheme.Child(btnObj.transform, "Icon", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(8f, 8f), new Vector2(62f, -8f));
-            GameObject iconObj = iconRect.gameObject;
-
-            Image iconBg = iconObj.AddComponent<Image>();
-            iconBg.color = new Color(0.6f, 0.15f, 0.10f, 0.9f);
-
-            RectTransform iconTxtRect = UiTheme.Child(iconObj.transform, "IconText", Vector2.zero, Vector2.one);
-            GameObject iconTxt = iconTxtRect.gameObject;
-
-            Text icoTxt = UiTheme.PlainText(iconTxt, font, 26, TextAnchor.MiddleCenter, Color.white);
-            icoTxt.text = ""; // the font has no emoji: a themed icon instead
+            RectTransform iconRect = UiTheme.Child(rect, "Icon", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(9f, 9f), new Vector2(65f, -9f));
+            UiTheme.PanelImage(iconRect, UiTheme.SlotSprite).raycastTarget = false;
             UiTheme.Icon icon = def.Type == BuildingType.Mine ? UiTheme.Icon.Ore
                               : def.Type == BuildingType.StorageChest ? UiTheme.Icon.Wood
                               : def.Type == BuildingType.Workbench ? UiTheme.Icon.Hammer
-                              : WallSegment.IsWall(def.Type) ? UiTheme.Icon.Army
+                              : WallSegment.IsWall(def.Type) ? UiTheme.Icon.Wall
                               : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
-            UiTheme.IconImage(iconObj.transform, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
+            UiTheme.IconImage(iconRect, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
-            RectTransform nameRect = UiTheme.Child(btnObj.transform, "NameText", new Vector2(0f, 0.5f), new Vector2(1f, 1f), new Vector2(72f, 0f), new Vector2(-10f, -4f));
-            GameObject nameObj = nameRect.gameObject;
+            UiTheme.Label(UiTheme.Child(rect, "Name", new Vector2(0f, 0.5f), new Vector2(0.55f, 1f), new Vector2(78f, 0f), new Vector2(0f, -4f)), "NameText", def.DisplayName, 19, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            Text cost = UiTheme.Label(UiTheme.Child(rect, "Cost", new Vector2(0.55f, 0.5f), new Vector2(1f, 1f), Vector2.zero, new Vector2(-14f, -4f)), "CostText", "", 16, TextAnchor.MiddleRight, UiTheme.Gold);
+            Text desc = UiTheme.Label(UiTheme.Child(rect, "Description", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(78f, 5f), new Vector2(-14f, 0f)), "DescriptionText", def.Description, 15, TextAnchor.MiddleLeft, UiTheme.InkDim);
+            desc.horizontalOverflow = HorizontalWrapMode.Wrap;
+            desc.resizeTextForBestFit = true;
+            desc.resizeTextMinSize = 12;
+            desc.resizeTextMaxSize = 15;
 
-            Text nameTxt = UiTheme.PlainText(nameObj, font, 19, TextAnchor.MiddleLeft, Color.white, def.DisplayName, style: FontStyle.Bold);
+            return new Row { Type = def.Type, Button = btn, Cost = cost, Description = desc, Group = rect.gameObject.AddComponent<CanvasGroup>() };
+        }
 
-            RectTransform costRect = UiTheme.Child(btnObj.transform, "CostText", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(72f, 4f), new Vector2(-10f, 0f));
-            GameObject costObj = costRect.gameObject;
-
-            Text costTxt = UiTheme.PlainText(costObj, font, 16, TextAnchor.MiddleLeft, new Color(0.85f, 0.80f, 0.55f));
-
-            string shortTierName = WallSegment.IsWall(def.Type) ? "руди (рівень: Tab)" : $"Руда рів. {def.OreTierRequired}";
-            costTxt.text = $"Ціна: 🪵 {def.WoodCost} Дерево  +  🪨 {def.OreCost} {shortTierName}  |  {def.Description}";
+        /// <summary>Costs in red and the row dimmed when the stock is short; a building not allowed (a second hall) says why.</summary>
+        private void RefreshRows()
+        {
+            BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
+            foreach (Row r in rows)
+            {
+                if (r.Button == null) continue;
+                BuildingDefinition def = BuildingData.GetDefinition(r.Type);
+                bool affordable = placer == null || placer.CanAfford(r.Type);
+                bool allowed = BuildingPlacementSystem.IsAllowed(r.Type, out string reason);
+                string ore = $"руда {def.OreCost} <size=13>({(WallSegment.IsWall(r.Type) ? "рівень — Tab" : "рів. " + def.OreTierRequired)})</size>";
+                r.Cost.text = $"дерево {def.WoodCost}  ·  {ore}";
+                r.Cost.color = affordable ? UiTheme.Gold : UiTheme.Bad;
+                r.Description.text = allowed ? def.Description : UiTheme.Sanitize(reason);
+                r.Description.color = allowed ? UiTheme.InkDim : UiTheme.Bad;
+                r.Button.interactable = allowed;
+                r.Group.alpha = affordable && allowed ? 1f : 0.7f;
+            }
         }
     }
 }

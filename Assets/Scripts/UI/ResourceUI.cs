@@ -1,13 +1,20 @@
 using UnityEngine;
 using UnityEngine.UI;
+using BattleOfAges.Managers;
 
 namespace BattleOfAges.UI
 {
+    /// <summary>
+    /// The interaction prompt under the crosshair ("[E] Open the chest", tree progress): a themed plate sized to its
+    /// text. Shown only in first person with no window open, so it never sits over the map or a menu.
+    /// </summary>
     [DisallowMultipleComponent]
     public class ResourceUI : MonoBehaviour
     {
         private Text promptText;
-        private GameObject promptPanelObj;
+        private RectTransform promptPanel;
+        private bool wanted;
+        private GameModeManager modes;
 
         private void Awake()
         {
@@ -22,19 +29,32 @@ namespace BattleOfAges.UI
 
         public void ShowTreePrompt(string message)
         {
-            if (promptText != null)
+            if (promptText == null) return;
+            message = UiTheme.Sanitize(message).Trim();
+            if (promptText.text != message)
             {
                 promptText.text = message;
-                if (promptPanelObj != null) promptPanelObj.SetActive(true);
+                promptPanel.sizeDelta = new Vector2(Mathf.Min(promptText.preferredWidth + 56f, 900f), promptText.preferredHeight + 22f);
             }
+            wanted = true;
+            Refresh();
         }
 
         public void HideTreePrompt()
         {
-            if (promptPanelObj != null)
-            {
-                promptPanelObj.SetActive(false);
-            }
+            wanted = false;
+            Refresh();
+        }
+
+        private void LateUpdate() => Refresh();
+
+        private void Refresh()
+        {
+            if (promptPanel == null) return;
+            if (modes == null) modes = FindFirstObjectByType<GameModeManager>();
+            bool firstPerson = modes == null || modes.CurrentMode == GameMode.FirstPerson;
+            bool show = wanted && firstPerson && !GameWindows.BlockGameplay;
+            if (promptPanel.gameObject.activeSelf != show) promptPanel.gameObject.SetActive(show);
         }
 
         private void BuildPromptUI()
@@ -48,40 +68,14 @@ namespace BattleOfAges.UI
             if (scaler == null) scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+            if (gameObject.GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
 
-            if (gameObject.GetComponent<GraphicRaycaster>() == null)
-            {
-                gameObject.AddComponent<GraphicRaycaster>();
-            }
-
-            Font defaultFont = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
-
-            // Center Interaction Prompt Banner ONLY
-            promptPanelObj = new GameObject("PromptPanel");
-            promptPanelObj.transform.SetParent(transform, false);
-            RectTransform promptPanelRect = promptPanelObj.AddComponent<RectTransform>();
-            promptPanelRect.anchorMin = new Vector2(0.5f, 0.22f);
-            promptPanelRect.anchorMax = new Vector2(0.5f, 0.22f);
-            promptPanelRect.sizeDelta = new Vector2(780f, 90f);
-
-            Image promptBg = promptPanelObj.AddComponent<Image>();
-            promptBg.color = new Color(0.04f, 0.08f, 0.14f, 0.88f);
-
-            GameObject promptTxtObj = new GameObject("PromptText");
-            promptTxtObj.transform.SetParent(promptPanelObj.transform, false);
-            RectTransform promptTxtRect = promptTxtObj.AddComponent<RectTransform>();
-            promptTxtRect.anchorMin = Vector2.zero;
-            promptTxtRect.anchorMax = Vector2.one;
-            promptTxtRect.offsetMin = new Vector2(15f, 10f);
-            promptTxtRect.offsetMax = new Vector2(-15f, -10f);
-
-            promptText = promptTxtObj.AddComponent<Text>();
-            promptText.font = defaultFont;
-            promptText.fontSize = 22;
-            promptText.alignment = TextAnchor.MiddleCenter;
-            promptText.color = new Color(0.3f, 0.9f, 1.0f);
-            promptText.text = "[Hold E] Gather Branches  |  [Hold F] Chop Down Tree";
-            promptPanelObj.SetActive(false);
+            promptPanel = UiTheme.Rect(transform, "PromptPanel", new Vector2(0.5f, 0.3f), Vector2.zero, new Vector2(400f, 50f));
+            UiTheme.PanelImage(promptPanel).raycastTarget = false;
+            promptText = UiTheme.Label(promptPanel, "PromptText", "", 21, TextAnchor.MiddleCenter, UiTheme.Ink);
+            promptText.lineSpacing = 1.15f;
+            promptPanel.gameObject.SetActive(false);
         }
     }
 }

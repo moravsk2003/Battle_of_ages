@@ -23,7 +23,7 @@ namespace BattleOfAges.UI
         public static readonly Color Good = new Color(0.45f, 0.78f, 0.38f);
         public static readonly Color Bad = new Color(0.86f, 0.32f, 0.26f);
 
-        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House }
+        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall }
 
         private static Font font;
         private static Sprite panel, button, bar, slot, round;
@@ -163,6 +163,16 @@ namespace BattleOfAges.UI
                     Layer(Poly(p, new[] { new Vector2(-0.85f, 0.05f), new Vector2(0f, 0.85f), new Vector2(0.85f, 0.05f) }), new Color(0.80f, 0.62f, 0.30f));
                     Layer(Box(p - new Vector2(0f, -0.52f), new Vector2(0.17f, 0.28f)), new Color(0.38f, 0.24f, 0.13f));
                     break;
+                case Icon.Wall:
+                {
+                    // Stone wall with three merlons and an arched gate; courses of stone as darker lines
+                    float wall = Box(p - new Vector2(0f, -0.28f), new Vector2(0.86f, 0.5f));
+                    foreach (float x in new[] { -0.64f, 0f, 0.64f }) wall = Mathf.Min(wall, Box(p - new Vector2(x, 0.36f), new Vector2(0.2f, 0.18f)));
+                    bool course = Mathf.Repeat((p.y + 0.78f) * 4f, 1f) < 0.12f || Mathf.Repeat(p.x * 2.5f + (Mathf.Repeat((p.y + 0.78f) * 2f, 1f) < 0.5f ? 0.5f : 0f), 1f) < 0.07f;
+                    Layer(wall, course ? new Color(0.52f, 0.50f, 0.46f) : new Color(0.76f, 0.73f, 0.66f));
+                    Layer(Mathf.Min(Box(p - new Vector2(0f, -0.58f), new Vector2(0.22f, 0.2f)), (p - new Vector2(0f, -0.38f)).magnitude - 0.22f), new Color(0.30f, 0.20f, 0.11f));
+                    break;
+                }
             }
             return result;
         }

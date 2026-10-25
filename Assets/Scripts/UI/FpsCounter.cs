@@ -7,7 +7,7 @@ namespace BattleOfAges.UI
     /// <summary>
     /// On-screen performance meter (top-left, toggled with F3): average FPS and frame time, the worst frame of the last
     /// second, the number of hitches (frames over 50 ms) in the last 10 seconds, and a frame-time graph of the last
-    /// 160 frames where every spike shows as a tall red bar. Created automatically in every scene.
+    /// 160 frames where every spike shows as a tall red bar. Created automatically in every scene, hidden until F3.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class FpsCounter : MonoBehaviour
@@ -25,6 +25,9 @@ namespace BattleOfAges.UI
         private readonly float[] frameMs = new float[GraphFrames];
         private readonly float[] hitchTimes = new float[64];
         private int frameIndex, hitchIndex;
+
+        /// <summary>The meter is on screen (F3 switches it).</summary>
+        public bool Shown { get => panel.activeSelf; set { panel.SetActive(value); refreshTimer = RefreshInterval; } }
         private float accumulated, worstMs, refreshTimer;
         private int accumulatedFrames;
 
@@ -83,11 +86,12 @@ namespace BattleOfAges.UI
             graphImage = graphObj.AddComponent<RawImage>();
             graphImage.texture = graph;
             graphImage.raycastTarget = false;
+            panel.SetActive(false);
         }
 
         private void Update()
         {
-            if (UniversalInput.IsKeyDown(KeyCode.F3)) panel.SetActive(!panel.activeSelf);
+            if (UniversalInput.IsKeyDown(KeyCode.F3)) Shown = !Shown;
 
             float ms = Time.unscaledDeltaTime * 1000f;
             frameMs[frameIndex] = ms;

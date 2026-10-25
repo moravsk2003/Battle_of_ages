@@ -422,6 +422,9 @@ namespace BattleOfAges.Building
         /// <summary>The ore tier the building takes: a wall's is the one picked for it (its strength).</summary>
         private int OreTierOf(BuildingDefinition def) => WallSegment.IsWall(def.Type) ? wallTier : def.OreTierRequired;
 
+        /// <summary>The stock has what the building costs now (a wall: in some ore tier, see NextWallTier).</summary>
+        public bool CanAfford(BuildingType type) => CanAfford(BuildingData.GetDefinition(type));
+
         private bool CanAfford(BuildingDefinition def)
         {
             if (WallSegment.IsWall(def.Type) && !isPlacing) return CanAffordTier(def, NextWallTier(wallTier, def.OreCost, true));

@@ -234,8 +234,8 @@ namespace BattleOfAges.UI
             if (pollTimer <= 0f)
             {
                 pollTimer = 0.3f;
-                if (lastWood >= 0 && wood > lastWood) Toast("wood", wood - lastWood, n => $"+{n}  деревини");
-                if (lastOre >= 0 && ore > lastOre) Toast("ore", ore - lastOre, n => $"+{n}  руди");
+                if (lastWood >= 0 && wood > lastWood) Toast("wood", wood - lastWood, n => $"+{n} деревини");
+                if (lastOre >= 0 && ore > lastOre) Toast("ore", ore - lastOre, n => $"+{n} руди");
                 if (lastWorkers >= 0 && workers > lastWorkers) Toast("worker", workers - lastWorkers, n => n > 1 ? $"Нові робітники: {n}" : "Новий робітник");
                 int buildings = BuildingNode.Active.Count;
                 if (lastBuildings >= 0 && buildings > lastBuildings)

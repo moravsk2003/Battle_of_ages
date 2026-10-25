@@ -40,6 +40,7 @@ namespace BattleOfAges.UI
         private KeyAction? activeRebindAction = null;
         private readonly Dictionary<KeyAction, Text> keybindButtonTexts = new Dictionary<KeyAction, Text>();
         private GameObject keybindsContainerObj;
+        private Slider zoomSlider;
 
         private void Awake()
         {
@@ -80,6 +81,14 @@ namespace BattleOfAges.UI
             AddPauseButton("LoadButton", "Завантажити", at += step, () => SaveSlotsUI.Open(false));
             AddPauseButton("MainMenuButton", "Головне меню", at += step, SaveSystem.ToMainMenu);
             if (quitButton != null) ((RectTransform)quitButton.transform).anchoredPosition = at + step;
+
+            // A window behind the column, from the title down to the last button
+            Transform title = resume.parent.Find("Title");
+            float top = (title != null ? ((RectTransform)title).anchoredPosition.y : resume.anchoredPosition.y) + 50f;
+            float bottom = (at + step).y - 45f;
+            RectTransform window = UiTheme.Rect(resume.parent, "PauseWindow", new Vector2(0.5f, 0.5f), new Vector2(0f, (top + bottom) * 0.5f), new Vector2(resume.rect.width + 140f, top - bottom));
+            UiTheme.PanelImage(window).raycastTarget = false;
+            window.SetAsFirstSibling();
         }
 
         private void AddPauseButton(string name, string text, Vector2 position, UnityEngine.Events.UnityAction onClick)
@@ -137,40 +146,18 @@ namespace BattleOfAges.UI
             }
         }
 
-        /// <summary>
-        /// The map's wheel zoom speed: a copy of the map row (label and slider) under it; the rows close up to make room
-        /// (the panel is laid out by SetupPauseMenuTool with three rows).
-        /// </summary>
+        /// <summary>The map's wheel zoom speed: a copy of the map slider (BuildSettingsWindow puts it in its row).</summary>
         private void AddZoomSlider()
         {
-            Transform panel = settingsPanel != null ? settingsPanel.transform : null;
-            Transform mapLabel = panel != null ? panel.Find("MapLabel") : null;
-            if (mapLabel == null || panel.Find("ZoomSlider") != null) return;
-
-            void Place(string name, float y)
-            {
-                Transform t = panel.Find(name);
-                if (t is RectTransform rt) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
-            }
-            Place("FpsLabel", 120f); Place("FpsSensSlider", 90f);
-            Place("MapLabel", 40f); Place("MapSensSlider", 10f);
-            Place("VolLabel", -120f); Place("VolSlider", -150f);
-
-            GameObject label = Instantiate(mapLabel.gameObject, panel);
-            label.name = "ZoomLabel";
-            ((RectTransform)label.transform).anchoredPosition = new Vector2(((RectTransform)mapLabel).anchoredPosition.x, -40f);
-            Text text = label.GetComponent<Text>();
-            if (text != null) text.text = "Колесо миші на мапі (швидкість зуму):";
-
-            GameObject slider = Instantiate(mapSensSlider.gameObject, panel);
+            if (settingsPanel == null || zoomSlider != null) return;
+            GameObject slider = Instantiate(mapSensSlider.gameObject, settingsPanel.transform);
             slider.name = "ZoomSlider";
-            ((RectTransform)slider.transform).anchoredPosition = new Vector2(((RectTransform)mapSensSlider.transform).anchoredPosition.x, -70f);
-            Slider zoom = slider.GetComponent<Slider>();
-            zoom.onValueChanged = new Slider.SliderEvent();
-            zoom.minValue = SettingsManager.MIN_ZOOM_SENSITIVITY;
-            zoom.maxValue = SettingsManager.MAX_ZOOM_SENSITIVITY;
-            zoom.value = SettingsManager.Instance.ZoomSensitivity;
-            zoom.onValueChanged.AddListener(v => SettingsManager.Instance?.SetZoomSensitivity(v));
+            zoomSlider = slider.GetComponent<Slider>();
+            zoomSlider.onValueChanged = new Slider.SliderEvent();
+            zoomSlider.minValue = SettingsManager.MIN_ZOOM_SENSITIVITY;
+            zoomSlider.maxValue = SettingsManager.MAX_ZOOM_SENSITIVITY;
+            zoomSlider.value = SettingsManager.Instance.ZoomSensitivity;
+            zoomSlider.onValueChanged.AddListener(v => SettingsManager.Instance?.SetZoomSensitivity(v));
         }
 
         private void SetupButtonListeners()
@@ -321,128 +308,125 @@ namespace BattleOfAges.UI
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(true);
         }
 
+        /// <summary>
+        /// The settings screen as one themed window: the sliders with their values on the left (the scene's sliders are
+        /// moved into rows and its labels hidden), graphics and keys on the right, Back and Reset along the bottom.
+        /// </summary>
         private void BuildKeybindsUI()
         {
             if (settingsPanel == null || keybindsContainerObj != null) return;
+            Transform panel = settingsPanel.transform;
+            foreach (Text t in panel.GetComponentsInChildren<Text>(true))
+                if (t.GetComponentInParent<Slider>(true) == null && (closeSettingsButton == null || !t.transform.IsChildOf(closeSettingsButton.transform)))
+                    t.gameObject.SetActive(false);
 
-            // Shift existing settingsPanel elements to the left side to prevent overlap
-            for (int i = 0; i < settingsPanel.transform.childCount; i++)
+            RectTransform win = UiTheme.Rect(panel, "SettingsWindow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1040f, 640f));
+            UiTheme.PanelImage(win);
+            UiTheme.Label(UiTheme.Rect(win, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 50f)), "Text", "Налаштування", 32, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+
+            RectTransform left = Section(win, "Sliders", "Миша й звук", new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(28f, 96f), new Vector2(-12f, -76f));
+            int row = 0;
+            SliderRow(left, row++, "Миша від першої особи", fpsSensSlider, v => v.ToString("0.0"));
+            SliderRow(left, row++, "Перетяг мапи", mapSensSlider, v => v.ToString("0.0"));
+            SliderRow(left, row++, "Зум колесом на мапі", zoomSlider, v => v.ToString("0.0"));
+            SliderRow(left, row, "Гучність", volumeSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+
+            RectTransform right = Section(win, "KeybindsPanel", "Графіка й клавіші", new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Vector2(12f, 96f), new Vector2(-28f, -76f));
+            keybindsContainerObj = right.gameObject;
+            BuildKeyList(right);
+
+            if (closeSettingsButton != null)
             {
-                Transform child = settingsPanel.transform.GetChild(i);
-                RectTransform rt = child.GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    Vector2 pos = rt.anchoredPosition;
-                    rt.anchoredPosition = new Vector2(-220f, pos.y);
-                }
+                var back = (RectTransform)closeSettingsButton.transform;
+                back.SetParent(win, false);
+                back.anchorMin = back.anchorMax = back.pivot = new Vector2(0.5f, 0f);
+                back.sizeDelta = new Vector2(260f, 52f);
+                back.anchoredPosition = new Vector2(-145f, 24f);
             }
-
-            Font font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
-
-            RectTransform containerRect = UiTheme.Child(settingsPanel.transform, "KeybindsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-            keybindsContainerObj = containerRect.gameObject;
-            containerRect.pivot = new Vector2(0.5f, 0.5f);
-            containerRect.anchoredPosition = new Vector2(220f, 0f);
-            containerRect.sizeDelta = new Vector2(400f, 480f);
-
-            Image bg = keybindsContainerObj.AddComponent<Image>();
-            bg.color = new Color(0.06f, 0.10f, 0.18f, 0.95f);
-
-            // Header Title
-            RectTransform headerRect = UiTheme.Child(keybindsContainerObj.transform, "Title", new Vector2(0f, 1f), new Vector2(1f, 1f));
-            GameObject headerObj = headerRect.gameObject;
-            headerRect.pivot = new Vector2(0.5f, 1f);
-            headerRect.sizeDelta = new Vector2(0f, 45f);
-
-            Image headerBg = headerObj.AddComponent<Image>();
-            headerBg.color = new Color(0.12f, 0.20f, 0.35f, 0.98f);
-
-            // A GameObject holds one Graphic: the title text goes on a child of the header background
-            GameObject headerTxtObj = new GameObject("Text", typeof(RectTransform));
-            headerTxtObj.transform.SetParent(headerObj.transform, false);
-            RectTransform headerTxtRect = headerTxtObj.GetComponent<RectTransform>();
-            headerTxtRect.anchorMin = Vector2.zero; headerTxtRect.anchorMax = Vector2.one;
-            headerTxtRect.offsetMin = headerTxtRect.offsetMax = Vector2.zero;
-            Text headerTxt = UiTheme.PlainText(headerTxtObj, font, 18, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), "🎮 НАЛАШТУВАННЯ КЕРУВАННЯ", style: FontStyle.Bold);
-
-            // Scrollable List Container
-            RectTransform scrollRect = UiTheme.Child(keybindsContainerObj.transform, "ScrollView", Vector2.zero, Vector2.one, new Vector2(10f, 55f), new Vector2(-10f, -50f));
-            GameObject scrollObj = scrollRect.gameObject;
-
-            ScrollRect scroll = scrollObj.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-
-            RectTransform viewportRect = UiTheme.Child(scrollObj.transform, "Viewport", Vector2.zero, Vector2.one);
-            GameObject viewportObj = viewportRect.gameObject;
-
-            Image vpMask = viewportObj.AddComponent<Image>();
-            vpMask.color = Color.white;
-            Mask mask = viewportObj.AddComponent<Mask>();
-            mask.showMaskGraphic = false;
-            scroll.viewport = viewportRect;
-
-            RectTransform contentRect = UiTheme.Child(viewportObj.transform, "Content", new Vector2(0f, 1f), new Vector2(1f, 1f));
-            GameObject contentObj = contentRect.gameObject;
-            contentRect.pivot = new Vector2(0.5f, 1f);
-            contentRect.sizeDelta = new Vector2(0f, 0f);
-
-            VerticalLayoutGroup layout = contentObj.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8f;
-            layout.childControlWidth = true;
-            layout.childControlHeight = false;
-            layout.padding = new RectOffset(5, 5, 5, 5);
-
-            ContentSizeFitter fitter = contentObj.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            scroll.content = contentRect;
-
-            CreateGraphicsRow(contentObj.transform, font);
-            // Create rows for each KeyAction
-            foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
-            {
-                CreateKeybindRow(contentObj.transform, font, action);
-            }
-
-            // Reset Defaults Button
-            RectTransform resetRect = UiTheme.Child(keybindsContainerObj.transform, "ResetDefaultsBtn", new Vector2(0.05f, 0.02f), new Vector2(0.95f, 0.09f), Vector2.zero, Vector2.zero);
-            GameObject resetBtnObj = resetRect.gameObject;
-
-            Image resetBg = resetBtnObj.AddComponent<Image>();
-            resetBg.color = new Color(0.45f, 0.18f, 0.18f, 0.95f);
-
-            Button resetBtn = resetBtnObj.AddComponent<Button>();
-            ColorBlock cb = resetBtn.colors;
-            cb.normalColor = new Color(0.45f, 0.18f, 0.18f, 0.95f);
-            cb.highlightedColor = new Color(0.65f, 0.25f, 0.25f, 1.0f);
-            cb.pressedColor = new Color(0.35f, 0.10f, 0.10f, 1.0f);
-            resetBtn.colors = cb;
-            resetBtn.onClick.AddListener(() =>
+            UiTheme.TextButton(win, "ResetDefaultsBtn", "Скинути клавіші", new Vector2(0.5f, 0f), new Vector2(145f, 24f), new Vector2(260f, 52f), () =>
             {
                 activeRebindAction = null;
                 KeybindsManager.ResetToDefaults();
             });
-
-            RectTransform resetTxtRect = UiTheme.Child(resetBtnObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject resetTxtObj = resetTxtRect.gameObject;
-
-            Text resetTxt = UiTheme.PlainText(resetTxtObj, font, 15, TextAnchor.MiddleCenter, Color.white, "🔄 Скинути за замовчуванням", style: FontStyle.Bold);
-
             RefreshKeybindButtonTexts();
         }
 
-        private void CreateKeybindRow(Transform parent, Font font, KeyAction action)
+        private static RectTransform Section(RectTransform win, string name, string title, Vector2 min, Vector2 max, Vector2 offMin, Vector2 offMax)
         {
-            KeyAction capturedAction = action;
-            keybindButtonTexts[action] = CreateRow(parent, font, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(capturedAction));
+            RectTransform s = UiTheme.Child(win, name, min, max, offMin, offMax);
+            UiTheme.PanelImage(s, UiTheme.SlotSprite);
+            UiTheme.Label(UiTheme.Child(s, "Heading", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -40f), new Vector2(-18f, -6f)), "Text", title, 20, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            return s;
+        }
+
+        /// <summary>One slider row: name on the left, current value on the right, the slider under them.</summary>
+        private static void SliderRow(RectTransform section, int index, string title, Slider slider, System.Func<float, string> format)
+        {
+            if (slider == null) return;
+            const float h = 92f;
+            RectTransform r = UiTheme.Child(section, "Row_" + slider.name, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f - h * (index + 1)), new Vector2(-22f, -52f - h * index));
+            UiTheme.Label(UiTheme.Child(r, "Name", new Vector2(0f, 0.5f), new Vector2(0.75f, 1f), Vector2.zero, Vector2.zero), "Text", title, 19, TextAnchor.MiddleLeft);
+            Text value = UiTheme.Label(UiTheme.Child(r, "Value", new Vector2(0.75f, 0.5f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero), "Text", format(slider.value), 19, TextAnchor.MiddleRight, UiTheme.Gold, FontStyle.Bold);
+            slider.onValueChanged.AddListener(v => value.text = format(v));
+
+            var st = (RectTransform)slider.transform;
+            st.SetParent(r, false);
+            st.anchorMin = new Vector2(0f, 0.08f); st.anchorMax = new Vector2(1f, 0.46f);
+            st.pivot = new Vector2(0.5f, 0.5f);
+            st.offsetMin = new Vector2(12f, 0f); st.offsetMax = new Vector2(-12f, 0f);
+            foreach (RectTransform part in st)
+            {
+                if (part.name == "Handle Slide Area") continue;
+                part.anchorMin = new Vector2(0f, 0.3f); part.anchorMax = new Vector2(1f, 0.7f); part.offsetMin = part.offsetMax = Vector2.zero;
+            }
+            foreach (Image img in slider.GetComponentsInChildren<Image>(true))
+            {
+                if (img.rectTransform == slider.handleRect) { img.sprite = UiTheme.RoundSprite; img.color = UiTheme.Gold; img.rectTransform.sizeDelta = new Vector2(26f, 0f); }
+                else if (img.rectTransform == slider.fillRect) { img.sprite = UiTheme.BarSprite; img.color = UiTheme.Rim; }
+                else { img.sprite = UiTheme.BarSprite; img.color = new Color(0.03f, 0.025f, 0.02f, 0.95f); }
+                img.type = Image.Type.Sliced;
+                img.preserveAspect = img.rectTransform == slider.handleRect;
+            }
+        }
+
+        /// <summary>Graphics preset and one row per key, scrolling under the heading.</summary>
+        private void BuildKeyList(RectTransform section)
+        {
+            RectTransform scrollRect = UiTheme.Child(section, "ScrollView", Vector2.zero, Vector2.one, new Vector2(14f, 14f), new Vector2(-14f, -48f));
+            ScrollRect scroll = scrollRect.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.scrollSensitivity = 30f;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+
+            RectTransform viewportRect = UiTheme.Child(scrollRect, "Viewport", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            viewportRect.gameObject.AddComponent<RectMask2D>();
+            scroll.viewport = viewportRect;
+
+            RectTransform contentRect = UiTheme.Child(viewportRect, "Content", new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            VerticalLayoutGroup layout = contentRect.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 6f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(4, 4, 4, 4);
+            contentRect.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scroll.content = contentRect;
+
+            CreateGraphicsRow(contentRect);
+            foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
+            {
+                KeyAction captured = action;
+                keybindButtonTexts[action] = CreateRow(contentRect, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(captured));
+            }
         }
 
         /// <summary>The graphics preset (GraphicsQuality): a click goes to the next one.</summary>
-        private void CreateGraphicsRow(Transform parent, Font font)
+        private void CreateGraphicsRow(Transform parent)
         {
             Text value = null;
-            value = CreateRow(parent, font, "Row_Graphics", "🖥 Графіка", () =>
+            value = CreateRow(parent, "Row_Graphics", "Графіка", () =>
             {
                 GraphicsQuality.Cycle();
                 value.text = GraphicsQuality.Names[(int)GraphicsQuality.Current];
@@ -450,39 +434,18 @@ namespace BattleOfAges.UI
             value.text = GraphicsQuality.Names[(int)GraphicsQuality.Current];
         }
 
-        private static Text CreateRow(Transform parent, Font font, string name, string label, UnityEngine.Events.UnityAction onClick)
+        private static Text CreateRow(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
         {
-            GameObject rowObj = new GameObject(name, typeof(RectTransform));
-            rowObj.transform.SetParent(parent, false);
+            var row = new GameObject(name, typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            LayoutElement element = row.AddComponent<LayoutElement>();
+            element.minHeight = element.preferredHeight = 46f;
+            var rt = (RectTransform)row.transform;
+            UiTheme.PanelImage(rt, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
 
-            LayoutElement element = rowObj.AddComponent<LayoutElement>();
-            element.minHeight = 44f;
-            element.preferredHeight = 44f;
-
-            Image rowBg = rowObj.AddComponent<Image>();
-            rowBg.color = new Color(0.10f, 0.15f, 0.25f, 0.9f);
-
-            // Label
-            RectTransform labelRect = UiTheme.Child(rowObj.transform, "Label", new Vector2(0.03f, 0f), new Vector2(0.65f, 1f), Vector2.zero, Vector2.zero);
-            GameObject labelObj = labelRect.gameObject;
-
-            Text labelTxt = UiTheme.PlainText(labelObj, font, 14, TextAnchor.MiddleLeft, Color.white, label, style: FontStyle.Bold);
-
-            // Key Button
-            RectTransform btnRect = UiTheme.Child(rowObj.transform, "KeyBtn", new Vector2(0.67f, 0.10f), new Vector2(0.97f, 0.90f), Vector2.zero, Vector2.zero);
-            GameObject btnObj = btnRect.gameObject;
-
-            Image btnBg = btnObj.AddComponent<Image>();
-            btnBg.color = new Color(0.18f, 0.35f, 0.55f, 0.95f);
-
-            Button btn = btnObj.AddComponent<Button>();
-            btn.onClick.AddListener(onClick);
-
-            RectTransform txtRect = UiTheme.Child(btnObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject txtObj = txtRect.gameObject;
-
-            Text keyTxt = UiTheme.PlainText(txtObj, font, 15, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), style: FontStyle.Bold);
-            return keyTxt;
+            UiTheme.Label(UiTheme.Child(rt, "Label", new Vector2(0f, 0f), new Vector2(0.62f, 1f), new Vector2(14f, 0f), Vector2.zero), "Text", label, 17, TextAnchor.MiddleLeft);
+            Button btn = UiTheme.TextButton(rt, "KeyBtn", "", new Vector2(1f, 0.5f), new Vector2(-6f, 0f), new Vector2(150f, 36f), onClick, 17);
+            return btn.GetComponentInChildren<Text>();
         }
 
         private void StartRebinding(KeyAction action)
@@ -504,13 +467,13 @@ namespace BattleOfAges.UI
                 if (activeRebindAction.HasValue && activeRebindAction.Value == action)
                 {
                     txt.text = "[ ? ... ]";
-                    txt.color = Color.yellow;
+                    txt.color = UiTheme.Bad;
                 }
                 else
                 {
                     KeyCode key = KeybindsManager.GetKey(action);
                     txt.text = $"[ {KeybindsManager.GetKeyDisplayString(key)} ]";
-                    txt.color = new Color(0.3f, 0.95f, 1.0f);
+                    txt.color = UiTheme.Gold;
                 }
             }
         }
