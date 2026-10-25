@@ -111,6 +111,51 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(4, leader.SquadMembers.Count);
         }
 
+        [UnityTest]
+        public IEnumerator KilledAnimal_FallsOntoItsSide_AwayFromTheKiller_OnTheGround()
+        {
+            CreateGround();
+            foreach (AnimalType type in new[] { AnimalType.Deer, AnimalType.Boar, AnimalType.Rabbit })
+            {
+                GameObject a = Track(AnimalModelBuilder.CreateAnimalPrefab(type, "Dying" + type));
+                Vector3 spot = new Vector3(-300f, 0f, -300f + (int)type * 10f);
+                spot.y = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(spot);
+                a.transform.SetPositionAndRotation(spot, Quaternion.identity);
+                GameObject hunter = Track(new GameObject("Hunter", typeof(HealthComponent), typeof(CombatUnit)));
+                hunter.transform.position = a.transform.position + Vector3.right * 6f; // on its right: it falls to its left
+                yield return null;
+                PeacefulAnimalAI ai = a.GetComponent<PeacefulAnimalAI>();
+                ai.enabled = false;
+                Transform model = a.transform.Find("VisualModel");
+                float ground = BattleOfAges.RTS.RtsUnit.GetTerrainHeight(a.transform.position);
+                float standingTop = Top(a) - ground;
+
+                HealthComponent hp = a.GetComponent<HealthComponent>();
+                hp.LastAttacker = hunter.GetComponent<CombatUnit>();
+                hp.TakeDamage(hp.MaxHealth * 10);
+                Assert.IsTrue(ai.HasFallen, $"{type}: falls");
+                yield return new WaitForSeconds(PeacefulAnimalAI.FallSeconds + PeacefulAnimalAI.SettleSeconds + 0.2f);
+
+                Assert.Less(Mathf.Abs(Vector3.Dot(model.up, Vector3.up)), 0.1f, $"{type}: lies on its side");
+                Vector3 toHunter = hunter.transform.position - a.transform.position;
+                toHunter.y = 0f;
+                Assert.Less(Vector3.Dot(model.up, toHunter.normalized), 0f, $"{type}: fell away from the hunter (its back away, the legs toward them)");
+                float bottom = float.MaxValue;
+                foreach (Renderer r in a.GetComponentsInChildren<Renderer>()) if (r.enabled) bottom = Mathf.Min(bottom, r.bounds.min.y);
+                bottom -= ground; // above the ground under it (the world of an earlier test may be loaded)
+                Assert.Greater(bottom, -0.35f, $"{type}: not sunk into the ground"); // (a turned leg's box reaches a little lower than the leg)
+                Assert.Less(bottom, 0.25f, $"{type}: not hovering");
+                Assert.Less(Top(a) - ground, standingTop * 0.85f, $"{type}: lower lying than standing");
+            }
+        }
+
+        private static float Top(GameObject g)
+        {
+            float top = float.MinValue;
+            foreach (Renderer r in g.GetComponentsInChildren<Renderer>()) if (r.enabled) top = Mathf.Max(top, r.bounds.max.y);
+            return top;
+        }
+
         [UnityTest, Order(3)]
         public IEnumerator WildBoar_HasBoarStats_IsAnimated_AndGrazesNearSpawn()
         {

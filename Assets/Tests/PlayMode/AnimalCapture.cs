@@ -42,7 +42,8 @@ namespace BattleOfAges.PlayModeTests
 
             Vector3 Ground(float x, float z) => new Vector3(x, InfiniteWorldManager.GetSampledTerrainHeight(x, z), z);
             Vector3 main = Ground(-14f, -30f), gait = Ground(-14f, -44f), graze = Ground(-2f, -30f), group = Ground(10f, -30f), scale = Ground(10f, -44f);
-            ModelCapture.ClearStage(new[] { main, gait, graze, group, scale }, 10f);
+            Vector3 deadSpot = Ground(-2f, -44f);
+            ModelCapture.ClearStage(new[] { main, gait, graze, group, scale, deadSpot }, 10f);
             GrassFieldRenderer grassField = UnityEngine.Object.FindFirstObjectByType<GrassFieldRenderer>();
             if (grassField != null) grassField.enabled = false;
 
@@ -73,6 +74,7 @@ namespace BattleOfAges.PlayModeTests
                 herd.Add(Make(p, facing * Quaternion.Euler(0f, (i - 1) * 35f, 0f), "Herd_" + i));
             }
             PeacefulAnimalAI scaled = Make(scale, side, "ScaleAnimal");
+            PeacefulAnimalAI dead = Make(deadSpot, side, "DeadAnimal");
             if (type == AnimalType.Deer)
             {
                 // Fixed sexes for review (in game two hinds to a stag): stag specimen, hind grazing, mixed gait row and herd.
@@ -92,6 +94,8 @@ namespace BattleOfAges.PlayModeTests
             for (int i = 0; i < gaitRow.Count; i++) gaitRow[i].PoseGait(i * 0.25f, 1f);
             for (int i = 0; i < herd.Count; i++) herd[i].PoseGait(0.15f + i * 0.3f, i == 1 ? 0f : 1f);
             scaled.PoseGait(0.1f, 1f);
+            dead.Health.TakeDamage(dead.Health.MaxHealth * 10); // falls onto its side
+            yield return new WaitForSeconds(PeacefulAnimalAI.FallSeconds + PeacefulAnimalAI.SettleSeconds + 0.3f);
             // CAPTURE_LOD = 1 shows the distant meshes up close (to check them); unset = normal switching.
             if (int.TryParse(Environment.GetEnvironmentVariable("CAPTURE_LOD"), out int forcedLod))
                 foreach (LODGroup g in UnityEngine.Object.FindObjectsByType<LODGroup>(FindObjectsSortMode.None))
@@ -129,6 +133,7 @@ namespace BattleOfAges.PlayModeTests
                 ("grazing", G(-1.6f, 0.8f, 1.6f), G(0f, 0.4f, 0.4f)),
                 ("group_mid_distance", group + facing * new Vector3(-2.5f, 2.2f, 8.5f), group + Vector3.up * 0.5f),
                 ("scale_with_knight", scale + new Vector3(-0.6f, 1.4f, -5.2f), scale + new Vector3(-0.6f, 0.8f, 0f)),
+                ("dead", deadSpot + new Vector3(-2.2f * s, 1.3f * s, -2.6f * s), deadSpot + Vector3.up * 0.25f * s),
             };
 
             // CAPTURE_LIST = "3,8,10" picks views by number; otherwise CAPTURE_FROM + CAPTURE_VIEWS.

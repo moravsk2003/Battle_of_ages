@@ -60,6 +60,7 @@ namespace BattleOfAges.AI
         {
             spawnOrigin = transform.position;
             base.Awake();
+            if (Health != null) Health.OnDeath += OnDied;
             CacheVisualNodes();
             ConfigureAnimalStats();
         }
@@ -264,6 +265,82 @@ namespace BattleOfAges.AI
                 earL.localRotation = earLRest * Quaternion.Euler(-28f * move - 22f * flickL, 0f, 14f * flickL);
                 earR.localRotation = earRRest * Quaternion.Euler(-28f * move - 22f * flickR, 0f, -14f * flickR);
             }
+        }
+
+        // ------------------------------------------------------------------ death
+
+        /// <summary>How long the fall onto the side takes, and the little settle after it hits the ground.</summary>
+        public const float FallSeconds = 0.55f, SettleSeconds = 0.35f;
+        private bool fallen;
+        /// <summary>Fallen (or falling) onto its side.</summary>
+        public bool HasFallen => fallen;
+
+        /// <summary>
+        /// Shot or cut down it falls onto its side away from its killer (the corpse then lies and sinks, UnitCorpse); before,
+        /// the animation just stopped and it stood dead on its legs.
+        /// </summary>
+        private void OnDied()
+        {
+            if (fallen || visualModel == null) return;
+            fallen = true;
+            Combat.CombatUnit killer = Health != null ? Health.LastAttacker : null;
+            float side = killer != null
+                ? (Vector3.Dot(transform.right, transform.position - killer.transform.position) >= 0f ? 1f : -1f)
+                : ((GetInstanceID() & 1) == 0 ? 1f : -1f);
+            StartCoroutine(Collapse(side)); // (runs on though the corpse switches this component off)
+        }
+
+        /// <summary>How far the body reaches to that side of its middle (the edge it rolls over), in the animal's frame.</summary>
+        private float SideExtent(float side)
+        {
+            float reach = 0.1f;
+            foreach (MeshFilter mf in visualModel.GetComponentsInChildren<MeshFilter>())
+            {
+                if (mf.sharedMesh == null) continue;
+                Bounds b = mf.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    Vector3 c = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f));
+                    Vector3 local = transform.InverseTransformPoint(mf.transform.TransformPoint(c));
+                    reach = Mathf.Max(reach, local.x * side);
+                }
+            }
+            return reach;
+        }
+
+        private System.Collections.IEnumerator Collapse(float side)
+        {
+            visualModel.localPosition = Vector3.zero;
+            visualModel.localRotation = Quaternion.identity;
+            Vector3 edge = new Vector3(SideExtent(side) * side, 0f, 0f);
+            var legStart = new Quaternion[4];
+            var kneeStart = new Quaternion[4];
+            for (int i = 0; i < 4; i++)
+            {
+                legStart[i] = legPivots[i] != null ? legPivots[i].localRotation : Quaternion.identity;
+                kneeStart[i] = knees[i] != null ? knees[i].localRotation : Quaternion.identity;
+            }
+            Quaternion neckStart = neckPivot != null ? neckPivot.localRotation : Quaternion.identity;
+            for (float t = 0f; t <= FallSeconds + SettleSeconds; t += Time.deltaTime)
+            {
+                float k = Mathf.Clamp01(t / FallSeconds);
+                k *= k; // it drops faster and faster, as a falling body does
+                float settle = t > FallSeconds ? Mathf.Sin((t - FallSeconds) / SettleSeconds * Mathf.PI) * 0.05f : 0f;
+                Quaternion roll = Quaternion.Euler(0f, 0f, -90f * side * (k - settle)); // that side down
+                visualModel.localRotation = roll;
+                visualModel.localPosition = edge + roll * -edge; // over the edge of the body, so it lies on the ground
+                float relax = Mathf.Clamp01(t / (FallSeconds + SettleSeconds));
+                for (int i = 0; i < 4; i++)
+                {
+                    // the legs go limp: the front ones a little forward, the hind ones back, the knees half bent
+                    if (legPivots[i] != null) legPivots[i].localRotation = Quaternion.Slerp(legStart[i], Quaternion.Euler(i < 2 ? -14f : 18f, 0f, 0f), relax);
+                    if (knees[i] != null) knees[i].localRotation = Quaternion.Slerp(kneeStart[i], Quaternion.Euler(i < 2 ? 30f : 20f, 0f, 0f), relax);
+                }
+                if (neckPivot != null) neckPivot.localRotation = Quaternion.Slerp(neckStart, neckRest * Quaternion.Euler(18f, 0f, 0f), relax); // the head down
+                yield return null;
+            }
+            visualModel.localRotation = Quaternion.Euler(0f, 0f, -90f * side);
+            visualModel.localPosition = edge + visualModel.localRotation * -edge;
         }
 
         /// <summary>0 most of the time, a quick 0..1..0 twitch for a quarter second every ~3.7 s.</summary>
