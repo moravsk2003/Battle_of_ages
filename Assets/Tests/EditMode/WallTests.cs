@@ -121,6 +121,144 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void Barrier_IsARectangleWithSquareEnds()
+        {
+            // A wall from (0,0) to (4,0), 0.9 either side of its middle line
+            var wall = new WallBarriers.Barrier(Vector2.zero, new Vector2(4f, 0f), 0.9f, 10f);
+            Assert.AreEqual(-0.9f, WallBarriers.Distance(wall, new Vector2(2f, 0f), out _), 1e-4f, "the middle: deepest inside");
+            Assert.AreEqual(0.6f, WallBarriers.Distance(wall, new Vector2(2f, 1.5f), out Vector2 n), 1e-4f, "beside it");
+            Assert.AreEqual(1f, n.y, 1e-4f, "the normal points out of the face");
+            Assert.AreEqual(0.5f, WallBarriers.Distance(wall, new Vector2(4.5f, 0.8f), out n), 1e-4f, "past the end, within its thickness: square, not rounded");
+            Assert.AreEqual(1f, n.x, 1e-4f);
+            Assert.AreEqual(Mathf.Sqrt(0.5f * 0.5f + 0.6f * 0.6f), WallBarriers.Distance(wall, new Vector2(4.5f, 1.5f), out _), 1e-4f, "off the corner");
+            var pier = new WallBarriers.Barrier(new Vector2(4f, 0f), new Vector2(4f, 0f), 1f, 10f);
+            Assert.AreEqual(1f, WallBarriers.Distance(pier, new Vector2(6f, 0f), out _), 1e-4f, "a pier is a disc");
+        }
+
+        [Test]
+        public void SegmentDistance_CrossingIsZero_ParallelIsTheGap()
+        {
+            Assert.AreEqual(0f, WallBarriers.SegmentDistance(new Vector2(0f, -1f), new Vector2(0f, 1f), new Vector2(-1f, 0f), new Vector2(1f, 0f)), 1e-5f);
+            Assert.AreEqual(2f, WallBarriers.SegmentDistance(new Vector2(0f, 0f), new Vector2(4f, 0f), new Vector2(0f, 2f), new Vector2(4f, 2f)), 1e-5f);
+            Assert.AreEqual(1f, WallBarriers.SegmentDistance(new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(2f, 0f), new Vector2(3f, 0f)), 1e-5f, "in line, apart");
+        }
+
+        [Test]
+        public void FromTheWalls_TheWallsLevelAddsDamage()
+        {
+            int before = Fortifications.Level;
+            PendingHits.FlushAll();
+            GameObject Striker(string name)
+            {
+                var go = new GameObject(name, typeof(HealthComponent), typeof(CombatUnit));
+                go.AddComponent<Crafting.Equipment>();
+                UnitProgress.Setup(go, UnitRank.Knight);
+                go.GetComponent<HealthComponent>().InitializeHealth(100);
+                return go;
+            }
+            GameObject ground = Striker("OnGround"), wall = Striker("OnWall");
+            var victimObj = new GameObject("Victim", typeof(HealthComponent));
+            victimObj.transform.position = new Vector3(1.5f, 0f, 0f);
+            HealthComponent victim = victimObj.GetComponent<HealthComponent>();
+            try
+            {
+                Fortifications.Level = 3;
+                victim.InitializeHealth(100000);
+                Assert.IsTrue(ground.GetComponent<CombatUnit>().TryAttack(victim));
+                PendingHits.FlushAll();
+                int plain = 100000 - victim.CurrentHealth;
+
+                victim.InitializeHealth(100000);
+                CombatUnit fromWall = wall.GetComponent<CombatUnit>();
+                fromWall.OnWall = true;
+                Assert.IsTrue(fromWall.TryAttack(victim));
+                PendingHits.FlushAll();
+                int walled = 100000 - victim.CurrentHealth;
+                Assert.AreEqual(Mathf.RoundToInt(plain * (1f + GameBalance.WallLevelDamageBonus[3])), walled, 1, "walls III: +30%");
+            }
+            finally
+            {
+                Fortifications.Level = before;
+                PendingHits.FlushAll();
+                Object.DestroyImmediate(ground);
+                Object.DestroyImmediate(wall);
+                Object.DestroyImmediate(victimObj);
+            }
+        }
+
+        [Test]
+        public void Fortifications_CannotBeRaised_WithoutWalls_OrPastV()
+        {
+            int before = Fortifications.Level;
+            try
+            {
+                Fortifications.Level = 1;
+                Assert.IsFalse(Fortifications.CanUpgrade(out string why), "no wall yet");
+                Assert.IsNotEmpty(why);
+                Fortifications.Level = Fortifications.MaxLevel;
+                Assert.IsFalse(Fortifications.CanUpgrade(out why), "the top level");
+                Assert.AreEqual(GameBalance.WallLevelDamageBonus[Fortifications.MaxLevel], Fortifications.DamageBonus);
+            }
+            finally { Fortifications.Level = before; }
+        }
+
+        [Test]
+        public void WallTypes_AreWalls_OthersAreNot()
+        {
+            Assert.IsTrue(WallSegment.IsWall(BuildingType.CastleWall));
+            Assert.IsTrue(WallSegment.IsWall(BuildingType.WallStairs));
+            Assert.IsTrue(WallSegment.IsWall(BuildingType.WallGate));
+            Assert.IsFalse(WallSegment.IsWall(BuildingType.WorkerHouse));
+            Assert.IsFalse(WallSegment.IsWall(BuildingType.TownHall));
+            Assert.AreEqual(Utils.WallBuilder.Kind.Stairs, WallSegment.KindOf(BuildingType.WallStairs));
+            Assert.AreEqual(Utils.WallBuilder.Kind.Gate, WallSegment.KindOf(BuildingType.WallGate));
+            Assert.Greater(BuildingPlacementSystem.MaxRiseFor(BuildingType.CastleWall), BuildingPlacementSystem.MaxRiseFor(BuildingType.WorkerHouse), "walls stand on steeper ground");
+            foreach (BuildingType t in new[] { BuildingType.CastleWall, BuildingType.WallStairs, BuildingType.WallGate })
+            {
+                BuildingDefinition d = BuildingData.GetDefinition(t);
+                Assert.AreEqual(t, d.Type, $"{t} is in the build menu");
+                Assert.Greater(d.OreCost, 0);
+                Assert.Greater(d.MaxHealth, 0);
+            }
+            Assert.AreEqual(Utils.WallBuilder.GateLength, BuildingData.GetDefinition(BuildingType.WallGate).Size.x, "the gate snaps at its own length");
+        }
+
+        [Test]
+        public void Stairs_ClimbAssist_PointsUpTheFlight()
+        {
+            GameObject stairs = BuildingNode.CreateWallPrefab(BuildingType.WallStairs, "TestStairs");
+            try
+            {
+                CastleWallClimbTrigger assist = stairs.GetComponentInChildren<CastleWallClimbTrigger>();
+                Assert.IsNotNull(assist);
+                Vector3 up = assist.transform.forward;
+                Assert.Greater(up.y, 0.5f, "uphill");
+                Assert.Less(up.x, -0.5f, "toward the landing (-x)");
+                Assert.IsNotNull(stairs.transform.Find("StairsRampCollider"));
+                Assert.IsNotNull(stairs.transform.Find("Landing"));
+            }
+            finally { Object.DestroyImmediate(stairs); }
+        }
+
+        [Test]
+        public void Gate_LeavesHangOnTheJambs()
+        {
+            GameObject gate = BuildingNode.CreateWallPrefab(BuildingType.WallGate, "TestGate");
+            try
+            {
+                Transform left = gate.transform.Find("LeafLeft"), right = gate.transform.Find("LeafRight");
+                Assert.IsNotNull(left);
+                Assert.IsNotNull(right);
+                Assert.AreEqual(-Utils.WallBuilder.GateHalfW, left.localPosition.x, 1e-4f);
+                Assert.AreEqual(Utils.WallBuilder.GateHalfW, right.localPosition.x, 1e-4f);
+                Assert.IsNotNull(left.GetComponent<BoxCollider>(), "a shut leaf stops the player");
+                Assert.IsNotNull(gate.GetComponentInChildren<Light>(), "a torch by the gate");
+                Assert.IsNull(gate.transform.Find("Body"), "no solid body across the opening");
+            }
+            finally { Object.DestroyImmediate(gate); }
+        }
+
+        [Test]
         public void WallPrefabs_HaveTheirParts()
         {
             GameObject gate = BuildingNode.CreateWallPrefab(BuildingType.WallGate, "TestGate");

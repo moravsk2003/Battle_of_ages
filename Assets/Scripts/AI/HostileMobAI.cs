@@ -251,6 +251,7 @@ namespace BattleOfAges.AI
                 StartCoroutine(Climb(ladder));
                 return true;
             }
+            if (ladder.Ready && ladder.Free) { SetMoveDestination(foot); return true; } // its turn: to the foot
             // Wait for the turn round the foot, a little out from the wall
             int id = Mathf.Abs(GetInstanceID());
             Vector3 along = Vector3.Cross(Vector3.up, ladder.Side);

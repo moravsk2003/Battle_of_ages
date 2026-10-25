@@ -217,6 +217,39 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator TwoClimbers_TakeTurns_OnOneLadder()
+        {
+            var (first, wall, target) = Siege(AI.HostileMobType.Bandit);
+            GameObject m = Utils.HostileCampBuilder.CreateHostileMob(AI.HostileMobType.Bandit, "SecondBesieger");
+            CharacterController cc = m.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            m.transform.position = OnGround(Far + new Vector3(-0.5f, 0f, 9f));
+            if (cc != null) cc.enabled = true;
+            spawned.Add(m);
+            AI.HostileMobAI second = m.GetComponent<AI.HostileMobAI>();
+            yield return null;
+            yield return null;
+            first.OrderAttack(target);
+            second.OrderAttack(target);
+            int mostLadders = 0;
+            bool bothOn = false;
+            float t = 0f;
+            for (; t < 60f && (first.transform.position.z > Far.z - 1.8f || second.transform.position.z > Far.z - 1.8f); t += Time.deltaTime)
+            {
+                mostLadders = Mathf.Max(mostLadders, SiegeLadder.Active.Count);
+                bothOn |= first.IsClimbing && second.IsClimbing && first.transform.position.y < wall.transform.position.y + 3f && second.transform.position.y < wall.transform.position.y + 3f
+                          && first.transform.position.y > wall.transform.position.y + 0.3f && second.transform.position.y > wall.transform.position.y + 0.3f
+                          && first.transform.position.z > Far.z + 1f && second.transform.position.z > Far.z + 1f; // both on the ladder (outside), not one coming down inside
+                yield return null;
+            }
+            Assert.Less(first.transform.position.z, Far.z - 1.7f, $"the first got in (at {first.transform.position - Far})");
+            Assert.Less(second.transform.position.z, Far.z - 1.7f, $"and the second after it (at {second.transform.position - Far}, {t:0} s)");
+            Assert.AreEqual(1, mostLadders, "side by side they share one ladder");
+            Assert.IsFalse(bothOn, "one at a time on it");
+            foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
+        }
+
+        [UnityTest]
         public IEnumerator StrongAttackers_BreakTheWall()
         {
             var (mob, wall, target) = Siege(AI.HostileMobType.WarlordGuard);
@@ -291,13 +324,188 @@ namespace BattleOfAges.PlayModeTests
             mob.OrderAttack(target);
             HealthComponent mobHp = mob.GetComponent<HealthComponent>();
             bool fought = false;
+            var track = new System.Text.StringBuilder();
+            float mark = 0f;
             for (float t = 0f; t < 45f && !fought; t += Time.deltaTime)
             {
                 fought = defender.CurrentHealth < defender.MaxHealth || !mobHp.IsAlive || mobHp.CurrentHealth < mobHp.MaxHealth;
+                if (t >= mark) { mark += 3f; Vector3 p = mob.transform.position - Far; track.Append($" [{p.x:0.0} {p.y:0.0} {p.z:0.0} {mob.CurrentStateType} {(mob.CurrentCombatTarget != null ? mob.CurrentCombatTarget.name : "-")} L{SiegeLadder.Active.Count}]"); }
                 yield return null;
             }
-            Assert.IsTrue(fought, $"they fought on the walls (bandit at {mob.transform.position - Far})");
+            Assert.IsTrue(fought, $"they fought on the walls (defender at {v.transform.position - Far}; bandit{track})");
             foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator ABrokenWall_OpensTheWay_AndTakesItsLadderAndPiers()
+        {
+            Ground();
+            WallSegment wall = Segment(BuildingType.CastleWall, OnGround(Far), 0f);
+            yield return null;
+            yield return null;
+            SiegeLadder ladder = SiegeLadder.Raise(wall, wall.transform.position, Vector3.forward);
+            Assert.Greater(Walk(Far + new Vector3(0f, 0f, 5f), Far + new Vector3(0f, 0f, -5f), false, false).z, Far.z + 0.9f, "shut");
+
+            wall.GetComponent<HealthComponent>().TakeDamage(1000000);
+            for (int i = 0; i < 4; i++) yield return null;
+            Assert.IsTrue(wall == null, "the wall is gone");
+            Assert.IsTrue(ladder == null, "its ladder with it");
+            Assert.AreEqual(0, PiersNear(Far, 10f), "and its piers");
+            Assert.Less(Walk(Far + new Vector3(0f, 0f, 5f), Far + new Vector3(0f, 0f, -5f), false, false).z, Far.z - 4f, "open now");
+        }
+
+        [UnityTest]
+        public IEnumerator Gate_OpensForAnOwnUnit_NotForAnEnemy()
+        {
+            Ground();
+            WallSegment gate = Segment(BuildingType.WallGate, OnGround(Far), 0f);
+            WallGateDoors doors = gate.GetComponent<WallGateDoors>();
+            GameObject m = Utils.HostileCampBuilder.CreateHostileMob(AI.HostileMobType.Bandit, "GateEnemy");
+            m.GetComponent<AI.HostileMobAI>().enabled = false;
+            CharacterController cc = m.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            m.transform.position = OnGround(Far + new Vector3(0f, 0f, 2.5f));
+            spawned.Add(m);
+            yield return new WaitForSeconds(1f);
+            Assert.AreEqual(0f, doors.Angle, 0.01f, "shut to an enemy at the gate");
+
+            GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(0f, 0f, -2.5f)), "GateFriend");
+            spawned.Add(v);
+            yield return new WaitForSeconds(1.5f);
+            Assert.AreEqual(WallGateDoors.OpenAngle, doors.Angle, 0.5f, "open for an own unit");
+        }
+
+        [UnityTest]
+        public IEnumerator Route_TakesTheGateWithTheShorterWay()
+        {
+            Ground();
+            // gate A at x 0, a long wall, gate B at x 30
+            Segment(BuildingType.WallGate, OnGround(Far), 0f);
+            for (int i = 0; i < 6; i++) Segment(BuildingType.CastleWall, OnGround(Far + new Vector3(5f + i * 4f, 0f, 0f)), 0f);
+            Segment(BuildingType.WallGate, OnGround(Far + new Vector3(30f, 0f, 0f)), 0f);
+            yield return null;
+            yield return null;
+            Vector3 via = WallBarriers.Route(Far + new Vector3(24f, 0f, 6f), Far + new Vector3(25f, 0f, -6f));
+            Assert.Less(Mathf.Abs(via.x - (Far.x + 30f)), 1.6f, $"near gate B (heading {via - Far})");
+            via = WallBarriers.Route(Far + new Vector3(4f, 0f, 6f), Far + new Vector3(6f, 0f, -6f));
+            Assert.Less(Mathf.Abs(via.x - Far.x), 1.6f, $"near gate A (heading {via - Far})");
+            Vector3 straight = Far + new Vector3(10f, 0f, 9f);
+            Assert.AreEqual(straight, WallBarriers.Route(Far + new Vector3(10f, 0f, 6f), straight), "no wall in the way: straight there");
+        }
+
+        [UnityTest]
+        public IEnumerator Snap_TurnsLeftAndRight_NoFurtherThanARightAngle()
+        {
+            Ground();
+            Segment(BuildingType.CastleWall, OnGround(Far), 0f);
+            yield return null;
+            // A turn outward (+z) off the +x end: the new segment runs along +z, its outside turns with it to -x
+            Assert.IsTrue(WallSegment.Snap(Far + new Vector3(2.2f, 0f, 2.5f), 4f, out Vector3 c, out float yaw, out _));
+            Assert.Less((c - (OnGround(Far) + new Vector3(2f, 0f, 2f))).magnitude, 0.05f);
+            Vector3 outside = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
+            Assert.Less(outside.x, -0.99f, "turning out, the outside turns to -x");
+            // Behind the end (over the wall itself): clamped to a right angle, not folded back
+            Assert.IsTrue(WallSegment.Snap(Far + new Vector3(1f, 0f, -0.5f), 4f, out c, out _, out _));
+            Assert.Less(Mathf.Abs(c.x - (Far.x + 2f)), 0.05f, "a right angle at most");
+        }
+
+        [UnityTest]
+        public IEnumerator Archer_OnThePost_ReachesFurtherThanOnTheGround()
+        {
+            Ground();
+            Vector3 at = OnGround(Far);
+            Segment(BuildingType.WallStairs, at, 0f);
+            WallSegment wall = Segment(BuildingType.CastleWall, at + new Vector3(4f, 0f, 0f), 0f);
+            yield return null;
+            yield return null;
+            GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(3f, 0f, -5f)), "WallArcher");
+            spawned.Add(v);
+            yield return null;
+            v.GetComponent<RTS.NpcResourceGatherer>().SetGatherDirective(RTS.GatherDirective.Idle);
+            v.GetComponent<Crafting.Equipment>().Equip(new Crafting.Item(Crafting.ItemType.Bow, 1));
+            CombatUnit bow = v.GetComponent<CombatUnit>();
+            Assert.IsTrue(bow.IsRanged, "armed with a bow");
+            float groundRange = bow.AttackRange;
+            RTS.RtsUnit unit = v.GetComponent<RTS.RtsUnit>();
+            Assert.IsTrue(unit.SendToWall(WallWalk.FreePost(wall.transform.position)));
+            for (float t = 0f; t < 25f && !unit.IsPostedOnWall; t += Time.deltaTime) yield return null;
+            Assert.IsTrue(unit.IsPostedOnWall);
+
+            // An enemy outside, past the bow's reach on the ground but within it from the walls
+            float d = groundRange + 1.5f;
+            GameObject m = Utils.HostileCampBuilder.CreateHostileMob(AI.HostileMobType.Bandit, "Target");
+            m.GetComponent<AI.HostileMobAI>().SpeedCap = 0f; // stays where it is, still a target in the grid
+            CharacterController cc = m.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            Vector3 flat = v.transform.position + Vector3.forward * d;
+            m.transform.position = OnGround(flat);
+            spawned.Add(m);
+            Assert.Greater(Vector3.Distance(v.transform.position, m.transform.position), groundRange + 1f, "out of reach from the ground");
+            HealthComponent hp = m.GetComponent<HealthComponent>();
+            for (float t = 0f; t < 8f && hp.CurrentHealth == hp.MaxHealth; t += Time.deltaTime) yield return null;
+            Assert.Less(hp.CurrentHealth, hp.MaxHealth, "shot from the walls");
+            Assert.IsTrue(unit.IsPostedOnWall, "and stayed up");
+        }
+
+        [UnityTest]
+        public IEnumerator Alarm_SendsTheArcherUp_AndDownAgain()
+        {
+            Ground();
+            Vector3 at = OnGround(Far);
+            Segment(BuildingType.WallStairs, at, 0f);
+            Segment(BuildingType.CastleWall, at + new Vector3(4f, 0f, 0f), 0f);
+            GameObject hall = TownHall.CreatePrefab("AlarmHall"); // the settlement's home (the scene has none)
+            hall.transform.position = OnGround(Far + new Vector3(0f, 0f, -12f));
+            spawned.Add(hall);
+            GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(3f, 0f, -6f)), "AlarmArcher");
+            spawned.Add(v);
+            yield return null;
+            v.GetComponent<RTS.NpcResourceGatherer>().SetGatherDirective(RTS.GatherDirective.Idle);
+            v.GetComponent<Crafting.Equipment>().Equip(new Crafting.Item(Crafting.ItemType.Bow, 1));
+            GameObject m = Utils.HostileCampBuilder.CreateHostileMob(AI.HostileMobType.Bandit, "Raider");
+            m.GetComponent<AI.HostileMobAI>().SpeedCap = 0f; // stays where it is, still a target in the grid
+            CharacterController cc = m.GetComponent<CharacterController>();
+            if (cc != null) cc.enabled = false;
+            m.transform.position = OnGround(Far + new Vector3(2f, 0f, 30f));
+            spawned.Add(m);
+            yield return null;
+
+            RTS.SettlementAlarm alarm = Object.FindFirstObjectByType<RTS.SettlementAlarm>();
+            Assert.IsNotNull(alarm);
+            RTS.SettlementAlarm.Raise();
+            alarm.Tick();
+            RTS.RtsUnit unit = v.GetComponent<RTS.RtsUnit>();
+            Assert.IsTrue(unit.WallBound && unit.PostedByAlarm, "the archer goes to the walls");
+            for (float t = 0f; t < 25f && !unit.IsPostedOnWall; t += Time.deltaTime) yield return null;
+            Assert.IsTrue(unit.IsPostedOnWall);
+
+            Object.Destroy(m);
+            RTS.SettlementAlarm.StandDown();
+            for (float t = 0f; t < 25f && unit.WallBound; t += Time.deltaTime) yield return null;
+            Assert.IsFalse(unit.WallBound, "down again when it is over");
+        }
+
+        [UnityTest]
+        public IEnumerator OnlyTheStrong_PickAWallToAttack()
+        {
+            Ground();
+            Segment(BuildingType.CastleWall, OnGround(Far), 0f);
+            AI.HostileMobAI Mob(AI.HostileMobType type)
+            {
+                GameObject m = Utils.HostileCampBuilder.CreateHostileMob(type, "WallLooker");
+                m.GetComponent<AI.HostileMobAI>().enabled = false;
+                CharacterController cc = m.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                m.transform.position = OnGround(Far + new Vector3(0f, 0f, 4f));
+                spawned.Add(m);
+                return m.GetComponent<AI.HostileMobAI>();
+            }
+            AI.HostileMobAI bandit = Mob(AI.HostileMobType.Bandit), warlord = Mob(AI.HostileMobType.WarlordGuard);
+            yield return null;
+            HealthComponent b = bandit.FindNearestTarget(), w = warlord.FindNearestTarget();
+            Assert.IsTrue(b == null || b.GetComponent<WallSegment>() == null, "a bandit does not go for a wall it cannot harm");
+            Assert.IsNotNull(w, "a warlord does");
+            Assert.IsNotNull(w.GetComponent<WallSegment>());
         }
 
         [UnityTest]
