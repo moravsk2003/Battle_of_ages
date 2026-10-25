@@ -123,6 +123,16 @@ namespace BattleOfAges.Player
             // The class's active skills: the first on Q, the second on R (fire fan / meteor, dash / critical hit, heal)
             if (KeybindsManager.GetKeyDown(KeyAction.Ability)) UseSkill(0);
             if (KeybindsManager.GetKeyDown(KeyAction.Ability2)) UseSkill(1);
+            // The one-shot artifacts on their own keys (1, 2)
+            if (KeybindsManager.GetKeyDown(KeyAction.UseFullHeal)) UseArtifact(ArtifactType.FullHeal);
+            if (KeybindsManager.GetKeyDown(KeyAction.UseLightning)) UseArtifact(ArtifactType.Lightning);
+        }
+
+        private void UseArtifact(ArtifactType a)
+        {
+            HeroArtifacts bag = GetComponent<HeroArtifacts>();
+            if (bag == null || !bag.Has(a)) return;
+            if (!bag.Use(a)) StrategyHud.Notify(a == ArtifactType.Lightning ? "Блискавці нема в кого влучити" : "Не вдалося");
         }
 
         private void UseSkill(int slot)

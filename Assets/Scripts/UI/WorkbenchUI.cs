@@ -6,6 +6,7 @@ using BattleOfAges.Resources;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.RTS;
+using BattleOfAges.Player;
 
 namespace BattleOfAges.UI
 {
@@ -286,6 +287,31 @@ namespace BattleOfAges.UI
             cost.supportRichText = true;
             Button craft = UiTheme.TextButton(card, "Craft", "Виготовити", new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(W - 20f, 36f), () => Craft(type), 16);
             cards.Add((type, icon, name, desc, cost, craft));
+            Tooltip.Set(card.gameObject, () => RecipeTip(type));
+        }
+
+        /// <summary>The recipe at the chosen level: what it gives, what it costs and takes, and how it compares with the hero's piece.</summary>
+        private string RecipeTip(ItemType type)
+        {
+            Item item = new Item(type, selectedLevel);
+            int tier = ItemStatCalculator.CalculateRequiredOreTier(selectedLevel);
+            string s = TipText.Title($"{ItemTypeNames.MaterialName(type, selectedLevel)} {ItemTypeNames.Display(type).ToLowerInvariant()} {ItemTypeNames.Roman(selectedLevel)}", UiTheme.LevelColor(selectedLevel))
+                     + "\n" + ItemTypeNames.Describe(item)
+                     + $"\nДеревина {ItemStatCalculator.CalculateWoodCost(type, selectedLevel)}, руда {(tier == 0 ? "будь-якого рівня" : "рів. " + tier + " і вище")} ×{ItemStatCalculator.CalculateOreCost(type, selectedLevel)}"
+                     + $"\nЧас {ItemStatCalculator.CalculateCraftTime(type, selectedLevel):0.#} с з одним робітником; більше робітників — швидше";
+            int stored = 0;
+            foreach (Item it in Armory.Instance.Items) if (it.Equals(item)) stored++;
+            if (stored > 0) s += "\n" + TipText.Dim($"На складі вже є: {stored}");
+            PlayerCombatController player = FindFirstObjectByType<PlayerCombatController>();
+            if (player != null && player.Gear != null)
+            {
+                Equipment gear = player.Gear;
+                Item worn = gear[item.Slot];
+                if (gear.IsLocked(item.Slot)) s += "\n" + TipText.Dim("У героя цей слот тримає артефакт");
+                else s += "\n" + TipText.Dim(worn.IsEmpty ? "У героя слот вільний" : "У героя зараз: " + worn)
+                          + TipText.Compare(gear.StatsWith(worn), gear.StatsWith(item), "Герою, якщо надягти:");
+            }
+            return s;
         }
     }
 }

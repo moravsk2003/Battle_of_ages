@@ -23,7 +23,7 @@ namespace BattleOfAges.UI
         public static readonly Color Good = new Color(0.45f, 0.78f, 0.38f);
         public static readonly Color Bad = new Color(0.86f, 0.32f, 0.26f);
 
-        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall }
+        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall, Fire, Bolt, Clock, Bell }
 
         private static Font font;
         private static Sprite panel, button, bar, slot, round;
@@ -52,6 +52,28 @@ namespace BattleOfAges.UI
         public static Sprite RoundSprite => round != null ? round : round = Frame(64, 31f, 0f, Color.white, Color.white, Color.white, 0f);
 
         /// <summary>Rounded rectangle, vertical gradient (top to bottom), rim of the given width, a faint inner highlight; 9-sliced.</summary>
+        private static Sprite ring;
+        /// <summary>A white ring (minimap pings, highlights), tinted by the Image colour.</summary>
+        public static Sprite RingSprite
+        {
+            get
+            {
+                if (ring != null) return ring;
+                const int N = 64;
+                var tex = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "UI_Ring" };
+                var px = new Color[N * N];
+                for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float d = new Vector2(x + 0.5f - N * 0.5f, y + 0.5f - N * 0.5f).magnitude;
+                    px[x + y * N] = new Color(1f, 1f, 1f, Mathf.Clamp01(3.5f - Mathf.Abs(d - 27f)));
+                }
+                tex.SetPixels(px);
+                tex.Apply();
+                return ring = Sprite.Create(tex, new Rect(0, 0, N, N), new Vector2(0.5f, 0.5f), 100f);
+            }
+        }
+
         private static Sprite Frame(int size, float radius, float rimWidth, Color top, Color bottom, Color rim, float highlight)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "UI_Frame" };
@@ -162,6 +184,32 @@ namespace BattleOfAges.UI
                     Layer(Box(p - new Vector2(0f, -0.35f), new Vector2(0.6f, 0.45f)), new Color(0.88f, 0.80f, 0.62f));
                     Layer(Poly(p, new[] { new Vector2(-0.85f, 0.05f), new Vector2(0f, 0.85f), new Vector2(0.85f, 0.05f) }), new Color(0.80f, 0.62f, 0.30f));
                     Layer(Box(p - new Vector2(0f, -0.52f), new Vector2(0.17f, 0.28f)), new Color(0.38f, 0.24f, 0.13f));
+                    break;
+                case Icon.Fire:
+                {
+                    // A flame: a teardrop pointing up, a brighter core
+                    Vector2 q = new Vector2(p.x * (1.25f + p.y * 0.35f), p.y + 0.25f);
+                    float drop = Mathf.Min((q - new Vector2(0f, -0.2f)).magnitude - 0.55f, Poly(q, new[] { new Vector2(-0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 0.95f) }));
+                    Layer(drop, new Color(0.92f, 0.36f, 0.12f));
+                    Vector2 k = new Vector2(q.x * 1.6f, (q.y + 0.25f) * 1.4f);
+                    Layer(Mathf.Min((k - new Vector2(0f, -0.2f)).magnitude - 0.45f, Poly(k, new[] { new Vector2(-0.42f, 0f), new Vector2(0.42f, 0f), new Vector2(0f, 0.8f) })), new Color(1f, 0.78f, 0.3f));
+                    break;
+                }
+                case Icon.Bolt:
+                    Layer(Mathf.Min(Poly(p, new[] { new Vector2(0.15f, 0.92f), new Vector2(0.55f, 0.92f), new Vector2(0.05f, 0.05f), new Vector2(-0.3f, 0.05f) }),
+                                    Poly(p, new[] { new Vector2(-0.3f, 0.12f), new Vector2(0.32f, 0.12f), new Vector2(-0.35f, -0.92f) })), new Color(1f, 0.88f, 0.4f));
+                    break;
+                case Icon.Clock:
+                {
+                    float r = p.magnitude;
+                    Layer(r - 0.82f, new Color(0.9f, 0.84f, 0.7f));
+                    Layer(Mathf.Min(Segment(p, Vector2.zero, new Vector2(0f, 0.55f)) - 0.07f, Segment(p, Vector2.zero, new Vector2(0.4f, -0.12f)) - 0.07f), new Color(0.3f, 0.22f, 0.14f));
+                    break;
+                }
+                case Icon.Bell:
+                    Layer(Mathf.Min(Poly(p, new[] { new Vector2(-0.62f, -0.55f), new Vector2(0.62f, -0.55f), new Vector2(0.4f, 0.4f), new Vector2(-0.4f, 0.4f) }),
+                                    (p - new Vector2(0f, 0.42f)).magnitude - 0.4f), new Color(0.86f, 0.66f, 0.3f));
+                    Layer((p - new Vector2(0f, -0.72f)).magnitude - 0.16f, new Color(0.62f, 0.46f, 0.2f));
                     break;
                 case Icon.Wall:
                 {

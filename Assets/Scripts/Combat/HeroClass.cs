@@ -33,6 +33,19 @@ namespace BattleOfAges.Combat
         /// <summary>The tank ignores every 10th hit (a counter, no chance).</summary>
         public static int IgnoredHitEvery(HeroClass c) => c == HeroClass.Tank ? GameBalance.TankIgnoreEveryNthHit : 0;
 
+        /// <summary>What the class does, in a line or two (the class picker's tooltip; docs/GAME_DESIGN.md §8.1).</summary>
+        public static string Description(HeroClass c)
+        {
+            switch (c)
+            {
+                case HeroClass.Tank: return "+20% HP; кожен 10-й удар по ньому не проходить. Навики: регенерація, миттєвий відхіл.";
+                case HeroClass.Archer: return "−20% HP; з луком сила ×2 (урон і біг), дальність від швидкості, не менше 12 м. Навики: далекий постріл, пробивна стріла.";
+                case HeroClass.Mage: return "5 самонавідних куль по 20% урону, крізь броню, без промахів. Навики: вогняне віяло, метеор.";
+                case HeroClass.Dd: return "Б'є вдвічі частіше. Навики: ривок, критичний удар.";
+                default: return "";
+            }
+        }
+
         public static string Name(HeroClass c)
         {
             switch (c)

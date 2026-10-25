@@ -185,6 +185,15 @@ namespace BattleOfAges.RTS
 
         public IReadOnlyList<RtsUnit> SelectedUnits => selectedUnits;
 
+        /// <summary>The selected units walk to a ground point in formation (a right-click on the minimap).</summary>
+        public void OrderMoveTo(Vector3 point)
+        {
+            tempUnitsBuffer.Clear();
+            foreach (RtsUnit u in selectedUnits) if (u != null) tempUnitsBuffer.Add(u);
+            if (tempUnitsBuffer.Count > 0) MoveInFormation(tempUnitsBuffer, point);
+            tempUnitsBuffer.Clear();
+        }
+
         private void HandleMovementInput()
         {
             if (!UniversalInput.GetMouseButtonDown(1) || selectedUnits.Count == 0 || PointerOverUi()) return;
@@ -290,6 +299,13 @@ namespace BattleOfAges.RTS
                 selectedUnits.Add(unit);
                 unit.SetSelected(true);
             }
+        }
+
+        /// <summary>Selects just this unit (a card in the selection panel, the idle-worker button).</summary>
+        public void SelectOnly(RtsUnit unit)
+        {
+            DeselectAll();
+            SelectUnit(unit);
         }
 
         /// <summary>Drops one unit from the selection (it went into a building).</summary>

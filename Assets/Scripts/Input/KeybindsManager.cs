@@ -16,7 +16,11 @@ namespace BattleOfAges.InputSystem
         Hero,
         Ability,
         Ability2,
-        Alarm
+        Alarm,
+        IdleWorker,
+        AlertJump,
+        UseFullHeal,
+        UseLightning
     }
 
     /// <summary>
@@ -38,7 +42,11 @@ namespace BattleOfAges.InputSystem
             { KeyAction.Hero,            KeyCode.H },
             { KeyAction.Ability,         KeyCode.Q },
             { KeyAction.Ability2,        KeyCode.R },
-            { KeyAction.Alarm,           KeyCode.T }
+            { KeyAction.Alarm,           KeyCode.T },
+            { KeyAction.IdleWorker,      KeyCode.Period },
+            { KeyAction.AlertJump,       KeyCode.Space },
+            { KeyAction.UseFullHeal,     KeyCode.Alpha1 },
+            { KeyAction.UseLightning,    KeyCode.Alpha2 }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -53,7 +61,11 @@ namespace BattleOfAges.InputSystem
             { KeyAction.Hero,            "Герой" },
             { KeyAction.Ability,         "Уміння класу" },
             { KeyAction.Ability2,        "Друге вміння класу" },
-            { KeyAction.Alarm,           "🔔 Тривога (захист поселення)" }
+            { KeyAction.Alarm,           "🔔 Тривога (захист поселення)" },
+            { KeyAction.IdleWorker,      "Наступний робітник без діла" },
+            { KeyAction.AlertJump,       "До місця нападу (мапа)" },
+            { KeyAction.UseFullHeal,     "Артефакт: повне зцілення" },
+            { KeyAction.UseLightning,    "Артефакт: блискавка" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();
@@ -194,6 +206,8 @@ namespace BattleOfAges.InputSystem
                 case KeyCode.Keypad8: return "Num 8";
                 case KeyCode.Keypad9: return "Num 9";
                 case KeyCode.Return: return "Enter";
+                case KeyCode.Period: return ".";
+                case KeyCode.Space: return "Пробіл";
                 case KeyCode.LeftShift: return "LShift";
                 case KeyCode.RightShift: return "RShift";
                 case KeyCode.LeftControl: return "LCtrl";

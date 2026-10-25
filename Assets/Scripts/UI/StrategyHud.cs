@@ -26,7 +26,7 @@ namespace BattleOfAges.UI
         private RtsUnitCommander commander;
         private HealthComponent playerHealth;
 
-        private Text woodText, oreText, workerText, armyText, modeText, hpText;
+        private Text woodText, oreText, workerText, armyText, clockText, modeText, hpText;
         private RectTransform mode;
         private RectTransform fpGroup, rtsGroup, crosshair, hpFill, minimapDots, toastColumn;
         private RawImage minimapImage;
@@ -55,6 +55,73 @@ namespace BattleOfAges.UI
             BuildFirstPerson();
             BuildMap();
             toastColumn = UiTheme.Rect(root, "Toasts", new Vector2(1f, 0f), new Vector2(-24f, 300f), new Vector2(360f, 260f));
+            AttackAlerts.Raised += OnAttackAlert;
+            Advisor.Create(root);
+        }
+
+        // ------------------------------------------------------------------ attack alerts
+
+        private readonly List<(Vector3 pos, float born, Image img)> pings = new List<(Vector3, float, Image)>();
+
+        private void OnAttackAlert(string what, Vector3 where)
+        {
+            Toast("alert:" + what, 1, n => (n > 1 ? $"Напад: {what} ×{n}" : $"Напад: {what}") + $"  ·  {HudTips.Key(InputSystem.KeyAction.AlertJump)} — туди", UiTheme.Bad);
+            RectTransform r = UiTheme.Rect(minimapDots, "Ping", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(12f, 12f));
+            Image img = r.gameObject.AddComponent<Image>();
+            img.sprite = UiTheme.RingSprite; img.raycastTarget = false; img.color = UiTheme.Bad;
+            pings.Add((where, Time.unscaledTime, img));
+            if (pings.Count > 6) { Destroy(pings[0].img.gameObject); pings.RemoveAt(0); }
+        }
+
+        /// <summary>Pulsing rings where we were attacked; a place off the minimap sits on its edge.</summary>
+        private void UpdatePings()
+        {
+            float scale = MinimapPx / (2f * MinimapHalfSize), edge = MinimapPx * 0.5f - 8f;
+            for (int i = pings.Count - 1; i >= 0; i--)
+            {
+                float age = Time.unscaledTime - pings[i].born;
+                if (age > AttackAlerts.PingSeconds || pings[i].img == null) { if (pings[i].img != null) Destroy(pings[i].img.gameObject); pings.RemoveAt(i); continue; }
+                Vector3 d = pings[i].pos - minimapCentre;
+                Vector2 p = new Vector2(d.x, d.z) * scale;
+                float m = Mathf.Max(Mathf.Abs(p.x), Mathf.Abs(p.y));
+                if (m > edge) p *= edge / m;
+                float pulse = Mathf.Repeat(age, 1f);
+                RectTransform rt = pings[i].img.rectTransform;
+                rt.anchoredPosition = p;
+                rt.sizeDelta = Vector2.one * Mathf.Lerp(10f, 34f, pulse);
+                Color tint = pings[i].img.color;
+                pings[i].img.color = new Color(tint.r, tint.g, tint.b, (0.35f + 0.65f * (1f - pulse)) * Mathf.Clamp01((AttackAlerts.PingSeconds - age) / 1.5f));
+                rt.SetAsLastSibling();
+            }
+        }
+
+        /// <summary>A press or drag on the minimap (map view only): left — the camera goes there, right — the selected walk there.</summary>
+        private void OnMinimapPressed(Vector2 local, bool right, bool drag)
+        {
+            if (modes == null || modes.CurrentMode != GameMode.RtsMap || GameWindows.BlockGameplay) return;
+            float scale = MinimapPx / (2f * MinimapHalfSize);
+            Vector3 world = minimapCentre + new Vector3(local.x / scale, 0f, local.y / scale);
+            world.y = RtsUnit.GetTerrainHeight(world);
+            if (right)
+            {
+                if (drag || commander == null || commander.SelectedUnits.Count == 0) return;
+                commander.OrderMoveTo(world);
+                RectTransform r = UiTheme.Rect(minimapDots, "MovePing", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(12f, 12f));
+                Image img = r.gameObject.AddComponent<Image>();
+                img.sprite = UiTheme.RingSprite; img.raycastTarget = false; img.color = UiTheme.Good;
+                pings.Add((world, Time.unscaledTime - AttackAlerts.PingSeconds + 1.2f, img)); // a short green ring
+                return;
+            }
+            var cam = FindFirstObjectByType<CameraSystem.RtsMapCameraController>();
+            if (cam != null) cam.LookAtGround(world);
+        }
+
+        /// <summary>Space on the map: the camera goes to the last attack.</summary>
+        private void JumpToAlert(bool map)
+        {
+            if (!map || !AttackAlerts.HasLast || GameWindows.BlockGameplay || !InputSystem.KeybindsManager.GetKeyDown(InputSystem.KeyAction.AlertJump)) return;
+            var cam = FindFirstObjectByType<CameraSystem.RtsMapCameraController>();
+            if (cam != null) cam.LookAtGround(AttackAlerts.Last);
         }
 
         // ------------------------------------------------------------------ layout
@@ -72,20 +139,25 @@ namespace BattleOfAges.UI
             var fit = bar.gameObject.AddComponent<ContentSizeFitter>();
             fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            woodText = Entry(bar, UiTheme.Icon.Wood, "Деревина");
-            oreText = Entry(bar, UiTheme.Icon.Ore, "Руда");
-            workerText = Entry(bar, UiTheme.Icon.Worker, "Робітники");
-            armyText = Entry(bar, UiTheme.Icon.Army, "Військо");
+            woodText = Entry(bar, UiTheme.Icon.Wood, "Деревина", HudTips.Wood);
+            oreText = Entry(bar, UiTheme.Icon.Ore, "Руда", HudTips.Ore);
+            workerText = Entry(bar, UiTheme.Icon.Worker, "Робітники", HudTips.Workers);
+            armyText = Entry(bar, UiTheme.Icon.Army, "Військо", HudTips.Army);
+            clockText = Entry(bar, UiTheme.Icon.Clock, "Час", HudTips.Clock);
+            clockText.fontSize = 19;
+            clockText.color = UiTheme.InkDim;
 
             mode = UiTheme.Rect(root, "ModeHint", new Vector2(0f, 1f), new Vector2(14f, -14f), new Vector2(470f, 44f));
             UiTheme.PanelImage(mode);
             modeText = UiTheme.Label(mode, "Text", "", 19, TextAnchor.MiddleCenter, UiTheme.InkDim);
         }
 
-        private Text Entry(RectTransform parent, UiTheme.Icon icon, string tooltip)
+        private Text Entry(RectTransform parent, UiTheme.Icon icon, string name, System.Func<string> tip)
         {
-            var go = new GameObject(tooltip, typeof(RectTransform));
+            var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
+            go.AddComponent<Image>().color = Color.clear; // a hover target for the tooltip
+            Tooltip.Set(go, tip);
             var h = go.AddComponent<HorizontalLayoutGroup>();
             h.spacing = 8f; h.childAlignment = TextAnchor.MiddleLeft;
             h.childControlWidth = h.childControlHeight = true; h.childForceExpandWidth = h.childForceExpandHeight = false;
@@ -116,14 +188,136 @@ namespace BattleOfAges.UI
             Tick(new Vector2(0f, 11f), new Vector2(2.5f, 8f)); Tick(new Vector2(0f, -11f), new Vector2(2.5f, 8f));
             Tick(new Vector2(11f, 0f), new Vector2(8f, 2.5f)); Tick(new Vector2(-11f, 0f), new Vector2(8f, 2.5f));
 
-            RectTransform vitals = UiTheme.Rect(fpGroup, "Vitals", new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(380f, 66f));
+            RectTransform vitals = UiTheme.Rect(fpGroup, "Vitals", new Vector2(0f, 0f), new Vector2(24f, 24f), new Vector2(380f, 86f));
             UiTheme.PanelImage(vitals);
-            UiTheme.IconImage(vitals, UiTheme.Icon.Heart, new Vector2(0f, 0.5f), new Vector2(14f, 0f), 40f);
-            RectTransform back = UiTheme.Rect(vitals, "Bar", new Vector2(0f, 0.5f), new Vector2(64f, 0f), new Vector2(296f, 26f));
+            UiTheme.IconImage(vitals, UiTheme.Icon.Heart, new Vector2(0f, 0.5f), new Vector2(14f, 6f), 40f);
+            RectTransform back = UiTheme.Rect(vitals, "Bar", new Vector2(0f, 1f), new Vector2(64f, -14f), new Vector2(296f, 26f));
             UiTheme.PanelImage(back, UiTheme.SlotSprite);
             hpFill = UiTheme.Rect(back, "Fill", new Vector2(0f, 0.5f), new Vector2(3f, 0f), new Vector2(290f, 20f));
             UiTheme.PanelImage(hpFill, UiTheme.BarSprite, new Color(0.72f, 0.16f, 0.13f));
             hpText = UiTheme.Label(back, "Value", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+
+            // Hero level and the experience to the next one
+            RectTransform lv = UiTheme.Rect(vitals, "Level", new Vector2(0f, 0f), new Vector2(12f, 10f), new Vector2(48f, 24f));
+            levelText = UiTheme.Label(lv, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            RectTransform xpBack = UiTheme.Rect(vitals, "Xp", new Vector2(0f, 0f), new Vector2(64f, 16f), new Vector2(296f, 12f));
+            UiTheme.PanelImage(xpBack, UiTheme.SlotSprite);
+            xpFill = UiTheme.Rect(xpBack, "Fill", new Vector2(0f, 0.5f), new Vector2(2f, 0f), new Vector2(0f, 7f));
+            UiTheme.PanelImage(xpFill, UiTheme.BarSprite, UiTheme.Gold);
+
+            // Q / R skills and the one-shot artifacts (1 / 2) at the bottom middle
+            abilityBar = UiTheme.Rect(fpGroup, "Abilities", new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(4 * 86f, 80f));
+            abilitySlots.Add(AbilitySlot(InputSystem.KeyAction.Ability));
+            abilitySlots.Add(AbilitySlot(InputSystem.KeyAction.Ability2));
+            abilitySlots.Add(AbilitySlot(InputSystem.KeyAction.UseFullHeal));
+            abilitySlots.Add(AbilitySlot(InputSystem.KeyAction.UseLightning));
+            for (int i = 0; i < abilitySlots.Count; i++)
+            {
+                int index = i;
+                Tooltip.Set(abilitySlots[i].rt.gameObject, () => AbilityTip(index));
+            }
+
+            // The alarm, in both views, under the resource bar
+            alarmBanner = UiTheme.Rect(root, "AlarmBanner", new Vector2(0.5f, 1f), new Vector2(0f, -76f), new Vector2(420f, 40f));
+            UiTheme.PanelImage(alarmBanner, null, new Color(1f, 0.62f, 0.58f));
+            UiTheme.IconImage(alarmBanner, UiTheme.Icon.Bell, new Vector2(0f, 0.5f), new Vector2(12f, 0f), 28f);
+            UiTheme.Label(alarmBanner, "Text", "Тривога: усі до зброї", 19, TextAnchor.MiddleCenter, UiTheme.Bad, FontStyle.Bold);
+            alarmBanner.gameObject.SetActive(false);
+        }
+
+        private Text levelText;
+        private RectTransform xpFill, abilityBar, alarmBanner;
+        private readonly List<(RectTransform rt, Image icon, Image cooldown, Text seconds, Text key)> abilitySlots = new List<(RectTransform, Image, Image, Text, Text)>();
+        private HeroSkills playerSkills;
+        private HeroArtifacts playerArtifacts;
+        private HeroProgress playerProgress;
+
+        private (RectTransform, Image, Image, Text, Text) AbilitySlot(InputSystem.KeyAction key)
+        {
+            RectTransform rt = UiTheme.Rect(abilityBar, "Slot_" + key, new Vector2(0f, 0f), Vector2.zero, new Vector2(72f, 72f));
+            UiTheme.PanelImage(rt, UiTheme.SlotSprite);
+            RectTransform ic = UiTheme.Rect(rt, "Icon", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(50f, 50f));
+            Image icon = ic.gameObject.AddComponent<Image>();
+            icon.preserveAspect = true; icon.raycastTarget = false;
+            RectTransform cd = UiTheme.Child(rt, "Cooldown", Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            Image cool = cd.gameObject.AddComponent<Image>();
+            cool.sprite = UiTheme.BarSprite; cool.color = new Color(0f, 0f, 0f, 0.62f); cool.raycastTarget = false;
+            cool.type = Image.Type.Filled; cool.fillMethod = Image.FillMethod.Radial360; cool.fillOrigin = (int)Image.Origin360.Top; cool.fillClockwise = false;
+            Text secs = UiTheme.Label(rt, "Seconds", "", 22, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            RectTransform k = UiTheme.Rect(rt, "Key", new Vector2(0f, 1f), new Vector2(4f, -2f), new Vector2(30f, 22f));
+            Text keyText = UiTheme.Label(k, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Gold, FontStyle.Bold);
+            rt.gameObject.SetActive(false);
+            return (rt, icon, cool, secs, keyText);
+        }
+
+        private static readonly InputSystem.KeyAction[] AbilityKeys =
+            { InputSystem.KeyAction.Ability, InputSystem.KeyAction.Ability2, InputSystem.KeyAction.UseFullHeal, InputSystem.KeyAction.UseLightning };
+
+        /// <summary>Which slots show (a skill the class has, an artifact held), their icons, cooldown rings and keys.</summary>
+        private void UpdateAbilities()
+        {
+            if (playerSkills == null && playerHealth != null) playerSkills = playerHealth.GetComponent<HeroSkills>();
+            if (playerArtifacts == null && playerHealth != null) playerArtifacts = playerHealth.GetComponent<HeroArtifacts>();
+            if (playerProgress == null && playerHealth != null) playerProgress = playerHealth.GetComponent<HeroProgress>();
+
+            if (playerProgress != null)
+            {
+                levelText.text = "Рів. " + playerProgress.Level;
+                float f = Mathf.Clamp01(playerProgress.Xp / (float)Mathf.Max(1, playerProgress.XpToNextLevel));
+                xpFill.sizeDelta = new Vector2(292f * f, 7f);
+            }
+
+            int shown = 0;
+            for (int i = 0; i < abilitySlots.Count; i++)
+            {
+                var s = abilitySlots[i];
+                bool on;
+                float left = 0f, total = 1f;
+                if (i < 2)
+                {
+                    on = playerSkills != null && playerSkills.HasActiveIn(i);
+                    if (on) { left = playerSkills.CooldownLeftIn(i); total = Mathf.Max(0.01f, playerSkills.CooldownOf(i)); s.icon.sprite = SkillIcon(playerSkills.Class, i); }
+                }
+                else
+                {
+                    ArtifactType a = i == 2 ? ArtifactType.FullHeal : ArtifactType.Lightning;
+                    on = playerArtifacts != null && playerArtifacts.Has(a);
+                    if (on) s.icon.sprite = UiTheme.IconSprite(a == ArtifactType.FullHeal ? UiTheme.Icon.Heart : UiTheme.Icon.Bolt);
+                }
+                if (s.rt.gameObject.activeSelf != on) s.rt.gameObject.SetActive(on);
+                if (!on) continue;
+                s.rt.anchoredPosition = new Vector2(shown++ * 86f, 0f);
+                s.cooldown.fillAmount = left > 0f ? left / total : 0f;
+                s.seconds.text = left > 0f ? (left >= 60f ? Mathf.CeilToInt(left / 60f) + " хв" : Mathf.CeilToInt(left).ToString()) : "";
+                s.icon.color = left > 0f ? new Color(0.6f, 0.6f, 0.6f) : Color.white;
+                s.key.text = HudTips.Key(AbilityKeys[i]);
+            }
+            abilityBar.sizeDelta = new Vector2(Mathf.Max(1, shown) * 86f - 14f, 72f);
+        }
+
+        private static Sprite SkillIcon(HeroClass c, int slot)
+        {
+            switch (c)
+            {
+                case HeroClass.Tank: return UiTheme.IconSprite(UiTheme.Icon.Heart);
+                case HeroClass.Mage: return UiTheme.IconSprite(UiTheme.Icon.Fire);
+                case HeroClass.Archer: return UiTheme.ItemSprite(ItemType.Bow, 4);
+                default: return slot == 0 ? UiTheme.ItemSprite(ItemType.Boots, 4) : UiTheme.ItemSprite(ItemType.Sword, 4);
+            }
+        }
+
+        private string AbilityTip(int i)
+        {
+            if (i < 2)
+            {
+                if (playerSkills == null) return null;
+                float left = playerSkills.CooldownLeftIn(i);
+                return TipText.Title(playerSkills.ActiveName(i), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i]))
+                       + "\n" + (left > 0f ? TipText.Dim($"Перезарядка ще {left:0} с") : TipText.Good("Готове"))
+                       + "\n" + TipText.Dim($"Перезарядка {playerSkills.CooldownOf(i):0} с. Опис — у вікні героя ") + TipText.Key(HudTips.Key(InputSystem.KeyAction.Hero));
+            }
+            ArtifactType a = i == 2 ? ArtifactType.FullHeal : ArtifactType.Lightning;
+            return TipText.Title(Artifacts.Name(a), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i])) + "\n" + Artifacts.Description(a) + "\n" + TipText.Dim("Одноразовий: після використання зникає");
         }
 
         private void BuildMap()
@@ -138,7 +332,11 @@ namespace BattleOfAges.UI
             view.gameObject.AddComponent<RectMask2D>();
             minimapImage = view.gameObject.AddComponent<RawImage>();
             minimapImage.color = new Color(0.9f, 0.9f, 0.9f);
-            minimapImage.raycastTarget = false;
+            minimapImage.raycastTarget = true; // clicks: MinimapInput
+            view.gameObject.AddComponent<MinimapInput>().Pressed = OnMinimapPressed;
+            Tooltip.Set(view.gameObject, () => modes != null && modes.CurrentMode == GameMode.RtsMap
+                ? TipText.Title("Мапа", UiTheme.Gold) + "\nЛКМ — камера туди (можна вести), ПКМ — обрані йдуть туди." + "\n" + TipText.Dim("Сині — свої, червоні — вороги, жовті — обрані, кільця — напад.")
+                : null);
             minimapDots = UiTheme.Rect(view, "Dots", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(MinimapPx, MinimapPx));
             heading = UiTheme.Rect(minimapDots, "Heading", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(3f, 16f));
             heading.pivot = new Vector2(0.5f, 0f);
@@ -169,6 +367,39 @@ namespace BattleOfAges.UI
             // The call to arms, over the minimap
             alarmButton = UiTheme.TextButton(rtsGroup, "Alarm", "", new Vector2(0f, 0f), new Vector2(18f, MinimapPx + 24f + 30f), new Vector2(MinimapPx + 24f, 46f), SettlementAlarm.Toggle, 16);
             alarmText = alarmButton.GetComponentInChildren<Text>();
+            Tooltip.Set(alarmButton.gameObject, HudTips.Alarm);
+
+            // Workers doing nothing: count, and the next one on a click or the key
+            idleButton = UiTheme.TextButton(rtsGroup, "IdleWorkers", "", new Vector2(0f, 0f), new Vector2(18f, MinimapPx + 24f + 30f + 54f), new Vector2(MinimapPx + 24f, 46f), SelectNextIdle, 16);
+            idleText = idleButton.GetComponentInChildren<Text>();
+            Tooltip.Set(idleButton.gameObject, () => TipText.Title("Робітники без діла", UiTheme.Gold)
+                + "\nСтоять без наказу або не знаходять роботи." + "\n" + TipText.Dim("Клік — наступний: виділити й показати  ") + TipText.Key(HudTips.Key(InputSystem.KeyAction.IdleWorker)));
+        }
+
+        private Button idleButton;
+        private Text idleText;
+        private float idleTimer;
+
+        private void UpdateIdleButton(bool map)
+        {
+            if (map && InputSystem.KeybindsManager.GetKeyDown(InputSystem.KeyAction.IdleWorker) && !GameWindows.BlockGameplay) SelectNextIdle();
+            idleTimer -= Time.unscaledDeltaTime;
+            if (idleTimer > 0f || idleText == null) return;
+            idleTimer = 0.5f;
+            int n = IdleWorkers.Count;
+            idleText.text = $"Без діла: {n}  ({HudTips.Key(InputSystem.KeyAction.IdleWorker)})";
+            idleText.color = n > 0 ? UiTheme.Gold : UiTheme.InkDim;
+        }
+
+        /// <summary>Selects the next idle worker and takes the map camera to it.</summary>
+        public void SelectNextIdle()
+        {
+            NpcResourceGatherer w = IdleWorkers.Next();
+            if (w == null) { Notify("Усі робітники при ділі"); return; }
+            RtsUnit u = w.GetComponent<RtsUnit>();
+            if (commander != null && u != null) commander.SelectOnly(u);
+            var cam = FindFirstObjectByType<CameraSystem.RtsMapCameraController>();
+            if (cam != null) cam.LookAtGround(w.transform.position);
         }
 
         private Button alarmButton;
@@ -196,6 +427,8 @@ namespace BattleOfAges.UI
             if (playerHealth == null) { GameObject p = GameObject.Find("Player"); if (p != null) playerHealth = p.GetComponent<HealthComponent>(); }
             bool map = modes != null && modes.CurrentMode == GameMode.RtsMap;
             UpdateAlarmButton();
+            if (alarmBanner.gameObject.activeSelf != SettlementAlarm.Active) alarmBanner.gameObject.SetActive(SettlementAlarm.Active);
+            clockText.text = HudTips.ClockShort();
 
             ResourceManager res = ResourceManager.Instance;
             int wood = res != null ? res.WoodCount : 0, ore = res != null ? res.OreCount : 0;
@@ -217,6 +450,7 @@ namespace BattleOfAges.UI
             if (!map)
             {
                 crosshair.gameObject.SetActive(!Cursor.visible && Time.timeScale > 0f);
+                UpdateAbilities();
                 if (playerHealth != null)
                 {
                     float f = playerHealth.MaxHealth > 0 ? Mathf.Clamp01(playerHealth.CurrentHealth / (float)playerHealth.MaxHealth) : 0f;
@@ -248,6 +482,9 @@ namespace BattleOfAges.UI
             UpdateMineLabels(map);
             UpdateHallLabel(map);
             UpdateToasts();
+            UpdatePings();
+            JumpToAlert(map);
+            UpdateIdleButton(map);
         }
 
         private static readonly string[] Roman = { "0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
@@ -547,7 +784,7 @@ namespace BattleOfAges.UI
             active.Toast("msg:" + message, 1, n => n > 1 ? message + "  ×" + n : message);
         }
 
-        private void Toast(string key, int amount, System.Func<int, string> text)
+        private void Toast(string key, int amount, System.Func<int, string> text, Color? color = null)
         {
             // Keep merging into a recent toast of the same kind instead of stacking a new one
             for (int i = toasts.Count - 1; i >= 0; i--)
@@ -563,7 +800,8 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(rt);
             var group = rt.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
-            Text label = UiTheme.Label(rt, "Text", text(amount), 19, TextAnchor.MiddleCenter, UiTheme.Gold);
+            Text label = UiTheme.Label(rt, "Text", text(amount), 19, TextAnchor.MiddleCenter, color ?? UiTheme.Gold);
+            if (color.HasValue) rt.GetComponent<Image>().color = new Color(1f, 0.75f, 0.7f);
             toasts.Add((rt, label, group, Time.unscaledTime, key, amount));
             if (toasts.Count > 5) { Destroy(toasts[0].rt.gameObject); toasts.RemoveAt(0); }
         }
@@ -582,6 +820,7 @@ namespace BattleOfAges.UI
 
         private void OnDestroy()
         {
+            AttackAlerts.Raised -= OnAttackAlert;
             if (minimapRt != null) minimapRt.Release();
         }
     }

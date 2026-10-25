@@ -237,6 +237,14 @@ namespace BattleOfAges.CameraSystem
             transform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0.0f);
         }
 
+        /// <summary>Moves the camera so that this ground point is in the middle of the view (the camera looks at it, tilted).</summary>
+        public void LookAtGround(Vector3 point)
+        {
+            float pitch = Mathf.Clamp(currentPitch, 10f, 90f);
+            float back = pitch >= 89.5f ? 0f : (cameraHeight - point.y) / Mathf.Tan(pitch * Mathf.Deg2Rad);
+            FocusOnPosition(point - Quaternion.Euler(0f, currentYaw, 0f) * Vector3.forward * back);
+        }
+
         public void EnableControl(bool enable)
         {
             isControlEnabled = enable;

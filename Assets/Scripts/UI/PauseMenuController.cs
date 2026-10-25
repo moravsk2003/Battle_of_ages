@@ -415,11 +415,38 @@ namespace BattleOfAges.UI
             scroll.content = contentRect;
 
             CreateGraphicsRow(contentRect);
+            CycleRow(contentRect, "Row_UiScale", "Масштаб інтерфейсу", () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
+            CycleRow(contentRect, "Row_FullScreen", "Повний екран", () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);
+            CycleRow(contentRect, "Row_Resolution", "Роздільність", () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
+            CycleRow(contentRect, "Row_VSync", "VSync", () => DisplaySettings.VSync ? "увімк." : "вимк.", DisplaySettings.ToggleVSync);
+            CycleRow(contentRect, "Row_FrameCap", "Ліміт кадрів", () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
+            CycleRow(contentRect, "Row_Advisor", "Поради «Перші кроки»", () => Advisor.Hidden ? "сховано" : "показано", () => Advisor.Hidden = !Advisor.Hidden);
             foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
             {
                 KeyAction captured = action;
                 keybindButtonTexts[action] = CreateRow(contentRect, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(captured));
             }
+        }
+
+        /// <summary>A row whose button steps through values (each click: the next one); the text follows the value.</summary>
+        private void CycleRow(Transform parent, string name, string label, System.Func<string> value, System.Action next)
+        {
+            Text text = null;
+            text = CreateRow(parent, name, label, () =>
+            {
+                next();
+                text.text = value();
+                // the resolution and the window change on the next frame: read them again then
+                StartCoroutine(RefreshNextFrame(text, value));
+            });
+            text.text = value();
+        }
+
+        private static System.Collections.IEnumerator RefreshNextFrame(Text text, System.Func<string> value)
+        {
+            yield return null;
+            yield return null;
+            if (text != null) text.text = value();
         }
 
         /// <summary>The graphics preset (GraphicsQuality): a click goes to the next one.</summary>

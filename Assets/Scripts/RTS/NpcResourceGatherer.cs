@@ -66,6 +66,15 @@ namespace BattleOfAges.RTS
         /// <summary>Has a job (any directive but Idle); a direct work order gives an idle unit the Auto job.</summary>
         public bool IsWorking => currentDirective != GatherDirective.Idle;
 
+        /// <summary>
+        /// Doing nothing (for the idle-worker button): told to stand by, or searching for work and finding none for a
+        /// few seconds. Not while fighting, on the wall, in a mine or as a hauler waiting at its mine.
+        /// </summary>
+        public bool IsIdle => (!IsWorking || searchingFor > IdleAfterSeconds) && currentDirective != GatherDirective.HaulOreFromMineToChest
+                              && !IsInsideMine && (rtsUnit == null || (!rtsUnit.WallBound && !rtsUnit.HasAttackTarget));
+        public const float IdleAfterSeconds = 4f;
+        private float searchingFor;
+
         private HealthComponent healthComponent;
         private bool interrupted;
 
@@ -126,6 +135,7 @@ namespace BattleOfAges.RTS
             currentDirective = newDirective;
             ClearCurrentTargets();
             currentState = GathererState.FindingResource;
+            searchingFor = 0f; // a new order: give it time to find work before it counts as idle
         }
 
         public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
@@ -274,6 +284,7 @@ namespace BattleOfAges.RTS
                 stateWatchdogTimer = 0f;
             }
 
+            searchingFor = currentState == GathererState.FindingResource ? searchingFor + Time.deltaTime : 0f;
             switch (currentState)
             {
                 case GathererState.FindingResource:

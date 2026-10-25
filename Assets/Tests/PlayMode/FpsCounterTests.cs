@@ -58,6 +58,9 @@ namespace BattleOfAges.PlayModeTests
             if (string.IsNullOrEmpty(dir)) dir = Directory.GetCurrentDirectory();
             Directory.CreateDirectory(dir);
             File.WriteAllBytes(Path.Combine(dir, "fps_counter.png"), tex.EncodeToPNG());
+            // The counter outlives the scene: leave it as the game starts it
+            counter.Shown = false;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         }
     }
 }

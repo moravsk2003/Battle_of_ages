@@ -45,7 +45,7 @@ namespace BattleOfAges.Combat
 
         private HeroProgress hero;
         private HeroProgress Hero => hero != null ? hero : hero = GetComponent<HeroProgress>();
-        private HeroClass Class => Hero != null ? Hero.Class : HeroClass.None;
+        public HeroClass Class => Hero != null ? Hero.Class : HeroClass.None;
         private CombatUnit combat;
         private CombatUnit Combat => combat != null ? combat : combat = GetComponent<CombatUnit>();
 
@@ -100,6 +100,34 @@ namespace BattleOfAges.Combat
         public bool HasActive => HasActiveIn(0) || HasActiveIn(1);
         public float CooldownLeft => CooldownLeftIn(0);
         public float CooldownLeftIn(int slot) => Mathf.Max(0f, readyAt[slot] - Time.time);
+
+        /// <summary>The full recharge of the skill in the slot (the HUD's cooldown ring), 0 without one.</summary>
+        public float CooldownOf(int slot)
+        {
+            if (!HasActiveIn(slot)) return 0f;
+            switch (Class)
+            {
+                case HeroClass.Tank: return GameBalance.HealCooldown;
+                case HeroClass.Mage: return slot == 0 ? GameBalance.FireFanCooldown : GameBalance.MeteorCooldown;
+                case HeroClass.Archer: return GameBalance.PierceCooldown;
+                case HeroClass.Dd: return slot == 0 ? GameBalance.DashCooldown : GameBalance.CritCooldown;
+                default: return 0f;
+            }
+        }
+
+        /// <summary>The name of the skill in the slot (0: Q, 1: R), or null.</summary>
+        public string ActiveName(int slot)
+        {
+            if (!HasActiveIn(slot)) return null;
+            switch (Class)
+            {
+                case HeroClass.Tank: return "Миттєвий відхіл";
+                case HeroClass.Mage: return slot == 0 ? "Вогняне віяло" : "Метеор";
+                case HeroClass.Archer: return "Пробивна стріла";
+                case HeroClass.Dd: return slot == 0 ? "Ривок" : "Критичний удар";
+                default: return null;
+            }
+        }
 
         /// <summary>Uses the class's first active skill (Q).</summary>
         public bool UseActive(Vector3 forward) => UseActive(0, forward);

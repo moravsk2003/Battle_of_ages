@@ -88,6 +88,29 @@ namespace BattleOfAges.Crafting
         private float DamageFactor() => ItemStatCalculator.WeaponDamageMultiplier(this[EquipSlot.Weapon]);
         private float CooldownFactor() => ItemStatCalculator.CooldownMultiplier(this[EquipSlot.Weapon]) * ItemStatCalculator.CooldownMultiplier(this[EquipSlot.Gloves]);
 
+        /// <summary>The resulting stats if this item were worn instead of what is in its slot (nothing changes).</summary>
+        public (int health, int damage, float cooldown, float reduction, float range) StatsWith(Item item)
+        {
+            EnsureBase();
+            int s = (int)item.Slot;
+            Item old = Slots[s];
+            if (!item.IsEmpty && !IsLocked(item.Slot)) Slots[s] = item;
+            var stats = (MaxHealth, Damage, Cooldown, DamageReduction, Range);
+            Slots[s] = old;
+            return stats;
+        }
+
+        /// <summary>The same stats with the slot empty (what taking the piece off leaves).</summary>
+        public (int health, int damage, float cooldown, float reduction, float range) StatsWithout(EquipSlot slot)
+        {
+            EnsureBase();
+            Item old = Slots[(int)slot];
+            if (!IsLocked(slot)) Slots[(int)slot] = Item.None;
+            var stats = (MaxHealth, Damage, Cooldown, DamageReduction, Range);
+            Slots[(int)slot] = old;
+            return stats;
+        }
+
         /// <summary>Level of the item of this type when it is worn, else 0.</summary>
         public int LevelOf(ItemType type)
         {

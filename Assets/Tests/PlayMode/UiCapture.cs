@@ -67,7 +67,15 @@ namespace BattleOfAges.PlayModeTests
                         if (n < 4 && u.name != "Player") { select?.Invoke(commander, new object[] { u }); n++; }
                     return Wait(0.3f);
                 }),
-                ("build_menu", () => { BuildMenuUI.Instance?.OpenMenu(); return Wait(0.3f); }),
+                ("tooltip_workers", () => { Hover("Робітники"); return Wait(0.2f); }),
+                ("rts_one_unit", () =>
+                {
+                    RtsUnit first = commander != null && commander.SelectedUnits.Count > 0 ? commander.SelectedUnits[0] : null;
+                    if (first != null) commander.SelectOnly(first);
+                    Hover("Single");
+                    return Wait(0.3f);
+                }),
+                ("build_menu", () => { BuildMenuUI.Instance?.OpenMenu(); Hover("Btn_CastleWall"); return Wait(0.3f); }),
                 ("worker_orders", () => { BuildMenuUI.Instance?.CloseMenu(); NpcGatherCommandUI.Instance?.OpenMenu(); return Wait(0.3f); }),
                 ("inventory", () =>
                 {
@@ -101,8 +109,33 @@ namespace BattleOfAges.PlayModeTests
                     HeroUI.Instance?.Open();
                     return Wait(0.3f);
                 }),
-                ("pause", () => { HeroUI.Instance?.Close(); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
+                ("fp_abilities", () =>
+                {
+                    HeroUI.Instance?.Close();
+                    var hero = UnityEngine.Object.FindFirstObjectByType<BattleOfAges.Combat.HeroProgress>();
+                    if (hero != null)
+                    {
+                        hero.ChooseClass(BattleOfAges.Combat.HeroClass.Mage);
+                        var skills = hero.GetComponent<BattleOfAges.Combat.HeroSkills>();
+                        if (skills != null) { skills.LearnFireFan(); skills.LearnMeteor(); skills.UseActive(0, hero.transform.forward); }
+                        var bag = hero.GetComponent<BattleOfAges.Combat.HeroArtifacts>();
+                        if (bag != null) { bag.Add(BattleOfAges.Combat.ArtifactType.FullHeal); bag.Add(BattleOfAges.Combat.ArtifactType.Lightning); }
+                        hero.GetComponent<BattleOfAges.Combat.HealthComponent>()?.TakeDamage(140);
+                    }
+                    SettlementAlarm.Raise();
+                    if (hero != null) AttackAlerts.Report("робітник", hero.transform.position + new Vector3(40f, 0f, 25f), Time.unscaledTime);
+                    return Wait(0.4f);
+                }),
+                ("rts_alert", () => { modes?.SetGameMode(GameMode.RtsMap); return Wait(0.6f); }),
+                ("pause", () => { SettlementAlarm.StandDown(); modes?.SetGameMode(GameMode.FirstPerson); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
                 ("settings", () => { PauseMenuController.Instance?.OpenSettings(); return Wait(0.3f); }),
+                ("help", () =>
+                {
+                    PauseMenuController.Instance?.CloseSettings();
+                    PauseMenuController.Instance?.ResumeGame();
+                    HelpUI.Instance?.Open();
+                    return Wait(0.3f);
+                }),
             };
 
             var picked = new List<int>();
@@ -142,6 +175,13 @@ namespace BattleOfAges.PlayModeTests
             }
             Time.timeScale = 1f;
             capture.Finish();
+        }
+
+        /// <summary>Shows the tooltip of the named element at once (the cursor sits at the screen's corner in batch).</summary>
+        private static void Hover(string name)
+        {
+            foreach (Tooltip t in UnityEngine.Object.FindObjectsByType<Tooltip>(FindObjectsSortMode.None))
+                if (t.name == name && t.isActiveAndEnabled) { TooltipUI.Hover(t); TooltipUI.ShowNow(); return; }
         }
 
         private static IEnumerator Wait(float seconds)

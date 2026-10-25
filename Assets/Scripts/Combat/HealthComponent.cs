@@ -18,6 +18,8 @@ namespace BattleOfAges.Combat
 
         public event Action<int, int> OnHealthChanged; // (current, max)
         public event Action<int> OnTakeDamage;        // (damageAmount)
+        /// <summary>Any unit or building took a hit (the HUD's attack alerts listen).</summary>
+        public static event Action<HealthComponent, int> AnyDamaged;
         public event Action OnDeath;
 
         private void Awake()
@@ -68,6 +70,7 @@ namespace BattleOfAges.Combat
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
             OnTakeDamage?.Invoke(damage);
+            AnyDamaged?.Invoke(this, damage);
             OnHealthChanged?.Invoke(currentHealth, maxHealth);
 
             // (No per-hit Debug.Log: in a 100 vs 100 battle hundreds of hits per second each cost a stack trace.)

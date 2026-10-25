@@ -216,7 +216,27 @@ namespace BattleOfAges.UI
             desc.resizeTextMinSize = 12;
             desc.resizeTextMaxSize = 15;
 
+            Tooltip.Set(rect.gameObject, () => BuildTip(capturedType));
             return new Row { Type = def.Type, Button = btn, Cost = cost, Description = desc, Group = rect.gameObject.AddComponent<CanvasGroup>() };
+        }
+
+        /// <summary>What the building is, costs against the stock, strength, and the placing keys.</summary>
+        private static string BuildTip(BuildingType type)
+        {
+            BuildingDefinition def = BuildingData.GetDefinition(type);
+            ResourceManager rm = ResourceManager.Instance;
+            bool wall = WallSegment.IsWall(type);
+            int wood = rm != null ? rm.WoodCount : 0;
+            int ore = rm == null ? 0 : wall ? rm.GetOreCountAtLeast(0) : rm.GetOreTierCount(def.OreTierRequired);
+            string Have(int have, int need) => have >= need ? TipText.Good($"є {have}") : TipText.Bad($"є {have}");
+            var sb = new System.Text.StringBuilder(TipText.Title(def.DisplayName, UiTheme.Gold));
+            sb.Append("\n").Append(def.Description);
+            sb.Append($"\nДеревина {def.WoodCost}  ({Have(wood, def.WoodCost)})");
+            sb.Append(wall ? $"\nРуда {def.OreCost} одного рівня  ({Have(ore, def.OreCost)} усього)" : $"\nРуда рів. {def.OreTierRequired}: {def.OreCost}  ({Have(ore, def.OreCost)})");
+            sb.Append(wall ? $"\nМіцність {def.MaxHealth} на руді рів. 0, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% за кожен рівень руди" : $"\nМіцність {def.MaxHealth}");
+            if (def.NpcSpawnCount > 0) sb.Append($"\nДає {def.NpcSpawnCount} робітника (потрібне місце в населенні)");
+            sb.Append("\n").Append(TipText.Dim(wall ? "Z / X — повернути, Tab — руда, ЛКМ — поставити, ПКМ — скасувати" : "Z / X — повернути, ЛКМ — поставити, ПКМ — скасувати"));
+            return sb.ToString();
         }
 
         /// <summary>Costs in red and the row dimmed when the stock is short; a building not allowed (a second hall) says why.</summary>

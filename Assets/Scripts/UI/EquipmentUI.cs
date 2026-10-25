@@ -42,8 +42,6 @@ namespace BattleOfAges.UI
         private RectTransform grid;
         private Text emptyStore;
         private readonly List<Button> filterButtons = new List<Button>();
-        private RectTransform tooltip;
-        private Text tooltipText;
         private bool dirty;
 
         private static readonly Vector2 Size = new Vector2(1180f, 680f);
@@ -129,7 +127,6 @@ namespace BattleOfAges.UI
         {
             open = false;
             window.SetActive(false);
-            tooltip.gameObject.SetActive(false);
             GameModeManager modes = FindFirstObjectByType<GameModeManager>();
             bool otherModal = GameWindows.InventoryOpen || GameWindows.WorkbenchOpen
                               || GameWindows.Paused;
@@ -150,7 +147,6 @@ namespace BattleOfAges.UI
                 if (Cursor.lockState != CursorLockMode.None) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
                 if (UniversalInput.GetKeyDownEscape() || KeybindsManager.GetKeyDown(KeyAction.Equipment)) { Close(); return; }
                 if (dirty) Refresh();
-                if (tooltip.gameObject.activeSelf) PlaceTooltip();
                 return;
             }
             if (GameWindows.Paused) return;
@@ -186,10 +182,7 @@ namespace BattleOfAges.UI
         {
             if (Target != null && Target.IsLocked(item.Slot)) { StrategyHud.Notify("Цей слот тримає артефакт"); return; }
             if (Armory.Instance.EquipFromStore(Target, item))
-            {
-                tooltip.gameObject.SetActive(false);
                 Refresh();
-            }
         }
 
         private void SetFilter(int f)
@@ -306,41 +299,20 @@ namespace BattleOfAges.UI
 
         private string Describe(Item item, bool compare)
         {
-            string s = $"<b><color=#{ColorUtility.ToHtmlStringRGB(UiTheme.LevelColor(item.Level))}>{ItemTypeNames.MaterialName(item.Type, item.Level)} {ItemTypeNames.Display(item.Type).ToLowerInvariant()} {ItemTypeNames.Roman(item.Level)}</color></b>\n"
-                     + ItemTypeNames.Describe(item);
+            string s = TipText.Title($"{ItemTypeNames.MaterialName(item.Type, item.Level)} {ItemTypeNames.Display(item.Type).ToLowerInvariant()} {ItemTypeNames.Roman(item.Level)}", UiTheme.LevelColor(item.Level))
+                     + "\n" + ItemTypeNames.Describe(item);
             Equipment t = Target;
             if (compare && t != null)
             {
                 Item worn = t[item.Slot];
-                s += worn.IsEmpty ? "\n<color=#9C9080>Слот вільний</color>" : $"\n<color=#9C9080>Замість: {worn}</color>";
-                s += "\n<color=#9C9080>Клік — надягти</color>";
+                s += "\n" + TipText.Dim(worn.IsEmpty ? "Слот вільний" : "Замість: " + worn);
+                s += TipText.Compare(t.StatsWith(worn), t.StatsWith(item));
+                s += "\n" + TipText.Dim("Клік — надягти");
             }
             return s;
         }
 
-        // ------------------------------------------------------------------ tooltip
-
-        private void Hover(GameObject go, System.Func<string> text)
-        {
-            var trigger = go.AddComponent<EventTrigger>();
-            var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-            enter.callback.AddListener(_ => { tooltipText.text = text(); tooltip.gameObject.SetActive(true); tooltip.SetAsLastSibling(); PlaceTooltip(); });
-            var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
-            exit.callback.AddListener(_ => tooltip.gameObject.SetActive(false));
-            trigger.triggers.Add(enter);
-            trigger.triggers.Add(exit);
-        }
-
-        private void PlaceTooltip()
-        {
-            var canvasRt = (RectTransform)tooltip.parent;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRt, UniversalInput.GetMousePosition(), null, out Vector2 local);
-            Vector2 half = canvasRt.rect.size * 0.5f;
-            Vector2 size = tooltip.sizeDelta;
-            float x = Mathf.Clamp(local.x + 18f, -half.x, half.x - size.x);
-            float y = Mathf.Clamp(local.y - 18f, -half.y + size.y, half.y);
-            tooltip.anchoredPosition = new Vector2(x, y);
-        }
+        private void Hover(GameObject go, System.Func<string> text) => Tooltip.Set(go, text);
 
         // ------------------------------------------------------------------ building
 
@@ -417,15 +389,6 @@ namespace BattleOfAges.UI
             hint = UiTheme.Label(hintRt, "Text", "Клік по речі — надягти  ·  клік по слоту — зняти на склад  ·  [C] закрити", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
 
             // Tooltip
-            tooltip = UiTheme.Rect(canvas.transform, "Tooltip", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(360f, 118f));
-            tooltip.pivot = new Vector2(0f, 1f);
-            UiTheme.PanelImage(tooltip);
-            tooltip.gameObject.AddComponent<CanvasGroup>().blocksRaycasts = false;
-            RectTransform tt = UiTheme.Rect(tooltip, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(330f, 100f));
-            tooltipText = UiTheme.Label(tt, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
-            tooltipText.supportRichText = true;
-            tooltipText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            tooltip.gameObject.SetActive(false);
         }
 
         private void Slot(RectTransform doll, EquipSlot slot, Vector2 offset)
@@ -449,7 +412,9 @@ namespace BattleOfAges.UI
             Hover(rt.gameObject, () =>
             {
                 Item worn = Target != null ? Target[slot] : Item.None;
-                return worn.IsEmpty ? $"<b>{ItemTypeNames.SlotName(slot)}</b>\n<color=#9C9080>Порожньо — оберіть річ на складі</color>" : Describe(worn, false) + "\n<color=#9C9080>Клік — зняти на склад</color>";
+                if (Target != null && Target.IsLocked(slot)) return TipText.Title("Артефакт", new Color(1f, 0.78f, 0.3f)) + "\n" + TipText.Dim("Тримає цей слот, не знімається");
+                if (worn.IsEmpty) return TipText.Title(ItemTypeNames.SlotName(slot), UiTheme.Gold) + "\n" + TipText.Dim("Порожньо — оберіть річ на складі");
+                return Describe(worn, false) + TipText.Compare(Target.StatsWith(worn), Target.StatsWithout(slot), "Якщо зняти:") + "\n" + TipText.Dim("Клік — зняти на склад");
             });
         }
 

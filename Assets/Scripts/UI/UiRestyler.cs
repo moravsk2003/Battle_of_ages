@@ -45,6 +45,7 @@ namespace BattleOfAges.UI
             timer = 0.2f;
             foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
             {
+                if (c.isRootCanvas && c.renderMode != RenderMode.WorldSpace) Managers.DisplaySettings.Apply(c.GetComponent<CanvasScaler>());
                 if (!c.isRootCanvas || c.GetComponent<UiThemed>() != null || c.renderMode == RenderMode.WorldSpace) continue;
                 c.GetComponentsInChildren(true, buffer);
                 foreach (Graphic g in buffer)
