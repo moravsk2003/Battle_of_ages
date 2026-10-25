@@ -33,11 +33,16 @@ namespace BattleOfAges.Combat
         /// <summary>The weapon multiplier with the artifact sword taking the weapon slot.</summary>
         public float WeaponMultiplier(float worn) => Has(ArtifactType.SwordX5) ? GameBalance.SwordArtifactMultiplier : worn;
         /// <summary>The damage reduction with the artifact armour taking the armour slot.</summary>
-        public float DamageReduction(float worn) => Has(ArtifactType.Armor90) ? GameBalance.ArmorArtifactReduction : worn;
+        /// <summary>The damage reduction: the artifact armour set (helmet, chest, gloves, boots) instead of those pieces, plus what is worn elsewhere (a shield).</summary>
+        public float DamageReduction(float wornElsewhere) => Has(ArtifactType.Armor90) ? GameBalance.ArmorArtifactReduction + wornElsewhere : wornElsewhere;
 
-        /// <summary>The artifact sword and armour hold their slot: nothing else goes there and they cannot be taken off.</summary>
+        /// <summary>The artifact sword and armour set hold their slots: nothing else goes there and they cannot be taken off.</summary>
         public bool LocksSlot(Crafting.EquipSlot slot) =>
-            (slot == Crafting.EquipSlot.Weapon && Has(ArtifactType.SwordX5)) || (slot == Crafting.EquipSlot.Chest && Has(ArtifactType.Armor90));
+            (slot == Crafting.EquipSlot.Weapon && Has(ArtifactType.SwordX5)) || (IsArmourSetSlot(slot) && Has(ArtifactType.Armor90));
+
+        /// <summary>The slots the artifact armour set covers (not the shield).</summary>
+        public static bool IsArmourSetSlot(Crafting.EquipSlot slot) =>
+            slot == Crafting.EquipSlot.Helmet || slot == Crafting.EquipSlot.Chest || slot == Crafting.EquipSlot.Gloves || slot == Crafting.EquipSlot.Boots;
 
         private void OnEnable() => HeroSuccession.HeroDied += OnHeroDied;
         private void OnDisable() => HeroSuccession.HeroDied -= OnHeroDied;

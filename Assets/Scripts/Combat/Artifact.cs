@@ -32,7 +32,7 @@ namespace BattleOfAges.Combat
             {
                 case ArtifactType.Vampiric: return "Вампірський";
                 case ArtifactType.SwordX5: return "Меч ×5";
-                case ArtifactType.Armor90: return "Броня 90%";
+                case ArtifactType.Armor90: return "Броня 80%";
                 case ArtifactType.FullHeal: return "Повне зцілення";
                 case ArtifactType.Lightning: return "Блискавка";
                 case ArtifactType.Wisdom: return "Мудрості";
@@ -46,7 +46,7 @@ namespace BattleOfAges.Combat
             {
                 case ArtifactType.Vampiric: return "10% завданого урону повертається як HP";
                 case ArtifactType.SwordX5: return "урон ×5 (займає слот зброї, не знімається)";
-                case ArtifactType.Armor90: return "вхідний урон −90% (займає слот броні, не знімається; магія крізь неї)";
+                case ArtifactType.Armor90: return "комплект броні: вхідний урон −80% (шолом, нагрудник, рукавиці, чоботи; не знімається; щит — окремо; магія крізь неї)";
                 case ArtifactType.FullHeal: return "одноразовий: миттєво все HP і 1 с невразливості";
                 case ArtifactType.Lightning: return "одноразовий: 250 магічного урону найближчому ворогу (крізь броню)";
                 case ArtifactType.Wisdom: return "+20% досвіду";

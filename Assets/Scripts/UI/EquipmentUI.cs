@@ -172,6 +172,10 @@ namespace BattleOfAges.UI
 
         private static readonly Color ArtifactGold = new Color(1f, 0.78f, 0.3f);
 
+        /// <summary>What an artifact-held slot shows: the sword, or the piece of the armour set.</summary>
+        private static ItemType ArtifactLook(EquipSlot s) =>
+            s == EquipSlot.Weapon ? ItemType.Sword : s == EquipSlot.Helmet ? ItemType.Helmet : s == EquipSlot.Gloves ? ItemType.Gloves : s == EquipSlot.Boots ? ItemType.Boots : ItemType.Armor;
+
         private void OnSlotClicked(EquipSlot slot)
         {
             if (Target != null && Target.IsLocked(slot)) { StrategyHud.Notify("Артефакт не знімається"); return; }
@@ -212,10 +216,10 @@ namespace BattleOfAges.UI
                 Item item = t[s];
                 if (t.IsLocked(s))
                 {
-                    // The artifact sword or armour holds the slot: shown as the artifact, it does not come off
+                    // The artifact sword or a piece of the artifact armour set holds the slot: shown as the artifact, it does not come off
                     v.icon.enabled = true;
-                    v.icon.sprite = UiTheme.ItemSprite(s == EquipSlot.Weapon ? ItemType.Sword : ItemType.Armor, 5);
-                    v.level.text = s == EquipSlot.Weapon ? "×5" : "90%";
+                    v.icon.sprite = UiTheme.ItemSprite(ArtifactLook(s), 5);
+                    v.level.text = s == EquipSlot.Weapon ? "×5" : s == EquipSlot.Chest ? "80%" : "";
                     v.level.color = ArtifactGold;
                     v.caption.text = "артефакт";
                     v.rim.color = ArtifactGold;

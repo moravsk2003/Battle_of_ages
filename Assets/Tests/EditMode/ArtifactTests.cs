@@ -49,13 +49,13 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
-        public void Armor90_StopsNineTenths_ButNotMagic()
+        public void ArmourSet_StopsFourFifths_ButNotMagic()
         {
             bag.Add(ArtifactType.Armor90);
             hp.TakeDamage(100);
-            Assert.AreEqual(hp.MaxHealth - 10, hp.CurrentHealth);
+            Assert.AreEqual(hp.MaxHealth - 20, hp.CurrentHealth, "-80%");
             hp.TakeDamage(100, ignoreArmor: true);
-            Assert.AreEqual(hp.MaxHealth - 110, hp.CurrentHealth, "The mage goes through.");
+            Assert.AreEqual(hp.MaxHealth - 120, hp.CurrentHealth, "The mage goes through.");
         }
 
         [Test]
@@ -126,9 +126,23 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(other, gear.Equip(other), "another sword is handed back");
             Assert.AreEqual(new Item(ItemType.Sword, 3), gear[EquipSlot.Weapon]);
             Assert.AreEqual(damage, combat.AttackDamage, "the artifact's damage stays");
-            Assert.IsFalse(gear.IsLocked(EquipSlot.Helmet), "the other slots are free");
-            gear.Equip(new Item(ItemType.Helmet, 1));
-            Assert.AreEqual(new Item(ItemType.Helmet, 1), gear[EquipSlot.Helmet], "a helmet goes on");
+            foreach (EquipSlot s in new[] { EquipSlot.Helmet, EquipSlot.Gloves, EquipSlot.Boots }) Assert.IsTrue(gear.IsLocked(s), $"{s}: part of the armour set");
+            Assert.IsFalse(gear.IsLocked(EquipSlot.Shield), "the shield is free");
+            gear.Equip(new Item(ItemType.Shield, 1));
+            Assert.AreEqual(new Item(ItemType.Shield, 1), gear[EquipSlot.Shield], "a shield goes on");
+        }
+
+        [Test]
+        public void ArmourSet_ReplacesThePieces_AShieldAddsUpToTheCap()
+        {
+            gear.Equip(new Item(ItemType.Helmet, 5));
+            gear.Equip(new Item(ItemType.Armor, 5));
+            bag.Add(ArtifactType.Armor90);
+            Assert.AreEqual(GameBalance.ArmorArtifactReduction, gear.DamageReduction, 1e-4f, "the set instead of the helmet and chest, not on top");
+            gear.Equip(new Item(ItemType.Shield, 2));
+            Assert.AreEqual(GameBalance.ArmorArtifactReduction + ItemStatCalculator.DamageReduction(new Item(ItemType.Shield, 2)), gear.DamageReduction, 1e-4f, "a shield adds");
+            gear.Equip(new Item(ItemType.Shield, 5));
+            Assert.AreEqual(GameBalance.MaxDamageReduction, gear.DamageReduction, 1e-4f, "up to the cap");
         }
 
         [Test]

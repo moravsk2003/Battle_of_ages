@@ -33,7 +33,7 @@ namespace BattleOfAges.Combat
 
         // ------------------------------------------------------------------ artifacts (§9.1.1)
 
-        public static float VampiricShare = 0.1f, SwordArtifactMultiplier = 5f, ArmorArtifactReduction = 0.9f;
+        public static float VampiricShare = 0.1f, SwordArtifactMultiplier = 5f, ArmorArtifactReduction = 0.8f; // the armour: a whole set (helmet, chest, gloves, boots)
         public static float WisdomXpBonus = 0.2f;
         /// <summary>Full heal: all HP back and nothing hurts the hero for this long.</summary>
         public static float FullHealInvulnerableSeconds = 1f;

@@ -57,10 +57,11 @@ namespace BattleOfAges.Crafting
         {
             get
             {
+                // The pieces worn; those under an artifact (the armour set) count as the artifact instead
                 float r = 0f;
-                foreach (Item i in Slots) r += ItemStatCalculator.DamageReduction(i);
+                for (int s = 0; s < Slots.Length; s++) if (!IsLocked((EquipSlot)s)) r += ItemStatCalculator.DamageReduction(Slots[s]);
                 r = Mathf.Min(r, ItemStatCalculator.MAX_DAMAGE_REDUCTION);
-                return Modifier != null ? Modifier.DamageReduction(r) : r; // artifact armour takes the armour slot
+                return Modifier != null ? Mathf.Min(Modifier.DamageReduction(r), Combat.GameBalance.MaxDamageReduction) : r;
             }
         }
 
