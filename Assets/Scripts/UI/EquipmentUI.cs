@@ -170,13 +170,17 @@ namespace BattleOfAges.UI
             Refresh();
         }
 
+        private static readonly Color ArtifactGold = new Color(1f, 0.78f, 0.3f);
+
         private void OnSlotClicked(EquipSlot slot)
         {
+            if (Target != null && Target.IsLocked(slot)) { StrategyHud.Notify("Артефакт не знімається"); return; }
             if (Armory.Instance.UnequipToStore(Target, slot)) Refresh();
         }
 
         private void OnStoreItemClicked(Item item)
         {
+            if (Target != null && Target.IsLocked(item.Slot)) { StrategyHud.Notify("Цей слот тримає артефакт"); return; }
             if (Armory.Instance.EquipFromStore(Target, item))
             {
                 tooltip.gameObject.SetActive(false);
@@ -206,6 +210,17 @@ namespace BattleOfAges.UI
             {
                 var v = slotViews[s];
                 Item item = t[s];
+                if (t.IsLocked(s))
+                {
+                    // The artifact sword or armour holds the slot: shown as the artifact, it does not come off
+                    v.icon.enabled = true;
+                    v.icon.sprite = UiTheme.ItemSprite(s == EquipSlot.Weapon ? ItemType.Sword : ItemType.Armor, 5);
+                    v.level.text = s == EquipSlot.Weapon ? "×5" : "90%";
+                    v.level.color = ArtifactGold;
+                    v.caption.text = "артефакт";
+                    v.rim.color = ArtifactGold;
+                    continue;
+                }
                 bool has = !item.IsEmpty;
                 v.icon.enabled = has;
                 if (has) v.icon.sprite = UiTheme.ItemSprite(item.Type, item.Level);

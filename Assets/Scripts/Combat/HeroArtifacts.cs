@@ -35,6 +35,10 @@ namespace BattleOfAges.Combat
         /// <summary>The damage reduction with the artifact armour taking the armour slot.</summary>
         public float DamageReduction(float worn) => Has(ArtifactType.Armor90) ? GameBalance.ArmorArtifactReduction : worn;
 
+        /// <summary>The artifact sword and armour hold their slot: nothing else goes there and they cannot be taken off.</summary>
+        public bool LocksSlot(Crafting.EquipSlot slot) =>
+            (slot == Crafting.EquipSlot.Weapon && Has(ArtifactType.SwordX5)) || (slot == Crafting.EquipSlot.Chest && Has(ArtifactType.Armor90));
+
         private void OnEnable() => HeroSuccession.HeroDied += OnHeroDied;
         private void OnDisable() => HeroSuccession.HeroDied -= OnHeroDied;
 
@@ -73,13 +77,17 @@ namespace BattleOfAges.Combat
             return true;
         }
 
-        /// <summary>Uses a one-shot artifact: Full heal (all HP) or Lightning (200 to the nearest enemy).</summary>
+        /// <summary>Uses a one-shot artifact: Full heal (all HP and a moment of invulnerability) or Lightning (magic damage to the nearest enemy).</summary>
         public bool Use(ArtifactType a)
         {
             if (!Artifacts.IsConsumable(a) || !held.Contains(a)) return false;
             HealthComponent hp = GetComponent<HealthComponent>();
             if (hp == null || !hp.IsAlive) return false;
-            if (a == ArtifactType.FullHeal) hp.Heal(hp.MaxHealth);
+            if (a == ArtifactType.FullHeal)
+            {
+                hp.Heal(hp.MaxHealth);
+                hp.InvulnerableUntil = Time.time + GameBalance.FullHealInvulnerableSeconds; // and a moment nothing hurts
+            }
             else
             {
                 CombatUnit combat = GetComponent<CombatUnit>();
@@ -87,6 +95,7 @@ namespace BattleOfAges.Combat
                                                         combat != null ? combat.Team : UnitSpatialGrid.TeamPlayer);
                 if (enemy < 0) { UI.StrategyHud.Notify("Немає ворога поблизу"); return false; }
                 HealthComponent target = UnitSpatialGrid.Health(enemy);
+                LightningStrike.Show(target.transform.position); // magic: from the sky, through any armour
                 if (combat != null) combat.DeliverHit(target, GameBalance.LightningDamage, ignoreArmor: true);
                 else target.TakeDamage(GameBalance.LightningDamage, ignoreArmor: true);
             }

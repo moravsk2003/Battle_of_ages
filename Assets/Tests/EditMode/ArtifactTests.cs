@@ -94,6 +94,44 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void FullHeal_GivesAMomentOfInvulnerability()
+        {
+            bag.Add(ArtifactType.FullHeal);
+            hp.SetCurrentHealth(10);
+            Assert.IsTrue(bag.Use(ArtifactType.FullHeal));
+            Assert.IsTrue(hp.IsInvulnerable);
+            Assert.AreEqual(Time.time + GameBalance.FullHealInvulnerableSeconds, hp.InvulnerableUntil, 1e-3f, "for 1 s");
+            hp.TakeDamage(400, ignoreArmor: true);
+            Assert.AreEqual(hp.MaxHealth, hp.CurrentHealth, "nothing hurts meanwhile, magic neither");
+            hp.InvulnerableUntil = Time.time - 0.01f; // the second is over
+            hp.TakeDamage(40, ignoreArmor: true);
+            Assert.AreEqual(hp.MaxHealth - 40, hp.CurrentHealth, "then it does");
+        }
+
+        [Test]
+        public void ArtifactSwordAndArmour_CannotBeTakenOffOrReplaced()
+        {
+            gear.Equip(new Item(ItemType.Sword, 3));
+            gear.Equip(new Item(ItemType.Armor, 2));
+            Assert.IsFalse(gear.IsLocked(EquipSlot.Weapon), "an ordinary sword comes off");
+            bag.Add(ArtifactType.SwordX5);
+            bag.Add(ArtifactType.Armor90);
+            int damage = combat.AttackDamage;
+
+            Assert.IsTrue(gear.IsLocked(EquipSlot.Weapon));
+            Assert.IsTrue(gear.IsLocked(EquipSlot.Chest));
+            Assert.IsTrue(gear.Unequip(EquipSlot.Weapon).IsEmpty, "the sword slot gives nothing up");
+            Assert.IsTrue(gear.Unequip(EquipSlot.Chest).IsEmpty, "nor the armour slot");
+            Item other = new Item(ItemType.Sword, 5);
+            Assert.AreEqual(other, gear.Equip(other), "another sword is handed back");
+            Assert.AreEqual(new Item(ItemType.Sword, 3), gear[EquipSlot.Weapon]);
+            Assert.AreEqual(damage, combat.AttackDamage, "the artifact's damage stays");
+            Assert.IsFalse(gear.IsLocked(EquipSlot.Helmet), "the other slots are free");
+            gear.Equip(new Item(ItemType.Helmet, 1));
+            Assert.AreEqual(new Item(ItemType.Helmet, 1), gear[EquipSlot.Helmet], "a helmet goes on");
+        }
+
+        [Test]
         public void TwoShards_MakeOneOfTheirArtifacts()
         {
             bag.AddShard(ArtifactType.Wisdom);

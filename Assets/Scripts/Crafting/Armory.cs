@@ -64,7 +64,7 @@ namespace BattleOfAges.Crafting
         /// <summary>Takes the item from the store and puts it on the unit; what was worn there goes back to the store.</summary>
         public bool EquipFromStore(Equipment target, Item item)
         {
-            if (target == null || !Remove(item)) return false;
+            if (target == null || target.IsLocked(item.Slot) || !Remove(item)) return false; // an artifact holds that slot
             Add(target.Equip(item));
             return true;
         }

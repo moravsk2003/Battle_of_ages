@@ -137,10 +137,18 @@ namespace BattleOfAges.Crafting
             Apply();
         }
 
-        /// <summary>Wears the item; returns what was in that slot before (Item.None if it was empty).</summary>
+        /// <summary>The slot is held by an artifact (the hero's sword or armour): nothing goes on or comes off there.</summary>
+        public bool IsLocked(EquipSlot slot)
+        {
+            Combat.HeroArtifacts a = GetComponent<Combat.HeroArtifacts>();
+            return a != null && a.LocksSlot(slot);
+        }
+
+        /// <summary>Wears the item; returns what was in that slot before (Item.None if it was empty). A slot an artifact holds refuses it (it comes back).</summary>
         public Item Equip(Item item)
         {
             if (item.IsEmpty) return Item.None;
+            if (IsLocked(item.Slot)) return item;
             EnsureBase();
             int s = (int)item.Slot;
             Item old = Slots[s];
@@ -149,9 +157,10 @@ namespace BattleOfAges.Crafting
             return old;
         }
 
-        /// <summary>Takes off what is in the slot and returns it.</summary>
+        /// <summary>Takes off what is in the slot and returns it (nothing from a slot an artifact holds).</summary>
         public Item Unequip(EquipSlot slot)
         {
+            if (IsLocked(slot)) return Item.None;
             EnsureBase();
             Item old = Slots[(int)slot];
             if (old.IsEmpty) return Item.None;

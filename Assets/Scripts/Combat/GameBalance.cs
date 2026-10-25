@@ -35,7 +35,10 @@ namespace BattleOfAges.Combat
 
         public static float VampiricShare = 0.1f, SwordArtifactMultiplier = 5f, ArmorArtifactReduction = 0.9f;
         public static float WisdomXpBonus = 0.2f;
-        public static int LightningDamage = 200;
+        /// <summary>Full heal: all HP back and nothing hurts the hero for this long.</summary>
+        public static float FullHealInvulnerableSeconds = 1f;
+        /// <summary>Lightning: magic (through any armour) on the nearest enemy within LightningRange.</summary>
+        public static int LightningDamage = 250;
         public static float LightningRange = 40f;
         /// <summary>No armour stops more than this share of a hit.</summary>
         public static float MaxDamageReduction = 0.9f;
