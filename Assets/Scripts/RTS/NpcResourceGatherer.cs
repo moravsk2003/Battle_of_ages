@@ -247,7 +247,7 @@ namespace BattleOfAges.RTS
 
             // Pause AI logic if worker is selected by player in RTS mode, while it fights or the alarm sounds;
             // afterwards it looks for its work again (the fight took it away from where it was going)
-            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active))
+            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound))
             {
                 if (!rtsUnit.IsSelected) interrupted = true;
                 return;

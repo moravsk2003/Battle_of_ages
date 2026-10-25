@@ -94,6 +94,10 @@ namespace BattleOfAges.PlayModeTests
                 k.transform.SetPositionAndRotation(Ground(g.transform.position + right * 3.2f + fwd * 1.5f), facing);
                 knights.Add(k);
             }
+            // A defender at a post on the walkway (§10.5)
+            GameObject guard = HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.KnightGuard, "Cap_WallGuard");
+            guard.transform.SetPositionAndRotation(WallWalk.PostPoint(new WallWalk.Post(wall.GetComponent<WallSegment>(), 0)), facing);
+            knights.Add(guard);
             // CAPTURE_EQUATOR = "r,g,b": try another trilight horizon (ambient) colour for this capture only
             string eq = Environment.GetEnvironmentVariable("CAPTURE_EQUATOR");
             if (!string.IsNullOrEmpty(eq))

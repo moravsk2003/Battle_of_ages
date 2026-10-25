@@ -229,6 +229,78 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator Defender_GoesUpTheStairsToAPost_AndComesDown()
+        {
+            Ground();
+            Vector3 at = OnGround(Far);
+            Segment(BuildingType.WallStairs, at, 0f);
+            WallSegment wall = Segment(BuildingType.CastleWall, at + new Vector3(4f, 0f, 0f), 0f);
+            yield return null;
+            yield return null;
+            WallWalk.Post post = WallWalk.FreePost(wall.transform.position + Vector3.right);
+            Assert.IsTrue(post.Valid, "a post up there");
+
+            GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(2f, 0f, -6f)), "WallDefender");
+            spawned.Add(v);
+            yield return null;
+            v.GetComponent<RTS.NpcResourceGatherer>().SetGatherDirective(RTS.GatherDirective.Idle);
+            RTS.RtsUnit unit = v.GetComponent<RTS.RtsUnit>();
+            Assert.IsTrue(unit.SendToWall(post));
+            for (float t = 0f; t < 25f && !unit.IsPostedOnWall; t += Time.deltaTime) yield return null;
+            Assert.IsTrue(unit.IsPostedOnWall, $"posted (at {v.transform.position - Far})");
+            Assert.Less(Vector3.Distance(v.transform.position, WallWalk.PostPoint(post)), 0.1f, "at its post on the walkway");
+            Assert.IsTrue(v.GetComponent<CombatUnit>().OnWall);
+
+            Vector3 down = OnGround(Far + new Vector3(0f, 0f, -7f));
+            unit.IssueMoveCommand(down);
+            for (float t = 0f; t < 25f && (unit.WallBound || FlatDist(v.transform.position, down) > 1.3f); t += Time.deltaTime) yield return null;
+            Assert.IsFalse(unit.WallBound, "came down");
+            Assert.Less(FlatDist(v.transform.position, down), 1.3f, "and went where it was sent");
+            Assert.Less(Mathf.Abs(v.transform.position.y - down.y), 0.5f, "on the ground");
+        }
+
+        private static float FlatDist(Vector3 a, Vector3 b) { a.y = b.y = 0f; return Vector3.Distance(a, b); }
+
+        [UnityTest]
+        public IEnumerator NoStairs_NoPosts()
+        {
+            Ground();
+            Segment(BuildingType.CastleWall, OnGround(Far), 0f);
+            yield return null;
+            Assert.IsFalse(WallWalk.FreePost(Far).Valid);
+        }
+
+        [UnityTest]
+        public IEnumerator OnTheWalkway_AClimberFightsTheDefender()
+        {
+            var (mob, wall, target) = Siege(AI.HostileMobType.Bandit);
+            Segment(BuildingType.WallStairs, OnGround(Far + new Vector3(-8f, 0f, 0f)), 0f);
+            yield return null;
+            yield return null;
+            GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(-4f, 0f, -4f)), "WalkwayDefender");
+            spawned.Add(v);
+            yield return null;
+            v.GetComponent<RTS.NpcResourceGatherer>().SetGatherDirective(RTS.GatherDirective.Idle);
+            RTS.RtsUnit unit = v.GetComponent<RTS.RtsUnit>();
+            HealthComponent defender = v.GetComponent<HealthComponent>();
+            WallWalk.Post post = WallWalk.FreePost(wall.transform.position);
+            Assert.IsTrue(unit.SendToWall(post));
+            for (float t = 0f; t < 25f && !unit.IsPostedOnWall; t += Time.deltaTime) yield return null;
+            Assert.IsTrue(unit.IsPostedOnWall, "the defender is up");
+
+            mob.OrderAttack(target);
+            HealthComponent mobHp = mob.GetComponent<HealthComponent>();
+            bool fought = false;
+            for (float t = 0f; t < 45f && !fought; t += Time.deltaTime)
+            {
+                fought = defender.CurrentHealth < defender.MaxHealth || !mobHp.IsAlive || mobHp.CurrentHealth < mobHp.MaxHealth;
+                yield return null;
+            }
+            Assert.IsTrue(fought, $"they fought on the walls (bandit at {mob.transform.position - Far})");
+            foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
+        }
+
+        [UnityTest]
         public IEnumerator OwnUnits_GoRoundThroughTheGate()
         {
             yield return WallWithGate();

@@ -149,6 +149,7 @@ namespace BattleOfAges.RTS
         {
             UnitRegistry.Unregister(this);
             UnitSpatialGrid.Unregister(gridId);
+            Building.WallWalk.Release(this);
             gridId = -1;
         }
 
@@ -157,17 +158,143 @@ namespace BattleOfAges.RTS
 
         public void IssueAttackCommand(HealthComponent target)
         {
+            if (target != null && wallState == WallState.Posted && combatUnit != null
+                && Vector3.Distance(transform.position, target.transform.position) <= combatUnit.AttackRange)
+            {
+                attackTarget = target; // in reach from the post: stays up there
+                return;
+            }
             if (target != null)
             {
                 IssueMoveCommand(target.transform.position); // clears the previous attack target...
             }
-            attackTarget = target;                           // ...so the new one is set afterwards (was lost before)
+            if (OnWall) leaveTarget = target; // after coming down
+            else attackTarget = target;       // ...so the new one is set afterwards (was lost before)
+        }
+
+        // ------------------------------------------------------------------ on the walls (§10.5)
+
+        private enum WallState { None, ToStairs, Climbing, Posted, Leaving }
+        private WallState wallState;
+        private readonly System.Collections.Generic.List<Vector3> wallPath = new System.Collections.Generic.List<Vector3>();
+        private int wallLeg;
+        private bool leaveToMove;
+        private Vector3 leaveTo;
+        private HealthComponent leaveTarget;
+
+        /// <summary>On the stairs, the walkway or its post (moved along the way, not by the motor).</summary>
+        public bool OnWall => wallState >= WallState.Climbing;
+        public bool IsPostedOnWall => wallState == WallState.Posted;
+        /// <summary>Going up to the walls or on them: its job and the alarm leave it be.</summary>
+        public bool WallBound => wallState != WallState.None;
+        public bool IsRanged => combatUnit != null && combatUnit.IsRanged;
+
+        /// <summary>The alarm is over: one it sent up comes down (one on the way there turns back).</summary>
+        public void StandDownFromWall()
+        {
+            if (!PostedByAlarm) return;
+            if (wallState == WallState.ToStairs) { wallState = WallState.None; Building.WallWalk.Release(this); hasTarget = false; }
+            else LeaveWall();
+            PostedByAlarm = false;
+        }
+        /// <summary>Sent up by the alarm (comes down when it stands down).</summary>
+        public bool PostedByAlarm { get; private set; }
+
+        private static float FlatDistance(Vector3 a, Vector3 b) { a.y = b.y = 0f; return Vector3.Distance(a, b); }
+
+        /// <summary>Sends the unit to a post on the walls: to the foot of the stairs, up and along the walkway.</summary>
+        public bool SendToWall(Building.WallWalk.Post post, bool byAlarm = false)
+        {
+            if (isPlayerControlled || OnWall || !post.Valid) return false;
+            if (!Building.WallWalk.PathUp(post, wallPath)) return false;
+            Building.WallWalk.Reserve(post, this);
+            attackTarget = null;
+            targetPosition = wallPath[0];
+            hasTarget = true;
+            stuckTimer = 0f;
+            wallState = WallState.ToStairs;
+            PostedByAlarm = byAlarm;
+            return true;
+        }
+
+        /// <summary>Down from the walls the way it came, then on to a place (or the target set meanwhile).</summary>
+        public void LeaveWall()
+        {
+            if (!OnWall || wallState == WallState.Leaving) return; // (already on the way down: only where to next changed)
+            if (wallState == WallState.Posted) // back along the way up: from the post to the foot of the stairs
+            {
+                wallPath.Reverse();
+                wallLeg = 0;
+            }
+            else wallPath.RemoveRange(wallLeg + 1, wallPath.Count - wallLeg - 1); // turn back where it is on the way up
+            if (wallState == WallState.Climbing) { wallPath.Reverse(); wallLeg = wallPath.Count - 1 - wallLeg; }
+            wallState = WallState.Leaving;
+            attackTarget = null;
+            if (combatUnit != null) combatUnit.OnWall = false;
+            Building.WallWalk.Release(this);
+        }
+
+        private void UpdateOnWall()
+        {
+            if (wallState == WallState.Posted) { DefendFromPost(); return; }
+            // Along the way: the stairs and the walkway at walking pace
+            if (wallLeg >= wallPath.Count - 1)
+            {
+                if (wallState == WallState.Climbing)
+                {
+                    wallState = WallState.Posted;
+                    if (combatUnit != null) combatUnit.OnWall = true;
+                }
+                else
+                {
+                    wallState = WallState.None;
+                    PostedByAlarm = false;
+                    hasTarget = false;
+                    GroundMotor.Settle(transform);
+                    if (leaveTarget != null && leaveTarget.IsAlive) IssueAttackCommand(leaveTarget);
+                    else if (leaveToMove) IssueMoveCommand(leaveTo);
+                    leaveTarget = null;
+                    leaveToMove = false;
+                }
+                return;
+            }
+            Vector3 next = wallPath[wallLeg + 1];
+            Vector3 step = Vector3.MoveTowards(transform.position, next, MoveSpeed * 0.8f * Time.deltaTime);
+            Vector3 dir = next - transform.position;
+            dir.y = 0f;
+            if (dir.sqrMagnitude > 1e-4f) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), rotationSpeed * Time.deltaTime);
+            transform.position = step;
+            if ((step - next).sqrMagnitude < 1e-4f) wallLeg++;
+        }
+
+        /// <summary>At its post: fights whatever comes within reach (from the walls: further, harder), never steps down for it.</summary>
+        private void DefendFromPost()
+        {
+            if (combatUnit == null) return;
+            float range = combatUnit.AttackRange;
+            if (attackTarget != null && (!attackTarget.IsAlive || Vector3.Distance(transform.position, attackTarget.transform.position) > range + 0.5f)) attackTarget = null;
+            if (attackTarget == null)
+            {
+                engageTimer -= Time.deltaTime;
+                if (engageTimer > 0f) return;
+                engageTimer = EngageInterval;
+                int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, range, UnitSpatialGrid.TeamPlayer);
+                if (enemy < 0) return;
+                attackTarget = UnitSpatialGrid.Health(enemy);
+                if (attackTarget == null) return;
+            }
+            Vector3 look = attackTarget.transform.position - transform.position;
+            look.y = 0f;
+            if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(look), rotationSpeed * Time.deltaTime);
+            combatUnit.TryAttack(attackTarget);
         }
 
         private void Update()
         {
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
             if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
+            if (wallState == WallState.ToStairs && FlatDistance(transform.position, wallPath[0]) < 1.2f) { wallState = WallState.Climbing; wallLeg = 0; hasTarget = false; }
+            if (wallState >= WallState.Climbing) { UpdateOnWall(); return; }
 
             // Soldiers (and everyone during an alarm) engage raiders that come near on their own; a worker goes for an
             // enemy close to it (one kind of unit: people fight too), even on the way to work. Not the hero, not in a mine.
@@ -475,6 +602,16 @@ namespace BattleOfAges.RTS
 
         public void IssueMoveCommand(Vector3 destination)
         {
+            if (OnWall)
+            {
+                // Down the walls first, then there
+                leaveTo = destination;
+                leaveToMove = true;
+                leaveTarget = null;
+                LeaveWall();
+                return;
+            }
+            if (wallState == WallState.ToStairs) { wallState = WallState.None; Building.WallWalk.Release(this); PostedByAlarm = false; }
             attackTarget = null;
             targetPosition = destination;
             targetPosition.y = GetTerrainHeight(destination);

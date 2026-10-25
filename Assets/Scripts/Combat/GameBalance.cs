@@ -175,6 +175,8 @@ namespace BattleOfAges.Combat
         public static float GateOpenRadius = 5f;
         /// <summary>A blow harms a wall only from this strength up (a knight); siege engines will not need it (§11.3).</summary>
         public static float WallBreachStrength = 10f;
+        /// <summary>A bow (or the mage's bolts) on the walls reaches this much further.</summary>
+        public static float WallRangeBonus = 0.3f;
         /// <summary>
         /// Ladders: the first attacker at a spot sets one up in LadderSetupSeconds; the attackers then go up one at a time
         /// at LadderClimbSpeed m/s, over the breastwork onto the walkway and down inside. A ladder nobody used for

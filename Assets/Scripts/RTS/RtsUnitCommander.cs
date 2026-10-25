@@ -203,8 +203,18 @@ namespace BattleOfAges.RTS
         {
             Collider target = hit.collider;
 
+            // Own wall: up onto it, to the free posts nearest the click (§10.5)
+            if (target.GetComponentInParent<WallSegment>() != null || target.GetComponentInParent<WallPier>() != null)
+            {
+                int sent = 0;
+                foreach (RtsUnit unit in units)
+                    if (unit.OnWall || unit.SendToWall(WallWalk.FreePost(hit.point, unit))) sent++;
+                if (sent == 0) StrategyHud.Notify("На стіну не піднятися: потрібна стіна зі сходами (і вільні місця)");
+                return;
+            }
+
             HealthComponent enemy = target.GetComponentInParent<HealthComponent>();
-            if (enemy != null && enemy.IsAlive)
+            if (enemy != null && enemy.IsAlive && enemy.GetComponent<BuildingNode>() == null) // not an own building
             {
                 foreach (RtsUnit unit in units) unit.IssueAttackCommand(enemy);
                 return;

@@ -98,6 +98,29 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void OnTheWalls_ABowReachesFurther_ASwordDoesNot()
+        {
+            var archer = new GameObject("Archer");
+            var swordsman = new GameObject("Swordsman");
+            try
+            {
+                CombatUnit bow = archer.AddComponent<CombatUnit>();
+                bow.InitializeCombatStats(4, 2f, Crafting.ItemStatCalculator.BOW_RANGE);
+                CombatUnit sword = swordsman.AddComponent<CombatUnit>();
+                sword.InitializeCombatStats(4, 2f, 2.5f);
+                float bowRange = bow.AttackRange, swordRange = sword.AttackRange;
+                bow.OnWall = sword.OnWall = true;
+                Assert.AreEqual(bowRange * (1f + GameBalance.WallRangeBonus), bow.AttackRange, 1e-4f);
+                Assert.AreEqual(swordRange, sword.AttackRange, 1e-4f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(archer);
+                Object.DestroyImmediate(swordsman);
+            }
+        }
+
+        [Test]
         public void WallPrefabs_HaveTheirParts()
         {
             GameObject gate = BuildingNode.CreateWallPrefab(BuildingType.WallGate, "TestGate");

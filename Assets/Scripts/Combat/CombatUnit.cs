@@ -19,7 +19,10 @@ namespace BattleOfAges.Combat
 
         public int AttackDamage => attackDamage;
         public float AttackCooldown => attackCooldown;
-        public float AttackRange => attackRange;
+        /// <summary>Reach of its attack; a bow or the mage's bolts on a wall reach further (GameBalance.WallRangeBonus).</summary>
+        public float AttackRange => OnWall && IsRanged ? attackRange * (1f + GameBalance.WallRangeBonus) : attackRange;
+        /// <summary>Standing on the walls: the walls' level adds to its damage, a bow reaches further (§10.5).</summary>
+        public bool OnWall { get; set; }
 
         [SerializeField] private float strength;
         /// <summary>Strength characteristic: the damage before the weapon (Equipment sets it; without gear = AttackDamage).</summary>
@@ -73,7 +76,7 @@ namespace BattleOfAges.Combat
             if (!CanAttack) return false;
 
             float dst = Vector3.Distance(transform.position, target.transform.position);
-            if (dst > attackRange + 1.0f) return false;
+            if (dst > AttackRange + 1.0f) return false;
 
             nextAttackTime = Time.time + attackCooldown;
             // The swing lands after its wind-up (PendingHits), so the one walked up to can swing back (docs/GAME_DESIGN.md §11.1).
@@ -83,10 +86,11 @@ namespace BattleOfAges.Combat
             recoveryUntil = Time.time + windup + (IsRanged ? GameBalance.RangedRootSeconds : GameBalance.MeleeSlowSeconds);
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
+            if (OnWall) finalDamage = Mathf.RoundToInt(finalDamage * (1f + Building.Fortifications.DamageBonus)); // the walls' level
             if (NextHitCritical) { finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); NextHitCritical = false; } // the DD's Critical hit
             bool piercing = NextShotPiercing && IsRanged && !FiresBolts;
             if (piercing) { NextShotPiercing = false; finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.PierceShotMultiplier); }
-            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, attackRange, piercing);
+            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, AttackRange, piercing);
 
             TriggerAttackAnimation();
             return true;

@@ -261,6 +261,25 @@ namespace BattleOfAges.AI
 
         private static float FlatDistance(Vector3 a, Vector3 b) { a.y = b.y = 0f; return Vector3.Distance(a, b); }
 
+        /// <summary>Up on the walkway it fights the defenders within this, for at most this long, before going down inside.</summary>
+        private const float WalkwayFightRadius = 7f, WalkwayFightSeconds = 30f;
+
+        /// <summary>The nearest living unit of the player's on the walls within radius.</summary>
+        private RtsUnit NearestDefender(float radius)
+        {
+            RtsUnit best = null;
+            float bestD = radius * radius;
+            var units = UnitRegistry.ActiveUnits;
+            for (int i = 0; i < units.Count; i++)
+            {
+                RtsUnit u = units[i];
+                if (u == null || !u.OnWall || !u.IsAlive) continue;
+                float d = (u.transform.position - transform.position).sqrMagnitude;
+                if (d < bestD) { bestD = d; best = u; }
+            }
+            return best;
+        }
+
         private void Face(Vector3 p)
         {
             Vector3 d = p - transform.position;
@@ -278,7 +297,7 @@ namespace BattleOfAges.AI
             Face(l.Walk);
             for (int leg = 0; leg < 3; leg++)
             {
-                Vector3 a = leg == 0 ? transform.position : path[leg], b = path[leg + 1];
+                Vector3 a = transform.position, b = path[leg + 1];
                 float time = Mathf.Max(0.2f, Vector3.Distance(a, b) / speed[leg]);
                 for (float t = 0f; t < time; t += Time.deltaTime)
                 {
@@ -288,7 +307,26 @@ namespace BattleOfAges.AI
                 }
                 transform.position = b;
                 if (leg == 0) l.EndClimb(Health); // up: the next may start
-                if (leg == 1) yield return new WaitForSeconds(0.3f);
+                if (leg == 1)
+                {
+                    yield return new WaitForSeconds(0.3f);
+                    // On the walkway: fight the defenders up here first, moving along to them
+                    for (float fight = 0f; fight < WalkwayFightSeconds; fight += Time.deltaTime)
+                    {
+                        if (Health == null || !Health.IsAlive) { climbing = false; yield break; }
+                        RtsUnit defender = NearestDefender(WalkwayFightRadius);
+                        if (defender == null) break;
+                        Vector3 to = defender.transform.position - transform.position;
+                        float reach = Combat != null ? Combat.AttackRange : 2f;
+                        if (to.magnitude > reach * 0.85f) transform.position = Vector3.MoveTowards(transform.position, defender.transform.position, 2f * Time.deltaTime);
+                        Face(defender.transform.position);
+                        HealthComponent dHp = defender.GetComponent<HealthComponent>();
+                        if (Combat != null && Combat.CanAttack && dHp != null) Combat.TryAttack(dHp);
+                        yield return null;
+                    }
+                    path[3] = transform.position - l.Side * (Utils.WallBuilder.Thickness * 0.5f + 1.2f); // down from where it is
+                    path[3].y = RtsUnit.GetTerrainHeight(path[3]);
+                }
             }
             climbing = false;
             ladder = null;
