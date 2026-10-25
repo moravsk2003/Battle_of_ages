@@ -162,6 +162,7 @@ namespace BattleOfAges.UI
 
             titleText = UiTheme.Label(UiTheme.Child(panelRect, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f), new Vector2(-22f, -6f)), "Title", "", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             UpdateHeaderText();
+            UiTheme.Divider(panelRect, -54f, 600f);
 
             statusText = UiTheme.Label(UiTheme.Child(panelRect, "Status", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(16f, 8f), new Vector2(-16f, 42f)), "StatusText", "Оберіть споруду; ЛКМ ставить, ПКМ скасовує", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
 

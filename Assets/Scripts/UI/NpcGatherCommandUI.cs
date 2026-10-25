@@ -269,7 +269,7 @@ namespace BattleOfAges.UI
 
             titleTxt = titleObj.AddComponent<Text>();
             titleTxt.font = font;
-            titleTxt.fontSize = 22;
+            titleTxt.fontSize = 26;
             titleTxt.fontStyle = FontStyle.Bold;
             titleTxt.alignment = TextAnchor.MiddleCenter;
             titleTxt.color = new Color(0.3f, 0.95f, 1.0f);
@@ -290,7 +290,8 @@ namespace BattleOfAges.UI
 
             RectTransform closeTxtRect = UiTheme.Child(closeBtnObj.transform, "Text", Vector2.zero, Vector2.one);
             GameObject closeTxtObj = closeTxtRect.gameObject;
-            Text closeTxt = UiTheme.PlainText(closeTxtObj, font, 20, TextAnchor.MiddleCenter, Color.white, "✖", style: FontStyle.Bold, raycast: false);
+            Text closeTxt = UiTheme.PlainText(closeTxtObj, font, 20, TextAnchor.MiddleCenter, Color.white, "×", style: FontStyle.Bold, raycast: false);
+            closeTxt.fontSize = 28;
 
             // Status Subheader Text
             RectTransform statusRect = UiTheme.Child(commandPanelObj.transform, "StatusText", new Vector2(0f, 0.81f), new Vector2(1f, 0.89f), new Vector2(25f, 0f), new Vector2(-25f, 0f));
@@ -319,7 +320,7 @@ namespace BattleOfAges.UI
             // 5 Job Allocation Rows
             branchesText = CreateJobCounterRow(rowsContainer.transform, font, "🪵 Збирання гілок (без нищення дерев)", GatherDirective.WoodGatherBranchesOnly);
             chopText = CreateJobCounterRow(rowsContainer.transform, font, "🪓 Рубання дерев на дрова", GatherDirective.WoodChopTreesOnly);
-            pebblesText = CreateJobCounterRow(rowsContainer.transform, font, "🪨 Збір камінчиків руди (Pebbles)", GatherDirective.OrePebblesOnly);
+            pebblesText = CreateJobCounterRow(rowsContainer.transform, font, "🪨 Збір камінчиків руди", GatherDirective.OrePebblesOnly);
             haulText = CreateJobCounterRow(rowsContainer.transform, font, "⛏️ Перевезення руди з шахти в скриню", GatherDirective.HaulOreFromMineToChest);
             autoText = CreateJobCounterRow(rowsContainer.transform, font, "🔄 Автономні (Шукають найближчі)", GatherDirective.Auto);
 
@@ -348,7 +349,7 @@ namespace BattleOfAges.UI
             {
                 KeyCode key = KeybindsManager.GetKey(KeyAction.WorkerCommandUI);
                 string keyName = KeybindsManager.GetKeyDisplayString(key);
-                titleTxt.text = $"📜 НАЛАШТУВАННЯ ТА РОЗПОДІЛ РОБІТ (Клавіша '{keyName}')";
+                titleTxt.text = $"Розподіл робіт  <size=17><color=#B8A88E>[{keyName}]</color></size>";
             }
         }
 

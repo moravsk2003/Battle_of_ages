@@ -44,14 +44,129 @@ namespace BattleOfAges.UI
 
         // ------------------------------------------------------------------ sprites
 
-        public static Sprite PanelSprite => panel != null ? panel : panel = Frame(64, 12f, 2.2f, new Color(0.11f, 0.09f, 0.07f), new Color(0.055f, 0.045f, 0.035f), Rim, 0.35f);
-        public static Sprite ButtonSprite => button != null ? button : button = Frame(48, 8f, 1.8f, new Color(0.30f, 0.23f, 0.15f), new Color(0.17f, 0.13f, 0.09f), Gold * 0.85f, 0.5f);
-        public static Sprite SlotSprite => slot != null ? slot : slot = Frame(48, 7f, 1.4f, new Color(0.05f, 0.04f, 0.03f), new Color(0.09f, 0.075f, 0.06f), Rim * 0.8f, 0.2f);
+        // Windows and plates: leather with grain, a double bronze rim with a gold hairline inside, studs in the corners
+        public static Sprite PanelSprite => panel != null ? panel : panel = Ornate(96, 10f, new Color(0.12f, 0.095f, 0.072f), new Color(0.058f, 0.046f, 0.036f), 3.2f, true, 0.55f, 0.035f);
+        // Buttons: lighter leather, bevelled (light top edge, dark bottom), a gold rim
+        public static Sprite ButtonSprite => button != null ? button : button = Ornate(64, 7f, new Color(0.36f, 0.27f, 0.17f), new Color(0.17f, 0.125f, 0.08f), 1.8f, false, 0.9f, 0.025f, bevel: true);
+        // Slots and wells: sunk in, a dark inner shadow
+        public static Sprite SlotSprite => slot != null ? slot : slot = Ornate(64, 6f, new Color(0.045f, 0.036f, 0.028f), new Color(0.085f, 0.07f, 0.055f), 1.4f, false, 0.25f, 0.02f, sunk: true);
+
+        /// <summary>
+        /// The themed frame: rounded rectangle with a vertical gradient (top to bottom) and leather grain; a bronze rim of
+        /// rimWidth with a dark line outside and a gold hairline inside; optional corner studs, bevel or sunk shading. 9-sliced.
+        /// </summary>
+        private static Sprite Ornate(int size, float radius, Color top, Color bottom, float rimWidth, bool studs, float hairline, float grain, bool bevel = false, bool sunk = false)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "UI_Ornate" };
+            var px = new Color[size * size];
+            float h = size * 0.5f;
+            Color rimDark = new Color(0.03f, 0.022f, 0.015f), rimHi = new Color(0.80f, 0.62f, 0.36f), rimLo = new Color(0.42f, 0.30f, 0.16f);
+            var rng = new System.Random(size * 31 + (int)(radius * 7f));
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f - h, y + 0.5f - h);
+                Vector2 q = new Vector2(Mathf.Abs(p.x) - (h - radius - 1f), Mathf.Abs(p.y) - (h - radius - 1f));
+                float d = Mathf.Min(Mathf.Max(q.x, q.y), 0f) + new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude - radius; // <0 inside
+                float a = Mathf.Clamp01(0.5f - d);
+                float v = (y + 0.5f) / size;
+                Color c = Color.Lerp(bottom, top, v);
+                c *= 1f + ((float)rng.NextDouble() - 0.5f) * 2f * grain; // grain
+                float inside = -d; // distance in from the edge
+                if (sunk) c = Color.Lerp(c * 0.45f, c, Mathf.Clamp01((inside - rimWidth) / 7f));
+                if (bevel)
+                {
+                    if (p.y > 0f) c = Color.Lerp(c, c * 1.35f, Mathf.Clamp01(1f - (inside - rimWidth) / 4f) * 0.8f);
+                    else c = Color.Lerp(c, c * 0.6f, Mathf.Clamp01(1f - (inside - rimWidth) / 4f) * 0.8f);
+                }
+                // the rim: dark outer line, bronze lit from above, gold hairline inside
+                if (inside < rimWidth + 1f)
+                {
+                    Color bronze = Color.Lerp(rimLo, rimHi, Mathf.Clamp01(v * 1.2f));
+                    c = inside < 1f ? Color.Lerp(rimDark, bronze, Mathf.Clamp01(inside)) : Color.Lerp(bronze, c, Mathf.Clamp01(inside - rimWidth));
+                }
+                float hair = Mathf.Clamp01(1f - Mathf.Abs(inside - (rimWidth + 2f)) * 1.6f) * hairline;
+                c = Color.Lerp(c, Gold, hair * 0.55f);
+                if (studs)
+                {
+                    float sd = Mathf.Abs(Mathf.Abs(p.x) - (h - radius - 1f)) + Mathf.Abs(Mathf.Abs(p.y) - (h - radius - 1f));
+                    if (sd < 3.6f) c = Color.Lerp(c, Color.Lerp(Gold, rimHi, Mathf.Clamp01(p.y > 0f ? 0f : 0.6f)), Mathf.Clamp01(3.6f - sd));
+                }
+                c.a = a;
+                px[x + y * size] = c;
+            }
+            tex.SetPixels(px);
+            tex.Apply();
+            float b = Mathf.Ceil(radius + rimWidth + 4f);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(b, b, b, b));
+        }
+
+        private static Sprite figure;
+        /// <summary>A soft human silhouette, front view (the paper doll behind the equipment slots), white for tinting.</summary>
+        public static Sprite FigureSprite
+        {
+            get
+            {
+                if (figure != null) return figure;
+                const int W = 135, H = 205;
+                var tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "UI_Figure" };
+                var px = new Color[W * H];
+                for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f - W * 0.5f, y + 0.5f); // origin at the feet, centre line
+                    Vector2 m = new Vector2(Mathf.Abs(p.x), p.y);           // mirrored
+                    float d = (p - new Vector2(0f, 184f)).magnitude - 17f;                                  // head
+                    d = Mathf.Min(d, Segment(p, new Vector2(0f, 160f), new Vector2(0f, 168f)) - 7f);         // neck
+                    d = Mathf.Min(d, Box(p - new Vector2(0f, 123f), new Vector2(30f, 36f)) - 6f);            // torso
+                    d = Mathf.Min(d, Segment(m, new Vector2(38f, 150f), new Vector2(50f, 84f)) - 8.5f);       // arms
+                    d = Mathf.Min(d, (m - new Vector2(52f, 76f)).magnitude - 8f);                          // hands
+                    d = Mathf.Min(d, Box(p - new Vector2(0f, 84f), new Vector2(28f, 10f)) - 4f);             // hips
+                    d = Mathf.Min(d, Segment(m, new Vector2(15f, 76f), new Vector2(17f, 10f)) - 10f);         // legs
+                    px[x + y * W] = new Color(1f, 1f, 1f, Mathf.Clamp01(0.5f - d / 1.5f));
+                }
+                tex.SetPixels(px);
+                tex.Apply();
+                return figure = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100f);
+            }
+        }
+
+        private static Sprite divider;
+        /// <summary>A gold rule fading at both ends with a diamond in the middle (under window titles).</summary>
+        public static Sprite DividerSprite
+        {
+            get
+            {
+                if (divider != null) return divider;
+                const int W = 256, H = 16;
+                var tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "UI_Divider" };
+                var px = new Color[W * H];
+                for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float u = (x + 0.5f) / W * 2f - 1f, vy = y + 0.5f - H * 0.5f;
+                    float line = Mathf.Clamp01(1.2f - Mathf.Abs(vy)) * Mathf.Clamp01((1f - Mathf.Abs(u)) * 3f);
+                    float diamond = Mathf.Clamp01(5.5f - (Mathf.Abs(x + 0.5f - W * 0.5f) + Mathf.Abs(vy) * 1.3f));
+                    px[x + y * W] = new Color(Gold.r, Gold.g, Gold.b, Mathf.Max(line * 0.8f, diamond));
+                }
+                tex.SetPixels(px);
+                tex.Apply();
+                return divider = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100f);
+            }
+        }
+
+        /// <summary>A divider image under a title: centred at offset from the parent's top, of the given width.</summary>
+        public static Image Divider(Transform parent, float y, float width)
+        {
+            RectTransform rt = Rect(parent, "Divider", new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(width, 14f));
+            Image img = rt.gameObject.AddComponent<Image>();
+            img.sprite = DividerSprite; img.raycastTarget = false;
+            return img;
+        }
         /// <summary>Plain white rounded rectangle (bars, tinted chips).</summary>
         public static Sprite BarSprite => bar != null ? bar : bar = Frame(32, 6f, 0f, Color.white, Color.white, Color.white, 0f);
         public static Sprite RoundSprite => round != null ? round : round = Frame(64, 31f, 0f, Color.white, Color.white, Color.white, 0f);
 
-        /// <summary>Rounded rectangle, vertical gradient (top to bottom), rim of the given width, a faint inner highlight; 9-sliced.</summary>
         private static Sprite ring;
         /// <summary>A white ring (minimap pings, highlights), tinted by the Image colour.</summary>
         public static Sprite RingSprite
@@ -74,6 +189,7 @@ namespace BattleOfAges.UI
             }
         }
 
+        /// <summary>Rounded rectangle, vertical gradient (top to bottom), rim of the given width, a faint inner highlight; 9-sliced.</summary>
         private static Sprite Frame(int size, float radius, float rimWidth, Color top, Color bottom, Color rim, float highlight)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "UI_Frame" };
@@ -128,6 +244,47 @@ namespace BattleOfAges.UI
             s = Sprite.Create(tex, new Rect(0, 0, N, N), new Vector2(0.5f, 0.5f), 100f);
             Icons[icon] = s;
             return s;
+        }
+
+        private static readonly Dictionary<int, Texture2D> Cursors = new Dictionary<int, Texture2D>();
+
+        /// <summary>
+        /// A 32 px cursor (no mipmaps, as the OS cursor wants): a gold arrow (icon null, hotspot at its tip) or an icon
+        /// (hotspot in the middle).
+        /// </summary>
+        public static Texture2D CursorTexture(Icon? icon)
+        {
+            int key = icon.HasValue ? (int)icon.Value : -1;
+            if (Cursors.TryGetValue(key, out Texture2D t) && t != null) return t;
+            const int N = 32;
+            t = new Texture2D(N, N, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "UI_Cursor_" + key };
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++)
+            {
+                Color acc = Color.clear;
+                for (int s = 0; s < 4; s++)
+                {
+                    float sx = x + (s % 2 + 0.5f) / 2f, sy = y + (s / 2 + 0.5f) / 2f;
+                    Color c;
+                    if (icon.HasValue) c = Shade(icon.Value, new Vector2(sx / N * 2f - 1f, sy / N * 2f - 1f) * 1.08f);
+                    else
+                    {
+                        // the arrow points to the top left corner (texture y runs up: the tip is at y = N)
+                        Vector2 p = new Vector2(sx, N - sy);
+                        float d = Mathf.Min(Poly(p, new[] { new Vector2(2f, 2f), new Vector2(2f, 23f), new Vector2(18f, 16f) }),
+                                           Poly(p, new[] { new Vector2(7.5f, 17f), new Vector2(11.5f, 15.5f), new Vector2(16.5f, 26f), new Vector2(12.5f, 28f) })); // head and tail (Poly wants convex)
+                        c = d < 0f ? Color.Lerp(Gold, new Color(0.62f, 0.44f, 0.2f), Mathf.Clamp01(p.y / 26f)) : d < 1.6f ? new Color(0.07f, 0.05f, 0.03f, 1f) : Color.clear;
+                    }
+                    acc += new Color(c.r * c.a, c.g * c.a, c.b * c.a, c.a);
+                }
+                acc /= 4f;
+                px[x + y * N] = acc.a > 0f ? new Color(acc.r / acc.a, acc.g / acc.a, acc.b / acc.a, acc.a) : Color.clear;
+            }
+            t.SetPixels(px);
+            t.Apply(false);
+            Cursors[key] = t;
+            return t;
         }
 
         // Icon artwork: layered signed distances in [-1, 1]^2, a dark outline under every layer.

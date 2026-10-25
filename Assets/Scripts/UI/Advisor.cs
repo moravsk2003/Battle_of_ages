@@ -97,6 +97,9 @@ namespace BattleOfAges.UI
         }
 
         private string shownGoal;
+        private float bornAt;
+
+        private void Start() => bornAt = Time.unscaledTime;
 
         private void Refresh()
         {
@@ -105,7 +108,8 @@ namespace BattleOfAges.UI
             if (panel.gameObject.activeSelf != show) panel.gameObject.SetActive(show);
             if (!show) return;
             count.text = $"{DoneCount} / {Goals.Length}";
-            if (shownGoal != Goals[i].goal && shownGoal != null) StrategyHud.Notify("Ціль виконано!");
+            // (not in the first seconds: a scene or a save fills in and several goals tick at once)
+            if (shownGoal != Goals[i].goal && shownGoal != null && Time.unscaledTime - bornAt > 4f) { StrategyHud.Notify("Ціль виконано!"); UiSound.Play(UiSound.Kind.Success); }
             shownGoal = Goals[i].goal;
             title.text = Goals[i].goal;
             hint.text = Goals[i].how();

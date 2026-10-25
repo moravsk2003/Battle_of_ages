@@ -331,6 +331,7 @@ namespace BattleOfAges.UI
 
             // Header
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(800f, 44f));
+            UiTheme.Divider(panel, -60f, 520f);
             title = UiTheme.Label(head, "Text", "Спорядження", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             prevButton = UiTheme.TextButton(panel, "Prev", "‹", new Vector2(0f, 1f), new Vector2(24f, -14f), new Vector2(46f, 44f), () => Step(-1), 30);
             nextButton = UiTheme.TextButton(panel, "Next", "›", new Vector2(0f, 1f), new Vector2(78f, -14f), new Vector2(46f, 44f), () => Step(1), 30);
@@ -418,22 +419,12 @@ namespace BattleOfAges.UI
             });
         }
 
-        /// <summary>A faint figure behind the slots.</summary>
+        /// <summary>A faint figure behind the slots (one soft drawn silhouette).</summary>
         private static void DrawSilhouette(RectTransform doll)
         {
-            Color c = new Color(0.9f, 0.8f, 0.6f, 0.06f);
-            void Shape(Vector2 pos, Vector2 size, bool round)
-            {
-                RectTransform rt = UiTheme.Rect(doll, "Figure", new Vector2(0.5f, 0.5f), pos, size);
-                Image img = rt.gameObject.AddComponent<Image>();
-                img.sprite = round ? UiTheme.RoundSprite : UiTheme.BarSprite; img.type = Image.Type.Sliced; img.color = c; img.raycastTarget = false;
-            }
-            Shape(new Vector2(0f, 228f), new Vector2(80f, 90f), true);
-            Shape(new Vector2(0f, 102f), new Vector2(170f, 200f), false);
-            Shape(new Vector2(-104f, 80f), new Vector2(46f, 190f), false);
-            Shape(new Vector2(104f, 80f), new Vector2(46f, 190f), false);
-            Shape(new Vector2(-36f, -50f), new Vector2(56f, 150f), false);
-            Shape(new Vector2(36f, -50f), new Vector2(56f, 150f), false);
+            RectTransform rt = UiTheme.Rect(doll, "Figure", new Vector2(0.5f, 0.5f), new Vector2(0f, 74f), new Vector2(270f, 410f));
+            Image img = rt.gameObject.AddComponent<Image>();
+            img.sprite = UiTheme.FigureSprite; img.color = new Color(0.95f, 0.82f, 0.6f, 0.05f); img.raycastTarget = false;
         }
     }
 }

@@ -96,15 +96,23 @@ namespace BattleOfAges.UI
             Big(menu, "Налаштування", ref y, () => ShowSettings(true));
             Big(menu, "Вихід", ref y, Quit);
 
-            settings = UiTheme.Rect(root, "Settings", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(620f, 520f));
+            settings = UiTheme.Rect(root, "Settings", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(1100f, 540f));
             UiTheme.PanelImage(settings);
             RectTransform st = UiTheme.Rect(settings, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(500f, 44f));
             UiTheme.Label(st, "Text", "Налаштування", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Divider(settings, -66f, 520f);
+            PopIn.On(settings);
             SettingsManager sm = SettingsManager.Instance;
             SliderRow(settings, "Чутливість миші (від першої особи)", -90f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_SENSITIVITY, sm != null ? sm.FpsSensitivity : 1f, v => SettingsManager.Instance?.SetFpsSensitivity(v));
             SliderRow(settings, "Чутливість камери мапи", -165f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_MAP_SENSITIVITY, sm != null ? sm.MapSensitivity : 1f, v => SettingsManager.Instance?.SetMapSensitivity(v));
             SliderRow(settings, "Колесо миші на мапі (швидкість зуму)", -240f, SettingsManager.MIN_ZOOM_SENSITIVITY, SettingsManager.MAX_ZOOM_SENSITIVITY, sm != null ? sm.ZoomSensitivity : 1f, v => SettingsManager.Instance?.SetZoomSensitivity(v));
             SliderRow(settings, "Гучність", -315f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MasterVolume : 1f, v => SettingsManager.Instance?.SetMasterVolume(v));
+            OptionRow(settings, "Графіка", -86f, () => GraphicsQuality.Names[(int)GraphicsQuality.Current], GraphicsQuality.Cycle);
+            OptionRow(settings, "Масштаб інтерфейсу", -136f, () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
+            OptionRow(settings, "Повний екран", -186f, () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);
+            OptionRow(settings, "Роздільність", -236f, () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
+            OptionRow(settings, "VSync", -286f, () => DisplaySettings.VSync ? "увімк." : "вимк.", DisplaySettings.ToggleVSync);
+            OptionRow(settings, "Ліміт кадрів", -336f, () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
             RectTransform kb = UiTheme.Rect(settings, "Keys", new Vector2(0.5f, 0f), new Vector2(0f, 88f), new Vector2(560f, 26f));
             UiTheme.Label(kb, "Text", "Клавіші можна перепризначити в грі: Esc → Налаштування", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             UiTheme.TextButton(settings, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(220f, 52f), () => ShowSettings(false), 20);
@@ -121,15 +129,28 @@ namespace BattleOfAges.UI
             return b;
         }
 
+        private const float SliderX = -265f;
+
+        /// <summary>A screen option on the right half: its name and a button that steps to the next value.</summary>
+        private static void OptionRow(RectTransform parent, string label, float y, System.Func<string> value, System.Action next)
+        {
+            RectTransform lab = UiTheme.Rect(parent, label, new Vector2(0.5f, 1f), new Vector2(150f, y), new Vector2(240f, 40f));
+            UiTheme.Label(lab, "Text", label, 19, TextAnchor.MiddleLeft, UiTheme.Ink);
+            Text text = null;
+            Button b = UiTheme.TextButton(parent, label + "_Value", "", new Vector2(0.5f, 1f), new Vector2(390f, y), new Vector2(220f, 40f), () => { next(); text.text = value(); }, 18);
+            text = b.GetComponentInChildren<Text>();
+            text.text = value();
+        }
+
         private static void SliderRow(RectTransform parent, string label, float y, float min, float max, float value, System.Action<float> changed)
         {
-            RectTransform lab = UiTheme.Rect(parent, label, new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(540f, 28f));
+            RectTransform lab = UiTheme.Rect(parent, label, new Vector2(0.5f, 1f), new Vector2(SliderX, y), new Vector2(480f, 28f));
             Text valueText = null;
             UiTheme.Label(lab, "Text", label, 19, TextAnchor.MiddleLeft, UiTheme.Ink);
             RectTransform valRt = UiTheme.Rect(lab, "Value", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(80f, 28f));
             valueText = UiTheme.Label(valRt, "Text", "", 19, TextAnchor.MiddleRight, UiTheme.Gold, FontStyle.Bold);
 
-            RectTransform s = UiTheme.Rect(parent, label + "_Slider", new Vector2(0.5f, 1f), new Vector2(0f, y - 38f), new Vector2(540f, 26f));
+            RectTransform s = UiTheme.Rect(parent, label + "_Slider", new Vector2(0.5f, 1f), new Vector2(SliderX, y - 38f), new Vector2(480f, 26f));
             UiTheme.PanelImage(s, UiTheme.SlotSprite);
             Slider slider = s.gameObject.AddComponent<Slider>();
             RectTransform fillArea = UiTheme.Rect(s, "FillArea", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
@@ -155,7 +176,7 @@ namespace BattleOfAges.UI
         /// <summary>Dusk sky over dark hills, painted into a small texture.</summary>
         private static Texture2D Backdrop()
         {
-            const int W = 480, H = 270;
+            const int W = 960, H = 540;
             var tex = new Texture2D(W, H, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, name = "MenuBackdrop" };
             var px = new Color[W * H];
             Color top = new Color(0.10f, 0.12f, 0.22f), horizon = new Color(0.85f, 0.52f, 0.30f), hillsFar = new Color(0.20f, 0.17f, 0.20f), hillsNear = new Color(0.08f, 0.07f, 0.07f);
@@ -168,8 +189,8 @@ namespace BattleOfAges.UI
                 c = Color.Lerp(c, new Color(1f, 0.85f, 0.55f), sun * 0.8f);
                 float far = 0.30f + 0.05f * Mathf.Sin(u * 9f + 1.3f) + 0.03f * Mathf.Sin(u * 23f);
                 float near = 0.20f + 0.06f * Mathf.Sin(u * 5f + 0.4f) + 0.02f * Mathf.Sin(u * 31f + 2f);
-                if (v < far) c = Color.Lerp(hillsFar, c, 0.25f);
-                if (v < near) c = hillsNear;
+                c = Color.Lerp(c, Color.Lerp(hillsFar, c, 0.25f), Mathf.Clamp01((far - v) * H / 1.5f + 0.5f));
+                c = Color.Lerp(c, hillsNear, Mathf.Clamp01((near - v) * H / 1.5f + 0.5f));
                 px[x + y * W] = c;
             }
             tex.SetPixels(px);

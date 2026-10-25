@@ -57,6 +57,7 @@ namespace BattleOfAges.UI
             toastColumn = UiTheme.Rect(root, "Toasts", new Vector2(1f, 0f), new Vector2(-24f, 300f), new Vector2(360f, 260f));
             AttackAlerts.Raised += OnAttackAlert;
             Advisor.Create(root);
+            CombatFeedback.Create(root);
         }
 
         // ------------------------------------------------------------------ attack alerts
@@ -70,6 +71,7 @@ namespace BattleOfAges.UI
             Image img = r.gameObject.AddComponent<Image>();
             img.sprite = UiTheme.RingSprite; img.raycastTarget = false; img.color = UiTheme.Bad;
             pings.Add((where, Time.unscaledTime, img));
+            UiSound.Play(UiSound.Kind.Alert);
             if (pings.Count > 6) { Destroy(pings[0].img.gameObject); pings.RemoveAt(0); }
         }
 
@@ -193,6 +195,8 @@ namespace BattleOfAges.UI
             UiTheme.IconImage(vitals, UiTheme.Icon.Heart, new Vector2(0f, 0.5f), new Vector2(14f, 6f), 40f);
             RectTransform back = UiTheme.Rect(vitals, "Bar", new Vector2(0f, 1f), new Vector2(64f, -14f), new Vector2(296f, 26f));
             UiTheme.PanelImage(back, UiTheme.SlotSprite);
+            hpTrail = UiTheme.Rect(back, "Trail", new Vector2(0f, 0.5f), new Vector2(3f, 0f), new Vector2(290f, 20f));
+            UiTheme.PanelImage(hpTrail, UiTheme.BarSprite, new Color(1f, 0.86f, 0.6f, 0.85f));
             hpFill = UiTheme.Rect(back, "Fill", new Vector2(0f, 0.5f), new Vector2(3f, 0f), new Vector2(290f, 20f));
             UiTheme.PanelImage(hpFill, UiTheme.BarSprite, new Color(0.72f, 0.16f, 0.13f));
             hpText = UiTheme.Label(back, "Value", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
@@ -226,6 +230,8 @@ namespace BattleOfAges.UI
         }
 
         private Text levelText;
+        private RectTransform hpTrail;
+        private float trail = 1f, trailHold;
         private RectTransform xpFill, abilityBar, alarmBanner;
         private readonly List<(RectTransform rt, Image icon, Image cooldown, Text seconds, Text key)> abilitySlots = new List<(RectTransform, Image, Image, Text, Text)>();
         private HeroSkills playerSkills;
@@ -373,7 +379,7 @@ namespace BattleOfAges.UI
             idleButton = UiTheme.TextButton(rtsGroup, "IdleWorkers", "", new Vector2(0f, 0f), new Vector2(18f, MinimapPx + 24f + 30f + 54f), new Vector2(MinimapPx + 24f, 46f), SelectNextIdle, 16);
             idleText = idleButton.GetComponentInChildren<Text>();
             Tooltip.Set(idleButton.gameObject, () => TipText.Title("Робітники без діла", UiTheme.Gold)
-                + "\nСтоять без наказу або не знаходять роботи." + "\n" + TipText.Dim("Клік — наступний: виділити й показати  ") + TipText.Key(HudTips.Key(InputSystem.KeyAction.IdleWorker)));
+                + "\nМають роботу, але не знаходять, що робити (немає дерев, руди, скрині поруч)." + "\n" + TipText.Dim("Клік — наступний: виділити й показати  ") + TipText.Key(HudTips.Key(InputSystem.KeyAction.IdleWorker)));
         }
 
         private Button idleButton;
@@ -455,6 +461,10 @@ namespace BattleOfAges.UI
                 {
                     float f = playerHealth.MaxHealth > 0 ? Mathf.Clamp01(playerHealth.CurrentHealth / (float)playerHealth.MaxHealth) : 0f;
                     hpFill.sizeDelta = new Vector2(290f * f, 20f);
+                    // the lost part stays pale for a moment, then drains (healing jumps it up at once)
+                    if (f >= trail) { trail = f; trailHold = 0f; }
+                    else if ((trailHold += Time.unscaledDeltaTime) > 0.45f) trail = Mathf.MoveTowards(trail, f, Time.unscaledDeltaTime * 0.6f);
+                    hpTrail.sizeDelta = new Vector2(290f * trail, 20f);
                     hpText.text = $"{playerHealth.CurrentHealth} / {playerHealth.MaxHealth}";
                 }
                 HideUnitBars(0);

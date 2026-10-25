@@ -45,7 +45,11 @@ namespace BattleOfAges.UI
             timer = 0.2f;
             foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
             {
-                if (c.isRootCanvas && c.renderMode != RenderMode.WorldSpace) Managers.DisplaySettings.Apply(c.GetComponent<CanvasScaler>());
+                if (c.isRootCanvas && c.renderMode != RenderMode.WorldSpace)
+                {
+                    Managers.DisplaySettings.Apply(c.GetComponent<CanvasScaler>());
+                    AddMotion(c);
+                }
                 if (!c.isRootCanvas || c.GetComponent<UiThemed>() != null || c.renderMode == RenderMode.WorldSpace) continue;
                 c.GetComponentsInChildren(true, buffer);
                 foreach (Graphic g in buffer)
@@ -65,6 +69,27 @@ namespace BattleOfAges.UI
                     }
                 }
             }
+        }
+
+        private static readonly HashSet<string> WindowNames = new HashSet<string> { "Window", "InventoryPanel", "NpcCommandPanel", "BuildMenuPanel", "PauseWindow" };
+        private readonly List<Button> buttons = new List<Button>();
+
+        /// <summary>Every button answers the cursor (ButtonFx); windows not yet shown pop in when they open (PopIn).</summary>
+        private void AddMotion(Canvas c)
+        {
+            c.GetComponentsInChildren(true, buttons);
+            foreach (Button b in buttons) ButtonFx.On(b);
+            foreach (Transform child in c.transform)
+            {
+                TryPop(child);
+                foreach (Transform grand in child) TryPop(grand);
+            }
+        }
+
+        private static void TryPop(Transform t)
+        {
+            if (!WindowNames.Contains(t.name) || t.gameObject.activeInHierarchy || t.GetComponent<PopIn>() != null) return;
+            PopIn.On(t);
         }
     }
 }

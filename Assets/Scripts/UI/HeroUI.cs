@@ -220,6 +220,7 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(panel);
 
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(460f, 44f));
+            UiTheme.Divider(panel, -58f, 380f);
             header = UiTheme.Label(head, "Text", "Герой", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-16f, -14f), new Vector2(46f, 44f), Close, 28);
 

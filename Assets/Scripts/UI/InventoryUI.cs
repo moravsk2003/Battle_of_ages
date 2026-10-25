@@ -387,7 +387,7 @@ namespace BattleOfAges.UI
             {
                 KeyCode key = KeybindsManager.GetKey(KeyAction.Inventory);
                 string keyName = KeybindsManager.GetKeyDisplayString(key);
-                titleText.text = $"🎒 ІНВЕНТАР ГРАВЦЯ (Клавіша '{keyName}')";
+                titleText.text = $"Інвентар  <size=17><color=#B8A88E>[{keyName}]</color></size>";
             }
         }
     }

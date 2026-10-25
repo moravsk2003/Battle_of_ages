@@ -323,6 +323,8 @@ namespace BattleOfAges.UI
             RectTransform win = UiTheme.Rect(panel, "SettingsWindow", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1040f, 640f));
             UiTheme.PanelImage(win);
             UiTheme.Label(UiTheme.Rect(win, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 50f)), "Text", "Налаштування", 32, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Divider(win, -64f, 520f);
+            PopIn.On(win);
 
             RectTransform left = Section(win, "Sliders", "Миша й звук", new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(28f, 96f), new Vector2(-12f, -76f));
             int row = 0;

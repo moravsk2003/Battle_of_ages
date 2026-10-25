@@ -67,10 +67,11 @@ namespace BattleOfAges.RTS
         public bool IsWorking => currentDirective != GatherDirective.Idle;
 
         /// <summary>
-        /// Doing nothing (for the idle-worker button): told to stand by, or searching for work and finding none for a
-        /// few seconds. Not while fighting, on the wall, in a mine or as a hauler waiting at its mine.
+        /// Doing nothing (for the idle-worker button): told to work but finding none for a few seconds. A unit told to
+        /// stand by (GatherDirective.Idle) is a soldier waiting for orders, not idle. Not while fighting, on the wall,
+        /// in a mine or as a hauler waiting at its mine.
         /// </summary>
-        public bool IsIdle => (!IsWorking || searchingFor > IdleAfterSeconds) && currentDirective != GatherDirective.HaulOreFromMineToChest
+        public bool IsIdle => IsWorking && searchingFor > IdleAfterSeconds && currentDirective != GatherDirective.HaulOreFromMineToChest
                               && !IsInsideMine && (rtsUnit == null || (!rtsUnit.WallBound && !rtsUnit.HasAttackTarget));
         public const float IdleAfterSeconds = 4f;
         private float searchingFor;

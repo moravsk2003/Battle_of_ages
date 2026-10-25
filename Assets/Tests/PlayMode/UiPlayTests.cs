@@ -110,7 +110,12 @@ namespace BattleOfAges.PlayModeTests
             yield return null;
             g.SetGatherDirective(GatherDirective.Idle);
             yield return null;
-            Assert.IsTrue(g.IsIdle, "told to stand by: idle");
+            Assert.IsFalse(g.IsIdle, "told to stand by: a soldier waiting, not an idle worker");
+            g.SetGatherDirective(GatherDirective.Auto);
+            // as if it had searched for work and found none for longer than the idle time
+            typeof(NpcResourceGatherer).GetField("searchingFor", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .SetValue(g, NpcResourceGatherer.IdleAfterSeconds + 1f);
+            Assert.IsTrue(g.IsIdle, "searching for work and finding none: idle");
             Assert.GreaterOrEqual(IdleWorkers.Count, 1);
 
             var commanderGo = new GameObject("IdleTestCommander");
@@ -126,9 +131,9 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(unit, commander.SelectedUnits[0]);
             commander.DeselectAll();
 
-            g.SetGatherDirective(GatherDirective.Auto);
+            g.SetGatherDirective(GatherDirective.WoodChopTreesOnly);
+            Assert.IsFalse(g.IsIdle, "a new order: not idle at once");
             yield return null;
-            Assert.IsFalse(g.IsIdle, "back to work: not idle at once");
         }
     }
 }

@@ -120,7 +120,17 @@ namespace BattleOfAges.PlayModeTests
                         if (skills != null) { skills.LearnFireFan(); skills.LearnMeteor(); skills.UseActive(0, hero.transform.forward); }
                         var bag = hero.GetComponent<BattleOfAges.Combat.HeroArtifacts>();
                         if (bag != null) { bag.Add(BattleOfAges.Combat.ArtifactType.FullHeal); bag.Add(BattleOfAges.Combat.ArtifactType.Lightning); }
-                        hero.GetComponent<BattleOfAges.Combat.HealthComponent>()?.TakeDamage(140);
+                        hero.GetComponent<BattleOfAges.Combat.HealthComponent>()?.TakeDamage(380);
+                        // a hit on a worker in view: a damage number over it
+                        Camera view = BattleOfAges.Utils.ViewCamera.Current;
+                        foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+                        {
+                            if (w == null || view == null) continue;
+                            Vector3 sp = view.WorldToViewportPoint(w.transform.position);
+                            if (sp.z < 3f || sp.z > 35f || sp.x < 0.2f || sp.x > 0.8f) continue;
+                            w.GetComponent<BattleOfAges.Combat.HealthComponent>()?.TakeDamage(12);
+                            break;
+                        }
                     }
                     SettlementAlarm.Raise();
                     if (hero != null) AttackAlerts.Report("робітник", hero.transform.position + new Vector3(40f, 0f, 25f), Time.unscaledTime);

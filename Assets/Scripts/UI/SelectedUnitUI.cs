@@ -268,6 +268,7 @@ namespace BattleOfAges.UI
             RectTransform rect = UiTheme.Rect(transform, "SelectedUnitPanel", new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(1120f, 136f));
             panelObj = rect.gameObject;
             UiTheme.PanelImage(rect);
+            PopIn.On(rect, sound: false);
 
             RectTransform head = UiTheme.Rect(rect, "Title", new Vector2(0f, 1f), new Vector2(22f, -8f), new Vector2(430f, 34f));
             titleText = UiTheme.Label(head, "Text", "", 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);

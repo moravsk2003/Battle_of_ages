@@ -144,6 +144,7 @@ namespace BattleOfAges.UI
             RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820f, 600f));
             UiTheme.PanelImage(panel);
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -16f), new Vector2(600f, 44f));
+            UiTheme.Divider(panel, -62f, 480f);
             title = UiTheme.Label(head, "Text", "", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-16f, -14f), new Vector2(46f, 44f), Close, 28)
                    .GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
