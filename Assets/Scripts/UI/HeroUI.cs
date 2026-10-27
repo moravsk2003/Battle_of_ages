@@ -245,8 +245,8 @@ namespace BattleOfAges.UI
                 () => { if (hero != null) hero.SpendOnStrength(); }, 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
                 () => { if (hero != null) hero.SpendOnHealth(); }, 22);
-            Tooltip.Set(strengthButton.gameObject, () => TipText.Title("+5 сили", UiTheme.Gold) + "\nСила — урон удару й швидкість бігу (вона росте як корінь із сили)." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
-            Tooltip.Set(healthButton.gameObject, () => TipText.Title("+50 HP", UiTheme.Gold) + "\nДо найбільшого здоров'я героя." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
+            Tooltip.Set(strengthButton.gameObject, () => TipText.Title("+5 сили", UiTheme.Gold) + "\nСила — урон удару; сила разом зі здоров'ям — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
+            Tooltip.Set(healthButton.gameObject, () => TipText.Title("+50 HP", UiTheme.Gold) + "\nДо найбільшого здоров'я героя; разом із силою — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
             // Artifacts: the starting pick (once), one-shots and shards
             RectTransform art = UiTheme.Rect(panel, "Artifacts", new Vector2(0.5f, 0f), new Vector2(0f, 262f), new Vector2(500f, 62f));
             artifactText = UiTheme.Label(art, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);

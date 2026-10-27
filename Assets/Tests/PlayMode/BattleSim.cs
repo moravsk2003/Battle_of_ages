@@ -38,7 +38,10 @@ namespace BattleOfAges.PlayModeTests
         private readonly List<GameObject> spawned = new List<GameObject>();
         private readonly List<int> gridIds = new List<int>();
 
-        /// <summary>Real units of a rank; a hero gets its class and a weapon (the archer a bow, others a sword I).</summary>
+        /// <summary>The class's weapon: the archer a bow, the mage a staff, others a sword.</summary>
+        private static ItemType WeaponOf(HeroClass cls) => cls == HeroClass.Archer ? ItemType.Bow : cls == HeroClass.Mage ? ItemType.Staff : ItemType.Sword;
+
+        /// <summary>Real units of a rank; a hero gets its class and a weapon (the archer a bow, the mage a staff, others a sword I).</summary>
         public Unit Add(int side, UnitRank rank, bool hero = false, HeroClass cls = HeroClass.None, bool kite = false, bool weapon = false, int level = 1)
         {
             int index = units.FindAll(u => u.Side == side).Count;
@@ -56,10 +59,10 @@ namespace BattleOfAges.PlayModeTests
             }
             if (GearLevel > 0)
             {
-                gear.Equip(new Item(cls == HeroClass.Archer ? ItemType.Bow : ItemType.Sword, GearLevel));
+                gear.Equip(new Item(WeaponOf(cls), GearLevel));
                 gear.Equip(new Item(ItemType.Armor, GearLevel));
             }
-            else if (weapon || hero) gear.Equip(new Item(cls == HeroClass.Archer ? ItemType.Bow : ItemType.Sword, 1));
+            else if (weapon || hero) gear.Equip(new Item(WeaponOf(cls), 1));
             if (hero && level > 1) Develop(go, cls, level);
             HealthComponent hp = go.GetComponent<HealthComponent>();
             hp.InitializeHealth(hp.MaxHealth);

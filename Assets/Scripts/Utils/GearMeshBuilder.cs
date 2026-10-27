@@ -780,6 +780,7 @@ namespace BattleOfAges.Utils
             switch (type)
             {
                 case ItemType.Bow: Bow(kit, m, level, f); break;
+                case ItemType.Staff: Staff(kit, m, level, f); break;
                 case ItemType.Axe: Axe(kit, m, level, f); break;
                 case ItemType.Pickaxe: Pickaxe(kit, m, level, f); break;
                 default: Sword(kit, m, level, f); break;
@@ -864,6 +865,28 @@ namespace BattleOfAges.Utils
             }
             kit.K.Grid(head, true, f.MainS, (i, j) => f.Main);
             kit.K.Box(m * Matrix4x4.Translate(new Vector3(0f, 0.62f, 0f)), new Vector3(0.045f, 0.06f, 0.045f), 0.006f, level >= 5 ? GoldS : f.TrimS, _ => level >= 5 ? Gold : f.Trim);
+        }
+
+        /// <summary>The mage's staff: a long haft through the fist, a metal collar and a crystal orb on top (brighter by level).</summary>
+        private static void Staff(Kit kit, Matrix4x4 m, int level, Finish f)
+        {
+            Grip(kit, m, -0.5f, 0.86f, 0.018f, WoodColour(level), WoodS);
+            Color fit = level >= 5 ? Gold : f.Main;
+            Vector3 fitS = level >= 5 ? GoldS : f.MainS;
+            Grip(kit, m, 0.82f, 0.9f, 0.026f, fit, fitS);
+            Grip(kit, m, -0.52f, -0.47f, 0.022f, fit, fitS);
+            Color gem = Color.Lerp(new Color(0.35f, 0.62f, 0.95f), new Color(0.72f, 0.42f, 0.98f), Mathf.Clamp01(level / 5f));
+            var orb = new Vector2[9];
+            for (int k = 0; k < orb.Length; k++)
+            {
+                float t = -Mathf.PI * 0.5f + k / (orb.Length - 1f) * Mathf.PI;
+                orb[k] = new Vector2(0.05f * Mathf.Cos(t), 0.95f + 0.05f * Mathf.Sin(t));
+            }
+            orb[0].x = 0f; orb[orb.Length - 1].x = 0f;
+            kit.K.Lathe(m, orb, 12, MetalS(0.15f, 0.92f), (i, a) => gem);
+            if (level >= 3) // prongs holding the orb
+                for (int k = 0; k < 3; k++)
+                    kit.K.Box(m * Matrix4x4.Rotate(Quaternion.Euler(0f, k * 120f, 0f)) * Matrix4x4.Translate(new Vector3(0.045f, 0.93f, 0f)), new Vector3(0.012f, 0.07f, 0.012f), 0.003f, fitS, _ => fit);
         }
 
         private static void Bow(Kit kit, Matrix4x4 m, int level, Finish f)

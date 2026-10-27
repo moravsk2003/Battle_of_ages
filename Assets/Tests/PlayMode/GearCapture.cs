@@ -39,9 +39,9 @@ namespace BattleOfAges.PlayModeTests
                 Spawn(HumanoidModelBuilder.HumanType.Villager, c + new Vector3((l - 3) * 1.4f, 0f, 0f), cam, items);
             }
             Vector3 w = c + new Vector3(0f, 0f, -14f), wCam = w + new Vector3(0f, 1.4f, -5f);
-            ItemType[] weapons = { ItemType.Sword, ItemType.Axe, ItemType.Pickaxe, ItemType.Bow };
+            ItemType[] weapons = { ItemType.Sword, ItemType.Axe, ItemType.Pickaxe, ItemType.Bow, ItemType.Staff };
             for (int i = 0; i < weapons.Length; i++)
-                Spawn(HumanoidModelBuilder.HumanType.Bandit, w + new Vector3((i - 1.5f) * 1.5f, 0f, 0f), wCam, new List<Item> { new Item(weapons[i], 2 + i) });
+                Spawn(HumanoidModelBuilder.HumanType.Bandit, w + new Vector3((i - 2f) * 1.4f, 0f, 0f), wCam, new List<Item> { new Item(weapons[i], 1 + i) });
             Vector3 k = c + new Vector3(12f, 0f, 0f), kCam = k + new Vector3(0f, 1.6f, -6f);
             var kit = new List<Item> { new Item(ItemType.Sword, 4) };
             foreach (ItemType t in Armour) kit.Add(new Item(t, 4));

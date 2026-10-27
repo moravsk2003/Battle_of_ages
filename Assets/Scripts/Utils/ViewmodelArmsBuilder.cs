@@ -486,6 +486,7 @@ namespace BattleOfAges.Utils
                 case ItemType.Axe: HeldAxe(kit, m, false); break;
                 case ItemType.Pickaxe: HeldAxe(kit, m, true); break;
                 case ItemType.Bow: HeldBow(kit, m, level); break;
+                case ItemType.Staff: HeldStaff(kit, m); break;
                 default: Sword(kit, m); break;
             }
             Refinish(kit, level);
@@ -541,6 +542,23 @@ namespace BattleOfAges.Utils
                 else if (s == IronS && level >= 3) { kit.C[i] = (level == 3 ? mainL * 0.7f : trimL) * (Sum(c) / Sum(iron)); kit.S[i] = level == 3 ? mainS : trimS; }
                 kit.C[i] = new Color(kit.C[i].r, kit.C[i].g, kit.C[i].b, 1f);
             }
+        }
+
+        /// <summary>The staff through the fist along +Y: a long haft, a steel collar (finished by level) and a crystal orb.</summary>
+        private static void HeldStaff(MeshKit kit, Matrix4x4 m)
+        {
+            var haft = new List<Vector2> { V2(0f, -0.2f), V2(0.013f, -0.198f) };
+            for (float y = -0.16f; y < 0.6f; y += 0.06f) haft.Add(V2(0.0135f - y * 0.003f, y));
+            haft.Add(V2(0.012f, 0.62f)); haft.Add(V2(0f, 0.625f));
+            kit.Lathe(m, haft.ToArray(), 16, WoodS, (i, a) => Wood * (0.85f + 0.2f * Mathf.Sin(a * 3f + i)));
+            kit.Lathe(m, new[] { V2(0f, 0.585f), V2(0.019f, 0.586f), V2(0.021f, 0.6f), V2(0.021f, 0.63f), V2(0.016f, 0.64f), V2(0f, 0.641f) }, 24, SteelS, (i, a) => Steel);
+            var orb = new Vector2[11];
+            for (int k = 0; k < orb.Length; k++)
+            {
+                float t = -Mathf.PI * 0.5f + k / (orb.Length - 1f) * Mathf.PI;
+                orb[k] = V2(k == 0 || k == orb.Length - 1 ? 0f : 0.034f * Mathf.Cos(t), 0.67f + 0.034f * Mathf.Sin(t));
+            }
+            kit.Lathe(m, orb, 20, new Vector3(3f, 0.15f, 0.92f), (i, a) => new Color(0.45f, 0.62f, 0.98f) * (0.85f + 0.25f * i / orb.Length));
         }
 
         private static void HeldAxe(MeshKit kit, Matrix4x4 m, bool pick)

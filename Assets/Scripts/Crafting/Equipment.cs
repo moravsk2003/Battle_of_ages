@@ -81,6 +81,7 @@ namespace BattleOfAges.Crafting
         }
 
         public bool HasBow => !this[EquipSlot.Weapon].IsEmpty && this[EquipSlot.Weapon].Type == ItemType.Bow;
+        public bool HasStaff => !this[EquipSlot.Weapon].IsEmpty && this[EquipSlot.Weapon].Type == ItemType.Staff;
         /// <summary>A hero's class changes what the gear gives (none on ordinary units).</summary>
         private IStatModifier Modifier { get { Resolve(); return modifier; } }
 
@@ -221,6 +222,10 @@ namespace BattleOfAges.Crafting
             {
                 combat.Strength = EffectiveStrength; // the characteristic; damage = strength x weapon
                 combat.SpeedStrength = Modifier != null ? Modifier.SpeedStrength(EffectiveStrength) : EffectiveStrength;
+                combat.SpeedHealth = Modifier != null ? Modifier.SpeedHealth(baseHealth) : baseHealth; // the body's, not the armour's
+                bool caster = Modifier != null && Modifier.CastsWithStaff;
+                combat.FiresBolts = caster && HasStaff;
+                combat.NeedsStaff = caster && !HasStaff;
                 combat.InitializeCombatStats(Damage, Cooldown, Range);
             }
             CharacterGear gear = GetComponentInChildren<CharacterGear>(true);

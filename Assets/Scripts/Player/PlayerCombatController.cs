@@ -170,6 +170,7 @@ namespace BattleOfAges.Player
                 HealthComponent targetHp = hit.collider.GetComponentInParent<HealthComponent>();
                 if (targetHp != null && targetHp != healthComponent && targetHp.IsAlive)
                 {
+                    if (combatUnit.NeedsStaff) { StrategyHud.Notify("Маг атакує лише з посохом (зробіть на верстаті)"); return; }
                     combatUnit.TryAttack(targetHp);
                     return;
                 }

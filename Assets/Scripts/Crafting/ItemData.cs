@@ -13,10 +13,11 @@ namespace BattleOfAges.Crafting
         Shield,   // Щит
         Helmet,   // Шолом
         Gloves,   // Рукавиці
-        Boots     // Чоботи
+        Boots,    // Чоботи
+        Staff     // Посох (the mage's weapon; added last so saved items keep their numbers)
     }
 
-    /// <summary>Where an item is worn. Weapon holds the sword, bow, axe or pickaxe; Armor is the chest piece.</summary>
+    /// <summary>Where an item is worn. Weapon holds the sword, bow, staff, axe or pickaxe; Armor is the chest piece.</summary>
     public enum EquipSlot { Weapon, Shield, Helmet, Chest, Gloves, Boots }
 
     /// <summary>An item: type + level (0..5; level 0 is the hero's plain starting sword). default(Item) = an empty slot.</summary>
@@ -40,7 +41,7 @@ namespace BattleOfAges.Crafting
     public static class ItemTypeNames
     {
         public static readonly ItemType[] All =
-            { ItemType.Sword, ItemType.Bow, ItemType.Axe, ItemType.Pickaxe, ItemType.Shield, ItemType.Helmet, ItemType.Armor, ItemType.Gloves, ItemType.Boots };
+            { ItemType.Sword, ItemType.Bow, ItemType.Staff, ItemType.Axe, ItemType.Pickaxe, ItemType.Shield, ItemType.Helmet, ItemType.Armor, ItemType.Gloves, ItemType.Boots };
         public static readonly EquipSlot[] Slots =
             { EquipSlot.Weapon, EquipSlot.Shield, EquipSlot.Helmet, EquipSlot.Chest, EquipSlot.Gloves, EquipSlot.Boots };
 
@@ -51,6 +52,7 @@ namespace BattleOfAges.Crafting
             {
                 case ItemType.Sword: return "Меч";
                 case ItemType.Bow: return "Лук";
+                case ItemType.Staff: return "Посох";
                 case ItemType.Armor: return "Нагрудник";
                 case ItemType.Axe: return "Сокира";
                 case ItemType.Pickaxe: return "Кайло";
@@ -95,7 +97,7 @@ namespace BattleOfAges.Crafting
         /// <summary>What a level is made of (the look on the model follows it).</summary>
         public static string MaterialName(ItemType t, int level)
         {
-            bool wood = t == ItemType.Bow || t == ItemType.Shield;
+            bool wood = t == ItemType.Bow || t == ItemType.Shield || t == ItemType.Staff;
             string stem;
             switch (Mathf.Clamp(level, 0, ItemStatCalculator.MAX_LEVEL))
             {
@@ -119,6 +121,7 @@ namespace BattleOfAges.Crafting
             {
                 case ItemType.Sword: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, швидкі удари";
                 case ItemType.Bow: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, дальність {ItemStatCalculator.BOW_RANGE:0} м";
+                case ItemType.Staff: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону; маг б'є лише з посохом";
                 case ItemType.Axe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, рубка ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
                 case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, видобуток ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
                 case ItemType.Armor: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% урону, +{Pct(ItemStatCalculator.HealthBonus(item))}% здоров'я";
@@ -185,6 +188,7 @@ namespace BattleOfAges.Crafting
 
         public static int CalculateWoodCost(ItemType type, int level)
         {
+            if (PricedAsSword(type, out float factor)) return Mathf.CeilToInt(CalculateWoodCost(ItemType.Sword, level) * factor);
             int lvl = ClampLevel(level);
             int baseCost;
             switch (type)
@@ -192,13 +196,14 @@ namespace BattleOfAges.Crafting
                 case ItemType.Sword: case ItemType.Armor: baseCost = 3; break;
                 case ItemType.Helmet: case ItemType.Gloves: case ItemType.Boots: baseCost = 2; break;
                 case ItemType.Shield: baseCost = 6; break;
-                default: baseCost = 5; break; // bow, axe, pickaxe
+                default: baseCost = 5; break; // axe, pickaxe
             }
             return baseCost + (lvl - 1) * 2;
         }
 
         public static int CalculateOreCost(ItemType type, int level)
         {
+            if (PricedAsSword(type, out float factor)) return Mathf.CeilToInt(CalculateOreCost(ItemType.Sword, level) * factor);
             int lvl = ClampLevel(level);
             int baseCost;
             switch (type)
@@ -207,6 +212,13 @@ namespace BattleOfAges.Crafting
                 default: baseCost = 1; break;
             }
             return baseCost + (lvl - 1) * 2;
+        }
+
+        /// <summary>A bow costs 1.5 swords, a staff 2 (GameBalance.BowCostFactor / StaffCostFactor).</summary>
+        private static bool PricedAsSword(ItemType type, out float factor)
+        {
+            factor = type == ItemType.Bow ? Combat.GameBalance.BowCostFactor : type == ItemType.Staff ? Combat.GameBalance.StaffCostFactor : 1f;
+            return type == ItemType.Bow || type == ItemType.Staff;
         }
 
         // ------------------------------------------------------------------ equipment effects (Equipment component)
@@ -222,7 +234,7 @@ namespace BattleOfAges.Crafting
             int l = ClampLevel(item.Level);
             switch (item.Type)
             {
-                case ItemType.Sword: return 1f + SWORD_DAMAGE_PER_LEVEL * Mathf.Clamp(item.Level, 0, MAX_LEVEL); // +20% per level: 0 = x1, V = x2
+                case ItemType.Sword: case ItemType.Staff: return 1f + SWORD_DAMAGE_PER_LEVEL * Mathf.Clamp(item.Level, 0, MAX_LEVEL); // +20% per level: 0 = x1, V = x2
                 case ItemType.Bow: return 1.1f + 0.1f * l;      // +20% .. +60%, at range
                 case ItemType.Axe: return 1.15f + 0.05f * l;    // +20% .. +40%
                 case ItemType.Pickaxe: return 1.1f + 0.05f * l; // +15% .. +35%

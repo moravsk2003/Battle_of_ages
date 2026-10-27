@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEngine;
 using BattleOfAges.Crafting;
 
 namespace BattleOfAges.Tests
@@ -89,6 +90,19 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(2, ItemStatCalculator.CalculateRequiredOreTier(3), "Level 3 requires Tier 2 ore.");
             Assert.AreEqual(3, ItemStatCalculator.CalculateRequiredOreTier(4), "Level 4 requires Tier 3 ore.");
             Assert.AreEqual(4, ItemStatCalculator.CalculateRequiredOreTier(5), "Level 5 requires Tier 4 ore.");
+        }
+
+        [Test]
+        public void ABow_CostsOneAndAHalfSwords_AStaffTwo()
+        {
+            for (int lvl = 1; lvl <= 5; lvl++)
+            {
+                int wood = ItemStatCalculator.CalculateWoodCost(ItemType.Sword, lvl), ore = ItemStatCalculator.CalculateOreCost(ItemType.Sword, lvl);
+                Assert.AreEqual(Mathf.CeilToInt(wood * 1.5f), ItemStatCalculator.CalculateWoodCost(ItemType.Bow, lvl));
+                Assert.AreEqual(Mathf.CeilToInt(ore * 1.5f), ItemStatCalculator.CalculateOreCost(ItemType.Bow, lvl));
+                Assert.AreEqual(wood * 2, ItemStatCalculator.CalculateWoodCost(ItemType.Staff, lvl));
+                Assert.AreEqual(ore * 2, ItemStatCalculator.CalculateOreCost(ItemType.Staff, lvl));
+            }
         }
     }
 }

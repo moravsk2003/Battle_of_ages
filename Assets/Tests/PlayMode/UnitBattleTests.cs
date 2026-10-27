@@ -151,6 +151,7 @@ namespace BattleOfAges.PlayModeTests
             heroObj.AddComponent<Crafting.Equipment>();
             UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
             heroObj.AddComponent<HeroProgress>().ChooseClass(HeroClass.Mage);
+            heroObj.GetComponent<Crafting.Equipment>().Equip(new Crafting.Item(Crafting.ItemType.Staff, 1));
             HealthComponent weak = Enemy(new Vector3(10f, 0f, 0f), 1);
             HealthComponent next = Enemy(new Vector3(12f, 0f, 2f), 10000);
             yield return null;
@@ -204,6 +205,7 @@ namespace BattleOfAges.PlayModeTests
             UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
             HeroProgress mage = heroObj.AddComponent<HeroProgress>();
             mage.ChooseClass(HeroClass.Mage);
+            heroObj.GetComponent<Crafting.Equipment>().Equip(new Crafting.Item(Crafting.ItemType.Staff, 1));
             GameObject victim = Track(new GameObject("TestRaider", typeof(HealthComponent), typeof(CombatUnit)));
             victim.AddComponent<Crafting.Equipment>();
             UnitProgress.Setup(victim, UnitRank.General);

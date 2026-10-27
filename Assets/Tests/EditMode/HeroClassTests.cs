@@ -64,8 +64,8 @@ namespace BattleOfAges.Tests
 
             gear.Equip(new Item(ItemType.Bow, 1));
             Assert.AreEqual(100f, combat.Strength, 1e-3f, "A bow doubles the archer's strength.");
-            float speed = 0.25f * 5f * Mathf.Sqrt(100f / 2f) + 1.5f; // 10.3 m/s
-            Assert.AreEqual(speed, combat.MoveSpeed, 1e-3f, "... and through sqrt(strength) the archer runs faster.");
+            float speed = 0.25f * 5f * Mathf.Sqrt((100f + 500f / 10f) / 2f / 2f) + 1.5f; // 9.2 m/s: body = (strength + HP / 10) / 2, the HP its rank's
+            Assert.AreEqual(speed, combat.MoveSpeed, 1e-3f, "... and through the body's sqrt the archer runs faster.");
             Assert.AreEqual(speed * 3f, combat.AttackRange, 1e-3f, "Range = the distance run in 3 s.");
             Assert.AreEqual(swordCooldown / 2f * 1.7f / 0.85f, combat.AttackCooldown, 1e-3f,
                 "The bow is twice as slow as a sword; the archer's sword is twice as slow again.");
@@ -75,11 +75,71 @@ namespace BattleOfAges.Tests
         public void Mage_FiresBolts_WithARangeOfItsRun_NeverUnder12m()
         {
             hero.ChooseClass(HeroClass.Mage);
+            gear.Equip(new Item(ItemType.Staff, 1));
             Assert.IsTrue(combat.FiresBolts);
             Assert.AreEqual((0.25f * 5f * Mathf.Sqrt(35f / 2f) + 1.5f) * 3f, combat.AttackRange, 1e-3f, "~20 m: the mage runs like strength 35.");
             Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(35f / 2f) + 1.5f, combat.MoveSpeed, 1e-3f, "A hero general mage runs 6.7 m/s.");
 
             Assert.AreEqual(12f, HeroClassRules.Range(2.5f), 1e-4f, "A hero person runs 7.5 m in 3 s: the minimum 12 m.");
+        }
+
+        [Test]
+        public void Mage_StrikesOnlyWithAStaff()
+        {
+            var victim = new GameObject("Victim", typeof(HealthComponent));
+            try
+            {
+                victim.GetComponent<HealthComponent>().InitializeHealth(100000);
+                gear.Equip(new Item(ItemType.Sword, 3));
+                hero.ChooseClass(HeroClass.Mage);
+                Assert.AreEqual(ItemType.Sword, gear[EquipSlot.Weapon].Type, "A crafted sword stays a sword.");
+                Assert.IsTrue(combat.NeedsStaff);
+                Assert.IsFalse(combat.FiresBolts);
+                Assert.IsFalse(combat.TryAttack(victim.GetComponent<HealthComponent>()), "No staff: no attack.");
+
+                gear.Equip(new Item(ItemType.Staff, 1));
+                Assert.IsFalse(combat.NeedsStaff);
+                Assert.IsTrue(combat.FiresBolts);
+                Assert.IsTrue(combat.TryAttack(victim.GetComponent<HealthComponent>()), "With a staff the bolts fly.");
+                Assert.AreEqual(Mathf.RoundToInt(50 * 1.2f), combat.AttackDamage, "A staff I adds 20% like a sword I.");
+            }
+            finally { Object.DestroyImmediate(victim); }
+        }
+
+        [Test]
+        public void Mage_TakesUpAStaffForThePlainStartingSword()
+        {
+            gear.Equip(new Item(ItemType.Sword, 0));
+            hero.ChooseClass(HeroClass.Mage);
+            Assert.AreEqual(new Item(ItemType.Staff, 0), gear[EquipSlot.Weapon]);
+            Assert.IsTrue(combat.FiresBolts);
+        }
+
+        [Test]
+        public void OtherClasses_StrikeWithoutAStaff()
+        {
+            hero.ChooseClass(HeroClass.Dd);
+            Assert.IsFalse(combat.NeedsStaff);
+            gear.Equip(new Item(ItemType.Staff, 2));
+            Assert.IsFalse(combat.FiresBolts, "Only the mage casts bolts from a staff.");
+        }
+
+        [Test]
+        public void HealthPoints_SpeedTheHeroUp_AsMuchAsStrengthPoints()
+        {
+            hero.AddXp(100 + 200);
+            float start = combat.MoveSpeed;
+            Assert.IsTrue(hero.SpendOnHealth());
+            float afterHp = combat.MoveSpeed;
+            Assert.Greater(afterHp, start, "+50 HP: faster.");
+            Assert.IsTrue(hero.SpendOnStrength());
+            float afterBoth = combat.MoveSpeed;
+            // body = (strength + HP / 10) / 2: +50 HP and +5 strength each add 2.5
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(52.5f / 2f) + 1.5f, afterHp, 1e-3f);
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(55f / 2f) + 1.5f, afterBoth, 1e-3f);
+
+            gear.Equip(new Item(ItemType.Armor, 5));
+            Assert.AreEqual(afterBoth, combat.MoveSpeed, 1e-4f, "Armour HP does not make anyone faster.");
         }
 
         [Test]
@@ -112,6 +172,7 @@ namespace BattleOfAges.Tests
             {
                 victim.GetComponent<HealthComponent>().InitializeHealth(100000);
                 hero.ChooseClass(HeroClass.Mage);
+                gear.Equip(new Item(ItemType.Staff, 1));
                 Assert.IsTrue(combat.IsRanged);
                 Assert.IsTrue(combat.TryAttack(victim.GetComponent<HealthComponent>()));
                 Assert.AreEqual(0f, combat.MoveSpeed, 1e-5f, "A ranged shot roots the shooter.");

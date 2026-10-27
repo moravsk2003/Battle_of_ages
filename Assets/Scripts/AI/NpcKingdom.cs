@@ -169,6 +169,9 @@ namespace BattleOfAges.AI
             else hero.ResetForNewHero();
             if (unit.GetComponent<HeroSkills>() == null) unit.gameObject.AddComponent<HeroSkills>();
             hero.ChooseClass(cls);
+            Equipment kingGear = unit.GetComponent<Equipment>();
+            if (cls == HeroClass.Mage && kingGear != null) // the mage strikes only with a staff: the kingdom's smiths make one
+                kingGear.Equip(new Item(ItemType.Staff, Mathf.Max(1, kingGear.LevelOf(ItemType.Sword))));
             hero.Changed -= OnHeroChanged;
             hero.Changed += OnHeroChanged;
             HealthComponent hp = unit.Health;

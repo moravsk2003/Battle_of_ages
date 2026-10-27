@@ -61,7 +61,10 @@ namespace BattleOfAges.Combat
         /// <summary>The mage's attack: this many homing bolts, each this share of the damage, through armour.</summary>
         public static int MageBolts = 5;
         public static float MageBoltShare = 0.2f;
-        /// <summary>The mage runs like this share of its rank's strength, and strength points add only to its spells.</summary>
+        /// <summary>
+        /// The mage runs like this share of its rank's strength and of its HP; strength points add only to its spells. Its
+        /// attack (the bolts) needs a staff in hand; without one it has only its skills.
+        /// </summary>
         public static float MageBodyStrengthShare = 0.7f; // hero general: 35
 
         // ------------------------------------------------------------------ class skills (§8.1)
@@ -92,6 +95,11 @@ namespace BattleOfAges.Combat
         public static float CritMultiplier = 2f, CritCooldown = 40f;
         /// <summary>Mage Meteor: fall time, radius, damage (x the mage's), cooldown.</summary>
         public static float MeteorDelay = 1f, MeteorRadius = 2.5f, MeteorDamageFactor = 5f, MeteorCooldown = 20f;
+
+        // ------------------------------------------------------------------ weapon prices (§9)
+
+        /// <summary>A bow and a staff cost this many times a sword of the same level (wood and ore alike, rounded up).</summary>
+        public static float BowCostFactor = 1.5f, StaffCostFactor = 2f;
 
         // ------------------------------------------------------------------ attack recovery (§11.1)
 
@@ -140,8 +148,12 @@ namespace BattleOfAges.Combat
 
         // ------------------------------------------------------------------ speed (§11.1)
 
-        /// <summary>speed = SpeedGlobal x modifier x sqrt(strength / SpeedStrengthDivisor) + SpeedFlat, metres per second.</summary>
-        public static float SpeedGlobal = 0.25f, SpeedStrengthDivisor = 2f, SpeedFlat = 1.5f;
+        /// <summary>
+        /// speed = SpeedGlobal x modifier x sqrt(body / SpeedStrengthDivisor) + SpeedFlat, metres per second, where body is the
+        /// mean of the strength and the HP / SpeedHealthPerStrength (every rank has 10 HP per strength point, so a plain
+        /// unit runs as on strength alone; an attribute point in HP speeds a hero up as much as one in strength).
+        /// </summary>
+        public static float SpeedGlobal = 0.25f, SpeedStrengthDivisor = 2f, SpeedFlat = 1.5f, SpeedHealthPerStrength = 10f;
         public static float SpeedModifierPerson = 7f;
         public static float SpeedModifierSoldier = 6f; // warrior, knight, general
         public static float SpeedModifierHero = 5f;

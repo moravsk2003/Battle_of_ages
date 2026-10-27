@@ -30,10 +30,13 @@ namespace BattleOfAges.Combat
         private float speedStrength;
         /// <summary>Strength the run speed follows (the mage: a fixed share of its rank, not its spell power).</summary>
         public float SpeedStrength { get => speedStrength > 0f ? speedStrength : Strength; set => speedStrength = value; }
+        private float speedHealth;
+        /// <summary>HP the run speed follows: the body's, without armour (Equipment sets it; without gear 10 per strength point).</summary>
+        public float SpeedHealth { get => speedHealth > 0f ? speedHealth : SpeedStrength * GameBalance.SpeedHealthPerStrength; set => speedHealth = value; }
         [SerializeField] private float speedModifier = CharacterSpeed.DefaultModifier;
         /// <summary>Speed characteristic (person 7, soldiers 6, hero 5; see UnitRanks, CharacterSpeed).</summary>
         public float SpeedModifier { get => speedModifier; set => speedModifier = value; }
-        /// <summary>Global x SpeedModifier x sqrt(strength).</summary>
+        /// <summary>Global x SpeedModifier x sqrt(body), body from strength and HP (CharacterSpeed).</summary>
         public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor;
 
         private float boostFactor = 1f, boostUntil = float.NegativeInfinity;
@@ -73,7 +76,7 @@ namespace BattleOfAges.Combat
         public bool TryAttack(HealthComponent target)
         {
             if (target == null || !target.IsAlive) return false;
-            if (!CanAttack) return false;
+            if (!CanAttack || NeedsStaff) return false;
 
             float dst = Vector3.Distance(transform.position, target.transform.position);
             if (dst > AttackRange + 1.0f) return false;
@@ -104,6 +107,8 @@ namespace BattleOfAges.Combat
 
         /// <summary>The mage (§8.1): its attack is a volley of homing bolts through armour instead of a direct hit.</summary>
         public bool FiresBolts { get; set; }
+        /// <summary>A mage without a staff: no attack at all (its skills still work); Equipment sets it.</summary>
+        public bool NeedsStaff { get; set; }
 
         /// <summary>The next arrow hits for double and goes on through (the archer's Piercing arrow, used on Q).</summary>
         public bool NextShotPiercing { get; set; }

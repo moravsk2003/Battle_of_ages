@@ -216,7 +216,7 @@ namespace BattleOfAges.UI
             dim.anchorMin = Vector2.zero; dim.anchorMax = Vector2.one; dim.sizeDelta = Vector2.zero;
             dim.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.45f);
 
-            RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1260f, 720f));
+            RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1260f, 900f));
             PopIn.On(panel);
             UiTheme.PanelImage(panel);
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 44f));
@@ -242,11 +242,11 @@ namespace BattleOfAges.UI
                 int lv = l;
                 levelTabs.Add(UiTheme.TextButton(panel, "Level" + l, "Рівень " + ItemTypeNames.Roman(l), new Vector2(0f, 1f), new Vector2(24f + (l - 1) * 160f, -146f), new Vector2(152f, 42f), () => SetSelectedLevel(lv), 18));
             }
-            RectTransform recipes = UiTheme.Rect(panel, "Recipes", new Vector2(0f, 1f), new Vector2(24f, -198f), new Vector2(800f, 500f));
+            RectTransform recipes = UiTheme.Rect(panel, "Recipes", new Vector2(0f, 1f), new Vector2(24f, -198f), new Vector2(800f, 680f));
             for (int i = 0; i < ItemTypeNames.All.Length; i++) Card(recipes, ItemTypeNames.All[i], i);
 
             // Queue column
-            RectTransform side = UiTheme.Rect(panel, "Queue", new Vector2(1f, 1f), new Vector2(-24f, -70f), new Vector2(408f, 628f));
+            RectTransform side = UiTheme.Rect(panel, "Queue", new Vector2(1f, 1f), new Vector2(-24f, -70f), new Vector2(408f, 808f));
             UiTheme.PanelImage(side, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
             RectTransform cur = UiTheme.Rect(side, "Current", new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(380f, 30f));
             currentText = UiTheme.Label(cur, "Text", "", 18, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
@@ -259,7 +259,7 @@ namespace BattleOfAges.UI
             percentText = UiTheme.Label(pct, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
             RectTransform qt = UiTheme.Rect(side, "QueueTitle", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(380f, 28f));
             UiTheme.Label(qt, "Text", "Далі в черзі", 17, TextAnchor.MiddleLeft, UiTheme.InkDim);
-            queueList = UiTheme.Rect(side, "List", new Vector2(0.5f, 1f), new Vector2(0f, -114f), new Vector2(380f, 350f));
+            queueList = UiTheme.Rect(side, "List", new Vector2(0.5f, 1f), new Vector2(0f, -114f), new Vector2(380f, 530f));
 
             RectTransform store = UiTheme.Rect(side, "Store", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(380f, 112f));
             UiTheme.PanelImage(store, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.9f));

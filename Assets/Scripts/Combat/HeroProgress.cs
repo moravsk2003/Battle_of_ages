@@ -88,6 +88,9 @@ namespace BattleOfAges.Combat
         {
             if (heroClass != HeroClass.None || c == HeroClass.None) return false;
             heroClass = c;
+            // The mage strikes only with a staff: the hero's plain starting sword becomes a plain staff
+            Equipment gear = GetComponent<Equipment>();
+            if (c == HeroClass.Mage && gear != null && gear[EquipSlot.Weapon].Equals(new Item(ItemType.Sword, 0))) gear.Equip(new Item(ItemType.Staff, 0));
             ApplyStats();
             Changed?.Invoke(this);
             return true;
@@ -100,7 +103,7 @@ namespace BattleOfAges.Combat
         float IStatModifier.WeaponMultiplier(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.WeaponMultiplier(worn) : worn; }
         float IStatModifier.DamageReduction(float worn) { HeroArtifacts a = GetComponent<HeroArtifacts>(); return a != null ? a.DamageReduction(worn) : worn; }
 
-        /// <summary>The mage runs like 70% of its rank's strength (a hero general: 35); its strength points go into its spells only.</summary>
+        /// <summary>The mage runs like 70% of its rank's strength (a hero general: 35) and of its HP; its strength points go into its spells only.</summary>
         float IStatModifier.SpeedStrength(float strength)
         {
             if (heroClass != HeroClass.Mage) return strength;
@@ -108,18 +111,23 @@ namespace BattleOfAges.Combat
             return UnitRanks.Strength(rank != null ? rank.Rank : UnitRank.General, hero: true) * GameBalance.MageBodyStrengthShare;
         }
 
+        float IStatModifier.SpeedHealth(float health) => heroClass == HeroClass.Mage ? health * GameBalance.MageBodyStrengthShare : health;
+        bool IStatModifier.CastsWithStaff => heroClass == HeroClass.Mage;
+
         float IStatModifier.Range(float range, bool bow, float strength)
         {
             if (!HeroClassRules.IsRanged(heroClass, bow)) return range;
             if (combat == null) combat = GetComponent<CombatUnit>();
-            float speed = CharacterSpeed.Of(combat != null ? combat.SpeedModifier : CharacterSpeed.HeroModifier, ((IStatModifier)this).SpeedStrength(strength));
+            Equipment gear = GetComponent<Equipment>();
+            float health = ((IStatModifier)this).SpeedHealth(gear != null ? gear.BaseHealth : strength * GameBalance.SpeedHealthPerStrength);
+            float speed = CharacterSpeed.Of(combat != null ? combat.SpeedModifier : CharacterSpeed.HeroModifier, ((IStatModifier)this).SpeedStrength(strength), health);
             return HeroClassRules.Range(speed, RangeBonus);
         }
 
-        /// <summary>Spends an attribute point on strength (+5: damage, and speed through sqrt(strength)).</summary>
+        /// <summary>Spends an attribute point on strength (+5: damage, and speed through sqrt of the body).</summary>
         public bool SpendOnStrength() => Spend(ref strengthPoints);
 
-        /// <summary>Spends an attribute point on health (+50 HP).</summary>
+        /// <summary>Spends an attribute point on health (+50 HP: as much speed as +5 strength).</summary>
         public bool SpendOnHealth() => Spend(ref healthPoints);
 
         /// <summary>Takes skill points (a skill learnt); false if there are not enough.</summary>
@@ -149,8 +157,6 @@ namespace BattleOfAges.Combat
             if (rank == null || gear == null) return;
             HealthComponent health = GetComponent<HealthComponent>();
             if (health != null) health.IgnoreEveryNthHit = HeroClassRules.IgnoredHitEvery(heroClass);
-            CombatUnit attack = GetComponent<CombatUnit>();
-            if (attack != null) attack.FiresBolts = heroClass == HeroClass.Mage;
             float share = health != null && health.MaxHealth > 0 ? (float)health.CurrentHealth / health.MaxHealth : 1f;
             int hp = UnitRanks.Health(rank.Rank, hero: true) + healthPoints * GameBalance.HealthPerPoint;
             int strength = UnitRanks.Strength(rank.Rank, hero: true) + strengthPoints * GameBalance.StrengthPerPoint;

@@ -614,6 +614,15 @@ namespace BattleOfAges.UI
                     if (level >= 3) { Layer((p - top).magnitude - 0.1f, trim); Layer((p - bot).magnitude - 0.1f, trim); }
                     break;
                 }
+                case ItemType.Staff:
+                {
+                    Vector2 orb = new Vector2(0.5f, 0.6f);
+                    Layer(Segment(p, new Vector2(-0.78f, -0.86f), new Vector2(0.38f, 0.44f)) - 0.075f, Lit(wood));
+                    Layer(Segment(p, new Vector2(0.28f, 0.33f), new Vector2(0.4f, 0.46f)) - 0.11f, Lit(level >= 5 ? gold : metal));
+                    Color gem = Color.Lerp(new Color(0.45f, 0.72f, 1f), new Color(0.78f, 0.52f, 1f), Mathf.Clamp01(level / 5f));
+                    Layer((p - orb).magnitude - 0.2f, Color.Lerp(gem, Color.white, Mathf.Clamp01(0.45f - (p - orb - new Vector2(-0.07f, 0.07f)).magnitude * 3f)));
+                    break;
+                }
                 case ItemType.Axe:
                     Layer(Segment(p, new Vector2(-0.6f, -0.8f), new Vector2(0.3f, 0.75f)) - 0.08f, Lit(wood));
                     Layer(Poly(Rotate(p - new Vector2(0.28f, 0.45f), 0.52f), new[] { new Vector2(-0.05f, 0.18f), new Vector2(0.55f, 0.38f), new Vector2(0.62f, -0.36f), new Vector2(-0.05f, -0.16f) }), Lit(metal));
