@@ -29,6 +29,7 @@ namespace BattleOfAges.UI
         private RtsUnitCommander commander;
         private readonly List<(RectTransform rt, Image icon, RectTransform fill, RtsUnit unit)> cards = new List<(RectTransform, Image, RectTransform, RtsUnit)>();
         private int shownHash;
+        private Shown groupCount;
 
         private void Awake()
         {
@@ -79,38 +80,65 @@ namespace BattleOfAges.UI
             else ShowGroup(selected);
         }
 
+        private RtsUnit singleUnit;
+        private HealthComponent singleHp;
+        private CombatUnit singleCombat;
+        private NpcResourceGatherer singleGatherer;
+        private Shown singleHead, singleHpShown, singleStats, singleJob;
+
+        /// <summary>The one selected unit; its texts are made again only when what they say changes.</summary>
         private void ShowSingle(RtsUnit unit)
         {
+            groupCount.Reset(); // the group view writes its title again next time
+            if (unit != singleUnit)
+            {
+                singleUnit = unit;
+                singleHp = unit.GetComponent<HealthComponent>();
+                singleCombat = unit.GetComponent<CombatUnit>();
+                singleGatherer = unit.GetComponent<NpcResourceGatherer>();
+                singleHead.Reset(); singleHpShown.Reset(); singleStats.Reset(); singleJob.Reset();
+            }
             UnitRank rank = RankOf(unit);
-            titleText.text = DisplayName(unit);
-            titleText.color = RankColor(rank, unit.IsHero);
-            SetPortrait(portrait, unit, rank);
+            if (singleHead.Changed(Shown.Key(unit.GetInstanceID(), (int)rank)))
+            {
+                titleText.text = DisplayName(unit);
+                titleText.color = RankColor(rank, unit.IsHero);
+                SetPortrait(portrait, unit, rank);
+            }
 
-            HealthComponent hp = unit.GetComponent<HealthComponent>();
+            HealthComponent hp = singleHp;
             float f = hp != null && hp.MaxHealth > 0 ? Mathf.Clamp01(hp.CurrentHealth / (float)hp.MaxHealth) : 1f;
             hpFill.anchorMax = new Vector2(f, 1f);
-            hpFill.GetComponent<Image>().color = HealthColor(f);
-            hpText.text = hp != null ? $"{hp.CurrentHealth} / {hp.MaxHealth}" : "";
+            if (singleHpShown.Changed(hp != null ? Shown.Key(hp.CurrentHealth, hp.MaxHealth) : -1))
+            {
+                hpFill.GetComponent<Image>().color = HealthColor(f);
+                hpText.text = hp != null ? $"{hp.CurrentHealth} / {hp.MaxHealth}" : "";
+            }
 
-            CombatUnit c = unit.GetComponent<CombatUnit>();
-            statsText.text = c != null
-                ? $"Урон <color=#F5CC73>{c.AttackDamage}</color>  ·  удар раз на {c.AttackCooldown:0.0} с  ·  захист <color=#F5CC73>{Mathf.RoundToInt((hp != null ? hp.DamageReduction : 0f) * 100f)}%</color>"
-                : "";
+            CombatUnit c = singleCombat;
+            int armour = Mathf.RoundToInt((hp != null ? hp.DamageReduction : 0f) * 100f);
+            if (singleStats.Changed(c != null ? Shown.Key(c.AttackDamage, Mathf.RoundToInt(c.AttackCooldown * 10f), armour) : -1))
+                statsText.text = c != null
+                    ? $"Урон <color=#F5CC73>{c.AttackDamage}</color>  ·  удар раз на {c.AttackCooldown:0.0} с  ·  захист <color=#F5CC73>{armour}%</color>"
+                    : "";
 
-            NpcResourceGatherer gatherer = unit.GetComponent<NpcResourceGatherer>();
-            string job = unit.WallBound ? (unit.IsPostedOnWall ? "На стіні, на посту" : "Іде на стіну")
-                       : unit.HasAttackTarget ? "У бою"
-                       : gatherer == null ? (unit.IsHero ? "Герой" : "Боєць")
-                       : gatherer.IsIdle ? "<color=#DB5242>Без діла</color>"
-                       : $"{GetDirectiveName(gatherer.CurrentDirective)}  ·  {GetStateName(gatherer.CurrentState)}";
-            statusText.text = job;
+            NpcResourceGatherer gatherer = singleGatherer;
+            int jobKind = unit.WallBound ? (unit.IsPostedOnWall ? 1 : 2) : unit.HasAttackTarget ? 3 : gatherer == null ? (unit.IsHero ? 4 : 5) : gatherer.IsIdle ? 6 : 7;
+            if (singleJob.Changed(jobKind == 7 ? Shown.Key(jobKind, (int)gatherer.CurrentDirective, (int)gatherer.CurrentState) : jobKind))
+                statusText.text = jobKind == 1 ? "На стіні, на посту" : jobKind == 2 ? "Іде на стіну" : jobKind == 3 ? "У бою"
+                                : jobKind == 4 ? "Герой" : jobKind == 5 ? "Боєць" : jobKind == 6 ? "<color=#DB5242>Без діла</color>"
+                                : $"{GetDirectiveName(gatherer.CurrentDirective)}  ·  {GetStateName(gatherer.CurrentState)}";
         }
 
         private void ShowGroup(IReadOnlyList<RtsUnit> selected)
         {
             int count = selected.Count;
-            titleText.text = $"Обрано: {count}";
-            titleText.color = UiTheme.Gold;
+            singleUnit = null; // the single view starts afresh next time
+            if (groupCount.Changed(count))
+            {
+                titleText.text = $"Обрано: {count}";
+                titleText.color = UiTheme.Gold;
+            }
 
             int hash = count;
             foreach (RtsUnit u in selected) hash = hash * 31 + (u != null ? u.GetInstanceID() : 0);

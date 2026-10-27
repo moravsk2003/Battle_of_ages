@@ -256,6 +256,8 @@ namespace BattleOfAges.UI
             return (rt, icon, cool, secs, keyText);
         }
 
+        private readonly Shown[] abilitySeconds = new Shown[4], abilityKeys = new Shown[4];
+
         private static readonly InputSystem.KeyAction[] AbilityKeys =
             { InputSystem.KeyAction.Ability, InputSystem.KeyAction.Ability2, InputSystem.KeyAction.UseFullHeal, InputSystem.KeyAction.UseLightning };
 
@@ -268,7 +270,7 @@ namespace BattleOfAges.UI
 
             if (playerProgress != null)
             {
-                levelText.text = "Рів. " + playerProgress.Level;
+                if (levelShown.Changed(playerProgress.Level)) levelText.text = "Рів. " + playerProgress.Level;
                 float f = Mathf.Clamp01(playerProgress.Xp / (float)Mathf.Max(1, playerProgress.XpToNextLevel));
                 xpFill.sizeDelta = new Vector2(292f * f, 7f);
             }
@@ -294,9 +296,10 @@ namespace BattleOfAges.UI
                 if (!on) continue;
                 s.rt.anchoredPosition = new Vector2(shown++ * 86f, 0f);
                 s.cooldown.fillAmount = left > 0f ? left / total : 0f;
-                s.seconds.text = left > 0f ? (left >= 60f ? Mathf.CeilToInt(left / 60f) + " хв" : Mathf.CeilToInt(left).ToString()) : "";
+                int secondsKey = left <= 0f ? -1 : left >= 60f ? 100000 + Mathf.CeilToInt(left / 60f) : Mathf.CeilToInt(left);
+                if (abilitySeconds[i].Changed(secondsKey)) s.seconds.text = secondsKey < 0 ? "" : secondsKey >= 100000 ? (secondsKey - 100000) + " хв" : secondsKey.ToString();
                 s.icon.color = left > 0f ? new Color(0.6f, 0.6f, 0.6f) : Color.white;
-                s.key.text = HudTips.Key(AbilityKeys[i]);
+                if (abilityKeys[i].Changed((long)InputSystem.KeybindsManager.GetKey(AbilityKeys[i]))) s.key.text = HudTips.Key(AbilityKeys[i]);
             }
             abilityBar.sizeDelta = new Vector2(Mathf.Max(1, shown) * 86f - 14f, 72f);
         }
@@ -434,16 +437,20 @@ namespace BattleOfAges.UI
             bool map = modes != null && modes.CurrentMode == GameMode.RtsMap;
             UpdateAlarmButton();
             if (alarmBanner.gameObject.activeSelf != SettlementAlarm.Active) alarmBanner.gameObject.SetActive(SettlementAlarm.Active);
-            clockText.text = HudTips.ClockShort();
+            // Texts change only when their numbers do (a new string every frame is garbage, and garbage is hitches)
+            if (clockShown.Changed((long)Combat.WorldClock.GameHours)) clockText.text = HudTips.ClockShort();
 
             ResourceManager res = ResourceManager.Instance;
             int wood = res != null ? res.WoodCount : 0, ore = res != null ? res.OreCount : 0;
-            woodText.text = wood.ToString();
-            oreText.text = OreSummary(res, ore);
-            int workers = WorkerRegistry.WorkerCount;
-            workerText.text = workers + "/" + TownHall.PopulationCap;
-            workerText.color = workers >= TownHall.PopulationCap ? UiTheme.Bad : UiTheme.Ink;
-            armyText.text = Mathf.Max(0, UnitRegistry.ActiveUnits.Count - workers).ToString();
+            if (woodShown.Changed(wood)) woodText.text = wood.ToString();
+            if (oreShown.Changed(OreKey(res, ore))) oreText.text = OreSummary(res, ore);
+            int workers = WorkerRegistry.WorkerCount, army = Mathf.Max(0, UnitRegistry.ActiveUnits.Count - workers);
+            if (workerShown.Changed(Shown.Key(workers, TownHall.PopulationCap)))
+            {
+                workerText.text = workers + "/" + TownHall.PopulationCap;
+                workerText.color = workers >= TownHall.PopulationCap ? UiTheme.Bad : UiTheme.Ink;
+            }
+            if (armyShown.Changed(army)) armyText.text = army.ToString();
             BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
             bool placing = map && placer != null && placer.IsPlacing;
             modeText.text = placing ? placer.Hint : map ? "Мапа  ·  M — від першої особи  ·  F1 — довідка" : "Від першої особи  ·  M — мапа  ·  F1 — довідка";
@@ -465,7 +472,7 @@ namespace BattleOfAges.UI
                     if (f >= trail) { trail = f; trailHold = 0f; }
                     else if ((trailHold += Time.unscaledDeltaTime) > 0.45f) trail = Mathf.MoveTowards(trail, f, Time.unscaledDeltaTime * 0.6f);
                     hpTrail.sizeDelta = new Vector2(290f * trail, 20f);
-                    hpText.text = $"{playerHealth.CurrentHealth} / {playerHealth.MaxHealth}";
+                    if (hpShown.Changed(Shown.Key(playerHealth.CurrentHealth, playerHealth.MaxHealth))) hpText.text = $"{playerHealth.CurrentHealth} / {playerHealth.MaxHealth}";
                 }
                 HideUnitBars(0);
             }
@@ -498,6 +505,24 @@ namespace BattleOfAges.UI
         }
 
         private static readonly string[] Roman = { "0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
+        private Shown clockShown, woodShown, oreShown, workerShown, armyShown, hpShown, levelShown, hallShown, hallButtonShown, wallShown, wallButtonShown;
+        private readonly Dictionary<MineNode, long> mineShown = new Dictionary<MineNode, long>();
+
+        /// <summary>The ore summary as a number: the total and the three highest tiers in stock with their counts.</summary>
+        private static long OreKey(ResourceManager res, int total)
+        {
+            if (res == null) return 0;
+            long k = total;
+            int shown = 0;
+            for (int t = Mathf.Min(res.HighestOreTier, OreTierHelper.MAX_TIERS - 1); t >= 0 && shown < 3; t--)
+            {
+                int n = res.GetOreTierCount(t);
+                if (n <= 0) continue;
+                k = Shown.Key(k, t * 100000L + n);
+                shown++;
+            }
+            return k;
+        }
 
         /// <summary>Total ore and the three highest tiers in stock ("16   II·4  I·12").</summary>
         private static string OreSummary(ResourceManager res, int total)
@@ -660,6 +685,13 @@ namespace BattleOfAges.UI
                 if (!show) continue;
                 RectTransformUtility.ScreenPointToLocalPointInRectangle(root, sp, null, out Vector2 local);
                 label.rt.anchoredPosition = local;
+                // only when something on it changed: workers, rate, stock and its two best tiers
+                long key = Shown.Key(mine.AssignedWorkerCount, Mathf.RoundToInt(mine.OrePerSecond * 10f), mine.AccumulatedOreCount, mine.MaxAccumulatedOre);
+                for (int t = mine.HighestTierInStock, n2 = 0; t >= 1 && n2 < 2; t--) { int n = mine.OreOfTier(t); if (n > 0) { key = Shown.Key(key, t * 100000L + n); n2++; } }
+                bool canRelease = map && mine.AssignedWorkerCount > 0;
+                if (label.button.gameObject.activeSelf != canRelease) label.button.gameObject.SetActive(canRelease);
+                if (mineShown.TryGetValue(mine, out long was) && was == key) continue;
+                mineShown[mine] = key;
                 // the two best tiers above the common ore ("III·1  I·7")
                 string tiers = "";
                 for (int t = mine.HighestTierInStock, shown = 0; t >= 1 && shown < 2; t--)
@@ -671,8 +703,6 @@ namespace BattleOfAges.UI
                 if (tiers.Length > 0) tiers = "<size=15><color=#c9b89a>" + tiers + "</color></size>";
                 label.text.text = $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  {mine.OrePerSecond:0.#}/с\n" +
                                   $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
-                bool canRelease = map && mine.AssignedWorkerCount > 0;
-                if (label.button.gameObject.activeSelf != canRelease) label.button.gameObject.SetActive(canRelease);
             }
             if (mineLabels.Count > MineNode.ActiveMines.Count + 4) PruneMineLabels();
         }
@@ -713,14 +743,16 @@ namespace BattleOfAges.UI
             hallLabel.anchoredPosition = local;
             UpdateWallRow(map);
             int pop = TownHall.Population, cap = TownHall.PopulationCap;
-            hallText.text = $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
+            if (hallShown.Changed(Shown.Key(hall.Level, pop, cap)))
+                hallText.text = $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
             bool max = hall.Level >= TownHall.MaxLevel;
             bool canShowButton = map && !max;
             if (hallButton.gameObject.activeSelf != canShowButton) hallButton.gameObject.SetActive(canShowButton);
             if (!canShowButton) return;
             TownHall.UpgradeCost(hall.Level + 1, out int wood, out int ore, out int tier);
             bool ok = hall.CanUpgrade(out _);
-            hallButtonText.text = $"Покращити до {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+            if (hallButtonShown.Changed(Shown.Key(hall.Level, wood, ore, tier)))
+                hallButtonText.text = $"Покращити до {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
             hallButton.interactable = ok;
         }
 
@@ -749,12 +781,14 @@ namespace BattleOfAges.UI
             if (wallRow.gameObject.activeSelf != show) wallRow.gameObject.SetActive(show);
             if (!show) return;
             int level = Fortifications.Level;
-            wallText.text = $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nурон зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>";
+            if (wallShown.Changed(level))
+                wallText.text = $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nурон зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>";
             bool max = level >= Fortifications.MaxLevel;
             if (wallButton.gameObject.activeSelf == max) wallButton.gameObject.SetActive(!max);
             if (max) return;
             Fortifications.UpgradeCost(level + 1, out int wood, out int ore, out int tier);
-            wallButtonText.text = $"Стіни до {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+            if (wallButtonShown.Changed(Shown.Key(level, wood, ore, tier)))
+                wallButtonText.text = $"Стіни до {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
             wallButton.interactable = Fortifications.CanUpgrade(out _);
         }
 

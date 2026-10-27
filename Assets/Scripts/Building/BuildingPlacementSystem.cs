@@ -41,18 +41,29 @@ namespace BattleOfAges.Building
         public const float TurnStep = 15f;
 
         /// <summary>What the keys do now (the HUD's hint line while placing).</summary>
+        private string hint;
+        private long hintKey = long.MinValue;
+
+        /// <summary>The HUD line while placing; made again only when the building, the ore or the snap changes.</summary>
         public string Hint
         {
             get
             {
                 if (!isPlacing) return "";
-                BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
-                if (!WallSegment.IsWall(currentBuildingType)) return $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати";
-                return $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
-                     + (snapped ? "прилипла до стіни" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
+                long key = ((long)currentBuildingType * 1000 + wallTier) * 2 + (snapped ? 1 : 0);
+                if (key == hintKey && hint != null) return hint;
+                hintKey = key;
+                return hint = MakeHint();
             }
         }
 
+        private string MakeHint()
+        {
+            BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
+            if (!WallSegment.IsWall(currentBuildingType)) return $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати";
+            return $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
+                 + (snapped ? "прилипла до стіни" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
+        }
 
         /// <summary>The frame a placement was last cancelled (that Escape is not also the pause or the way out of the map).</summary>
         public int CancelledFrame { get; private set; } = -1;

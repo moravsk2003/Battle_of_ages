@@ -85,6 +85,7 @@ namespace BattleOfAges.UI
         private Tooltip hovered;
         private float since;
         private string shown;
+        private float nextRead;
 
         public static bool IsShowing => instance != null && instance.panel.gameObject.activeSelf;
         public static string ShownText => IsShowing ? instance.shown : null;
@@ -122,6 +123,7 @@ namespace BattleOfAges.UI
         {
             if (instance == null || instance.hovered == null) return;
             instance.since = -1e6f;
+            instance.nextRead = 0f;
             instance.LateUpdate();
         }
 
@@ -146,6 +148,8 @@ namespace BattleOfAges.UI
         {
             if (hovered == null || !hovered.isActiveAndEnabled) { if (panel.gameObject.activeSelf) panel.gameObject.SetActive(false); hovered = null; return; }
             if (Time.unscaledTime - since < Delay) return;
+            if (panel.gameObject.activeSelf && Time.unscaledTime < nextRead) { Place(); return; }
+            nextRead = Time.unscaledTime + 0.25f;
             string text = hovered.Text;
             if (string.IsNullOrEmpty(text)) { panel.gameObject.SetActive(false); return; }
             if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);

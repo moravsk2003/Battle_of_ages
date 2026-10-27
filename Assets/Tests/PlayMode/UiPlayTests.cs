@@ -45,7 +45,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual("Сказано 1", TooltipUI.ShownText);
 
             n = 2;
-            yield return null;
+            yield return new WaitForSecondsRealtime(0.3f); // a shown tooltip reads its text four times a second
             Assert.AreEqual("Сказано 2", TooltipUI.ShownText, "live text follows the numbers");
 
             TooltipUI.Leave(tip);
