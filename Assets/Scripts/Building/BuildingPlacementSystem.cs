@@ -81,9 +81,9 @@ namespace BattleOfAges.Building
 
         private void Start()
         {
-            gameModeManager = FindFirstObjectByType<GameModeManager>();
+            gameModeManager = Managers.GameContext.Modes;
 
-            RtsMapCameraController mapController = FindFirstObjectByType<RtsMapCameraController>();
+            RtsMapCameraController mapController = Managers.GameContext.MapCamera;
             if (mapController != null)
             {
                 mapCamera = mapController.GetComponent<Camera>();
@@ -104,7 +104,7 @@ namespace BattleOfAges.Building
             // Ensure camera reference
             if (mapCamera == null || !mapCamera.enabled)
             {
-                RtsMapCameraController mapController = FindFirstObjectByType<RtsMapCameraController>();
+                RtsMapCameraController mapController = Managers.GameContext.MapCamera;
                 if (mapController != null) mapCamera = mapController.GetComponent<Camera>();
                 if (mapCamera == null) return;
             }

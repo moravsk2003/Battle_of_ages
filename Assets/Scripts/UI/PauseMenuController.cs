@@ -112,7 +112,7 @@ namespace BattleOfAges.UI
         {
             if (gameModeManager == null)
             {
-                gameModeManager = FindFirstObjectByType<GameModeManager>();
+                gameModeManager = Managers.GameContext.Modes;
             }
         }
 

@@ -57,6 +57,7 @@ namespace BattleOfAges.CameraSystem
 
         private void Awake()
         {
+            Managers.GameContext.Register(this);
             mapCamera = GetComponent<Camera>();
             mapCamera.orthographic = true;
             targetPosition = transform.position;

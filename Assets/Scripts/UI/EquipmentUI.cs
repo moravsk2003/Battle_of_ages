@@ -102,14 +102,14 @@ namespace BattleOfAges.UI
         public void OpenDefault()
         {
             var list = new List<Equipment>();
-            GameModeManager modes = FindFirstObjectByType<GameModeManager>();
-            RtsUnitCommander commander = FindFirstObjectByType<RtsUnitCommander>();
+            GameModeManager modes = Managers.GameContext.Modes;
+            RtsUnitCommander commander = Managers.GameContext.Commander;
             if (modes != null && modes.CurrentMode == GameMode.RtsMap && commander != null)
                 foreach (RtsUnit u in commander.SelectedUnits)
                     if (u != null) list.Add(GearOf(u.gameObject));
             if (list.Count == 0)
             {
-                var player = FindFirstObjectByType<PlayerCombatController>();
+                var player = Managers.GameContext.PlayerCombat;
                 if (player != null) list.Add(player.Gear);
             }
             Open(list);
@@ -127,7 +127,7 @@ namespace BattleOfAges.UI
         {
             open = false;
             window.SetActive(false);
-            GameModeManager modes = FindFirstObjectByType<GameModeManager>();
+            GameModeManager modes = Managers.GameContext.Modes;
             bool otherModal = GameWindows.InventoryOpen || GameWindows.WorkbenchOpen
                               || GameWindows.Paused;
             if (!otherModal && (modes == null || modes.CurrentMode == GameMode.FirstPerson))

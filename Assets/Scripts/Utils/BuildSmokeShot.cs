@@ -36,7 +36,7 @@ namespace BattleOfAges.Utils
         /// <summary>With "-smokefx": runtime-made looks in front of the camera (mage bolts, fire fan, an artifact).</summary>
         private static IEnumerator Effects()
         {
-            var player = UnityEngine.Object.FindFirstObjectByType<Player.PlayerCombatController>();
+            var player = Managers.GameContext.PlayerCombat;
             if (player == null) yield break;
             var hero = player.GetComponent<Combat.HeroProgress>();
             hero.ChooseClass(Combat.HeroClass.Mage);

@@ -52,6 +52,7 @@ namespace BattleOfAges.Player
 
         private void Awake()
         {
+            if (gameObject.name == "Player") Managers.GameContext.RegisterPlayer(gameObject);
             healthComponent = GetComponent<HealthComponent>();
             combatUnit = GetComponent<CombatUnit>();
             if (combatUnit != null) combatUnit.SpeedModifier = CharacterSpeed.HeroModifier;
@@ -108,7 +109,7 @@ namespace BattleOfAges.Player
 
         private void Update()
         {
-            if (cachedModeManager == null) cachedModeManager = FindFirstObjectByType<GameModeManager>(); // was a full scene search every frame
+            if (cachedModeManager == null) cachedModeManager = Managers.GameContext.Modes; // was a full scene search every frame
             GameModeManager gmm = cachedModeManager;
             if (gmm != null && gmm.CurrentMode != GameMode.FirstPerson) return;
             if (GameWindows.BlockGameplay) return;

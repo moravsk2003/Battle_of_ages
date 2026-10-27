@@ -353,7 +353,7 @@ namespace BattleOfAges.AI
         /// <summary>The player's hero, if alive.</summary>
         private static HealthComponent PlayerHero()
         {
-            GameObject player = GameObject.Find("Player");
+            GameObject player = Managers.GameContext.Player;
             HealthComponent p = player != null ? player.GetComponent<HealthComponent>() : null;
             return p != null && p.IsAlive ? p : null;
         }

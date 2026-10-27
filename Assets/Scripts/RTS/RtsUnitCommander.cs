@@ -31,6 +31,8 @@ namespace BattleOfAges.RTS
         private Vector3 startMousePos;
         private bool isDraggingSelection = false;
 
+        private void Awake() => Managers.GameContext.Register(this);
+
         private void Start()
         {
             InitializeReferences();
@@ -40,12 +42,12 @@ namespace BattleOfAges.RTS
         {
             if (gameModeManager == null)
             {
-                gameModeManager = FindFirstObjectByType<GameModeManager>();
+                gameModeManager = Managers.GameContext.Modes;
             }
 
             if (mapCamera == null)
             {
-                RtsMapCameraController mapController = FindFirstObjectByType<RtsMapCameraController>();
+                RtsMapCameraController mapController = Managers.GameContext.MapCamera;
                 if (mapController != null)
                 {
                     mapCamera = mapController.GetComponent<Camera>();

@@ -31,6 +31,8 @@ namespace BattleOfAges.Managers
 
         public event Action<GameMode> OnGameModeChanged;
 
+        private void Awake() => Managers.GameContext.Register(this);
+
         private void Start()
         {
             InitializeReferences();
@@ -46,7 +48,7 @@ namespace BattleOfAges.Managers
 
             if (mapCameraController == null)
             {
-                mapCameraController = FindFirstObjectByType<RtsMapCameraController>();
+                mapCameraController = Managers.GameContext.MapCamera;
             }
 
             if (fpsCamera == null && playerController != null)

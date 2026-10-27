@@ -19,7 +19,7 @@ namespace BattleOfAges.Utils
             {
                 if (frame == Time.frameCount && cached != null) return cached;
                 frame = Time.frameCount;
-                if (map == null) map = Object.FindFirstObjectByType<RtsMapCameraController>();
+                if (map == null) map = Managers.GameContext.MapCamera;
                 Camera mapCam = map != null ? map.GetComponent<Camera>() : null;
                 cached = mapCam != null && mapCam.isActiveAndEnabled ? mapCam : Camera.main;
                 return cached;

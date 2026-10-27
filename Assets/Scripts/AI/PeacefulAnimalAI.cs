@@ -159,7 +159,7 @@ namespace BattleOfAges.AI
         {
             if (cachedPlayer == null)
             {
-                GameObject player = GameObject.Find("Player");
+                GameObject player = Managers.GameContext.Player;
                 if (player != null) cachedPlayer = player.transform;
             }
 

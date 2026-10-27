@@ -131,7 +131,7 @@ namespace BattleOfAges.AI
         {
             if (playerViewer == null)
             {
-                GameObject player = GameObject.Find("Player");
+                GameObject player = Managers.GameContext.Player;
                 if (player != null) playerViewer = player.transform;
                 else if (Camera.main != null) playerViewer = Camera.main.transform;
             }

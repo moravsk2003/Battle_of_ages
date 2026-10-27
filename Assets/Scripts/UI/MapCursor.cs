@@ -38,8 +38,8 @@ namespace BattleOfAges.UI
             timer -= Time.unscaledDeltaTime;
             if (timer > 0f) return;
             timer = 0.05f;
-            if (modes == null) modes = FindFirstObjectByType<GameModeManager>();
-            if (commander == null) commander = FindFirstObjectByType<RtsUnitCommander>();
+            if (modes == null) modes = Managers.GameContext.Modes;
+            if (commander == null) commander = Managers.GameContext.Commander;
             Set(Decide());
         }
 

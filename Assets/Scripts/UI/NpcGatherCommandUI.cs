@@ -127,7 +127,7 @@ namespace BattleOfAges.UI
                 (BuildMenuUI.Instance == null || !BuildMenuUI.Instance.IsOpen) &&
                 !GameWindows.Paused)
             {
-                GameModeManager gmm = FindFirstObjectByType<GameModeManager>();
+                GameModeManager gmm = Managers.GameContext.Modes;
                 if (gmm == null || gmm.CurrentMode == GameMode.FirstPerson)
                 {
                     Cursor.lockState = CursorLockMode.Locked;

@@ -45,7 +45,7 @@ namespace BattleOfAges.UI
 
         private void Start()
         {
-            commander = FindFirstObjectByType<RtsUnitCommander>();
+            commander = Managers.GameContext.Commander;
             if (panelObj != null) panelObj.SetActive(false);
         }
 
@@ -53,7 +53,7 @@ namespace BattleOfAges.UI
         {
             if (commander == null)
             {
-                commander = FindFirstObjectByType<RtsUnitCommander>();
+                commander = Managers.GameContext.Commander;
                 if (commander == null) return;
             }
 

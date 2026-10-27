@@ -114,7 +114,7 @@ namespace BattleOfAges.UI
                 pings.Add((world, Time.unscaledTime - AttackAlerts.PingSeconds + 1.2f, img)); // a short green ring
                 return;
             }
-            var cam = FindFirstObjectByType<CameraSystem.RtsMapCameraController>();
+            var cam = Managers.GameContext.MapCamera;
             if (cam != null) cam.LookAtGround(world);
         }
 
@@ -122,7 +122,7 @@ namespace BattleOfAges.UI
         private void JumpToAlert(bool map)
         {
             if (!map || !AttackAlerts.HasLast || GameWindows.BlockGameplay || !InputSystem.KeybindsManager.GetKeyDown(InputSystem.KeyAction.AlertJump)) return;
-            var cam = FindFirstObjectByType<CameraSystem.RtsMapCameraController>();
+            var cam = Managers.GameContext.MapCamera;
             if (cam != null) cam.LookAtGround(AttackAlerts.Last);
         }
 
@@ -407,7 +407,7 @@ namespace BattleOfAges.UI
             if (w == null) { Notify("Усі робітники при ділі"); return; }
             RtsUnit u = w.GetComponent<RtsUnit>();
             if (commander != null && u != null) commander.SelectOnly(u);
-            var cam = FindFirstObjectByType<CameraSystem.RtsMapCameraController>();
+            var cam = Managers.GameContext.MapCamera;
             if (cam != null) cam.LookAtGround(w.transform.position);
         }
 
@@ -431,9 +431,9 @@ namespace BattleOfAges.UI
         private void Update()
         {
             if (root == null) return;
-            if (modes == null) modes = FindFirstObjectByType<GameModeManager>();
-            if (commander == null) commander = FindFirstObjectByType<RtsUnitCommander>();
-            if (playerHealth == null) { GameObject p = GameObject.Find("Player"); if (p != null) playerHealth = p.GetComponent<HealthComponent>(); }
+            if (modes == null) modes = Managers.GameContext.Modes;
+            if (commander == null) commander = Managers.GameContext.Commander;
+            if (playerHealth == null) { GameObject p = Managers.GameContext.Player; if (p != null) playerHealth = p.GetComponent<HealthComponent>(); }
             bool map = modes != null && modes.CurrentMode == GameMode.RtsMap;
             UpdateAlarmButton();
             if (alarmBanner.gameObject.activeSelf != SettlementAlarm.Active) alarmBanner.gameObject.SetActive(SettlementAlarm.Active);

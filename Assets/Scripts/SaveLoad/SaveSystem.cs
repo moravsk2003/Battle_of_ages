@@ -134,7 +134,7 @@ namespace BattleOfAges.SaveLoad
             d.Armory.AddRange(Armory.Instance.Items);
 
             // Player
-            PlayerCombatController player = UnityEngine.Object.FindFirstObjectByType<PlayerCombatController>();
+            PlayerCombatController player = Managers.GameContext.PlayerCombat;
             if (player != null)
             {
                 d.Player.Position = player.transform.position;
@@ -170,9 +170,9 @@ namespace BattleOfAges.SaveLoad
                     d.Player.PierceLevel = skills.PiercingArrow ? 1 : 0; d.Player.Meteor = skills.Meteor; d.Player.CriticalHit = skills.CriticalHit;
                 }
             }
-            GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
+            GameModeManager modes = Managers.GameContext.Modes;
             if (modes != null) d.Player.Mode = (int)modes.CurrentMode;
-            var mapCam = UnityEngine.Object.FindFirstObjectByType<RtsMapCameraController>();
+            var mapCam = Managers.GameContext.MapCamera;
             if (mapCam != null) { d.Player.HasMapCamera = true; d.Player.MapCameraPosition = mapCam.transform.position; }
 
             // Buildings (index = their place in the list, units refer to it)
@@ -311,7 +311,7 @@ namespace BattleOfAges.SaveLoad
         /// <summary>The NPC kings of a new game around the player (docs/GAME_DESIGN.md §12, M0).</summary>
         private static void FoundKingdoms()
         {
-            GameObject player = GameObject.Find("Player");
+            GameObject player = Managers.GameContext.Player;
             AI.NpcKingdom.FoundAround(player != null ? player.transform.position : Vector3.zero);
         }
 
@@ -430,7 +430,7 @@ namespace BattleOfAges.SaveLoad
             }
 
             // The hero
-            PlayerCombatController player = UnityEngine.Object.FindFirstObjectByType<PlayerCombatController>();
+            PlayerCombatController player = Managers.GameContext.PlayerCombat;
             if (player != null)
             {
                 Place(player.gameObject, d.Player.Position, d.Player.Yaw);
@@ -452,9 +452,9 @@ namespace BattleOfAges.SaveLoad
             AI.NpcKingdom.RemoveAll();
             if (d.KingdomsFounded) foreach (KingdomSave k in d.Kingdoms) AI.NpcKingdom.FromSave(k);
             else FoundKingdoms(); // a save from before the NPC kings
-            var mapCam = UnityEngine.Object.FindFirstObjectByType<RtsMapCameraController>();
+            var mapCam = Managers.GameContext.MapCamera;
             if (mapCam != null && d.Player.HasMapCamera) mapCam.transform.position = d.Player.MapCameraPosition;
-            GameModeManager modes = UnityEngine.Object.FindFirstObjectByType<GameModeManager>();
+            GameModeManager modes = Managers.GameContext.Modes;
             if (modes != null) modes.SetGameMode((GameMode)d.Player.Mode);
         }
 

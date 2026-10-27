@@ -76,7 +76,7 @@ namespace BattleOfAges.UI
         {
             IsOpen = false;
             if (window != null) window.SetActive(false);
-            GameModeManager gmm = FindFirstObjectByType<GameModeManager>();
+            GameModeManager gmm = Managers.GameContext.Modes;
             if (!EquipmentUI.IsVisible && (gmm == null || gmm.CurrentMode == GameMode.FirstPerson))
             {
                 Cursor.lockState = CursorLockMode.Locked;
@@ -303,7 +303,7 @@ namespace BattleOfAges.UI
             int stored = 0;
             foreach (Item it in Armory.Instance.Items) if (it.Equals(item)) stored++;
             if (stored > 0) s += "\n" + TipText.Dim($"На складі вже є: {stored}");
-            PlayerCombatController player = FindFirstObjectByType<PlayerCombatController>();
+            PlayerCombatController player = Managers.GameContext.PlayerCombat;
             if (player != null && player.Gear != null)
             {
                 Equipment gear = player.Gear;

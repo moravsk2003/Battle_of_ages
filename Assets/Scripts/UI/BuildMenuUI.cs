@@ -50,7 +50,7 @@ namespace BattleOfAges.UI
 
         private void Start()
         {
-            gameModeManager = FindFirstObjectByType<GameModeManager>();
+            gameModeManager = Managers.GameContext.Modes;
             CloseMenu();
         }
 

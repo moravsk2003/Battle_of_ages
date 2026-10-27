@@ -410,7 +410,7 @@ namespace BattleOfAges.RTS
                     currentState = GathererState.WorkingInsideMine;
                     if (rtsUnit != null)
                     {
-                        FindFirstObjectByType<RtsUnitCommander>()?.Deselect(rtsUnit);
+                        Managers.GameContext.Commander?.Deselect(rtsUnit);
                         rtsUnit.SetSelected(false);
                         rtsUnit.IssueMoveCommand(transform.position);
                     }

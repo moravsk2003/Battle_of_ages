@@ -40,7 +40,7 @@ namespace BattleOfAges.Building
         private bool OwnNear(Vector3 at, float radius)
         {
             float r2 = radius * radius;
-            if (player == null) { GameObject p = GameObject.Find("Player"); if (p != null) player = p.transform; }
+            if (player == null) { GameObject p = Managers.GameContext.Player; if (p != null) player = p.transform; }
             if (player != null && (player.position - at).sqrMagnitude < r2) return true;
             var units = UnitRegistry.ActiveUnits;
             for (int i = 0; i < units.Count; i++)

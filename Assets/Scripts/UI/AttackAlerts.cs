@@ -89,7 +89,7 @@ namespace BattleOfAges.UI
         private static Managers.GameModeManager modes;
         private static bool MapOpen()
         {
-            if (modes == null) modes = UnityEngine.Object.FindFirstObjectByType<Managers.GameModeManager>();
+            if (modes == null) modes = Managers.GameContext.Modes;
             return modes != null && modes.CurrentMode == Managers.GameMode.RtsMap;
         }
     }

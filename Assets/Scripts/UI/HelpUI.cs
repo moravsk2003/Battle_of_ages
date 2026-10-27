@@ -52,7 +52,7 @@ namespace BattleOfAges.UI
         {
             open = false;
             window.SetActive(false);
-            GameModeManager modes = FindFirstObjectByType<GameModeManager>();
+            GameModeManager modes = Managers.GameContext.Modes;
             if (!GameWindows.AnyModalOpen && !GameWindows.Paused && (modes == null || modes.CurrentMode == GameMode.FirstPerson))
             {
                 Cursor.lockState = CursorLockMode.Locked;

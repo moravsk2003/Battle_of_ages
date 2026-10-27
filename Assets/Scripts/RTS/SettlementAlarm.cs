@@ -46,7 +46,7 @@ namespace BattleOfAges.RTS
         {
             TownHall hall = TownHall.Current;
             if (hall != null) { home = hall.transform.position; return true; }
-            GameObject player = GameObject.Find("Player");
+            GameObject player = Managers.GameContext.Player;
             if (player == null) { home = Vector3.zero; return false; }
             home = StorageChestNode.GetNearestChestDepositPosition(player.transform.position);
             return true;

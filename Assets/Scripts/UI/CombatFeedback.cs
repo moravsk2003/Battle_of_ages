@@ -64,7 +64,7 @@ namespace BattleOfAges.UI
         private void FindPlayer()
         {
             if (player != null) return;
-            GameObject p = GameObject.Find("Player");
+            GameObject p = Managers.GameContext.Player;
             if (p == null) return;
             player = p.GetComponent<HealthComponent>();
             playerCombat = p.GetComponent<CombatUnit>();
@@ -76,7 +76,7 @@ namespace BattleOfAges.UI
         {
             if (target == null || root == null) return;
             FindPlayer();
-            if (modes == null) modes = FindFirstObjectByType<GameModeManager>();
+            if (modes == null) modes = Managers.GameContext.Modes;
             if (target == player) flash = 1f;
             if (playerCombat != null && target.LastAttacker == playerCombat && target != player) hitUntil = Time.unscaledTime + 0.15f;
 
@@ -139,7 +139,7 @@ namespace BattleOfAges.UI
 
             // The vignette and the hit marker, first person only
             FindPlayer();
-            if (modes == null) modes = FindFirstObjectByType<GameModeManager>();
+            if (modes == null) modes = Managers.GameContext.Modes;
             bool fp = !Map;
             float low = 0f;
             if (fp && player != null && player.IsAlive && player.MaxHealth > 0)

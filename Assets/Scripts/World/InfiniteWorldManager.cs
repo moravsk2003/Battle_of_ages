@@ -82,7 +82,7 @@ namespace BattleOfAges.World
         {
             if (viewerTarget == null)
             {
-                GameObject player = GameObject.Find("Player");
+                GameObject player = Managers.GameContext.Player;
                 if (player != null) viewerTarget = player.transform;
                 else if (Camera.main != null) viewerTarget = Camera.main.transform;
             }

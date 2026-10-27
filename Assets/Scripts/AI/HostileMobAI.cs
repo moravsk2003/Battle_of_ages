@@ -408,7 +408,7 @@ namespace BattleOfAges.AI
         {
             if (cachedPlayerHealth == null)
             {
-                GameObject player = GameObject.Find("Player");
+                GameObject player = Managers.GameContext.Player;
                 if (player != null) cachedPlayerHealth = player.GetComponent<HealthComponent>();
             }
             return cachedPlayerHealth;

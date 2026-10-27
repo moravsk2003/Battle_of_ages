@@ -51,7 +51,7 @@ namespace BattleOfAges.UI
         private void Refresh()
         {
             if (promptPanel == null) return;
-            if (modes == null) modes = FindFirstObjectByType<GameModeManager>();
+            if (modes == null) modes = Managers.GameContext.Modes;
             bool firstPerson = modes == null || modes.CurrentMode == GameMode.FirstPerson;
             bool show = wanted && firstPerson && !GameWindows.BlockGameplay;
             if (promptPanel.gameObject.activeSelf != show) promptPanel.gameObject.SetActive(show);
