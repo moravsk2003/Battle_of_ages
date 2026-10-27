@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Resources;
 using BattleOfAges.Building;
@@ -108,7 +109,7 @@ namespace BattleOfAges.RTS
             bool hurt = healthComponent.CurrentHealth < healthComponent.MaxHealth * GameBalance.WorkerFleeShare;
             if (!hurt && attackerHp != null && attackerHp.IsAlive && !IsInsideMine)
             {
-                rtsUnit.IssueAttackCommand(attackerHp);
+                rtsUnit.IssueAttackCommand(attackerHp, ordered: false);
                 return;
             }
 
@@ -225,6 +226,63 @@ namespace BattleOfAges.RTS
         {
             if (CentralEmpire.Active) return; // the Central Empire's units do not work (docs/GAME_DESIGN.md §9.1.1)
             if (currentDirective == GatherDirective.Idle) currentDirective = GatherDirective.Auto;
+        }
+
+        /// <summary>Has wood or ore in hand (on its way to the chest): the job distribution leaves it be.</summary>
+        public bool IsCarrying => carriedWood > 0 || carriedOreAmount > 0;
+        public ResourceNodeTree TargetTree => targetTree;
+
+        /// <summary>
+        /// How far this worker is from where the job is done (a mine for hauling, a tree, a pebble on the ground), for
+        /// handing jobs to the nearest workers; float.MaxValue when there is none within its search radius.
+        /// </summary>
+        public float DistanceToWork(GatherDirective d)
+        {
+            Vector3 me = transform.position;
+            if (d == GatherDirective.Auto || d == GatherDirective.Idle) return 0f;
+            if (d == GatherDirective.HaulOreFromMineToChest)
+            {
+                float best = float.MaxValue;
+                foreach (MineNode m in MineNode.ActiveMines) if (m != null) best = Mathf.Min(best, Vector3.Distance(me, m.GetOutputDepositPosition()));
+                return best;
+            }
+            int n = Physics.OverlapSphereNonAlloc(me, searchRadius, searchOverlapBuffer);
+            float nearest = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                Collider c = searchOverlapBuffer[i];
+                if (c == null) continue;
+                Vector3 at;
+                if (d == GatherDirective.OrePebblesOnly)
+                {
+                    OrePebbleNode p = c.GetComponentInParent<OrePebbleNode>();
+                    if (p == null || p.IsPickedUp) continue;
+                    at = p.transform.position;
+                }
+                else
+                {
+                    ResourceNodeTree t = c.GetComponentInParent<ResourceNodeTree>();
+                    if (t == null || t.CurrentState == TreeState.Depleted) continue;
+                    if (d == GatherDirective.WoodGatherBranchesOnly && t.CurrentState != TreeState.WholeTree) continue;
+                    at = t.transform.position;
+                }
+                nearest = Mathf.Min(nearest, Vector3.Distance(me, at));
+            }
+            return nearest;
+        }
+
+        private static readonly Dictionary<ResourceNodeTree, int> treeCrowd = new Dictionary<ResourceNodeTree, int>();
+
+        /// <summary>How many other workers are already going to or working at each tree (a tree takes WorkersPerTree).</summary>
+        private void CountTreeCrowds()
+        {
+            treeCrowd.Clear();
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+            {
+                if (w == null || w == this || w.targetTree == null) continue;
+                treeCrowd.TryGetValue(w.targetTree, out int k);
+                treeCrowd[w.targetTree] = k + 1;
+            }
         }
 
         private void ClearCurrentTargets()
@@ -389,7 +447,8 @@ namespace BattleOfAges.RTS
                 return;
             }
 
-            // 2. Search for wild wood / ore pebbles on map
+            // 2. Search for wild wood / ore pebbles on map (a tree with WorkersPerTree workers already is taken)
+            CountTreeCrowds();
             int hitCount = Physics.OverlapSphereNonAlloc(myPos, searchRadius, searchOverlapBuffer);
             float nearestSqrDst = searchRadius * searchRadius;
 
@@ -431,6 +490,7 @@ namespace BattleOfAges.RTS
                         {
                             continue;
                         }
+                        if (treeCrowd.TryGetValue(tree, out int crowd) && crowd >= GameBalance.WorkersPerTree) continue;
 
                         float sqrDst = (myPos - tree.transform.position).sqrMagnitude;
                         if (sqrDst < nearestSqrDst)

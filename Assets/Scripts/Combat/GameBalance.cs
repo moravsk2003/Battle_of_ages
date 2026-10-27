@@ -115,6 +115,13 @@ namespace BattleOfAges.Combat
         /// within AlarmRadius of the hall, and stands down AlarmStandDownSeconds after the last one is gone.
         /// </summary>
         public static float WorkerFleeShare = 0.25f, WorkerEngageRadius = 8f;
+        /// <summary>
+        /// A fight a unit picked itself (not ordered by the player or the alarm) ends this far from where it began: the
+        /// unit lets the enemy run and goes back (a soldier to its place, a worker to its job).
+        /// </summary>
+        public static float UnitLeashRadius = 25f, WorkerLeashRadius = 15f;
+        /// <summary>Workers at one tree at most: the rest take the next tree instead of crowding round one.</summary>
+        public static int WorkersPerTree = 2;
         public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f;
         public static bool AutoAlarm = true;
 

@@ -156,8 +156,15 @@ namespace BattleOfAges.RTS
         private HealthComponent attackTarget;
         private CombatUnit combatUnit;
 
-        public void IssueAttackCommand(HealthComponent target)
+        /// <summary>
+        /// Attack this target. ordered: the player's order or the alarm — the unit follows it anywhere. Otherwise (a
+        /// fight it picked itself, a worker hitting back) it is on a leash: it gives up past the leash from where the
+        /// fight began and goes back there (GameBalance.UnitLeashRadius, WorkerLeashRadius).
+        /// </summary>
+        public void IssueAttackCommand(HealthComponent target, bool ordered = true)
         {
+            bool keepLeash = !ordered && leashed; // the next enemy of the same fight keeps where the fight began
+            Vector3 keepOrigin = leashOrigin;
             if (target != null && wallState == WallState.Posted && combatUnit != null
                 && Vector3.Distance(transform.position, target.transform.position) <= combatUnit.AttackRange)
             {
@@ -170,6 +177,34 @@ namespace BattleOfAges.RTS
             }
             if (OnWall) leaveTarget = target; // after coming down
             else attackTarget = target;       // ...so the new one is set afterwards (was lost before)
+            if (ordered) leashed = false;
+            else if (keepLeash) { leashed = true; leashOrigin = keepOrigin; }
+            else StartLeash();
+        }
+
+        // ------------------------------------------------------------------ the leash
+
+        private bool leashed;
+        private Vector3 leashOrigin;
+
+        /// <summary>On a leash in a fight it picked itself: the point it will not chase further than the leash from.</summary>
+        public bool Leashed => leashed;
+        public Vector3 LeashOrigin => leashOrigin;
+        public float LeashRadius => IsWorking && !SettlementAlarm.Active ? GameBalance.WorkerLeashRadius : GameBalance.UnitLeashRadius;
+
+        private void StartLeash()
+        {
+            if (leashed) return; // the next enemy of the same fight: the leash stays where the fight began
+            leashed = true;
+            leashOrigin = transform.position;
+        }
+
+        /// <summary>The fight is over (won or given up): a soldier walks back to where it began; a worker's job takes it on.</summary>
+        private void EndLeash()
+        {
+            if (!leashed) return;
+            leashed = false;
+            if (!IsWorking && FlatDistance(transform.position, leashOrigin) > 2f) IssueMoveCommand(leashOrigin);
         }
 
         // ------------------------------------------------------------------ on the walls (§10.5)
@@ -306,7 +341,7 @@ namespace BattleOfAges.RTS
                 {
                     engageTimer = EngageInterval;
                     int enemy = UnitSpatialGrid.FindNearestEnemy(transform.position, soldier ? EngageRadius : GameBalance.WorkerEngageRadius, UnitSpatialGrid.TeamPlayer);
-                    if (enemy >= 0) attackTarget = UnitSpatialGrid.Health(enemy);
+                    if (enemy >= 0) { attackTarget = UnitSpatialGrid.Health(enemy); if (attackTarget != null) StartLeash(); }
                 }
             }
 
@@ -318,6 +353,14 @@ namespace BattleOfAges.RTS
                     attackTarget = null;
                     UnitProgress progress = GetComponent<UnitProgress>();
                     if (progress != null) progress.OnFightSurvived();
+                    EndLeash();
+                }
+                else if (leashed && FlatDistance(transform.position, leashOrigin) > LeashRadius)
+                {
+                    // Too far from where the fight began: let it run, go back
+                    attackTarget = null;
+                    hasTarget = false;
+                    EndLeash();
                 }
                 else
                 {
@@ -613,6 +656,7 @@ namespace BattleOfAges.RTS
             }
             if (wallState == WallState.ToStairs) { wallState = WallState.None; Building.WallWalk.Release(this); PostedByAlarm = false; }
             attackTarget = null;
+            leashed = false; // a new order: whatever fight it was in is over
             targetPosition = destination;
             targetPosition.y = GetTerrainHeight(destination);
             hasTarget = true;

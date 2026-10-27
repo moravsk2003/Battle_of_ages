@@ -65,24 +65,61 @@ namespace BattleOfAges.RTS
         private static readonly List<NpcResourceGatherer> workingBuffer = new List<NpcResourceGatherer>(64);
 
         /// <summary>Splits the units that have a job between the jobs (soldiers on stand-by keep standing by, miners keep mining).</summary>
+        /// <summary>
+        /// Gives the jobs out in these numbers (the rest work on their own, Auto) without reshuffling: a worker already on
+        /// a job keeps it while that job still needs hands; the missing hands come from the nearest free workers (to a mine,
+        /// a tree, a pebble); a worker with something in hand is moved last. Only workers whose job changes are told.
+        /// </summary>
         public static void ApplyJobDistribution(int branchesCount, int chopCount, int pebblesCount, int haulCount, int autoCount)
         {
             workingBuffer.Clear();
             foreach (NpcResourceGatherer w in activeWorkers) if (w != null && w.IsWorking && !w.IsMiner) workingBuffer.Add(w);
 
-            int index = 0;
-            index = Assign(index, branchesCount, GatherDirective.WoodGatherBranchesOnly);
-            index = Assign(index, chopCount, GatherDirective.WoodChopTreesOnly);
-            index = Assign(index, pebblesCount, GatherDirective.OrePebblesOnly);
-            index = Assign(index, haulCount, GatherDirective.HaulOreFromMineToChest);
-            Assign(index, workingBuffer.Count - index, GatherDirective.Auto); // the rest
-        }
+            var want = new (GatherDirective d, int n)[]
+            {
+                (GatherDirective.HaulOreFromMineToChest, haulCount), (GatherDirective.WoodChopTreesOnly, chopCount),
+                (GatherDirective.WoodGatherBranchesOnly, branchesCount), (GatherDirective.OrePebblesOnly, pebblesCount),
+            };
+            var assigned = new Dictionary<NpcResourceGatherer, GatherDirective>();
+            // each distance is a physics search: worked out once per worker and job
+            var distances = new Dictionary<(NpcResourceGatherer, GatherDirective), float>();
+            float Dist(NpcResourceGatherer w, GatherDirective d)
+            {
+                if (!distances.TryGetValue((w, d), out float v)) distances[(w, d)] = v = w.DistanceToWork(d);
+                return v;
+            }
 
-        private static int Assign(int from, int count, GatherDirective directive)
-        {
-            int end = Mathf.Min(workingBuffer.Count, from + Mathf.Max(0, count));
-            for (int i = from; i < end; i++) workingBuffer[i].SetGatherDirective(directive);
-            return end;
+            // 1. Keep those already on each job, nearest to the work first
+            foreach (var (d, n) in want)
+            {
+                var on = new List<NpcResourceGatherer>();
+                foreach (NpcResourceGatherer w in workingBuffer) if (w.CurrentDirective == d) on.Add(w);
+                on.Sort((a, b) => Dist(a, d).CompareTo(Dist(b, d)));
+                for (int i = 0; i < on.Count && i < n; i++) assigned[on[i]] = d;
+            }
+
+            // 2. Fill each job from the free workers nearest to it; those carrying something go last
+            foreach (var (d, n) in want)
+            {
+                int have = 0;
+                foreach (var kv in assigned) if (kv.Value == d) have++;
+                if (have >= n) continue;
+                var free = new List<NpcResourceGatherer>();
+                foreach (NpcResourceGatherer w in workingBuffer) if (!assigned.ContainsKey(w)) free.Add(w);
+                free.Sort((a, b) =>
+                {
+                    int c = a.IsCarrying.CompareTo(b.IsCarrying);
+                    return c != 0 ? c : Dist(a, d).CompareTo(Dist(b, d));
+                });
+                for (int i = 0; i < free.Count && have < n; i++, have++) assigned[free[i]] = d;
+            }
+
+            // 3. Everyone else works on their own; tell only those whose job changes
+            foreach (NpcResourceGatherer w in workingBuffer)
+            {
+                GatherDirective d = assigned.TryGetValue(w, out GatherDirective a) ? a : GatherDirective.Auto;
+                if (w.CurrentDirective != d) w.SetGatherDirective(d);
+            }
         }
     }
 }
