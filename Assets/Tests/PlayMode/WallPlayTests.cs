@@ -20,6 +20,7 @@ namespace BattleOfAges.PlayModeTests
             foreach (GameObject go in spawned) if (go != null) Object.Destroy(go);
             spawned.Clear();
             foreach (WallPier p in new List<WallPier>(WallPier.Active)) if (p != null) Object.Destroy(p.gameObject);
+            Time.timeScale = 1f;
         }
 
         private WallSegment Segment(BuildingType type, Vector3 at, float yaw)
@@ -213,6 +214,115 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(sawLadder, "a ladder was raised");
             Assert.Less(mob.transform.position.z, Far.z - 1.7f, $"the bandit got inside (at {mob.transform.position - Far} after {t:0} s)");
             Assert.AreEqual(wall.MaxHealth, wall.CurrentHealth, "and did not harm the wall");
+            foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
+        }
+
+        /// <summary>Waits until the besieger is up its ladder (between the ground and the walkway); false if it never gets there.</summary>
+        private IEnumerator UntilHalfwayUp(AI.HostileMobAI mob, HealthComponent wall, System.Action<bool> done)
+        {
+            for (float t = 0f; t < 40f; t += Time.deltaTime)
+            {
+                if (mob.IsClimbing && mob.transform.position.y > wall.transform.position.y + 1f) { done(true); yield break; }
+                yield return null;
+            }
+            done(false);
+        }
+
+        [UnityTest]
+        public IEnumerator WallFallsUnderAClimber_ItDropsToTheGround_AndGoesOn()
+        {
+            var (mob, wall, target) = Siege(AI.HostileMobType.Bandit);
+            yield return null;
+            yield return null;
+            mob.OrderAttack(target);
+            bool up = false;
+            yield return UntilHalfwayUp(mob, wall, b => up = b);
+            Assert.IsTrue(up, "it got onto a ladder");
+            WallSegment under = SiegeLadder.Active.Count > 0 ? SiegeLadder.Active[0].Wall : null;
+            Assert.IsNotNull(under);
+            under.GetComponent<HealthComponent>().TakeDamage(1000000); // the wall it climbs falls
+            yield return new WaitForSeconds(0.5f);
+            Assert.IsFalse(mob.IsClimbing, "no climbing a wall that is not there");
+            Assert.Less(mob.transform.position.y - RTS.RtsUnit.GetTerrainHeight(mob.transform.position), 0.6f, "it is on the ground, not in the air");
+            float t = 0f;
+            for (; t < 30f && mob.transform.position.z > Far.z - 1.8f; t += Time.deltaTime) yield return null;
+            Assert.Less(mob.transform.position.z, Far.z - 1.7f, $"and goes on through the gap (at {mob.transform.position - Far} after {t:0} s)");
+        }
+
+        [UnityTest]
+        public IEnumerator ClimberKilledOnTheLadder_FallsDown_AndFreesTheLadder()
+        {
+            var (mob, wall, target) = Siege(AI.HostileMobType.Bandit);
+            yield return null;
+            yield return null;
+            mob.OrderAttack(target);
+            bool up = false;
+            yield return UntilHalfwayUp(mob, wall, b => up = b);
+            Assert.IsTrue(up, "it got onto a ladder");
+            SiegeLadder ladder = SiegeLadder.Active[0];
+            Assert.IsFalse(ladder.Free, "taken while it climbs");
+            mob.GetComponent<HealthComponent>().TakeDamage(1000000); // shot off the ladder
+            yield return null;
+            yield return null;
+            Assert.IsTrue(ladder.Free, "the next one may climb");
+            Assert.Less(mob.transform.position.y - RTS.RtsUnit.GetTerrainHeight(mob.transform.position), 0.6f, "the body is on the ground");
+            foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
+        }
+
+        /// <summary>
+        /// A whole assault: six raiders of three kinds against a 20 m wall line — the strong break through, the rest take
+        /// ladders in turns — and nobody stands stuck outside: each one gets in (or dies) and none waits still for long.
+        /// </summary>
+        [UnityTest, Timeout(300000)]
+        public IEnumerator Assault_OnAWallLine_EveryoneGetsIn_NobodyStuck()
+        {
+            Ground();
+            for (int i = -2; i <= 2; i++) Segment(BuildingType.CastleWall, OnGround(Far + new Vector3(i * 4f, 0f, 0f)), 0f);
+            var target = new GameObject("AssaultTarget");
+            target.transform.position = OnGround(Far + new Vector3(0f, 0f, -8f));
+            HealthComponent targetHp = target.AddComponent<HealthComponent>();
+            targetHp.InitializeHealth(1000000);
+            spawned.Add(target);
+            var kinds = new[] { AI.HostileMobType.Bandit, AI.HostileMobType.Bandit, AI.HostileMobType.Goblin, AI.HostileMobType.Bandit, AI.HostileMobType.WarlordGuard, AI.HostileMobType.Goblin };
+            var mobs = new List<AI.HostileMobAI>();
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                GameObject m = Utils.HostileCampBuilder.CreateHostileMob(kinds[i], "Assault" + i);
+                CharacterController cc = m.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+                m.transform.position = OnGround(Far + new Vector3(-7.5f + i * 3f, 0f, 9f + (i % 2) * 2f));
+                if (cc != null) cc.enabled = true;
+                spawned.Add(m);
+                mobs.Add(m.GetComponent<AI.HostileMobAI>());
+            }
+            yield return null;
+            yield return null;
+            foreach (AI.HostileMobAI m in mobs) m.OrderAttack(targetHp);
+
+            Time.timeScale = 3f;
+            var lastPos = new Vector3[mobs.Count];
+            var stillFor = new float[mobs.Count];
+            float t = 0f;
+            bool AllIn()
+            {
+                foreach (AI.HostileMobAI m in mobs) if (m != null && m.Health != null && m.Health.IsAlive && m.transform.position.z > Far.z - 1.7f) return false;
+                return true;
+            }
+            for (; t < 150f && !AllIn(); t += Time.deltaTime)
+            {
+                for (int i = 0; i < mobs.Count; i++)
+                {
+                    AI.HostileMobAI m = mobs[i];
+                    if (m == null || m.Health == null || !m.Health.IsAlive || m.transform.position.z < Far.z - 1.7f) continue;
+                    if ((m.transform.position - lastPos[i]).sqrMagnitude > 0.25f || m.IsClimbing) { lastPos[i] = m.transform.position; stillFor[i] = 0f; continue; }
+                    stillFor[i] += Time.deltaTime;
+                    // waiting its turn at a ladder is fine, standing still outside for half a minute is not
+                    Assert.Less(stillFor[i], 30f, $"{m.name} ({kinds[i]}) stuck outside at {m.transform.position - Far} after {t:0} s");
+                }
+                yield return null;
+            }
+            Time.timeScale = 1f;
+            Assert.IsTrue(AllIn(), $"everyone got in within {t:0} s of game time");
             foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
         }
 

@@ -302,7 +302,8 @@ namespace BattleOfAges.AI
                 float time = Mathf.Max(0.2f, Vector3.Distance(a, b) / speed[leg]);
                 for (float t = 0f; t < time; t += Time.deltaTime)
                 {
-                    if (Health == null || !Health.IsAlive) { l.EndClimb(Health); climbing = false; yield break; }
+                    if (Health == null || !Health.IsAlive) { if (l != null) l.EndClimb(Health); DropDown(); yield break; }
+                    if (l == null || l.Wall == null) { DropDown(); yield break; } // the wall fell under it: it falls too
                     transform.position = Vector3.Lerp(a, b, t / time);
                     yield return null;
                 }
@@ -314,7 +315,8 @@ namespace BattleOfAges.AI
                     // On the walkway: fight the defenders up here first, moving along to them
                     for (float fight = 0f; fight < WalkwayFightSeconds; fight += Time.deltaTime)
                     {
-                        if (Health == null || !Health.IsAlive) { climbing = false; yield break; }
+                        if (Health == null || !Health.IsAlive) { DropDown(); yield break; }
+                        if (l == null || l.Wall == null) { DropDown(); yield break; }
                         RtsUnit defender = NearestDefender(WalkwayFightRadius);
                         if (defender == null) break;
                         Vector3 to = defender.transform.position - transform.position;
@@ -329,6 +331,18 @@ namespace BattleOfAges.AI
                     path[3].y = RtsUnit.GetTerrainHeight(path[3]);
                 }
             }
+            climbing = false;
+            ladder = null;
+            wallInWay = false;
+            nextSiegeCheck = Time.time + 0.5f;
+        }
+
+        /// <summary>Off the ladder or the walkway at once (the wall fell, or it died up there): onto the ground below, the siege over.</summary>
+        private void DropDown()
+        {
+            Vector3 p = transform.position;
+            p.y = RtsUnit.GetTerrainHeight(p);
+            transform.position = p;
             climbing = false;
             ladder = null;
             wallInWay = false;
