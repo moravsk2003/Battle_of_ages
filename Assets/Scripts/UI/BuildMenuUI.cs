@@ -159,6 +159,7 @@ namespace BattleOfAges.UI
             RectTransform panelRect = UiTheme.Rect(transform, "BuildMenuPanel", new Vector2(0.5f, 0f), new Vector2(0f, 160f), new Vector2(640f, height)); // above the unit command panel
             menuPanelObj = panelRect.gameObject;
             UiTheme.PanelImage(panelRect);
+            PopIn.On(panelRect);
 
             titleText = UiTheme.Label(UiTheme.Child(panelRect, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f), new Vector2(-22f, -6f)), "Title", "", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             UpdateHeaderText();
@@ -192,7 +193,7 @@ namespace BattleOfAges.UI
         private Row CreateBuildingButton(RectTransform rect, BuildingDefinition def)
         {
             UiTheme.PanelImage(rect, UiTheme.ButtonSprite);
-            Button btn = rect.gameObject.AddComponent<Button>();
+            Button btn = UiTheme.AddButton(rect.gameObject);
             ColorBlock cb = btn.colors;
             cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
             cb.disabledColor = new Color(0.7f, 0.7f, 0.7f, 1f); cb.colorMultiplier = 1.25f;

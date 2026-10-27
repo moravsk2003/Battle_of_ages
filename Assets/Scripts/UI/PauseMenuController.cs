@@ -61,6 +61,8 @@ namespace BattleOfAges.UI
 
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (settingsPanel != null) settingsPanel.SetActive(false);
+            Transform pauseWindow = pauseMenuPanel != null ? pauseMenuPanel.transform.Find("PauseWindow") : null;
+            if (pauseWindow != null) PopIn.On(pauseWindow);
 
             KeybindsManager.OnKeybindsChanged += RefreshKeybindButtonTexts;
         }

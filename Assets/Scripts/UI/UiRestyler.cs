@@ -1,23 +1,18 @@
-using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 using BattleOfAges.SaveLoad;
 
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// Brings every window the older UI scripts build (build menu, inventory, workbench, worker orders, pause, prompts)
-    /// to the UiTheme look without rewriting them: new graphics are restyled once as they appear, texts are kept free
-    /// of emoji the font cannot draw. Also starts the StrategyHud. Created automatically after a scene loads.
+    /// Starts the game UI after a scene loads: the StrategyHud, and — once, a frame later, when every window there has
+    /// built itself — the UiTheme look for the older windows built with default looks (inventory, worker orders, the
+    /// pause menu from the scene). Their rows made later restyle themselves (UiTheme.RestyleTree). It used to poll every
+    /// canvas five times a second for new graphics; now nothing here runs per frame.
     /// </summary>
     public sealed class UiRestyler : MonoBehaviour
     {
-        private readonly HashSet<int> styled = new HashSet<int>();
-        private readonly Dictionary<int, string> lastText = new Dictionary<int, string>();
-        private readonly List<Graphic> buffer = new List<Graphic>();
-        private float timer;
-
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
@@ -29,67 +24,20 @@ namespace BattleOfAges.UI
 
         private void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
         private void OnDisable() => SceneManager.sceneLoaded -= OnSceneLoaded;
-        private void Start() => EnsureHud();
-        private void OnSceneLoaded(Scene s, LoadSceneMode m) { styled.Clear(); lastText.Clear(); EnsureHud(s.name); }
+        private void Start() => StartCoroutine(SetUp(SceneManager.GetActiveScene().name));
+        private void OnSceneLoaded(Scene s, LoadSceneMode m) => StartCoroutine(SetUp(s.name));
 
-        private static void EnsureHud(string scene = null)
+        private static IEnumerator SetUp(string scene)
         {
-            if ((scene ?? SceneManager.GetActiveScene().name) == SaveSystem.MenuScene) return;
-            if (FindFirstObjectByType<StrategyHud>() == null) new GameObject("StrategyHud").AddComponent<StrategyHud>();
-        }
-
-        private void LateUpdate()
-        {
-            timer -= Time.unscaledDeltaTime;
-            if (timer > 0f) return;
-            timer = 0.2f;
-            foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+            if (scene != SaveSystem.MenuScene && FindFirstObjectByType<StrategyHud>() == null) new GameObject("StrategyHud").AddComponent<StrategyHud>();
+            yield return null; // the scene's windows build in Awake and Start
+            foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
-                if (c.isRootCanvas && c.renderMode != RenderMode.WorldSpace)
-                {
-                    Managers.DisplaySettings.Apply(c.GetComponent<CanvasScaler>());
-                    AddMotion(c);
-                }
-                if (!c.isRootCanvas || c.GetComponent<UiThemed>() != null || c.renderMode == RenderMode.WorldSpace) continue;
-                c.GetComponentsInChildren(true, buffer);
-                foreach (Graphic g in buffer)
-                {
-                    int id = g.GetInstanceID();
-                    if (styled.Add(id))
-                    {
-                        UiTheme.FixDefaultOffsets(g.rectTransform);
-                        if (g.transform.parent is RectTransform parent && styled.Add(parent.GetInstanceID())) UiTheme.FixDefaultOffsets(parent);
-                        UiTheme.Restyle(g);
-                    }
-                    else if (g is Text t && (!lastText.TryGetValue(id, out string last) || !ReferenceEquals(last, t.text)))
-                    {
-                        string clean = UiTheme.Sanitize(t.text);
-                        if (!ReferenceEquals(clean, t.text)) t.text = clean;
-                        lastText[id] = t.text;
-                    }
-                }
+                if (!c.isRootCanvas || c.renderMode == RenderMode.WorldSpace || c.GetComponent<UiThemed>() != null) continue;
+                UiTheme.RestyleTree(c.transform);
+                c.gameObject.AddComponent<UiThemed>();
             }
-        }
-
-        private static readonly HashSet<string> WindowNames = new HashSet<string> { "Window", "InventoryPanel", "NpcCommandPanel", "BuildMenuPanel", "PauseWindow" };
-        private readonly List<Button> buttons = new List<Button>();
-
-        /// <summary>Every button answers the cursor (ButtonFx); windows not yet shown pop in when they open (PopIn).</summary>
-        private void AddMotion(Canvas c)
-        {
-            c.GetComponentsInChildren(true, buttons);
-            foreach (Button b in buttons) ButtonFx.On(b);
-            foreach (Transform child in c.transform)
-            {
-                TryPop(child);
-                foreach (Transform grand in child) TryPop(grand);
-            }
-        }
-
-        private static void TryPop(Transform t)
-        {
-            if (!WindowNames.Contains(t.name) || t.gameObject.activeInHierarchy || t.GetComponent<PopIn>() != null) return;
-            PopIn.On(t);
+            Managers.DisplaySettings.ApplyScale();
         }
     }
 }

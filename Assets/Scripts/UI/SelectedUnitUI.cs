@@ -328,7 +328,7 @@ namespace BattleOfAges.UI
                 int col = i % CardColumns, row = i / CardColumns;
                 RectTransform card = UiTheme.Rect(grid, "Card" + i, new Vector2(0f, 1f), new Vector2(col * (CardSize + CardGap), -row * (CardSize + CardGap)), new Vector2(CardSize, CardSize));
                 UiTheme.PanelImage(card, UiTheme.SlotSprite);
-                card.gameObject.AddComponent<Button>().onClick.AddListener(() => OnCardClicked(index));
+                UiTheme.AddButton(card.gameObject).onClick.AddListener(() => OnCardClicked(index));
                 Tooltip.Set(card.gameObject, () => index < cards.Count && cards[index].unit != null ? CardTip(cards[index].unit) : null);
                 RectTransform ic = UiTheme.Rect(card, "Icon", new Vector2(0.5f, 0.5f), new Vector2(0f, 3f), new Vector2(32f, 32f));
                 Image icon = ic.gameObject.AddComponent<Image>();
@@ -365,7 +365,7 @@ namespace BattleOfAges.UI
 
             RectTransform close = UiTheme.Rect(rect, "DeselectBtn", new Vector2(1f, 1f), new Vector2(14f, 14f), new Vector2(38f, 38f));
             UiTheme.PanelImage(close, UiTheme.ButtonSprite, new Color(1f, 0.72f, 0.68f));
-            close.gameObject.AddComponent<Button>().onClick.AddListener(DeselectAll);
+            UiTheme.AddButton(close.gameObject).onClick.AddListener(DeselectAll);
             UiTheme.Label(close, "Text", "×", 26, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
             Tooltip.Set(close.gameObject, "Зняти виділення  " + TipText.Key("ПКМ по порожньому / Esc"));
         }
@@ -385,7 +385,7 @@ namespace BattleOfAges.UI
             var go = new GameObject("GearBtn", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite, new Color(1f, 0.92f, 0.75f));
-            Button btn = go.AddComponent<Button>();
+            Button btn = UiTheme.AddButton(go);
             ColorBlock cb = btn.colors;
             cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
             cb.colorMultiplier = 1.25f;
@@ -404,7 +404,7 @@ namespace BattleOfAges.UI
             var go = new GameObject("DirectiveBtn", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite);
-            Button btn = go.AddComponent<Button>();
+            Button btn = UiTheme.AddButton(go);
             ColorBlock cb = btn.colors;
             cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
             cb.colorMultiplier = 1.25f;

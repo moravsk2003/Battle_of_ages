@@ -279,7 +279,7 @@ namespace BattleOfAges.UI
             Image rim = go.AddComponent<Image>();
             rim.sprite = UiTheme.SlotSprite; rim.type = Image.Type.Sliced;
             rim.color = UiTheme.LevelColor(item.Level);
-            Button b = go.AddComponent<Button>();
+            Button b = UiTheme.AddButton(go);
             ColorBlock cb = b.colors;
             cb.highlightedColor = new Color(1.25f, 1.2f, 1.1f); cb.pressedColor = new Color(0.75f, 0.7f, 0.65f); cb.colorMultiplier = 1.3f;
             b.colors = cb;
@@ -327,6 +327,7 @@ namespace BattleOfAges.UI
             dim.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.45f);
 
             RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, Size);
+            PopIn.On(panel);
             UiTheme.PanelImage(panel);
 
             // Header
@@ -397,7 +398,7 @@ namespace BattleOfAges.UI
             RectTransform rt = UiTheme.Rect(doll, "Slot_" + slot, new Vector2(0.5f, 0.5f), offset, new Vector2(104f, 104f));
             Image rim = rt.gameObject.AddComponent<Image>();
             rim.sprite = UiTheme.SlotSprite; rim.type = Image.Type.Sliced;
-            Button b = rt.gameObject.AddComponent<Button>();
+            Button b = UiTheme.AddButton(rt.gameObject);
             ColorBlock cb = b.colors;
             cb.highlightedColor = new Color(1.25f, 1.2f, 1.1f); cb.pressedColor = new Color(0.75f, 0.7f, 0.65f); cb.colorMultiplier = 1.3f;
             b.colors = cb;

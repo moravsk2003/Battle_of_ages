@@ -168,7 +168,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activeWorkbenchTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            resourceUI.ShowTreePrompt($"⚒️ [Натисніть {keyEStr}] Відкрити Верстак (Крафт зброї/броні)");
+            resourceUI.ShowTreePrompt($"[Натисніть {keyEStr}] Відкрити Верстак (Крафт зброї/броні)");
         }
 
         private void HandleWorkbenchInput()
@@ -230,7 +230,7 @@ namespace BattleOfAges.Player
             else if (activeTreeTarget.CurrentState == TreeState.WoodPile)
             {
                 string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира {ItemTypeNames.Roman(EquippedAxeLevel)}]" : "";
-                resourceUI.ShowTreePrompt($"🪓 [Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} Деревини){axeStr}");
+                resourceUI.ShowTreePrompt($"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} Деревини){axeStr}");
             }
         }
 
@@ -238,7 +238,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activePebbleTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            resourceUI.ShowTreePrompt($"🪨 [Натисніть {keyEStr}] Підібрати руду");
+            resourceUI.ShowTreePrompt($"[Натисніть {keyEStr}] Підібрати руду");
         }
 
         private void HandleTreeHarvestInput()
@@ -286,7 +286,7 @@ namespace BattleOfAges.Player
                 if (resourceUI != null)
                 {
                     string bonusStr = (yieldAmount > 1) ? " (+2 Ore Bonus!)" : " (+1 Ore)";
-                    resourceUI.ShowTreePrompt($"✨ Picked up {OreTierHelper.GetTierName(rolledTier)}!{bonusStr}");
+                    resourceUI.ShowTreePrompt($"Підібрано: {OreTierHelper.GetTierName(rolledTier)}{bonusStr}");
                 }
             }
         }

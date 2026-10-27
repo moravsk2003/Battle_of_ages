@@ -130,6 +130,7 @@ namespace BattleOfAges.UI
             canvas.transform.SetParent(transform, false); // survives scene loads with this object
             window = canvas.gameObject;
             RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, Size);
+            PopIn.On(panel);
             UiTheme.PanelImage(panel);
 
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 48f));

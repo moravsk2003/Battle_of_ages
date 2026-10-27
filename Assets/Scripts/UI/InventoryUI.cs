@@ -234,6 +234,7 @@ namespace BattleOfAges.UI
 
                 Text qtyTxt = UiTheme.PlainText(qtyObj, font, 22, TextAnchor.MiddleRight, new Color(0.3f, 0.95f, 0.95f), style: FontStyle.Bold);
 
+                UiTheme.RestyleTree(slotObj.transform); // a row made after the window: themed now
                 oreSlotObjMap[tierLevel] = slotObj;
                 oreQuantityTextMap[tierLevel] = qtyTxt;
             }
@@ -269,6 +270,7 @@ namespace BattleOfAges.UI
             Font defaultFont = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
 
             RectTransform panelRect = UiTheme.Child(transform, "InventoryPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            PopIn.On(panelRect);
             inventoryPanelObj = panelRect.gameObject;
             panelRect.pivot = new Vector2(0.5f, 0.5f);
             panelRect.sizeDelta = new Vector2(840f, 680f);

@@ -427,6 +427,7 @@ namespace BattleOfAges.UI
             scaler.matchWidthOrHeight = 0.5f;
             go.AddComponent<GraphicRaycaster>();
             go.AddComponent<UiThemed>();
+            Managers.DisplaySettings.Apply(scaler);
             return canvas;
         }
 
@@ -508,7 +509,7 @@ namespace BattleOfAges.UI
         {
             RectTransform rt = Rect(parent, name, anchor, offset, size);
             PanelImage(rt, ButtonSprite);
-            Button b = rt.gameObject.AddComponent<Button>();
+            Button b = AddButton(rt.gameObject);
             ColorBlock cb = b.colors;
             cb.normalColor = Color.white; cb.highlightedColor = new Color(1.2f, 1.12f, 0.95f); cb.pressedColor = new Color(0.78f, 0.72f, 0.64f);
             cb.disabledColor = new Color(0.55f, 0.55f, 0.55f, 0.8f); cb.colorMultiplier = 1.25f;
@@ -710,6 +711,29 @@ namespace BattleOfAges.UI
                 if (Mathf.Approximately(min[a], -50f)) { min[a] = 0f; changed = true; }
             }
             if (changed) { rt.offsetMin = min; rt.offsetMax = max; }
+        }
+
+        /// <summary>A button that answers the cursor (ButtonFx: grows, sinks, ticks): every button of the game is made through this.</summary>
+        public static Button AddButton(GameObject go)
+        {
+            Button b = go.AddComponent<Button>();
+            go.AddComponent<ButtonFx>();
+            return b;
+        }
+
+        /// <summary>
+        /// The theme look for a part built with default looks (an older window, rows it adds later): fonts, panels,
+        /// buttons, colours, once; its buttons answer the cursor too.
+        /// </summary>
+        public static void RestyleTree(Transform root)
+        {
+            foreach (Graphic g in root.GetComponentsInChildren<Graphic>(true))
+            {
+                FixDefaultOffsets(g.rectTransform);
+                if (g.transform.parent is RectTransform parent) FixDefaultOffsets(parent);
+                Restyle(g);
+            }
+            foreach (Button b in root.GetComponentsInChildren<Button>(true)) ButtonFx.On(b);
         }
 
         /// <summary>Gives one element of an older window the theme look (fonts, panels, buttons, accent colours).</summary>

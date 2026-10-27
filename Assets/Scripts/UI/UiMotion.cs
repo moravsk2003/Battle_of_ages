@@ -15,12 +15,18 @@ namespace BattleOfAges.UI
         public bool Sound = true;
         private CanvasGroup group;
         private float start = -1f;
+        private static bool adding;
 
         public static PopIn On(Component target, bool sound = true)
         {
             if (target == null) return null;
             PopIn p = target.GetComponent<PopIn>();
-            if (p == null) p = target.gameObject.AddComponent<PopIn>();
+            if (p == null)
+            {
+                adding = true; // on a window that is showing, AddComponent runs OnEnable now: that is no opening
+                try { p = target.gameObject.AddComponent<PopIn>(); }
+                finally { adding = false; }
+            }
             p.Sound = sound;
             return p;
         }
@@ -29,6 +35,7 @@ namespace BattleOfAges.UI
         {
             if (group == null) group = GetComponent<CanvasGroup>();
             if (group == null) group = gameObject.AddComponent<CanvasGroup>();
+            if (adding) { Apply(1f); return; }
             start = Time.unscaledTime;
             Apply(0f);
             if (Sound) UiSound.Play(UiSound.Kind.Open);

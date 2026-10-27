@@ -217,6 +217,7 @@ namespace BattleOfAges.UI
             dim.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.45f);
 
             RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1260f, 720f));
+            PopIn.On(panel);
             UiTheme.PanelImage(panel);
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 44f));
             UiTheme.Divider(panel, -60f, 520f);

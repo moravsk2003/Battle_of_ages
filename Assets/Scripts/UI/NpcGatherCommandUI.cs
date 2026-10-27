@@ -161,7 +161,7 @@ namespace BattleOfAges.UI
             if (statusText != null)
             {
                 int miners = WorkerRegistry.MinerCount;
-                statusText.text = $"Усього робітників: {totalWorkers}  |  Налаштовано: {totalAssigned}" + (miners > 0 ? $"  |  ⛏ у шахтах: {miners}" : "");
+                statusText.text = $"Усього робітників: {totalWorkers}  |  Налаштовано: {totalAssigned}" + (miners > 0 ? $"  |  у шахтах: {miners}" : "");
             }
         }
 
@@ -211,7 +211,7 @@ namespace BattleOfAges.UI
 
             if (statusText != null)
             {
-                statusText.text = $"✅ Розподіл застосовано для {total} робітників!";
+                statusText.text = $"Розподіл застосовано для {total} робітників!";
             }
         }
 
@@ -222,7 +222,7 @@ namespace BattleOfAges.UI
 
             if (statusText != null)
             {
-                statusText.text = $"🔄 Усім робітникам призначено режим [{directive}]";
+                statusText.text = "Усім робітникам призначено нову роботу";
             }
         }
 
@@ -247,6 +247,7 @@ namespace BattleOfAges.UI
 
             // Main Panel Window
             RectTransform panelRect = UiTheme.Child(transform, "NpcCommandPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+            PopIn.On(panelRect);
             commandPanelObj = panelRect.gameObject;
             panelRect.pivot = new Vector2(0.5f, 0.5f);
             panelRect.sizeDelta = new Vector2(760f, 620f);
@@ -285,7 +286,7 @@ namespace BattleOfAges.UI
 
             Image closeBg = closeBtnObj.AddComponent<Image>();
             closeBg.color = new Color(0.85f, 0.20f, 0.20f, 0.95f);
-            Button closeBtn = closeBtnObj.AddComponent<Button>();
+            Button closeBtn = UiTheme.AddButton(closeBtnObj);
             closeBtn.onClick.AddListener(CloseMenu);
 
             RectTransform closeTxtRect = UiTheme.Child(closeBtnObj.transform, "Text", Vector2.zero, Vector2.one);
@@ -318,11 +319,11 @@ namespace BattleOfAges.UI
             layout.childForceExpandHeight = false;
 
             // 5 Job Allocation Rows
-            branchesText = CreateJobCounterRow(rowsContainer.transform, font, "🪵 Збирання гілок (без нищення дерев)", GatherDirective.WoodGatherBranchesOnly);
-            chopText = CreateJobCounterRow(rowsContainer.transform, font, "🪓 Рубання дерев на дрова", GatherDirective.WoodChopTreesOnly);
-            pebblesText = CreateJobCounterRow(rowsContainer.transform, font, "🪨 Збір камінчиків руди", GatherDirective.OrePebblesOnly);
-            haulText = CreateJobCounterRow(rowsContainer.transform, font, "⛏️ Перевезення руди з шахти в скриню", GatherDirective.HaulOreFromMineToChest);
-            autoText = CreateJobCounterRow(rowsContainer.transform, font, "🔄 Автономні (Шукають найближчі)", GatherDirective.Auto);
+            branchesText = CreateJobCounterRow(rowsContainer.transform, font, "Збирання гілок (без нищення дерев)", GatherDirective.WoodGatherBranchesOnly);
+            chopText = CreateJobCounterRow(rowsContainer.transform, font, "Рубання дерев на дрова", GatherDirective.WoodChopTreesOnly);
+            pebblesText = CreateJobCounterRow(rowsContainer.transform, font, "Збір камінчиків руди", GatherDirective.OrePebblesOnly);
+            haulText = CreateJobCounterRow(rowsContainer.transform, font, "Перевезення руди з шахти в скриню", GatherDirective.HaulOreFromMineToChest);
+            autoText = CreateJobCounterRow(rowsContainer.transform, font, "Автономні (Шукають найближчі)", GatherDirective.Auto);
 
             // Bottom Action Buttons Bar
             RectTransform barRect = UiTheme.Child(commandPanelObj.transform, "BottomBar", new Vector2(0.03f, 0.04f), new Vector2(0.97f, 0.18f), Vector2.zero, Vector2.zero);
@@ -335,10 +336,10 @@ namespace BattleOfAges.UI
             barLayout.childForceExpandWidth = true;
             barLayout.childForceExpandHeight = true;
 
-            CreateActionButton(bottomBar.transform, font, "✅ Застосувати", new Color(0.12f, 0.52f, 0.22f), ApplyCurrentAllocation);
-            CreateActionButton(bottomBar.transform, font, "🔄 Усі в Авто", new Color(0.18f, 0.32f, 0.55f), () => SetAllToDirective(GatherDirective.Auto));
-            CreateActionButton(bottomBar.transform, font, "🪵 Усі Рубачі", new Color(0.55f, 0.35f, 0.12f), () => SetAllToDirective(GatherDirective.WoodChopTreesOnly));
-            CreateActionButton(bottomBar.transform, font, "🪨 Усі Рудокопи", new Color(0.35f, 0.40f, 0.45f), () => SetAllToDirective(GatherDirective.OrePebblesOnly));
+            CreateActionButton(bottomBar.transform, font, "Застосувати", new Color(0.12f, 0.52f, 0.22f), ApplyCurrentAllocation);
+            CreateActionButton(bottomBar.transform, font, "Усі в Авто", new Color(0.18f, 0.32f, 0.55f), () => SetAllToDirective(GatherDirective.Auto));
+            CreateActionButton(bottomBar.transform, font, "Усі Рубачі", new Color(0.55f, 0.35f, 0.12f), () => SetAllToDirective(GatherDirective.WoodChopTreesOnly));
+            CreateActionButton(bottomBar.transform, font, "Усі Рудокопи", new Color(0.35f, 0.40f, 0.45f), () => SetAllToDirective(GatherDirective.OrePebblesOnly));
 
             if (commandPanelObj != null) commandPanelObj.SetActive(false);
         }
@@ -378,7 +379,7 @@ namespace BattleOfAges.UI
 
             Image minusBg = minusBtnObj.AddComponent<Image>();
             minusBg.color = new Color(0.45f, 0.15f, 0.15f, 0.95f);
-            Button minusBtn = minusBtnObj.AddComponent<Button>();
+            Button minusBtn = UiTheme.AddButton(minusBtnObj);
             minusBtn.onClick.AddListener(() => ChangeJobCount(directive, -1));
 
             RectTransform minusTxtRect = UiTheme.Child(minusBtnObj.transform, "Text", Vector2.zero, Vector2.one);
@@ -403,7 +404,7 @@ namespace BattleOfAges.UI
 
             Image plusBg = plusBtnObj.AddComponent<Image>();
             plusBg.color = new Color(0.15f, 0.45f, 0.20f, 0.95f);
-            Button plusBtn = plusBtnObj.AddComponent<Button>();
+            Button plusBtn = UiTheme.AddButton(plusBtnObj);
             plusBtn.onClick.AddListener(() => ChangeJobCount(directive, 1));
 
             RectTransform plusTxtRect = UiTheme.Child(plusBtnObj.transform, "Text", Vector2.zero, Vector2.one);
@@ -421,7 +422,7 @@ namespace BattleOfAges.UI
             Image bg = btnObj.AddComponent<Image>();
             bg.color = color;
 
-            Button btn = btnObj.AddComponent<Button>();
+            Button btn = UiTheme.AddButton(btnObj);
             ColorBlock cb = btn.colors;
             cb.normalColor = color;
             cb.highlightedColor = color * 1.25f;
