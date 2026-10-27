@@ -32,13 +32,12 @@ namespace BattleOfAges.RTS
 
     /// <summary>
     /// Autonomous worker AI for harvesting wood, ore pebbles, working inside mines, and hauling ore to Storage Chests.
-    /// Utilizes WorkerRegistry for zero-GC worker tracking and OverlapSphereNonAlloc for spatial searches.
+    /// Utilizes WorkerRegistry for zero-GC worker tracking and ResourceGrid for finding the nearest tree or pebble.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(RtsUnit))]
     public class NpcResourceGatherer : MonoBehaviour
     {
-        private static readonly Collider[] searchOverlapBuffer = new Collider[128];
 
         [Header("Gatherer AI Configuration")]
         [SerializeField] private GatherDirective currentDirective = GatherDirective.Auto;
@@ -246,29 +245,54 @@ namespace BattleOfAges.RTS
                 foreach (MineNode m in MineNode.ActiveMines) if (m != null) best = Mathf.Min(best, Vector3.Distance(me, m.GetOutputDepositPosition()));
                 return best;
             }
-            int n = Physics.OverlapSphereNonAlloc(me, searchRadius, searchOverlapBuffer);
-            float nearest = float.MaxValue;
-            for (int i = 0; i < n; i++)
-            {
-                Collider c = searchOverlapBuffer[i];
-                if (c == null) continue;
-                Vector3 at;
-                if (d == GatherDirective.OrePebblesOnly)
-                {
-                    OrePebbleNode p = c.GetComponentInParent<OrePebbleNode>();
-                    if (p == null || p.IsPickedUp) continue;
-                    at = p.transform.position;
-                }
-                else
-                {
-                    ResourceNodeTree t = c.GetComponentInParent<ResourceNodeTree>();
-                    if (t == null || t.CurrentState == TreeState.Depleted) continue;
-                    if (d == GatherDirective.WoodGatherBranchesOnly && t.CurrentState != TreeState.WholeTree) continue;
-                    at = t.transform.position;
-                }
-                nearest = Mathf.Min(nearest, Vector3.Distance(me, at));
-            }
+            bool wood = d == GatherDirective.WoodChopTreesOnly || d == GatherDirective.WoodGatherBranchesOnly;
+            FindNearest(d == GatherDirective.OrePebblesOnly, wood, d == GatherDirective.WoodGatherBranchesOnly, false, out _, out _, out float nearest);
             return nearest;
+        }
+
+        private static readonly List<Vector2Int> ringCells = new List<Vector2Int>(96);
+
+        /// <summary>
+        /// The nearest pebble and tree within the search radius, from ResourceGrid ring by ring (stops once nothing
+        /// further out can be nearer). reserve: skip a pebble another worker has taken and a tree with WorkersPerTree
+        /// workers already (CountTreeCrowds first). Only one of pebble / tree is set: the nearer.
+        /// </summary>
+        private void FindNearest(bool ore, bool wood, bool wholeTreesOnly, bool reserve, out OrePebbleNode pebble, out ResourceNodeTree tree, out float distance)
+        {
+            Vector3 me = transform.position;
+            Vector2Int centre = ResourceGrid.CellOf(me);
+            float best = searchRadius * searchRadius;
+            pebble = null;
+            tree = null;
+            int rings = ResourceGrid.RingsFor(searchRadius);
+            for (int k = 0; k < rings; k++)
+            {
+                float ringNear = (k - 1) * ResourceGrid.CellSize;
+                if (ringNear > 0f && ringNear * ringNear > best) break;
+                ringCells.Clear();
+                ResourceGrid.Ring(centre, k, ringCells);
+                foreach (Vector2Int cell in ringCells)
+                {
+                    List<OrePebbleNode> ps = ore ? ResourceGrid.PebblesIn(cell) : null;
+                    if (ps != null)
+                        foreach (OrePebbleNode p in ps)
+                        {
+                            if (p.IsPickedUp || (reserve && p.TargetedBy != null && p.TargetedBy != this)) continue;
+                            float d = (me - p.transform.position).sqrMagnitude;
+                            if (d < best) { best = d; pebble = p; tree = null; }
+                        }
+                    List<ResourceNodeTree> ts = wood ? ResourceGrid.TreesIn(cell) : null;
+                    if (ts != null)
+                        foreach (ResourceNodeTree t in ts)
+                        {
+                            if (t.CurrentState == TreeState.Depleted || (wholeTreesOnly && t.CurrentState != TreeState.WholeTree)) continue;
+                            if (reserve && treeCrowd.TryGetValue(t, out int crowd) && crowd >= GameBalance.WorkersPerTree) continue;
+                            float d = (me - t.transform.position).sqrMagnitude;
+                            if (d < best) { best = d; tree = t; pebble = null; }
+                        }
+                }
+            }
+            distance = pebble != null || tree != null ? Mathf.Sqrt(best) : float.MaxValue;
         }
 
         private static readonly Dictionary<ResourceNodeTree, int> treeCrowd = new Dictionary<ResourceNodeTree, int>();
@@ -449,58 +473,10 @@ namespace BattleOfAges.RTS
 
             // 2. Search for wild wood / ore pebbles on map (a tree with WorkersPerTree workers already is taken)
             CountTreeCrowds();
-            int hitCount = Physics.OverlapSphereNonAlloc(myPos, searchRadius, searchOverlapBuffer);
-            float nearestSqrDst = searchRadius * searchRadius;
-
-            bool allowOre = (currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.OrePebblesOnly);
-            bool allowWoodBranches = (currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.WoodGatherBranchesOnly);
-            bool allowWoodChop = (currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.WoodChopTreesOnly);
-
-            for (int i = 0; i < hitCount; i++)
-            {
-                Collider col = searchOverlapBuffer[i];
-                if (col == null) continue;
-
-                if (allowOre)
-                {
-                    OrePebbleNode pebble = col.GetComponentInParent<OrePebbleNode>();
-                    if (pebble != null && !pebble.IsPickedUp)
-                    {
-                        if (pebble.TargetedBy != null && pebble.TargetedBy != this)
-                        {
-                            continue;
-                        }
-
-                        float sqrDst = (myPos - pebble.transform.position).sqrMagnitude;
-                        if (sqrDst < nearestSqrDst)
-                        {
-                            nearestSqrDst = sqrDst;
-                            targetPebble = pebble;
-                            targetTree = null;
-                        }
-                    }
-                }
-
-                if (allowWoodBranches || allowWoodChop)
-                {
-                    ResourceNodeTree tree = col.GetComponentInParent<ResourceNodeTree>();
-                    if (tree != null && tree.CurrentState != TreeState.Depleted && targetPebble == null)
-                    {
-                        if (currentDirective == GatherDirective.WoodGatherBranchesOnly && tree.CurrentState != TreeState.WholeTree)
-                        {
-                            continue;
-                        }
-                        if (treeCrowd.TryGetValue(tree, out int crowd) && crowd >= GameBalance.WorkersPerTree) continue;
-
-                        float sqrDst = (myPos - tree.transform.position).sqrMagnitude;
-                        if (sqrDst < nearestSqrDst)
-                        {
-                            nearestSqrDst = sqrDst;
-                            targetTree = tree;
-                        }
-                    }
-                }
-            }
+            bool allowOre = currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.OrePebblesOnly;
+            bool allowWood = currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.WoodGatherBranchesOnly
+                             || currentDirective == GatherDirective.WoodChopTreesOnly;
+            FindNearest(allowOre, allowWood, currentDirective == GatherDirective.WoodGatherBranchesOnly, true, out targetPebble, out targetTree, out _);
 
             if (targetPebble != null)
             {

@@ -146,6 +146,45 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest, Timeout(120000)]
+        public IEnumerator Worker_FindsTheTree_EvenAmongHundredsOfOtherColliders()
+        {
+            // The old physics search took the first 128 colliders within 150 m: crates, rocks and units round a worker
+            // could fill it and hide the tree right there
+            Vector3 c = Far + new Vector3(60f, 0f, 0f);
+            for (int i = 0; i < 200; i++)
+            {
+                var clutter = new GameObject("Clutter" + i, typeof(BoxCollider));
+                clutter.transform.position = OnGround(c + new Vector3((i % 20) * 1.5f - 15f, 0.5f, (i / 20) * 1.5f - 7f));
+                spawned.Add(clutter);
+            }
+            GameObject tree = Utils.SteppeTreeBuilder.CreateSteppeTree("FarTree");
+            tree.transform.position = OnGround(c + new Vector3(0f, 0f, 20f));
+            spawned.Add(tree);
+            NpcResourceGatherer w = Worker(c, "NPC_Villager_Clutter");
+            yield return null;
+            w.SetGatherDirective(GatherDirective.WoodChopTreesOnly);
+            yield return new WaitForSeconds(1.5f);
+            Assert.AreEqual(tree.GetComponent<ResourceNodeTree>(), w.TargetTree, "it goes for the tree 20 m off");
+            Assert.Less(w.DistanceToWork(GatherDirective.WoodChopTreesOnly), 21f);
+        }
+
+        [UnityTest]
+        public IEnumerator ResourceGrid_FollowsTreesAndPebbles_AsTheyComeAndGo()
+        {
+            int trees = ResourceGrid.TreeCount;
+            GameObject t = Utils.SteppeTreeBuilder.CreateSteppeTree("GridTree");
+            t.transform.position = OnGround(Far + new Vector3(0f, 0f, 150f));
+            spawned.Add(t);
+            yield return null;
+            Assert.AreEqual(trees + 1, ResourceGrid.TreeCount, "a tree adds itself");
+            CollectionAssert.Contains(ResourceGrid.TreesIn(ResourceGrid.CellOf(t.transform.position)) ?? new List<ResourceNodeTree>(), t.GetComponent<ResourceNodeTree>());
+            t.SetActive(false); // back to the pool
+            Assert.AreEqual(trees, ResourceGrid.TreeCount, "and leaves when put away");
+            t.SetActive(true);
+            Assert.AreEqual(trees + 1, ResourceGrid.TreeCount);
+        }
+
+        [UnityTest, Timeout(120000)]
         public IEnumerator Workers_SpreadOverTrees_NotMoreThanTheCapAtOne()
         {
             Vector3 c = Far + new Vector3(0f, 0f, 90f);

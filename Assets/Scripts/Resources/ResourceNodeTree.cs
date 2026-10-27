@@ -51,6 +51,20 @@ namespace BattleOfAges.Resources
         private GameObject woodPileObj;
         private GameObject stumpObj;
 
+        private Vector2Int gridCell;
+        private bool inGrid;
+
+        private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; }
+        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; }
+
+        /// <summary>Moved after it was enabled (a builder makes it at the origin, then places it): into its new cell.</summary>
+        private void KeepGridCell()
+        {
+            if (!transform.hasChanged) return;
+            transform.hasChanged = false;
+            if (inGrid) gridCell = ResourceGrid.Move(this, gridCell);
+        }
+
         private void Awake()
         {
             currentWoodRemaining = maxWoodCapacity;
@@ -59,6 +73,7 @@ namespace BattleOfAges.Resources
 
         private void Update()
         {
+            KeepGridCell();
             // Smooth spring damping for tree wobble reaction on hit
             if (Mathf.Abs(wobbleAngle) > 0.01f || Mathf.Abs(wobbleVelocity) > 0.01f)
             {

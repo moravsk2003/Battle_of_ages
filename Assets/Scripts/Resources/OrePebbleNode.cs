@@ -14,6 +14,20 @@ namespace BattleOfAges.Resources
         public bool IsPickedUp { get; private set; }
         public MonoBehaviour TargetedBy { get; set; }
 
+        private Vector2Int gridCell;
+        private bool inGrid;
+
+        private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; }
+        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; }
+
+        // Moved after it was enabled (placed by a builder, or respawned): into its new cell
+        private void Update()
+        {
+            if (!transform.hasChanged) return;
+            transform.hasChanged = false;
+            if (inGrid) gridCell = ResourceGrid.Move(this, gridCell);
+        }
+
         public int PickupPebble()
         {
             if (IsPickedUp) return 0;
