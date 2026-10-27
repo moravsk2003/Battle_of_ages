@@ -64,7 +64,7 @@ namespace BattleOfAges.Tests
 
             gear.Equip(new Item(ItemType.Bow, 1));
             Assert.AreEqual(100f, combat.Strength, 1e-3f, "A bow doubles the archer's strength.");
-            float speed = 0.25f * 5f * Mathf.Sqrt((100f + 500f / 10f) / 2f / 2f) + 1.5f; // 9.2 m/s: body = (strength + HP / 10) / 2, the HP its rank's
+            float speed = 0.25f * 5f * Mathf.Sqrt((100f + 500f / 20f) / 3f / 2f) + 2f; // 7.7 m/s: body = (strength + HP / 20) / 3, the HP its rank's
             Assert.AreEqual(speed, combat.MoveSpeed, 1e-3f, "... and through the body's sqrt the archer runs faster.");
             Assert.AreEqual(speed * 3f, combat.AttackRange, 1e-3f, "Range = the distance run in 3 s.");
             Assert.AreEqual(swordCooldown / 2f * 1.7f / 0.85f, combat.AttackCooldown, 1e-3f,
@@ -77,8 +77,8 @@ namespace BattleOfAges.Tests
             hero.ChooseClass(HeroClass.Mage);
             gear.Equip(new Item(ItemType.Staff, 1));
             Assert.IsTrue(combat.FiresBolts);
-            Assert.AreEqual((0.25f * 5f * Mathf.Sqrt(35f / 2f) + 1.5f) * 3f, combat.AttackRange, 1e-3f, "~20 m: the mage runs like strength 35.");
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(35f / 2f) + 1.5f, combat.MoveSpeed, 1e-3f, "A hero general mage runs 6.7 m/s.");
+            Assert.AreEqual((0.25f * 5f * Mathf.Sqrt(17.5f / 2f) + 2f) * 3f, combat.AttackRange, 1e-3f, "~17 m: the mage runs on 70% of its rank's body (35 + 350 / 20) / 3.");
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(17.5f / 2f) + 2f, combat.MoveSpeed, 1e-3f, "A hero general mage runs 5.7 m/s.");
 
             Assert.AreEqual(12f, HeroClassRules.Range(2.5f), 1e-4f, "A hero person runs 7.5 m in 3 s: the minimum 12 m.");
         }
@@ -125,7 +125,7 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
-        public void HealthPoints_SpeedTheHeroUp_AsMuchAsStrengthPoints()
+        public void HealthPoints_SpeedTheHeroUp_HalfAsMuchAsStrengthPoints()
         {
             hero.AddXp(100 + 200);
             float start = combat.MoveSpeed;
@@ -134,9 +134,9 @@ namespace BattleOfAges.Tests
             Assert.Greater(afterHp, start, "+50 HP: faster.");
             Assert.IsTrue(hero.SpendOnStrength());
             float afterBoth = combat.MoveSpeed;
-            // body = (strength + HP / 10) / 2: +50 HP and +5 strength each add 2.5
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(52.5f / 2f) + 1.5f, afterHp, 1e-3f);
-            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt(55f / 2f) + 1.5f, afterBoth, 1e-3f);
+            // body = (strength + HP / 20) / 3: +50 HP adds 2.5 / 3, +5 strength 5 / 3
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt((50f + 550f / 20f) / 3f / 2f) + 2f, afterHp, 1e-3f);
+            Assert.AreEqual(0.25f * 5f * Mathf.Sqrt((55f + 550f / 20f) / 3f / 2f) + 2f, afterBoth, 1e-3f);
 
             gear.Equip(new Item(ItemType.Armor, 5));
             Assert.AreEqual(afterBoth, combat.MoveSpeed, 1e-4f, "Armour HP does not make anyone faster.");

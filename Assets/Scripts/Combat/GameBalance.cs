@@ -149,11 +149,11 @@ namespace BattleOfAges.Combat
         // ------------------------------------------------------------------ speed (§11.1)
 
         /// <summary>
-        /// speed = SpeedGlobal x modifier x sqrt(body / SpeedStrengthDivisor) + SpeedFlat, metres per second, where body is the
-        /// mean of the strength and the HP / SpeedHealthPerStrength (every rank has 10 HP per strength point, so a plain
-        /// unit runs as on strength alone; an attribute point in HP speeds a hero up as much as one in strength).
+        /// speed = SpeedGlobal x modifier x sqrt(body / SpeedStrengthDivisor) + SpeedFlat, metres per second, where
+        /// body = (strength + HP / SpeedHealthPerStrength) / SpeedBodyDivisor (a rank, 10 HP per strength point: half its
+        /// strength; +5 strength adds 1.67 to the body, +50 HP 0.83).
         /// </summary>
-        public static float SpeedGlobal = 0.25f, SpeedStrengthDivisor = 2f, SpeedFlat = 1.5f, SpeedHealthPerStrength = 10f;
+        public static float SpeedGlobal = 0.25f, SpeedStrengthDivisor = 2f, SpeedFlat = 2f, SpeedHealthPerStrength = 20f, SpeedBodyDivisor = 3f;
         public static float SpeedModifierPerson = 7f;
         public static float SpeedModifierSoldier = 6f; // warrior, knight, general
         public static float SpeedModifierHero = 5f;

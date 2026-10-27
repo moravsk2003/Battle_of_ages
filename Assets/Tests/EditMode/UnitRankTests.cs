@@ -24,13 +24,13 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(strength * 2, UnitRanks.Strength(rank, hero: true), "A hero has twice the strength of its rank.");
         }
 
-        [TestCase(UnitRank.Person, false, 3.25f)]
-        [TestCase(UnitRank.Warrior, false, 3.62f)]
-        [TestCase(UnitRank.Knight, false, 4.85f)]
-        [TestCase(UnitRank.General, false, 6.80f)]
-        [TestCase(UnitRank.Person, true, 3.27f)]
-        [TestCase(UnitRank.General, true, 7.75f)]
-        public void Speed_IsGlobalTimesModifierTimesSqrtHalfStrength_PlusOneAndAHalf(UnitRank rank, bool hero, float expected)
+        [TestCase(UnitRank.Person, false, 3.24f)]
+        [TestCase(UnitRank.Warrior, false, 3.50f)]
+        [TestCase(UnitRank.Knight, false, 4.37f)]
+        [TestCase(UnitRank.General, false, 5.75f)]
+        [TestCase(UnitRank.Person, true, 3.25f)]
+        [TestCase(UnitRank.General, true, 6.42f)]
+        public void Speed_IsGlobalTimesModifierTimesSqrtHalfBody_PlusTwo(UnitRank rank, bool hero, float expected)
         {
             float speed = CharacterSpeed.Of(UnitRanks.SpeedModifier(rank, hero), UnitRanks.Strength(rank, hero));
             Assert.AreEqual(expected, speed, 0.01f);

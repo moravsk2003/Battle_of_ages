@@ -32,7 +32,7 @@ namespace BattleOfAges.Combat
         public float SpeedStrength { get => speedStrength > 0f ? speedStrength : Strength; set => speedStrength = value; }
         private float speedHealth;
         /// <summary>HP the run speed follows: the body's, without armour (Equipment sets it; without gear 10 per strength point).</summary>
-        public float SpeedHealth { get => speedHealth > 0f ? speedHealth : SpeedStrength * GameBalance.SpeedHealthPerStrength; set => speedHealth = value; }
+        public float SpeedHealth { get => speedHealth > 0f ? speedHealth : SpeedStrength * CharacterSpeed.RankHealthPerStrength; set => speedHealth = value; }
         [SerializeField] private float speedModifier = CharacterSpeed.DefaultModifier;
         /// <summary>Speed characteristic (person 7, soldiers 6, hero 5; see UnitRanks, CharacterSpeed).</summary>
         public float SpeedModifier { get => speedModifier; set => speedModifier = value; }

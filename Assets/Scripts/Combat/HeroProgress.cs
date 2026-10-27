@@ -119,7 +119,7 @@ namespace BattleOfAges.Combat
             if (!HeroClassRules.IsRanged(heroClass, bow)) return range;
             if (combat == null) combat = GetComponent<CombatUnit>();
             Equipment gear = GetComponent<Equipment>();
-            float health = ((IStatModifier)this).SpeedHealth(gear != null ? gear.BaseHealth : strength * GameBalance.SpeedHealthPerStrength);
+            float health = ((IStatModifier)this).SpeedHealth(gear != null ? gear.BaseHealth : strength * CharacterSpeed.RankHealthPerStrength);
             float speed = CharacterSpeed.Of(combat != null ? combat.SpeedModifier : CharacterSpeed.HeroModifier, ((IStatModifier)this).SpeedStrength(strength), health);
             return HeroClassRules.Range(speed, RangeBonus);
         }
@@ -127,7 +127,7 @@ namespace BattleOfAges.Combat
         /// <summary>Spends an attribute point on strength (+5: damage, and speed through sqrt of the body).</summary>
         public bool SpendOnStrength() => Spend(ref strengthPoints);
 
-        /// <summary>Spends an attribute point on health (+50 HP: as much speed as +5 strength).</summary>
+        /// <summary>Spends an attribute point on health (+50 HP: half the speed +5 strength gives).</summary>
         public bool SpendOnHealth() => Spend(ref healthPoints);
 
         /// <summary>Takes skill points (a skill learnt); false if there are not enough.</summary>
