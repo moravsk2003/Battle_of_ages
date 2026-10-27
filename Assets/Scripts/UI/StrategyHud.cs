@@ -678,7 +678,7 @@ namespace BattleOfAges.UI
             {
                 if (mine == null) continue;
                 if (!mineLabels.TryGetValue(mine, out var label)) mineLabels[mine] = label = MineLabel(mine);
-                bool show = cam != null && mine.gameObject.activeInHierarchy && !mine.name.StartsWith("BuildGhost");
+                bool show = cam != null && mine.gameObject.activeInHierarchy && !BuildGhost.Is(mine);
                 Vector3 sp = show ? cam.WorldToScreenPoint(mine.transform.position + Vector3.up * 4.6f) : Vector3.zero;
                 show &= sp.z > 0f && (map || sp.z < 30f);
                 if (label.rt.gameObject.activeSelf != show) label.rt.gameObject.SetActive(show);

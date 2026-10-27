@@ -36,6 +36,8 @@ namespace BattleOfAges.RTS
         /// <summary>Busy with a job: working units do not go looking for fights (soldiers are units without a job).</summary>
         private bool IsWorking => gatherer != null && gatherer.IsWorking;
         public bool IsHero => isPlayerControlled;
+        /// <summary>Made by BuildingNode.CreateWorkerNpc (a settlement's villager, rebuilt from the save), not a scene unit.</summary>
+        public bool IsVillager { get; set; }
         public bool IsAlive => health == null || health.IsAlive;
         public bool InsideMine => gatherer != null && gatherer.IsInsideMine;
         private int gridId = -1;
@@ -54,6 +56,8 @@ namespace BattleOfAges.RTS
         private void Awake()
         {
             isPlayerControlled = GetComponent<FirstPersonController>() != null;
+            // Villagers placed in the scene by hand (not made by CreateWorkerNpc) are known by their name: the one place left that reads it
+            if (!IsVillager && name.StartsWith("NPC_Villager")) IsVillager = true;
             health = GetComponent<HealthComponent>();
             combat = GetComponent<CombatUnit>();
             if (!isPlayerControlled)

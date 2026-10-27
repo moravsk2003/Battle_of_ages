@@ -179,7 +179,7 @@ namespace BattleOfAges.SaveLoad
             var buildings = new List<BuildingNode>();
             foreach (BuildingNode b in BuildingNode.Active)
             {
-                if (b == null || b.name.StartsWith("BuildGhost")) continue;
+                if (b == null || BuildGhost.Is(b)) continue;
                 buildings.Add(b);
                 var s = new BuildingSave { Type = (int)b.Type, Name = b.name, Position = b.transform.position, Yaw = b.transform.eulerAngles.y, SceneKey = b.SceneKey };
                 HealthComponent hp = b.GetComponent<HealthComponent>();
@@ -281,7 +281,7 @@ namespace BattleOfAges.SaveLoad
         {
             // Buildings that come with the scene get a key (name + place) before anything moves them
             foreach (BuildingNode b in BuildingNode.Active)
-                if (b != null && !b.name.StartsWith("BuildGhost"))
+                if (b != null && !BuildGhost.Is(b))
                     b.SceneKey = b.name + "@" + Vector3Int.RoundToInt(b.transform.position);
             WorldPersistence.Suspended = false;
             sceneStartTime = Time.unscaledTime;
@@ -347,7 +347,7 @@ namespace BattleOfAges.SaveLoad
             var sceneBuildings = new Dictionary<string, BuildingNode>();
             foreach (BuildingNode b in new List<BuildingNode>(BuildingNode.Active))
             {
-                if (b == null || b.name.StartsWith("BuildGhost")) continue;
+                if (b == null || BuildGhost.Is(b)) continue;
                 if (!string.IsNullOrEmpty(b.SceneKey) && !sceneBuildings.ContainsKey(b.SceneKey)) sceneBuildings[b.SceneKey] = b;
                 else { b.gameObject.SetActive(false); UnityEngine.Object.Destroy(b.gameObject); }
             }
@@ -458,8 +458,8 @@ namespace BattleOfAges.SaveLoad
             if (modes != null) modes.SetGameMode((GameMode)d.Player.Mode);
         }
 
-        /// <summary>Villagers are rebuilt on load (CreateWorkerNpc names them); other own units are scene units matched by name.</summary>
-        private static bool IsVillager(RtsUnit u) => u.name.StartsWith("NPC_Villager");
+        /// <summary>Villagers are rebuilt on load (CreateWorkerNpc makes them); other own units are scene units matched by name.</summary>
+        private static bool IsVillager(RtsUnit u) => u.IsVillager;
 
         private static GameObject FindUnit(string name)
         {

@@ -151,7 +151,7 @@ namespace BattleOfAges.Building
                 Vector2 ring = Random.insideUnitCircle.normalized * 6f;
                 Vector3 pos = transform.position + new Vector3(ring.x, 0f, ring.y);
                 pos.y = RtsUnit.GetTerrainHeight(pos);
-                BuildingNode.CreateWorkerNpc(pos, $"NPC_Villager_{WorkerRegistry.WorkerCount + 1}");
+                BuildingNode.CreateWorkerNpc(pos, BuildingNode.NextVillagerName());
             }
         }
 

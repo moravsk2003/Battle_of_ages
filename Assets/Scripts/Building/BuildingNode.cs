@@ -99,14 +99,36 @@ namespace BattleOfAges.Building
             Vector3 spawnPos = transform.position + transform.forward * 3.5f + transform.right * (index * 1.5f);
             spawnPos.y = RtsUnit.GetTerrainHeight(spawnPos);
 
-            int workerNumber = WorkerRegistry.WorkerCount + 1;
-            while (GameObject.Find($"NPC_Villager_{workerNumber}") != null) workerNumber++; // names stay unique after deaths
-            CreateWorkerNpc(spawnPos, $"NPC_Villager_{workerNumber}");
+            CreateWorkerNpc(spawnPos, NextVillagerName());
         }
+
+        private static int nextVillagerNumber = 1;
+
+        /// <summary>
+        /// A name no villager has: the numbers only grow (names stay unique after deaths), and one placed in the scene
+        /// beforehand is skipped too.
+        /// </summary>
+        public static string NextVillagerName()
+        {
+            while (VillagerNamed($"NPC_Villager_{nextVillagerNumber}")) nextVillagerNumber++;
+            return $"NPC_Villager_{nextVillagerNumber}";
+        }
+
+        private static bool VillagerNamed(string name)
+        {
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null && w.name == name) return true;
+            return false;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetVillagerNumbers() => nextVillagerNumber = 1;
 
         /// <summary>A villager worker (gatherer) at the position; also used when a save is loaded.</summary>
         public static GameObject CreateWorkerNpc(Vector3 spawnPos, string npcName)
         {
+            // the next new villager gets a number above every one made so far (a loaded save brings its own numbers)
+            int dash = npcName.LastIndexOf('_');
+            if (dash >= 0 && int.TryParse(npcName.Substring(dash + 1), out int number) && number >= nextVillagerNumber) nextVillagerNumber = number + 1;
             GameObject npcObj = new GameObject(npcName);
             npcObj.transform.position = spawnPos;
 
@@ -121,6 +143,7 @@ namespace BattleOfAges.Building
             npcObj.AddComponent<Combat.HealthComponent>();
             npcObj.AddComponent<Combat.CombatUnit>();
             RtsUnit unitComp = npcObj.AddComponent<RtsUnit>();
+            unitComp.IsVillager = true;
             npcObj.AddComponent<NpcResourceGatherer>();
 
             GameObject npcModel = HumanoidModelBuilder.CreateHumanoidModel(
@@ -339,6 +362,7 @@ namespace BattleOfAges.Building
                 mr.receiveShadows = false;
             }
 
+            if (ghost != null) ghost.AddComponent<BuildGhost>();
             return ghost;
         }
     }
