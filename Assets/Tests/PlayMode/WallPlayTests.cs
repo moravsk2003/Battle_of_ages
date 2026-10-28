@@ -507,6 +507,8 @@ namespace BattleOfAges.PlayModeTests
 
             GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(0f, 0f, -2.5f)), "GateFriend");
             spawned.Add(v);
+            yield return null;
+            v.GetComponent<RTS.NpcResourceGatherer>().SetGatherDirective(RTS.GatherDirective.Idle); // stays at the gate (no work in sight to go to)
             yield return new WaitForSeconds(1.5f);
             Assert.AreEqual(WallGateDoors.OpenAngle, doors.Angle, 0.5f, "open for an own unit");
         }

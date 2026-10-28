@@ -49,6 +49,13 @@ namespace BattleOfAges.World
         /// <summary>True once the chunk has ground (terrain mesh and collider) at ChunkCoord; a LOD rebuild keeps the old one meanwhile.</summary>
         public bool HasTerrain { get; private set; }
 
+        /// <summary>Its trees, stones and camp are all placed (the same at any LOD).</summary>
+        private bool scattered;
+        /// <summary>Its animals and the camp's raiders are out: they come the first time the chunk is near (full LOD).</summary>
+        private bool alive;
+        private GameObject campRoot;
+        private Vector3 campCentre;
+
         private IEnumerator steps;
         private Random.State random; // this chunk's scatter sequence, kept apart from everything that runs between its steps
 
@@ -81,9 +88,15 @@ namespace BattleOfAges.World
         public void BeginGenerate(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
         {
             if (coord != ChunkCoord) HasTerrain = false;
+            bool onlyLod = coord == ChunkCoord && HasTerrain && scattered;
             ChunkCoord = coord;
             IsLowLOD = isLowLOD;
-            steps = GenerateSteps(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            // A change of LOD (the viewer crossed a chunk border) only re-meshes the ground: its content stays where it
+            // is. It used to be scattered anew - half the trees, no camp or animals far off - so trees doubled, stones
+            // jumped and a camp appeared 64-160 m away with every border crossed (a tester's two frames, 1 m apart).
+            steps = onlyLod ? RemeshSteps(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat)
+                            : GenerateSteps(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            if (!isLowLOD) steps = Then(steps, LifeSteps(coord, size));
         }
 
         /// <summary>Runs the next generation step; false when the chunk is complete.</summary>
@@ -99,9 +112,21 @@ namespace BattleOfAges.World
             return more;
         }
 
+        private static IEnumerator Then(IEnumerator a, IEnumerator b)
+        {
+            while (a.MoveNext()) yield return null;
+            while (b.MoveNext()) yield return null;
+        }
+
+        private IEnumerator RemeshSteps(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
+        {
+            BuildTerrain(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
+            yield break;
+        }
+
         private IEnumerator GenerateSteps(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
         {
-            ReleaseChunkResources(true); // the previous content (another place or LOD)
+            ReleaseChunkResources(true); // the previous content (another place, or a scatter cut short)
             BuildTerrain(coord, size, resolution, isLowLOD, steppeMat, forestMat, desertMat, snowMat);
             HasTerrain = true;
             if (!gameObject.activeSelf) gameObject.SetActive(true);
@@ -109,8 +134,9 @@ namespace BattleOfAges.World
 
             float startWorldX = coord.x * size - size * 0.5f;
             float startWorldZ = coord.y * size - size * 0.5f;
-            IEnumerator scatter = ScatterBiomeResources(startWorldX, startWorldZ, size, isLowLOD);
+            IEnumerator scatter = ScatterBiomeResources(startWorldX, startWorldZ, size);
             while (scatter.MoveNext()) yield return null;
+            scattered = true;
         }
 
         private void BuildTerrain(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
@@ -236,7 +262,8 @@ namespace BattleOfAges.World
             }
         }
 
-        private IEnumerator ScatterBiomeResources(float startX, float startZ, float size, bool isLowLOD)
+        /// <summary>The chunk's content, by its own seed: the same whatever the LOD (that only sets the ground's mesh).</summary>
+        private IEnumerator ScatterBiomeResources(float startX, float startZ, float size)
         {
             int seed = Mathf.Abs((ChunkCoord.x * 73856093) ^ (ChunkCoord.y * 19349663));
             Random.InitState(seed);
@@ -246,8 +273,8 @@ namespace BattleOfAges.World
             float coniferShare = (MainBiome == BiomeType.PineForest) ? 0.9f : (MainBiome == BiomeType.Steppe ? 0.1f : (MainBiome == BiomeType.SnowyPeaks ? 1f : 0.1f));
             int basePebbleCount = (MainBiome == BiomeType.Desert) ? 12 : 5;
 
-            int treeCount = isLowLOD ? Mathf.Max(1, baseTreeCount / 2) : baseTreeCount;
-            int pebbleCount = isLowLOD ? Mathf.Max(1, basePebbleCount / 2) : basePebbleCount;
+            int treeCount = baseTreeCount;
+            int pebbleCount = basePebbleCount;
 
             EnvironmentPoolManager pool = EnvironmentPoolManager.Instance;
 
@@ -320,8 +347,42 @@ namespace BattleOfAges.World
                 yield return null;
             }
 
+            // Hostile Raider Camp Spawning (At distance >= 2 chunks from spawn): its tents now, its raiders with LifeSteps
+            if ((Mathf.Abs(ChunkCoord.x) >= 2 || Mathf.Abs(ChunkCoord.y) >= 2) && (seed % 5 == 0))
+            {
+                float campX = startX + size * 0.5f;
+                float campZ = startZ + size * 0.5f;
+                // On level ground within the chunk (a camp on a ridge stood on stilts and in the rock), or no camp here
+                bool level = Building.BuildSite.FindLevel(new Vector3(campX, 0f, campZ), 14f, Combat.GameBalance.CampSiteSearchRadius, Combat.GameBalance.CampSiteMaxRise,
+                                                          p => InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), out Vector3 site);
+                if (level)
+                {
+                    GameObject camp = new GameObject($"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
+                    camp.transform.SetParent(transform);
+                    IEnumerator build = Utils.HostileCampBuilder.BuildCampStructures(camp, site);
+                    while (build.MoveNext()) yield return null;
+                    campRoot = camp;
+                    campCentre = site;
+                    activeEntities.Add(camp);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The chunk's life, once, when it is first near (full LOD): its animals (by their own seed) and its camp's
+        /// raiders. Far chunks show their trees and tents but leave out the animals (tens of thousands of triangles each,
+        /// animated) and the raiders' AI: nobody makes them out 150 m off in the haze, and everyone paid for them.
+        /// </summary>
+        private IEnumerator LifeSteps(Vector2Int coord, float size)
+        {
+            if (alive || !scattered || coord != ChunkCoord) yield break;
+            alive = true;
+            float startX = coord.x * size - size * 0.5f, startZ = coord.y * size - size * 0.5f;
+            int seed = Mathf.Abs((ChunkCoord.x * 73856093) ^ (ChunkCoord.y * 19349663));
+            Random.InitState(seed ^ 0x2545F491);
+
             // Wildlife Spawning (Deer, Boar, Rabbit)
-            if (!isLowLOD && (ChunkCoord.x != 0 || ChunkCoord.y != 0))
+            if (ChunkCoord.x != 0 || ChunkCoord.y != 0)
             {
                 int animalCount = (MainBiome == BiomeType.Steppe || MainBiome == BiomeType.PineForest) ? Random.Range(1, 3) : (Random.value > 0.6f ? 1 : 0);
                 for (int a = 0; a < animalCount; a++)
@@ -345,28 +406,14 @@ namespace BattleOfAges.World
                 }
             }
 
-            // Hostile Raider Camp Spawning (At distance >= 2 chunks from spawn)
-            if (!isLowLOD && (Mathf.Abs(ChunkCoord.x) >= 2 || Mathf.Abs(ChunkCoord.y) >= 2) && (seed % 5 == 0))
+            if (campRoot != null)
             {
-                float campX = startX + size * 0.5f;
-                float campZ = startZ + size * 0.5f;
-                // On level ground within the chunk (a camp on a ridge stood on stilts and in the rock), or no camp here
-                bool level = Building.BuildSite.FindLevel(new Vector3(campX, 0f, campZ), 14f, Combat.GameBalance.CampSiteSearchRadius, Combat.GameBalance.CampSiteMaxRise,
-                                                          p => InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), out Vector3 site);
-                campX = site.x; campZ = site.z;
-                float campY = site.y;
-
-                if (level)
-                {
-                    GameObject camp = new GameObject($"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
-                    camp.transform.SetParent(transform);
-                    buildingCamp = camp; // until complete it is destroyed on release without being recorded
-                    IEnumerator build = Utils.HostileCampBuilder.BuildHostileCamp(camp, new Vector3(campX, campY, campZ));
-                    while (build.MoveNext()) yield return null;
-                    buildingCamp = null;
-                    WorldPersistence.RegisterCamp(camp);
-                    activeEntities.Add(camp);
-                }
+                GameObject camp = campRoot;
+                buildingCamp = camp; // until its raiders are all out it is destroyed on release without being recorded
+                IEnumerator raiders = Utils.HostileCampBuilder.PopulateCamp(camp, campCentre);
+                while (raiders.MoveNext()) yield return null;
+                buildingCamp = null;
+                WorldPersistence.RegisterCamp(camp);
             }
         }
 
@@ -384,6 +431,9 @@ namespace BattleOfAges.World
         /// <summary>returnToPool = false while the chunk itself is destroyed (scene unload): the pool may be going away too.</summary>
         private void ReleaseChunkResources(bool returnToPool)
         {
+            scattered = false;
+            alive = false;
+            campRoot = null;
             EnvironmentPoolManager pool = returnToPool ? EnvironmentPoolManager.Instance : null;
 
             for (int i = 0; i < activeTrees.Count; i++)

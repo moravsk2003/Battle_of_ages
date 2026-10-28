@@ -28,6 +28,19 @@ namespace BattleOfAges.Utils
         public static IEnumerator BuildHostileCamp(GameObject root, Vector3 campCenter)
         {
             root.SetActive(false);
+            IEnumerator structures = BuildCampStructures(root, campCenter);
+            while (structures.MoveNext()) yield return null;
+            IEnumerator raiders = PopulateCamp(root, campCenter);
+            while (raiders.MoveNext()) yield return null;
+            root.SetActive(true);
+        }
+
+        /// <summary>
+        /// The camp's fire, tents, barricades and standard under root, in one step (a far chunk shows them; its raiders
+        /// come with PopulateCamp when the chunk is near).
+        /// </summary>
+        public static IEnumerator BuildCampStructures(GameObject root, Vector3 campCenter)
+        {
             root.transform.position = campCenter;
 
             // The camp's pieces (CampBuilder meshes), each set on the ground where it stands
@@ -64,7 +77,11 @@ namespace BattleOfAges.Utils
             Piece("WarStandard", CampBuilder.Standard, new Vector3(1.8f, 0f, 1.8f), 30f);
             Piece("CampClutter", CampBuilder.Clutter, new Vector3(-2.2f, 0f, -3.6f), 160f);
             yield return null;
+        }
 
+        /// <summary>The warlord and his squad, one per step, as children of the camp's root (WorldPersistence finds them there).</summary>
+        public static IEnumerator PopulateCamp(GameObject root, Vector3 campCenter)
+        {
             // 5. Spawn Warlord (Leader) & Raider Squad
             GameObject leaderObj = CreateHostileMob(HostileMobType.WarlordGuard, "Warlord_Leader");
             leaderObj.transform.position = campCenter + new Vector3(0f, 0f, 1.5f);
@@ -106,7 +123,6 @@ namespace BattleOfAges.Utils
             {
                 leaderComp.InitializeSquad(squad);
             }
-            root.SetActive(true);
         }
 
         public static GameObject CreateHostileMob(HostileMobType type, string name = "HostileMob")
