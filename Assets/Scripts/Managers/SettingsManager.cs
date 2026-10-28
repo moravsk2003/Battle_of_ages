@@ -14,14 +14,14 @@ namespace BattleOfAges.Managers
 
         private static class PlayerPrefsKeys
         {
-            public const string FPS_SENSITIVITY = "Settings_FpsSensitivity";
+            public const string FPS_SENSITIVITY = "Settings_FpsSensitivity2"; // new scale (FirstPersonController.LookScale): old values start over at 1
             public const string MAP_SENSITIVITY = "Settings_MapSensitivity";
             public const string MASTER_VOLUME = "Settings_MasterVolume";
             public const string MAP_ZOOM_SENSITIVITY = "Settings_MapZoomSensitivity";
         }
 
         public const float MIN_SENSITIVITY = 0.1f;
-        public const float MAX_SENSITIVITY = 8.0f;
+        public const float MAX_SENSITIVITY = 15.0f;
         public const float MIN_VOLUME = 0.0f;
         public const float MAX_VOLUME = 1.0f;
         /// <summary>The map camera has its own top (it pans a whole map), and its wheel zoom its own speed.</summary>

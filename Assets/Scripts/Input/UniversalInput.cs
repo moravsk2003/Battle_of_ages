@@ -14,7 +14,6 @@ namespace BattleOfAges.InputSystem
     public static class UniversalInput
     {
         private const float MOUSE_DELTA_SENSITIVITY = 0.1f;
-        private const float SCROLL_WHEEL_SENSITIVITY = 0.005f;
 
         public static bool IsShiftHeld()
         {
@@ -199,14 +198,23 @@ namespace BattleOfAges.InputSystem
 #endif
         }
 
+        /// <summary>
+        /// Wheel notches this frame (+1 per notch away from the player). The Input System reports either ±1 per notch
+        /// (its uniform range, the default) or the platform's ±120 (Windows): both come out as notches here. The old
+        /// fixed x0.005 assumed 120 and made one notch on a ±1 system zoom by 0.5%.
+        /// </summary>
         public static float GetScrollWheel()
         {
 #if ENABLE_INPUT_SYSTEM
             Mouse mouse = Mouse.current;
-            if (mouse != null) return mouse.scroll.ReadValue().y * SCROLL_WHEEL_SENSITIVITY;
+            if (mouse != null)
+            {
+                float y = mouse.scroll.ReadValue().y;
+                return Mathf.Abs(y) >= 10f ? y / 120f : y;
+            }
 #endif
 #if ENABLE_LEGACY_INPUT_MANAGER
-            return Input.GetAxis("Mouse ScrollWheel");
+            return Input.GetAxis("Mouse ScrollWheel") * 10f; // 0.1 per notch
 #else
             return 0f;
 #endif

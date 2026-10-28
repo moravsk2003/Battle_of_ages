@@ -26,7 +26,11 @@ namespace BattleOfAges.Player
         [Header("Look Configuration")]
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private float mouseSensitivity = 1.0f;
-        [SerializeField] private float lookMultiplier = 7.5f;
+        /// <summary>
+        /// Degrees per mouse unit (0.1 of a pixel) at sensitivity 1: 0.06° per pixel, a full turn in ~10 cm at 1600 DPI
+        /// (about CS 1.4 / Valorant 0.45). It was 0.75° per pixel: a tester spun "like a helicopter" even at 0.2.
+        /// </summary>
+        private const float LookScale = 0.6f;
         [SerializeField] private float minPitchAngle = -85.0f;
         [SerializeField] private float maxPitchAngle = 85.0f;
 
@@ -135,8 +139,8 @@ namespace BattleOfAges.Player
             Vector2 mouseDelta = UniversalInput.GetMouseDelta();
             
             float currentSens = (SettingsManager.Instance != null) ? SettingsManager.Instance.FpsSensitivity : mouseSensitivity;
-            float mouseX = mouseDelta.x * currentSens * lookMultiplier;
-            float mouseY = mouseDelta.y * currentSens * lookMultiplier;
+            float mouseX = mouseDelta.x * currentSens * LookScale;
+            float mouseY = mouseDelta.y * currentSens * LookScale;
 
             pitch -= mouseY;
             pitch = Mathf.Clamp(pitch, minPitchAngle, maxPitchAngle);

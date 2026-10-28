@@ -62,6 +62,8 @@ namespace BattleOfAges.UI
             if (gameModeManager != null && gameModeManager.CurrentMode != GameMode.RtsMap)
             {
                 if (IsOpen) CloseMenu();
+                else if (!GameWindows.BlockGameplay && IsToggleKeyPressed())
+                    StrategyHud.Notify($"Будівництво — на мапі: {HudTips.Key(KeyAction.ToggleGameMode)}, потім {HudTips.Key(KeyAction.BuildMenu)}");
                 return;
             }
 

@@ -30,7 +30,8 @@ namespace BattleOfAges.CameraSystem
         [Header("Zoom Configuration")]
         [SerializeField] private float minZoom = 10.0f;
         [SerializeField] private float maxZoom = 100.0f;
-        [SerializeField] private float zoomSensitivity = 10.0f;
+        /// <summary>One wheel notch zooms by this share of the view at zoom setting 1 (the same feel near and far).</summary>
+        private const float ZoomPerNotch = 0.15f;
         private float zoomSetting = 1.0f; // the wheel speed from the settings
 
         [Header("Rotation & Angle Configuration")]
@@ -174,8 +175,8 @@ namespace BattleOfAges.CameraSystem
             float scroll = UniversalInput.GetScrollWheel();
             if (Mathf.Abs(scroll) > 0.001f)
             {
-                float zoomScale = mapCamera.orthographicSize / (BASE_ZOOM_REF * 0.5f);
-                mapCamera.orthographicSize -= scroll * zoomSensitivity * zoomSetting * zoomScale;
+                float step = Mathf.Clamp(scroll * ZoomPerNotch * zoomSetting, -0.9f, 0.6f);
+                mapCamera.orthographicSize *= 1f - step;
                 mapCamera.orthographicSize = Mathf.Clamp(mapCamera.orthographicSize, minZoom, maxZoom);
             }
         }
