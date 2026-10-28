@@ -167,13 +167,39 @@ namespace BattleOfAges.PlayModeTests
             float mark = 0f;
             for (float t = 0f; t < 20f && Vector3.Distance(v.transform.position, target) > 1.2f; t += Time.deltaTime)
             {
-                // never through the wall itself: past its middle only within the gate's opening
+                // never through the wall itself: past its middle only within the gate's opening or round its free end (x -2)
                 Vector3 p = v.transform.position - Far;
-                if (p.z < 0f && p.z > -0.9f) Assert.Greater(p.x, 3.9f - 0.01f, $"walked through the wall at {p}");
+                if (p.z < 0f && p.z > -0.9f) Assert.IsTrue(p.x > 3.9f - 0.01f || p.x < -2f, $"walked through the wall at {p}");
                 if (t >= mark) { mark += 1f; track.Append($" {p.x:0.0},{p.z:0.0}"); }
                 yield return null;
             }
             Assert.Less(Vector3.Distance(v.transform.position, target), 1.5f, $"arrived behind the wall (at {v.transform.position - Far}; track{track})");
+        }
+
+        [UnityTest]
+        public IEnumerator Villager_GoesThroughTheGate_AndRoundAWallRightBehindIt()
+        {
+            // The tester's town: a gate (x 2..8) with a second wall 3.5 m behind it (x 1..9), the work beyond both. The
+            // old route aimed 4 m straight on past the gate, into the second wall: the workers stood pressed against it.
+            yield return WallWithGate();
+            Segment(BuildingType.CastleWall, OnGround(Far + new Vector3(3f, 0f, -3.5f)), 0f);
+            Segment(BuildingType.CastleWall, OnGround(Far + new Vector3(7f, 0f, -3.5f)), 0f);
+            yield return null;
+            yield return null;
+            GameObject v = BuildingNode.CreateWorkerNpc(OnGround(Far + new Vector3(5f, 0f, 7f)), "WallTestVillager");
+            spawned.Add(v);
+            yield return null;
+            v.GetComponent<RTS.NpcResourceGatherer>().SetGatherDirective(RTS.GatherDirective.Idle);
+            Vector3 target = OnGround(Far + new Vector3(5f, 0f, -8f));
+            v.GetComponent<RTS.RtsUnit>().IssueMoveCommand(target);
+            var track = new System.Text.StringBuilder();
+            float mark = 0f;
+            for (float t = 0f; t < 30f && Vector3.Distance(v.transform.position, target) > 1.2f; t += Time.deltaTime)
+            {
+                if (t >= mark) { mark += 1f; Vector3 p = v.transform.position - Far; track.Append($" {p.x:0.0},{p.z:0.0}"); }
+                yield return null;
+            }
+            Assert.Less(Vector3.Distance(v.transform.position, target), 1.5f, $"arrived behind both walls (at {v.transform.position - Far}; track{track})");
         }
 
         /// <summary>A mob outside (z +8) ordered at a target behind a plain wall (z -6), no gate near.</summary>

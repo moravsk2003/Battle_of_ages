@@ -8,7 +8,8 @@ namespace BattleOfAges.Building
     /// The walls as obstacles for the kinematic units (GroundMotor; the player's CharacterController has the colliders):
     /// each segment a thick line on the ground plane, a pier a disc, the stairs their own strip; the gate's opening is
     /// a leaf that only the player's side passes (§10.5: own units go through the gates only, enemies not at all).
-    /// Own units headed across a wall are routed through the gate that makes the shortest way (Route).
+    /// Own units headed across a wall take the shortest way round (Route): through the gates and past the free ends of
+    /// the walls, over a small graph of waypoints rebuilt when the walls change.
     /// </summary>
     public static class WallBarriers
     {
@@ -53,6 +54,7 @@ namespace BattleOfAges.Building
             foreach (WallSegment s in segments)
                 if (s != null && s.transform.hasChanged) { changed = true; s.transform.hasChanged = false; }
             if (!changed) return;
+            version++;
             builtCount = segments.Count;
             builtPiers = WallPier.Active.Count;
             barriers.Clear();
@@ -281,42 +283,153 @@ namespace BattleOfAges.Building
         /// <summary>How far before and after a gate a unit lines up to go through.</summary>
         public const float GateApproach = 2.6f;
 
+        // ------------------------------------------------------------------ routing (own units)
+
+        private static int version, graphVersion = -1;
+        /// <summary>Waypoints: in front of and behind every gate (on its axis), and round the free ends of the walls.</summary>
+        private static readonly List<Vector2> nodes = new List<Vector2>();
+        /// <summary>The gate a waypoint lines up with (-1: a wall's end).</summary>
+        private static readonly List<int> nodeGate = new List<int>();
+        /// <summary>Which waypoints see each other (a straight way between them misses every wall).</summary>
+        private static bool[,] sees = new bool[0, 0];
+        private static float[] cost = new float[0];
+        private static int[] previous = new int[0];
+        private static bool[] done = new bool[0];
+        private static bool[] fromSees = new bool[0];
+
+        /// <summary>How far off a gate's axis a unit may be and still count as lining up in it; room kept round a wall's end.</summary>
+        private const float GateCorridor = 1.5f, EndRoom = UnitRadius + 0.45f;
+
         /// <summary>
-        /// Where an own unit at from should head for to: to itself if no wall is in the way, else through the gate with
-        /// the shortest way round (first to the point in front of it, then along its axis through the opening and out the
-        /// other side). With no gate, to (the unit walks up to the wall and stays there).
+        /// Where an own unit at from should head for to: to itself if no wall is in the way, else the next waypoint of the
+        /// shortest way round (through the gates, in front of each and out behind it along its axis, and past the free
+        /// ends of the walls). With no way round, to (the unit walks up to the wall and stays there).
         /// </summary>
         public static Vector3 Route(Vector3 from, Vector3 to) => Route(from, to, out _);
 
-        /// <summary>Route; inGateway: the unit is in the corridor of the gate, heading along its axis (the way is clear).</summary>
+        /// <summary>Route; inGateway: the unit is lining up in a gate's corridor (the way is clear: no probes against the jambs).</summary>
         public static Vector3 Route(Vector3 from, Vector3 to, out bool inGateway)
         {
             Refresh();
             inGateway = false;
-            if (gates.Count == 0 || !Blocked(from, to, true)) return to;
+            if (barriers.Count == 0 || !Blocked(from, to, true)) return to;
+            BuildGraph();
+            int n = nodes.Count;
+            if (n == 0) return to;
             Vector2 f = Flat(from), t = Flat(to);
-            int best = -1;
-            float bestCost = float.MaxValue;
-            for (int i = 0; i < gates.Count; i++)
+
+            // Dijkstra from the unit over the waypoints (a few dozen); the target is reached from any waypoint that sees it
+            for (int i = 0; i < n; i++)
             {
-                float cost = (gates[i].center - f).magnitude + (t - gates[i].center).magnitude;
-                if (cost < bestCost) { bestCost = cost; best = i; }
+                done[i] = false;
+                previous[i] = -1;
+                // A waypoint the unit stands on is passed: it heads on to the next one (or the target)
+                fromSees[i] = (nodes[i] - f).sqrMagnitude > 0.36f && !Blocked(from, To3(nodes[i], from.y), true);
+                cost[i] = fromSees[i] ? (nodes[i] - f).magnitude : float.MaxValue;
             }
-            (Vector2 g, Vector2 n, Vector2 along) = gates[best];
-            // Sides by the target's (not the unit's: halfway through the unit must not turn back)
-            Vector2 rel = f - g;
-            float targetSide = Vector2.Dot(t - g, n) >= 0f ? 1f : -1f;
-            float onTargetSide = Vector2.Dot(rel, n) * targetSide, lateral = Mathf.Abs(Vector2.Dot(rel, along));
-            Vector2 before = g - n * targetSide * GateApproach;
-            // In the corridor in front of the opening (or in it, or past it): follow its axis a little ahead (a point
-            // that moves on with the unit, so it lines up as it goes); otherwise first to the point before it
-            bool corridor = onTargetSide > 0f || (lateral < GateCorridor && onTargetSide >= -GateApproach - 0.5f);
-            inGateway = corridor;
-            Vector2 aim = corridor ? g + n * targetSide * Mathf.Min(onTargetSide + GateLead, GateApproach + GateLead) : before;
-            return new Vector3(aim.x, from.y, aim.y);
+            int last = -1;
+            float best = float.MaxValue;
+            for (int step = 0; step < n; step++)
+            {
+                int u = -1;
+                for (int i = 0; i < n; i++) if (!done[i] && cost[i] < float.MaxValue && (u < 0 || cost[i] < cost[u])) u = i;
+                if (u < 0 || cost[u] >= best) break;
+                done[u] = true;
+                float toTarget = cost[u] + (t - nodes[u]).magnitude;
+                if (toTarget < best && !Blocked(To3(nodes[u], from.y), to, true)) { best = toTarget; last = u; }
+                for (int w = 0; w < n; w++)
+                {
+                    if (done[w] || !sees[u, w]) continue;
+                    float c = cost[u] + (nodes[w] - nodes[u]).magnitude;
+                    if (c < cost[w]) { cost[w] = c; previous[w] = u; }
+                }
+            }
+            if (last < 0) return to;
+            int first = last;
+            while (previous[first] >= 0) first = previous[first];
+
+            int gate = nodeGate[first];
+            if (gate >= 0)
+            {
+                // Lining up in the gate's corridor (to the point behind it, or out of it): no whiskers against the jambs
+                (Vector2 g, Vector2 axis, Vector2 along) = gates[gate];
+                Vector2 rel = f - g;
+                inGateway = Mathf.Abs(Vector2.Dot(rel, along)) < GateCorridor && Mathf.Abs(Vector2.Dot(rel, axis)) < GateApproach + 0.5f;
+            }
+            return To3(nodes[first], from.y);
         }
 
-        /// <summary>How far off the gate's axis a unit may be and still head along it; how far ahead along it it aims.</summary>
-        private const float GateCorridor = 1.5f, GateLead = 1.5f;
+        private static Vector3 To3(Vector2 p, float y) => new Vector3(p.x, y, p.y);
+
+        /// <summary>The waypoints and which see which: once per change of the walls.</summary>
+        private static void BuildGraph()
+        {
+            if (graphVersion == version) return;
+            graphVersion = version;
+            nodes.Clear();
+            nodeGate.Clear();
+            for (int i = 0; i < gates.Count; i++)
+            {
+                (Vector2 g, Vector2 axis, _) = gates[i];
+                foreach (float side in new[] { 1f, -1f })
+                    // As far as GateApproach out, closer if another wall stands right behind the gate
+                    foreach (float d in new[] { GateApproach, 1.9f, 1.3f })
+                    {
+                        Vector2 p = g + axis * side * d;
+                        if (!Free(p)) continue;
+                        nodes.Add(p);
+                        nodeGate.Add(i);
+                        break;
+                    }
+            }
+            // Round the ends of every wall (a joint's corners lie in the next wall and drop out): the corners of the
+            // segment's outline grown by the room a unit needs, and round each pier
+            foreach (Barrier b in barriers)
+            {
+                if (b.Leaf) continue;
+                Vector2 ab = b.B - b.A;
+                float r = b.Half + EndRoom;
+                if (ab.sqrMagnitude < 1e-6f)
+                {
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float a = (45f + 90f * k) * Mathf.Deg2Rad;
+                        TryEnd(b.A + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r * 1.42f);
+                    }
+                    continue;
+                }
+                Vector2 dir = ab.normalized, perp = new Vector2(-dir.y, dir.x);
+                foreach (float s in new[] { 1f, -1f })
+                {
+                    TryEnd(b.A - dir * EndRoom + perp * s * r);
+                    TryEnd(b.B + dir * EndRoom + perp * s * r);
+                }
+            }
+            int n = nodes.Count;
+            sees = new bool[n, n];
+            for (int i = 0; i < n; i++)
+                for (int j = i + 1; j < n; j++)
+                    sees[i, j] = sees[j, i] = !Blocked(To3(nodes[i], -1000f), To3(nodes[j], -1000f), true);
+            cost = new float[n];
+            previous = new int[n];
+            done = new bool[n];
+            fromSees = new bool[n];
+        }
+
+        private static void TryEnd(Vector2 p)
+        {
+            if (!Free(p)) return;
+            for (int i = 0; i < nodes.Count; i++) if ((nodes[i] - p).sqrMagnitude < 0.25f) return; // one per corner
+            nodes.Add(p);
+            nodeGate.Add(-1);
+        }
+
+        /// <summary>Whether a unit fits at p (not in any wall, the gates' openings open).</summary>
+        private static bool Free(Vector2 p)
+        {
+            foreach (Barrier b in barriers)
+                if (!b.Leaf && Distance(b, p, out _) < UnitRadius + 0.05f) return false;
+            return true;
+        }
     }
 }

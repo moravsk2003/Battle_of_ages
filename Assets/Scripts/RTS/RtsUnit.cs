@@ -43,6 +43,9 @@ namespace BattleOfAges.RTS
         private int gridId = -1;
         private Vector3 steerDir, steerDesired;
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
+        private float routeTimer;
+        private Vector3 routeVia, routeFor;
+        private bool routeInGateway;
         private HealthComponent health;
         private CombatUnit combat;
         /// <summary>CharacterSpeed formula: Global x modifier x sqrt(strength) (workers without a CombatUnit move like a person).</summary>
@@ -428,8 +431,17 @@ namespace BattleOfAges.RTS
                 bool inGateway = false;
                 if (!isPlayerControlled)
                 {
-                    // Across an own wall: by way of a gate (§10.5)
-                    Vector3 via = Building.WallBarriers.Route(currentPos, targetPosition, out inGateway), toVia = via - currentPos;
+                    // Across an own wall: by way of the gates and round the walls' ends (§10.5); asked again 4 times a
+                    // second, at once at a new target or on reaching the waypoint
+                    routeTimer -= Time.deltaTime;
+                    if (routeTimer <= 0f || routeFor != targetPosition || (routeVia - currentPos).sqrMagnitude < 0.36f)
+                    {
+                        routeVia = Building.WallBarriers.Route(currentPos, targetPosition, out routeInGateway);
+                        routeFor = targetPosition;
+                        routeTimer = 0.25f;
+                    }
+                    inGateway = routeInGateway;
+                    Vector3 via = routeVia, toVia = via - currentPos;
                     toVia.y = 0f;
                     if ((via.x != targetPosition.x || via.z != targetPosition.z) && toVia.sqrMagnitude > 0.04f) moveDir = toVia;
                 }
