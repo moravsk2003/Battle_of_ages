@@ -35,7 +35,7 @@ namespace BattleOfAges.PlayModeTests
         private readonly List<HealthComponent> mobs = new List<HealthComponent>(), knights = new List<HealthComponent>();
         private Vector3 arena;
 
-        [UnityTest]
+        [UnityTest, Timeout(3600000)] // STRESS_SCALE 10 (10 000 units) runs well past the default 3 minutes
         public IEnumerator StressBattles()
         {
             string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
