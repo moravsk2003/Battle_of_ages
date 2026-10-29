@@ -28,6 +28,9 @@ namespace BattleOfAges.AI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { far.Clear(); instance = null; }
 
+        /// <summary>Forgets every far kingdom (a new campaign, back to the menu): the next campaign founds its own.</summary>
+        public static void Clear() => far.Clear();
+
         private static void Ensure()
         {
             if (instance == null) instance = new GameObject("KingdomRealm").AddComponent<KingdomRealm>();

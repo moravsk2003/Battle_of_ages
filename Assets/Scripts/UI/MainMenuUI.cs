@@ -13,6 +13,7 @@ namespace BattleOfAges.UI
     public sealed class MainMenuUI : MonoBehaviour
     {
         private RectTransform menu, settings;
+        private CampaignSetupUI campaign;
         private Button continueButton;
         private Text continueInfo;
 
@@ -48,6 +49,13 @@ namespace BattleOfAges.UI
         {
             int slot = SaveSystem.LatestSlot();
             if (slot >= 0) SaveSystem.Load(slot);
+        }
+
+        /// <summary>The new campaign screen (M1): its world and hero are chosen before it starts.</summary>
+        private void ShowCampaign(bool show)
+        {
+            menu.gameObject.SetActive(!show);
+            campaign.Panel.gameObject.SetActive(show);
         }
 
         private void ShowSettings(bool show)
@@ -91,7 +99,7 @@ namespace BattleOfAges.UI
             RectTransform ci = UiTheme.Rect(menu, "ContinueInfo", new Vector2(0.5f, 1f), new Vector2(0f, y + 14f), new Vector2(400f, 24f));
             continueInfo = UiTheme.Label(ci, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             y -= 18f;
-            Big(menu, "Нова гра", ref y, SaveSystem.NewGame);
+            Big(menu, "Нова гра", ref y, () => ShowCampaign(true));
             Big(menu, "Завантажити", ref y, () => SaveSlotsUI.Open(false, RefreshContinue));
             Big(menu, "Налаштування", ref y, () => ShowSettings(true));
             Big(menu, "Вихід", ref y, Quit);
@@ -117,6 +125,9 @@ namespace BattleOfAges.UI
             UiTheme.Label(kb, "Text", "Клавіші можна перепризначити в грі: Esc → Налаштування", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             UiTheme.TextButton(settings, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(220f, 52f), () => ShowSettings(false), 20);
             settings.gameObject.SetActive(false);
+
+            campaign = CampaignSetupUI.Build(root, () => ShowCampaign(false));
+            campaign.Panel.gameObject.SetActive(false);
 
             RectTransform ver = UiTheme.Rect(root, "Version", new Vector2(1f, 0f), new Vector2(-16f, 12f), new Vector2(400f, 24f));
             UiTheme.Label(ver, "Text", "v" + Application.version, 14, TextAnchor.LowerRight, UiTheme.InkDim);

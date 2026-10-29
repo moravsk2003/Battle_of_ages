@@ -29,6 +29,7 @@ namespace BattleOfAges.PlayModeTests
         {
             SaveSystem.FolderOverride = null;
             NpcKingdom.RemoveAll();
+            KingdomRealm.Clear();
             WorldSettings.Set(0, 0f);
             try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch { }
         }

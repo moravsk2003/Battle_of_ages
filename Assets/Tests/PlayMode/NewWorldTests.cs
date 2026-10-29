@@ -27,6 +27,8 @@ namespace BattleOfAges.PlayModeTests
         {
             SaveSystem.FolderOverride = null;
             WorldSettings.Set(0, 0f); // the fixed world for the tests after
+            BattleOfAges.AI.NpcKingdom.RemoveAll();
+            BattleOfAges.AI.KingdomRealm.Clear();
             try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch { }
         }
 

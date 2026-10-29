@@ -257,11 +257,22 @@ namespace BattleOfAges.SaveLoad
             return true;
         }
 
-        public static void NewGame()
+        /// <summary>The choices of the campaign being started (applied to the hero once the scene is in).</summary>
+        private static CampaignSetup startingSetup;
+
+        public static void NewGame() => NewGame(null);
+
+        /// <summary>A new campaign with these choices (the setup screen; null: a random world with the defaults).</summary>
+        public static void NewGame(CampaignSetup setup)
         {
+            setup = setup ?? new CampaignSetup();
+            startingSetup = setup;
             pending = null;
+            AI.KingdomRealm.Clear(); // not the last campaign's heroes
             newGamePending = true;
-            World.WorldSettings.Set(World.WorldSettings.NewSeed(), World.WorldSettings.DefaultSize); // a world of its own (§5.1)
+            World.WorldSettings.Set(setup.SeedOrRandom(), setup.Size); // a world of its own (§5.1)
+            GameBalance.CampaignHeroes = setup.Heroes;
+            GameBalance.CampaignKingShare = setup.KingShare;
             AutosaveEnabled = true;
             WorldPersistence.Suspended = true;
             WorldPersistence.Clear();
@@ -273,6 +284,7 @@ namespace BattleOfAges.SaveLoad
         public static void ToMainMenu()
         {
             pending = null;
+            AI.KingdomRealm.Clear();
             WorldPersistence.Suspended = true;
             Time.timeScale = 1f;
             SceneManager.LoadScene(MenuScene);
@@ -304,9 +316,20 @@ namespace BattleOfAges.SaveLoad
             bool found = newGamePending || !Application.isBatchMode; // (batch test runs open the scene for other things)
             if (!newGamePending) WorldPersistence.Clear(); // the scene was opened directly (editor, tests)
             if (newGamePending && ResourceManager.Instance != null) ResourceManager.Instance.ResetToInitial();
+            if (newGamePending && startingSetup != null) { runner.StartCoroutine(ApplySetupLater(startingSetup)); startingSetup = null; }
             newGamePending = false;
             runner.StartCoroutine(RegisterSceneTreesLater());
             if (found) runner.StartCoroutine(FoundKingdomsLater());
+        }
+
+        /// <summary>The hero's class and starting artifact chosen before the game (once the hero is in place).</summary>
+        private static IEnumerator ApplySetupLater(CampaignSetup setup)
+        {
+            yield return null;
+            GameObject player = Managers.GameContext.Player;
+            if (player == null) yield break;
+            if (setup.Class != HeroClass.None) player.GetComponent<HeroProgress>()?.ChooseClass(setup.Class);
+            if (setup.HasArtifact) player.GetComponent<HeroArtifacts>()?.ChooseStart(setup.Artifact);
         }
 
         private static IEnumerator FoundKingdomsLater()

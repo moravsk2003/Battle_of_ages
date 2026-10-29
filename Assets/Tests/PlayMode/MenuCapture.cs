@@ -18,7 +18,7 @@ namespace BattleOfAges.PlayModeTests
         {
             string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
             if (string.IsNullOrEmpty(dir)) dir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), ".agent_vision", "menu");
-            var capture = new CaptureRenderer(dir, 5, 60f, drawGrass: true);
+            var capture = new CaptureRenderer(dir, 6, 60f, drawGrass: true);
             UnityEngine.Object.DontDestroyOnLoad(capture.Camera.transform.root.gameObject); // survives the switch to the game scene
 
             yield return SceneManager.LoadSceneAsync(SaveSystem.MenuScene, LoadSceneMode.Single);
@@ -32,6 +32,10 @@ namespace BattleOfAges.PlayModeTests
             GameObject.Find("MainMenuCanvas").transform.Find("Menu").gameObject.SetActive(false);
             yield return null;
             Shoot(capture, 2, "settings");
+            GameObject.Find("MainMenuCanvas").transform.Find("Settings").gameObject.SetActive(false);
+            GameObject.Find("MainMenuCanvas").transform.Find("NewCampaign").gameObject.SetActive(true);
+            yield return null;
+            Shoot(capture, 5, "new_campaign");
 
             yield return SceneManager.LoadSceneAsync(SaveSystem.GameScene, LoadSceneMode.Single);
             yield return new WaitForSeconds(1.5f);
