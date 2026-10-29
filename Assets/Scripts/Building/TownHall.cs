@@ -67,7 +67,7 @@ namespace BattleOfAges.Building
             ResourceManager rm = ResourceManager.Instance;
             if (rm == null) return true;
             if (rm.WoodCount < wood) { reason = $"Потрібно {wood} деревини"; return false; }
-            if (rm.GetOreCountAtLeast(tier) < ore) { reason = $"Потрібно {ore} руди рів. {tier}+"; return false; }
+            if (rm.GetOreCountAtLeast(tier) < ore) { reason = $"Потрібно {ore} руди {ItemTypeNames.Roman(tier)}+ (або переплавте нижчу на верстаці)"; return false; }
             return true;
         }
 

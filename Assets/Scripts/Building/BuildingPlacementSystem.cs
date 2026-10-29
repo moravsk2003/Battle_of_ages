@@ -373,7 +373,11 @@ namespace BattleOfAges.Building
             if (!Combat.CentralEmpire.Active) // building is free for the Central Empire
             {
                 if (def.WoodCost > 0) rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
-                if (def.OreCost > 0) rm.ConsumeOre(OreTierOf(def), def.OreCost);
+                if (def.OreCost > 0)
+                {
+                    if (WallSegment.IsWall(def.Type)) rm.ConsumeOre(OreTierOf(def), def.OreCost); // a wall is as strong as its ore
+                    else rm.ConsumeOreAtLeast(OreTierOf(def), def.OreCost); // others take its tier or better, the commonest first
+                }
             }
 
             GameObject building = CreateBuilding(currentBuildingType);
@@ -450,7 +454,8 @@ namespace BattleOfAges.Building
             if (Combat.CentralEmpire.Active) return true;
 
             if (def.WoodCost > 0 && rm.WoodCount < def.WoodCost) return false;
-            if (def.OreCost > 0 && rm.GetOreTierCount(tier) < def.OreCost) return false;
+            int have = WallSegment.IsWall(def.Type) ? rm.GetOreTierCount(tier) : rm.GetOreCountAtLeast(tier);
+            if (def.OreCost > 0 && have < def.OreCost) return false;
 
             return true;
         }

@@ -646,7 +646,7 @@ namespace BattleOfAges.AI
             if (IsDefeated) return;
             if (Raiding) EndRaid(retreat: true);
             InterregnumLeft = GameBalance.InterregnumSeconds;
-            StrategyHud.Notify($"Король {KingdomName} загинув! Міжцар'я");
+            StrategyHud.Notify($"Король {KingdomName} загинув! Міжцарів'я");
             Desert();
         }
 

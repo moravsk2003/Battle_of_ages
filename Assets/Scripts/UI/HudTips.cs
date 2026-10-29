@@ -29,7 +29,7 @@ namespace BattleOfAges.UI
                     int n = res.GetOreTierCount(t);
                     if (n > 0) sb.Append($"\n{OreTierHelper.GetTierName(t)}  <b>{n}</b>");
                 }
-            sb.Append("\n").Append(TipText.Dim("Будівля бере руду свого рівня; стіна й річ з вищої — міцніші."));
+            sb.Append("\n").Append(TipText.Dim("Будівлі й речі беруть руду свого рівня або вищу; стіна з вищої — міцніша. Переплавка на верстаці: 10 → 1 рівнем вище."));
             sb.Append("\n").Append(TipText.Dim("Камінці руди на землі, шахта (до 10 робітників) і носії до скрині."));
             return sb.ToString();
         }
@@ -48,8 +48,8 @@ namespace BattleOfAges.UI
 
         public static string Army() =>
             TipText.Title("Військо", UiTheme.Gold) +
-            "\nСвої бійці без роботи-збирача: воїни, лицарі, генерали." +
-            $"\n{TipText.Dim($"Робітник стає воїном від боїв і праці. Тривога {TipText.Key(Key(KeyAction.Alarm))} кличе всіх до зброї.")}";
+            "\nСвої бійці, що не працюють: воїни, лицарі, генерали." +
+            $"\n{TipText.Dim($"Воїном стають у боях і зрідка від праці, лицарем і генералом — лише в боях. Тривога {TipText.Key(Key(KeyAction.Alarm))} кличе всіх до зброї.")}";
 
         public static string Alarm() =>
             TipText.Title(SettlementAlarm.Active ? "Тривога триває" : "Тривога", SettlementAlarm.Active ? UiTheme.Bad : UiTheme.Gold) +

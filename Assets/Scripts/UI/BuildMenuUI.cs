@@ -236,8 +236,8 @@ namespace BattleOfAges.UI
             var sb = new System.Text.StringBuilder(TipText.Title(def.DisplayName, UiTheme.Gold));
             sb.Append("\n").Append(def.Description);
             sb.Append($"\nДеревина {def.WoodCost}  ({Have(wood, def.WoodCost)})");
-            sb.Append(wall ? $"\nРуда {def.OreCost} одного рівня  ({Have(ore, def.OreCost)} усього)" : $"\nРуда рів. {def.OreTierRequired}: {def.OreCost}  ({Have(ore, def.OreCost)})");
-            sb.Append(wall ? $"\nМіцність {def.MaxHealth} на руді рів. 0, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% за кожен рівень руди" : $"\nМіцність {def.MaxHealth}");
+            sb.Append(wall ? $"\nРуда {def.OreCost} одного рівня  ({Have(ore, def.OreCost)} усього)" : $"\nРуда {def.OreCost}, {(def.OreTierRequired == 0 ? "будь-яка" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + " і вища")}  ({Have(ore, def.OreCost)})");
+            sb.Append(wall ? $"\nМіцність {def.MaxHealth} на звичайній руді, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% за кожен рівень руди" : $"\nМіцність {def.MaxHealth}");
             if (def.NpcSpawnCount > 0) sb.Append($"\nДає {def.NpcSpawnCount} робітника (потрібне місце в населенні)");
             sb.Append("\n").Append(TipText.Dim(wall ? "Z / X — повернути, Tab — руда, ЛКМ — поставити, ПКМ — скасувати" : "Z / X — повернути, ЛКМ — поставити, ПКМ — скасувати"));
             return sb.ToString();
@@ -253,7 +253,7 @@ namespace BattleOfAges.UI
                 BuildingDefinition def = BuildingData.GetDefinition(r.Type);
                 bool affordable = placer == null || placer.CanAfford(r.Type);
                 bool allowed = BuildingPlacementSystem.IsAllowed(r.Type, out string reason);
-                string ore = $"руда {def.OreCost} <size=13>({(WallSegment.IsWall(r.Type) ? "рівень — Tab" : "рів. " + def.OreTierRequired)})</size>";
+                string ore = $"руда {def.OreCost} <size=13>({(WallSegment.IsWall(r.Type) ? "рівень — Tab" : def.OreTierRequired == 0 ? "будь-яка" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + "+")})</size>";
                 r.Cost.text = $"дерево {def.WoodCost}  ·  {ore}";
                 r.Cost.color = affordable ? UiTheme.Gold : UiTheme.Bad;
                 r.Description.text = allowed ? def.Description : UiTheme.Sanitize(reason);

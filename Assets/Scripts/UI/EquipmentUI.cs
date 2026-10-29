@@ -283,6 +283,8 @@ namespace BattleOfAges.UI
         private static string DisplayName(GameObject go)
         {
             if (go.GetComponent<PlayerCombatController>() != null) return "Герой";
+            RtsUnit unit = go.GetComponent<RtsUnit>();
+            if (unit != null) return SelectedUnitUI.DisplayName(unit); // by its rank, as in the selection panel
             string n = go.name;
             if (n.StartsWith("NPC_Villager_")) return "Робітник " + n.Substring("NPC_Villager_".Length);
             if (n.Contains("Knight")) return "Лицар";

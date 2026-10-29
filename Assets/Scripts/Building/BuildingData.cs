@@ -39,8 +39,8 @@ namespace BattleOfAges.Building
             new BuildingDefinition
             {
                 Type = BuildingType.WorkerHouse,
-                DisplayName = "Будинок Робітника",
-                Description = "Створює 1 робітника-селянина",
+                DisplayName = "Будинок",
+                Description = "Ще один робітник (і місце для нього в населенні)",
                 WoodCost = 1,
                 OreCost = 1,
                 OreTierRequired = 0,
@@ -51,7 +51,7 @@ namespace BattleOfAges.Building
             new BuildingDefinition
             {
                 Type = BuildingType.StorageChest,
-                DisplayName = "Скриня (Склад)",
+                DisplayName = "Скриня-склад",
                 Description = "Точка збору та сховище ресурсів",
                 WoodCost = 2,
                 OreCost = 1,
@@ -64,7 +64,7 @@ namespace BattleOfAges.Building
             {
                 Type = BuildingType.Mine,
                 DisplayName = "Шахта",
-                Description = "Видобуває руду (до 10 робітників, 1 руда/с, з кайлом більше)",
+                Description = "До 10 робітників копають 1 руду/с (з кайлом більше); носії несуть її в скриню",
                 WoodCost = 4,
                 OreCost = 2,
                 OreTierRequired = 0,
@@ -75,8 +75,8 @@ namespace BattleOfAges.Building
             new BuildingDefinition
             {
                 Type = BuildingType.Workbench,
-                DisplayName = "Верстак (Крафт)",
-                Description = "Виготовлення зброї та броні (до 4 NPC робітників)",
+                DisplayName = "Верстак",
+                Description = "Зброя, броня й інструменти; переплавка руди (до 4 робітників)",
                 WoodCost = 3,
                 OreCost = 1,
                 OreTierRequired = 0,

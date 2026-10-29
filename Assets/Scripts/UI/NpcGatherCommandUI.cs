@@ -323,7 +323,7 @@ namespace BattleOfAges.UI
             chopText = CreateJobCounterRow(rowsContainer.transform, font, "Рубання дерев на дрова", GatherDirective.WoodChopTreesOnly);
             pebblesText = CreateJobCounterRow(rowsContainer.transform, font, "Збір камінчиків руди", GatherDirective.OrePebblesOnly);
             haulText = CreateJobCounterRow(rowsContainer.transform, font, "Перевезення руди з шахти в скриню", GatherDirective.HaulOreFromMineToChest);
-            autoText = CreateJobCounterRow(rowsContainer.transform, font, "Автономні (Шукають найближчі)", GatherDirective.Auto);
+            autoText = CreateJobCounterRow(rowsContainer.transform, font, "Самостійно (беруться за те, чого бракує)", GatherDirective.Auto);
 
             // Bottom Action Buttons Bar
             RectTransform barRect = UiTheme.Child(commandPanelObj.transform, "BottomBar", new Vector2(0.03f, 0.04f), new Vector2(0.97f, 0.18f), Vector2.zero, Vector2.zero);
@@ -337,9 +337,9 @@ namespace BattleOfAges.UI
             barLayout.childForceExpandHeight = true;
 
             CreateActionButton(bottomBar.transform, font, "Застосувати", new Color(0.12f, 0.52f, 0.22f), ApplyCurrentAllocation);
-            CreateActionButton(bottomBar.transform, font, "Усі в Авто", new Color(0.18f, 0.32f, 0.55f), () => SetAllToDirective(GatherDirective.Auto));
-            CreateActionButton(bottomBar.transform, font, "Усі Рубачі", new Color(0.55f, 0.35f, 0.12f), () => SetAllToDirective(GatherDirective.WoodChopTreesOnly));
-            CreateActionButton(bottomBar.transform, font, "Усі Рудокопи", new Color(0.35f, 0.40f, 0.45f), () => SetAllToDirective(GatherDirective.OrePebblesOnly));
+            CreateActionButton(bottomBar.transform, font, "Усім: самостійно", new Color(0.18f, 0.32f, 0.55f), () => SetAllToDirective(GatherDirective.Auto));
+            CreateActionButton(bottomBar.transform, font, "Усім: рубати", new Color(0.55f, 0.35f, 0.12f), () => SetAllToDirective(GatherDirective.WoodChopTreesOnly));
+            CreateActionButton(bottomBar.transform, font, "Усім: камінці руди", new Color(0.35f, 0.40f, 0.45f), () => SetAllToDirective(GatherDirective.OrePebblesOnly));
 
             if (commandPanelObj != null) commandPanelObj.SetActive(false);
         }

@@ -169,7 +169,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activeWorkbenchTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            resourceUI.ShowTreePrompt($"[Натисніть {keyEStr}] Відкрити Верстак (Крафт зброї/броні)");
+            resourceUI.ShowTreePrompt($"[Натисніть {keyEStr}] Відкрити верстак");
         }
 
         private void HandleWorkbenchInput()
@@ -190,7 +190,7 @@ namespace BattleOfAges.Player
         private void UpdateChestPromptUI()
         {
             if (resourceUI == null || activeChestTarget == null) return;
-            resourceUI.ShowTreePrompt("[E] Відкрити скриню-склад");
+            resourceUI.ShowTreePrompt($"[Натисніть {KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather))}] Відкрити скриню-склад");
         }
 
         private void HandleChestInput()
@@ -218,8 +218,8 @@ namespace BattleOfAges.Player
                 int branchPercent = Mathf.RoundToInt(activeTreeTarget.BranchProgress * 100f);
                 int fellPercent = Mathf.RoundToInt(activeTreeTarget.FellingProgress * 100f);
 
-                string branchStr = (branchPercent > 0) ? $"[Утримуйте {keyEStr}] Збирання гілок ({branchPercent}%)" : $"[Утримуйте {keyEStr}] Збирати гілки (+1 Дерево)";
-                string chopStr = (fellPercent > 0) ? $"[Утримуйте {keyFStr}] Рубати стовбур ({fellPercent}%)" : $"[Утримуйте {keyFStr}] Зрубати дерево (+4 Дерева)";
+                string branchStr = (branchPercent > 0) ? $"[Утримуйте {keyEStr}] Збирання гілок ({branchPercent}%)" : $"[Утримуйте {keyEStr}] Збирати гілки (+1 деревина)";
+                string chopStr = (fellPercent > 0) ? $"[Утримуйте {keyFStr}] Рубати стовбур ({fellPercent}%)" : $"[Утримуйте {keyFStr}] Зрубати дерево (+4 деревини)";
 
                 if (EquippedAxeLevel > 0)
                 {
@@ -231,7 +231,7 @@ namespace BattleOfAges.Player
             else if (activeTreeTarget.CurrentState == TreeState.WoodPile)
             {
                 string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира {ItemTypeNames.Roman(EquippedAxeLevel)}]" : "";
-                resourceUI.ShowTreePrompt($"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} Деревини){axeStr}");
+                resourceUI.ShowTreePrompt($"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} деревини){axeStr}");
             }
         }
 

@@ -112,7 +112,7 @@ namespace BattleOfAges.UI
                 int tier = ItemStatCalculator.CalculateRequiredOreTier(selectedLevel);
                 ResourceManager rm = ResourceManager.Instance;
                 bool woodOk = rm == null || rm.WoodCount >= wood, oreOk = rm == null || rm.GetOreCountAtLeast(tier) >= ore;
-                string tierText = tier == 0 ? "руда" : $"руда {tier}+";
+                string tierText = tier == 0 ? "руда" : $"руда {ItemTypeNames.Roman(tier)}+";
                 c.cost.text = $"<color={(woodOk ? "#E8DFCB" : "#DB5242")}>дерево {wood}</color>  ·  <color={(oreOk ? "#E8DFCB" : "#DB5242")}>{tierText} ×{ore}</color>  ·  {ItemStatCalculator.CalculateCraftTime(c.type, selectedLevel):0.#} с";
                 c.craft.interactable = woodOk && oreOk && bench != null;
             }
@@ -182,7 +182,7 @@ namespace BattleOfAges.UI
             int have = rm != null ? rm.GetOreTierCount(smeltTier) : 0;
             smeltTierText.text = $"руда {CraftingTask.Tier(smeltTier)}  →  руда {CraftingTask.Tier(smeltTier + 1)}";
             smeltInfoText.text = $"{ratio} шт. → 1 шт., {Combat.GameBalance.SmeltSecondsPerPiece:0.#} с за шматок\n"
-                                 + $"у вас руди {CraftingTask.Tier(smeltTier)}: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — вийде {can}" : "");
+                                 + $"на складі цієї руди: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — вийде {can}" : "");
             smeltTen.interactable = bench != null && can >= 1;
             smeltAll.interactable = bench != null && can >= 2;
             smeltAll.GetComponentInChildren<Text>().text = can >= 2 ? $"Усе ({can})" : "Усе";
@@ -357,7 +357,7 @@ namespace BattleOfAges.UI
             int tier = ItemStatCalculator.CalculateRequiredOreTier(selectedLevel);
             string s = TipText.Title($"{ItemTypeNames.MaterialName(type, selectedLevel)} {ItemTypeNames.Display(type).ToLowerInvariant()} {ItemTypeNames.Roman(selectedLevel)}", UiTheme.LevelColor(selectedLevel))
                      + "\n" + ItemTypeNames.Describe(item)
-                     + $"\nДеревина {ItemStatCalculator.CalculateWoodCost(type, selectedLevel)}, руда {(tier == 0 ? "будь-якого рівня" : "рів. " + tier + " і вище")} ×{ItemStatCalculator.CalculateOreCost(type, selectedLevel)}"
+                     + $"\nДеревина {ItemStatCalculator.CalculateWoodCost(type, selectedLevel)}, руда {(tier == 0 ? "будь-якого рівня" : ItemTypeNames.Roman(tier) + " і вище")} ×{ItemStatCalculator.CalculateOreCost(type, selectedLevel)}"
                      + $"\nЧас {ItemStatCalculator.CalculateCraftTime(type, selectedLevel):0.#} с з одним робітником; більше робітників — швидше";
             int stored = 0;
             foreach (Item it in Armory.Instance.Items) if (it.Equals(item)) stored++;

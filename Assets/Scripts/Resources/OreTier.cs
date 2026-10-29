@@ -41,16 +41,18 @@ namespace BattleOfAges.Resources
 
         public static string GetTierName(int tier)
         {
-            if (tier == 0) return "Камінна руда (рів. 0)";
-            if (tier == 1) return "Мідно-залізна руда (рів. 1)";
-            if (tier == 2) return "Срібно-золота руда (рів. 2)";
-            if (tier == 3) return "Платинова руда (рів. 3)";
-            if (tier == 4) return "Мітрилова руда (рів. 4)";
-            if (tier == 5) return "Адамантитова руда (рів. 5)";
-            if (tier >= 90) return $"Небесна руда (рів. {tier})";
-            if (tier >= 50) return $"Драконова руда (рів. {tier})";
-            if (tier >= 20) return $"Давня реліктова руда (рів. {tier})";
-            return $"Рідкісна руда (рів. {tier})";
+            string r = Crafting.ItemTypeNames.Roman(tier);
+            string level = r.Length > 0 ? r : tier.ToString(); // the same Roman tiers as the HUD and the mine plates
+            if (tier == 0) return "Звичайна руда (0)";
+            if (tier == 1) return $"Мідно-залізна руда ({level})";
+            if (tier == 2) return $"Срібно-золота руда ({level})";
+            if (tier == 3) return $"Платинова руда ({level})";
+            if (tier == 4) return $"Мітрилова руда ({level})";
+            if (tier == 5) return $"Адамантитова руда ({level})";
+            if (tier >= 90) return $"Небесна руда ({level})";
+            if (tier >= 50) return $"Драконова руда ({level})";
+            if (tier >= 20) return $"Давня реліктова руда ({level})";
+            return $"Рідкісна руда ({level})";
         }
 
         public static Color GetTierColor(int tier)

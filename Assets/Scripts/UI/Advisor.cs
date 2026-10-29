@@ -38,14 +38,28 @@ namespace BattleOfAges.UI
         {
             ("Збудуйте скриню-склад", () => $"{ToBuild()} «Скриня», ЛКМ — поставити. У скриню робітники зносять дерево й руду.", () => StorageChestNode.ActiveChests.Count > 0),
             ("Назбирайте 20 деревини", () => $"Самі: {K(KeyAction.ChopTree)} біля дерева — рубати, {K(KeyAction.InteractGather)} — підняти гілку. Або на мапі: виділіть робітників і ПКМ по дереву.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
-            ("Збудуйте шахту", () => $"{ToBuild()} «Шахта». Далі на мапі виділіть робітників (ЛКМ або рамкою) і клацніть ПКМ по шахті — вони добуватимуть руду.", () => MineNode.ActiveMines.Count > 0),
+            ("Збудуйте шахту", () => $"{ToBuild()} «Шахта». Виділіть робітників (ЛКМ або рамкою) і ПКМ по шахті — копатимуть усередині. Носять руду в скриню інші: наказ «Шахта» або «Авто».", () => MineNode.ActiveMines.Count > 0),
             ("Збудуйте верстак", () => $"{ToBuild()} «Верстак». На ньому робітник кує зброю й броню для всіх.", () => WorkbenchNode.Instance != null),
-            ("Викуйте першу річ", () => $"Підійдіть до верстака, {K(KeyAction.InteractGather)}: «Покликати» робітника, оберіть рецепт і «Виготовити».", () => Armory.Instance.Items.Count > 0),
+            ("Викуйте першу річ", () => $"На мапі: виділіть робітника, ПКМ по верстаку — він стане до роботи; ЛКМ по верстаку — вікно, рецепт → «Виготовити». (Від першої особи — {K(KeyAction.InteractGather)} біля верстака.)", () => Armory.Instance.Items.Count > 0),
+            ("Озбройте робітника", () => $"На мапі виділіть людей, {K(KeyAction.Equipment)} — спорядження: клік по мечу чи броні на складі дає по одній кожному. Вище за воїна (лицар, генерал) піднімають лише бої.", () => ArmedVillager()),
             ("Збудуйте ратушу", () => $"{ToBuild()} «Ратуша». Вона піднімає межу населення; нові робітники народжуються самі.", () => TownHall.Current != null),
             ("Досягніть 10 жителів", () => $"{ToBuild()} «Будинок»: кожен дає ще одного робітника. Далі приріст іде сам, поки є місце.", () => TownHall.Population >= 10),
-            ("Покращте ратушу до II", () => $"На мапі ({K(KeyAction.ToggleGameMode)}) над ратушею — кнопка «Покращити». Потрібні дерево й руда вищого рівня.", () => TownHall.Current != null && TownHall.Current.Level >= 2),
+            ("Покращте ратушу до II", () => $"На мапі ({K(KeyAction.ToggleGameMode)}) наведіть на ратушу — кнопка «Покращити». Треба {Combat.GameBalance.TownHallWood[2]} дерева й {Combat.GameBalance.TownHallOre[2]} руди I+: з шахти зрідка або переплавкою на верстаці (10 → 1).", () => TownHall.Current != null && TownHall.Current.Level >= 2),
             ("Збудуйте стіну з воротами", () => $"{ToBuild()} «Стіна» і «Ворота». Виділені робітники ПКМ по стіні стають на пости; {K(KeyAction.Alarm)} — тривога, усі до зброї.", () => Has(BuildingType.WallGate)),
         };
+
+        /// <summary>A villager (not a guard born armed) holds a sword, a bow or a staff.</summary>
+        private static bool ArmedVillager()
+        {
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+            {
+                Equipment e = w != null ? w.GetComponent<Equipment>() : null;
+                if (e == null) continue;
+                Item held = e[EquipSlot.Weapon];
+                if (!held.IsEmpty && !GearDispenser.IsTool(held.Type)) return true;
+            }
+            return false;
+        }
 
         public static int DoneCount { get { int n = 0; foreach (var g in Goals) if (g.done()) n++; return n; } }
 
@@ -73,7 +87,7 @@ namespace BattleOfAges.UI
         {
             // The component lives on a full-screen holder so it keeps running while the panel is hidden
             root.anchorMin = Vector2.zero; root.anchorMax = Vector2.one; root.offsetMin = root.offsetMax = Vector2.zero;
-            panel = UiTheme.Rect(root, "Panel", new Vector2(1f, 1f), new Vector2(-18f, -250f), new Vector2(380f, 142f));
+            panel = UiTheme.Rect(root, "Panel", new Vector2(1f, 1f), new Vector2(-18f, -250f), new Vector2(380f, 166f));
             UiTheme.PanelImage(panel);
             RectTransform head = UiTheme.Rect(panel, "Head", new Vector2(0f, 1f), new Vector2(16f, -8f), new Vector2(250f, 24f));
             UiTheme.Label(head, "Text", "Порада", 15, TextAnchor.MiddleLeft, UiTheme.InkDim, FontStyle.Bold);
@@ -81,7 +95,7 @@ namespace BattleOfAges.UI
             count = UiTheme.Label(cnt, "Text", "", 15, TextAnchor.MiddleRight, UiTheme.InkDim);
             RectTransform t = UiTheme.Rect(panel, "Goal", new Vector2(0f, 1f), new Vector2(16f, -32f), new Vector2(350f, 28f));
             title = UiTheme.Label(t, "Text", "", 20, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
-            RectTransform h = UiTheme.Rect(panel, "How", new Vector2(0f, 1f), new Vector2(16f, -62f), new Vector2(350f, 72f));
+            RectTransform h = UiTheme.Rect(panel, "How", new Vector2(0f, 1f), new Vector2(16f, -62f), new Vector2(350f, 96f));
             hint = UiTheme.Label(h, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Ink);
             hint.horizontalOverflow = HorizontalWrapMode.Wrap;
             hint.supportRichText = true;

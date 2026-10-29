@@ -202,7 +202,7 @@ namespace BattleOfAges.UI
             else img.sprite = UiTheme.IconSprite(UiTheme.Icon.Worker);
         }
 
-        private static string DisplayName(RtsUnit u)
+        public static string DisplayName(RtsUnit u)
         {
             if (u.IsHero) return "Герой";
             string n = u.gameObject.name;
@@ -355,7 +355,7 @@ namespace BattleOfAges.UI
             CreateDirectiveButton(orders, UiTheme.Icon.Wood, "Гілки", GatherDirective.WoodGatherBranchesOnly,
                 "Збирати гілки", "Обтрушують дерева, не рубаючи їх: ліс лишається, деревини менше.");
             CreateDirectiveButton(orders, UiTheme.Icon.Hammer, "Рубати", GatherDirective.WoodChopTreesOnly,
-                "Рубати дерева", "Валять дерева на дрова: більше деревини, ліс рідшає. Сокира — швидше.");
+                "Рубати дерева", "Валять дерева на дрова: більше деревини, ліс рідшає.");
             CreateDirectiveButton(orders, UiTheme.Icon.Ore, "Руда", GatherDirective.OrePebblesOnly,
                 "Збирати руду", "Підбирають камінці руди з землі й несуть у скриню.");
             CreateDirectiveButton(orders, UiTheme.Icon.House, "Шахта", GatherDirective.HaulOreFromMineToChest,
