@@ -62,7 +62,7 @@ namespace BattleOfAges.RTS
         public static float WorldSize(float metres, float pixels, float orthoSize, float screenHeight) =>
             Mathf.Max(metres, pixels * 2f * orthoSize / Mathf.Max(1f, screenHeight));
 
-        private void LateUpdate() => SubmitFor(Camera.main, null);
+        private void LateUpdate() => SubmitFor(ViewCamera.Current, null); // the map camera is not tagged MainCamera
 
         /// <summary>Queues this frame's rings and badges as seen by the view camera: for every camera (target null), or only the target (a capture).</summary>
         public void SubmitFor(Camera cam, Camera target)

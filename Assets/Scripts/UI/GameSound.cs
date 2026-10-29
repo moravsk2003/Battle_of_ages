@@ -98,7 +98,7 @@ namespace BattleOfAges.UI
         public static bool Hear(Vector3 position, out float gain, out float pan)
         {
             gain = 0f; pan = 0f;
-            Camera cam = Camera.main;
+            Camera cam = Utils.ViewCamera.Current; // the map camera (not tagged MainCamera) or first person
             if (cam == null) return false;
             Transform c = cam.transform;
             Vector3 cp = c.position, fwd = c.forward;

@@ -11,7 +11,6 @@ namespace BattleOfAges.Utils
     {
         private static Camera cached;
         private static int frame = -1;
-        private static RtsMapCameraController map;
 
         public static Camera Current
         {
@@ -19,7 +18,7 @@ namespace BattleOfAges.Utils
             {
                 if (frame == Time.frameCount && cached != null) return cached;
                 frame = Time.frameCount;
-                if (map == null) map = Managers.GameContext.MapCamera;
+                RtsMapCameraController map = Managers.GameContext.MapCamera; // the one registered last (a new scene's, not a stale one)
                 Camera mapCam = map != null ? map.GetComponent<Camera>() : null;
                 cached = mapCam != null && mapCam.isActiveAndEnabled ? mapCam : Camera.main;
                 return cached;
