@@ -30,6 +30,7 @@ namespace BattleOfAges.RTS
             if (v.sqrMagnitude > maxSpeed * maxSpeed) v = v.normalized * maxSpeed;
 
             Vector3 step = Building.WallBarriers.Constrain(p, v * dt, radius, own);
+            step = World.Lakes.Constrain(p, step, radius); // nobody swims: along the shore instead
             if (step.sqrMagnitude < 1e-10f) return Vector3.zero;
             v = step / dt;
             Vector3 np = p + step;
@@ -42,6 +43,7 @@ namespace BattleOfAges.RTS
                 ground = RtsUnit.GetTerrainHeight(p);
                 v = Vector3.zero;
             }
+            np = World.WorldSettings.ClampInside(np); // not up the mountains round the world
             np.y = ground;
             t.position = np;
             return v;

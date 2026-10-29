@@ -281,6 +281,7 @@ namespace BattleOfAges.Building
 
         private bool CheckLocationValid(Vector3 position, Quaternion rot, BuildingDefinition def)
         {
+            if (World.Lakes.InWater(position.x, position.z, 3f)) return false; // the ghost turns red over water
             CheckBox(def, out Vector3 local, out Vector3 size);
             Vector3 center = position + rot * local;
             Vector3 halfExtents = size * 0.5f;
@@ -347,6 +348,11 @@ namespace BattleOfAges.Building
             if (!FootprintLevel(currentBuildingType, buildPos, buildRot, out _))
             {
                 StrategyHud.Notify("Тут надто круто для будівлі");
+                return;
+            }
+            if (World.Lakes.InWater(buildPos.x, buildPos.z, 3f))
+            {
+                StrategyHud.Notify("На воді не збудувати");
                 return;
             }
 

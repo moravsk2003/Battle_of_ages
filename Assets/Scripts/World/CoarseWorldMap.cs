@@ -68,8 +68,9 @@ namespace BattleOfAges.World
             slope[i] = steep;
             biome[i] = b;
             wall[i] = WorldSettings.OutsideBy(c.x, c.z) > -CellSize * 0.5f;
+            water[i] = Lakes.InWater(c.x, c.z);
             float soil = b == BiomeType.Steppe ? 1f : b == BiomeType.PineForest ? 0.7f : b == BiomeType.Desert ? 0.15f : 0f;
-            fertility[i] = wall[i] ? 0f : Mathf.Clamp01(soil * (0.5f + 0.5f * moisture) * flat);
+            fertility[i] = wall[i] || water[i] ? 0f : Mathf.Clamp01(soil * (0.5f + 0.5f * moisture) * flat);
             float woods = b == BiomeType.PineForest ? 0.9f : b == BiomeType.Steppe ? 0.25f : b == BiomeType.SnowyPeaks ? 0.1f : 0.05f;
             forest[i] = Mathf.Clamp01(woods * (0.6f + 0.4f * moisture));
             float vein = ProceduralBiomeChunk.SmoothRange(0.45f, 0.85f, OreField(c.x, c.z));
@@ -112,7 +113,5 @@ namespace BattleOfAges.World
         public bool Wall(int x, int z) => wall[z * Cells + x];
         public bool Habitable(int x, int z) => !wall[z * Cells + x] && !water[z * Cells + x] && biome[z * Cells + x] != BiomeType.SnowyPeaks;
 
-        /// <summary>Marks a cell as water (the lakes, M1 step 3).</summary>
-        internal void SetWater(int x, int z, bool w) { if (InRange(x, z)) water[z * Cells + x] = w; }
     }
 }

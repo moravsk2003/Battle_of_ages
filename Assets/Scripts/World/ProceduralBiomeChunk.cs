@@ -306,6 +306,7 @@ namespace BattleOfAges.World
 
                 float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
                 if (y > SnowLineHeight + 4f) continue; // Don't spawn trees on high snow peaks
+                if (Lakes.InWater(worldX, worldZ, 1.5f)) continue; // nor in a lake
 
                 // No trees on cliffs (rise over 2 m of more than ~1.3 m = steeper than ~33 degrees)
                 float rise = Mathf.Max(
@@ -347,6 +348,7 @@ namespace BattleOfAges.World
                 float worldZ = startZ + localZ;
 
                 float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
+                if (Lakes.InWater(worldX, worldZ, 1f)) continue; // ore lies on dry land
                 Vector3 pebblePos = new Vector3(worldX, y, worldZ);
 
                 GameObject pebble = (pool != null)
@@ -371,7 +373,7 @@ namespace BattleOfAges.World
                 // On level ground within the chunk (a camp on a ridge stood on stilts and in the rock), or no camp here
                 bool level = Building.BuildSite.FindLevel(new Vector3(campX, 0f, campZ), 14f, Combat.GameBalance.CampSiteSearchRadius, Combat.GameBalance.CampSiteMaxRise,
                                                           p => InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), out Vector3 site);
-                if (level && WorldSettings.Inside(site, 30f)) // not on the wall round the world
+                if (level && WorldSettings.Inside(site, 30f) && !Lakes.InWater(site.x, site.z, 25f)) // not on the wall round the world, nor in a lake
                 {
                     GameObject camp = new GameObject($"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
                     camp.transform.SetParent(transform);
@@ -408,7 +410,7 @@ namespace BattleOfAges.World
                     float worldX = startX + localX;
                     float worldZ = startZ + localZ;
                     float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
-                    if (!WorldSettings.Inside(new Vector3(worldX, y, worldZ), 10f)) continue; // none on the wall round the world
+                    if (!WorldSettings.Inside(new Vector3(worldX, y, worldZ), 10f) || Lakes.InWater(worldX, worldZ, 2f)) continue; // none on the wall round the world, nor in a lake
 
                     AI.AnimalType type = (MainBiome == BiomeType.PineForest) ? AI.AnimalType.Boar :
                                          (MainBiome == BiomeType.Desert) ? AI.AnimalType.Rabbit :

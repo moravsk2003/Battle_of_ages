@@ -79,8 +79,21 @@
             {
                 float2 screenUV = input.screenPos.xy / input.screenPos.w;
                 float rawDepth = SampleSceneDepth(screenUV);
-                float sceneEyeZ = LinearEyeDepth(rawDepth, _ZBufferParams);
-                float surfaceEyeZ = input.positionCS.w;
+                float sceneEyeZ, surfaceEyeZ;
+                if (unity_OrthoParams.w > 0.5)
+                {
+                    // Orthographic (the map camera): depth is linear between the planes, not 1/z
+                    #if UNITY_REVERSED_Z
+                    rawDepth = 1.0 - rawDepth;
+                    #endif
+                    sceneEyeZ = lerp(_ProjectionParams.y, _ProjectionParams.z, rawDepth);
+                    surfaceEyeZ = -TransformWorldToView(input.positionWS).z;
+                }
+                else
+                {
+                    sceneEyeZ = LinearEyeDepth(rawDepth, _ZBufferParams);
+                    surfaceEyeZ = input.positionCS.w;
+                }
                 float depthDiff = max(0.0, sceneEyeZ - surfaceEyeZ);
 
                 // Water gradient based on depth
@@ -95,7 +108,7 @@
 
                 // Specular sun highlight
                 Light mainLight = GetMainLight();
-                float3 viewDir = normalize(GetCameraPositionWS() - input.positionWS);
+                float3 viewDir = GetWorldSpaceNormalizeViewDir(input.positionWS); // (right for the orthographic map camera too)
                 float3 halfDir = normalize(mainLight.direction + viewDir);
                 float spec = pow(saturate(dot(input.normalWS, halfDir)), 64.0);
                 finalColor.rgb += mainLight.color * spec * 0.8;

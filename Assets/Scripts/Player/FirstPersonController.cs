@@ -134,6 +134,12 @@ namespace BattleOfAges.Player
             // Not past the mountains round a bounded world
             Vector3 p = transform.position, inside = World.WorldSettings.ClampInside(p);
             if (inside.x != p.x || inside.z != p.z) characterController.Move(new Vector3(inside.x - p.x, 0f, inside.z - p.z));
+            // Nor into a lake: back out to its shore
+            if (World.Lakes.TryLake(p.x, p.z, 0.3f, out World.Lakes.Lake lake))
+            {
+                Vector3 outward = new Vector3(p.x - lake.Center.x, 0f, p.z - lake.Center.y).normalized;
+                characterController.Move(outward * Mathf.Max(0.05f, speed * Time.deltaTime));
+            }
         }
 
         private void HandleMouseLook()

@@ -341,7 +341,10 @@ namespace BattleOfAges.World
             }
         }
 
-        public static float GetSampledTerrainHeight(float worldX, float worldZ)
+        public static float GetSampledTerrainHeight(float worldX, float worldZ) =>
+            Lakes.Carve(worldX, worldZ, HeightWithoutLakes(worldX, worldZ)); // the lakes' beds and banks (M1)
+
+        private static float HeightWithoutLakes(float worldX, float worldZ)
         {
             float y = GetNaturalTerrainHeight(worldX, worldZ) + WorldSettings.EdgeHeight(worldX, worldZ); // the wall round a bounded world
 
