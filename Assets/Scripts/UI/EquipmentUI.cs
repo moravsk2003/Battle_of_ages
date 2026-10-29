@@ -34,6 +34,9 @@ namespace BattleOfAges.UI
         private int current;
         private bool open;
         private int filter = -1; // -1 all, else EquipSlot
+        private bool toAll = true; // with several units chosen a click on the store gives one to each
+        private Button toAllButton;
+        private Text toAllText;
 
         private GameObject window;
         private Text title, counter, stats, hint;
@@ -180,9 +183,34 @@ namespace BattleOfAges.UI
 
         private void OnStoreItemClicked(Item item)
         {
+            if (toAll && targets.Count > 1)
+            {
+                int given = GearDispenser.GiveEach(targets, item);
+                int left = 0;
+                foreach (Equipment e in targets) if (e != null && !e.IsLocked(item.Slot) && !e[item.Slot].Equals(item)) left++;
+                StrategyHud.Notify(given == 0 ? "Усі обрані вже мають " + item
+                                   : $"{item}: видано {given}" + (left > 0 ? $", ще {left} без — на складі скінчилось" : ""));
+                Refresh();
+                return;
+            }
             if (Target != null && Target.IsLocked(item.Slot)) { StrategyHud.Notify("Цей слот тримає артефакт"); return; }
             if (Armory.Instance.EquipFromStore(Target, item))
                 Refresh();
+        }
+
+        /// <summary>The best from the store for the chosen (all, or this one): armour, and the weapon of the kind held.</summary>
+        private void GiveBest()
+        {
+            var who = toAll ? (IList<Equipment>)targets : new List<Equipment> { Target };
+            int n = GearDispenser.UpgradeAll(who);
+            StrategyHud.Notify(n > 0 ? $"Вдягнуто зі складу: {n}" : "На складі немає нічого кращого");
+            Refresh();
+        }
+
+        private void ToggleToAll()
+        {
+            toAll = !toAll;
+            Refresh();
         }
 
         private void SetFilter(int f)
@@ -202,6 +230,10 @@ namespace BattleOfAges.UI
             counter.text = targets.Count > 1 ? $"{current + 1} / {targets.Count}" : "";
             prevButton.gameObject.SetActive(targets.Count > 1);
             nextButton.gameObject.SetActive(targets.Count > 1);
+            toAllButton.gameObject.SetActive(targets.Count > 1);
+            toAllText.text = toAll ? $"Видати: усім обраним ({targets.Count})" : "Видати: лише цьому";
+            hint.text = (toAll && targets.Count > 1 ? "Клік по речі — по одній кожному обраному" : "Клік по речі — надягти")
+                        + "  ·  клік по слоту — зняти на склад  ·  [C] закрити";
 
             foreach (EquipSlot s in ItemTypeNames.Slots)
             {
@@ -363,6 +395,14 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(store, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
             RectTransform storeTitle = UiTheme.Rect(store, "Title", new Vector2(0f, 1f), new Vector2(18f, -8f), new Vector2(300f, 34f));
             UiTheme.Label(storeTitle, "Text", "Склад", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            Button best = UiTheme.TextButton(store, "Best", "Найкраще зі складу", new Vector2(1f, 1f), new Vector2(-16f, -6f), new Vector2(200f, 36f), GiveBest, 15);
+            Tooltip.Set(best.gameObject, () => TipText.Title("Найкраще зі складу", UiTheme.Gold)
+                + "\nКожному обраному — найкращі зі складу щит, шолом, нагрудник, рукавиці й чоботи, якщо вони кращі за вдягнуті, і краща зброя того ж виду, що в руках."
+                + "\n" + TipText.Dim("Інструмент у руках не міняється на зброю. Кайло шахтарі беруть зі складу самі, коли заходять у шахту."));
+            toAllButton = UiTheme.TextButton(store, "ToAll", "", new Vector2(1f, 1f), new Vector2(-224f, -6f), new Vector2(240f, 36f), ToggleToAll, 15);
+            toAllText = toAllButton.GetComponentInChildren<Text>();
+            Tooltip.Set(toAllButton.gameObject, () => TipText.Title("Кому видавати", UiTheme.Gold)
+                + "\nУсім обраним: клік по речі на складі дає по одній кожному, поки вистачає. Лише цьому: тому, чиє спорядження зараз видно.");
 
             string[] names = { "Усе", "Зброя", "Щит", "Шолом", "Нагр.", "Рукав.", "Чоботи" };
             for (int i = 0; i < names.Length; i++)

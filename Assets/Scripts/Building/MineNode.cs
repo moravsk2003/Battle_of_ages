@@ -127,6 +127,7 @@ namespace BattleOfAges.Building
             {
                 if (workers.Contains(worker)) return true;
                 workers.Add(worker);
+                GearDispenser.GiveTool(worker.GetComponent<Equipment>(), ItemType.Pickaxe); // takes the best pickaxe from the store itself
             }
             assignedWorkerCount++;
             return true;
