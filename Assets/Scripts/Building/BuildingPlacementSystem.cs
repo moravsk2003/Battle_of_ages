@@ -381,6 +381,7 @@ namespace BattleOfAges.Building
             if (building != null)
             {
                 building.transform.SetPositionAndRotation(buildPos, buildRot);
+                GameSound.At(GameSound.Kind.Place, buildPos);
                 WallSegment wall = building.GetComponent<WallSegment>();
                 if (wall != null) wall.OreTier = wallTier;
 

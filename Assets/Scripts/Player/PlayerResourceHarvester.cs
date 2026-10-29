@@ -14,6 +14,7 @@ namespace BattleOfAges.Player
     {
         [Header("Harvesting Configuration")]
         [SerializeField] private float harvestRange = 6.0f;
+        private float workSoundTimer;
         [SerializeField] private float proximityRadius = 5.0f;
 
         private Equipment gear;
@@ -244,6 +245,13 @@ namespace BattleOfAges.Player
         private void HandleTreeHarvestInput()
         {
             if (activeTreeTarget == null) return;
+
+            workSoundTimer -= Time.deltaTime;
+            if (workSoundTimer <= 0f && (IsKeyEHeld() || IsKeyFHeld()))
+            {
+                workSoundTimer = IsKeyFHeld() ? 0.6f : 0.8f;
+                GameSound.At(IsKeyFHeld() ? GameSound.Kind.Chop : GameSound.Kind.Branches, activeTreeTarget.transform.position);
+            }
 
             if (IsKeyEHeld())
             {

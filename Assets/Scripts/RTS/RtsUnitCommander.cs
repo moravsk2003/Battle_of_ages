@@ -146,6 +146,7 @@ namespace BattleOfAges.RTS
                 {
                     if (!isShift) DeselectAll();
                     SelectUnit(hitUnit);
+                    if (selectedUnits.Contains(hitUnit)) GameSound.Select(hitUnit);
                     return;
                 }
 
@@ -162,6 +163,7 @@ namespace BattleOfAges.RTS
                 {
                     if (!isShift) DeselectAll();
                     SelectUnit(nearestUnit);
+                    if (selectedUnits.Contains(nearestUnit)) GameSound.Select(nearestUnit);
                     return;
                 }
             }
@@ -178,11 +180,17 @@ namespace BattleOfAges.RTS
             UnitRegistry.GetUnitsInScreenRect(selectionRect, mapCamera, tempUnitsBuffer);
 
             int count = tempUnitsBuffer.Count;
+            RtsUnit loudest = null; // one reply for a group: of its strongest
+            int best = -1;
             for (int i = 0; i < count; i++)
             {
                 SelectUnit(tempUnitsBuffer[i]);
+                UnitProgress p = tempUnitsBuffer[i].GetComponent<UnitProgress>();
+                int rank = p == null ? 0 : p.IsHero ? 10 : (int)p.Rank;
+                if (rank > best && selectedUnits.Contains(tempUnitsBuffer[i])) { best = rank; loudest = tempUnitsBuffer[i]; }
             }
             tempUnitsBuffer.Clear();
+            GameSound.Select(loudest);
         }
 
         public IReadOnlyList<RtsUnit> SelectedUnits => selectedUnits;
@@ -192,7 +200,7 @@ namespace BattleOfAges.RTS
         {
             tempUnitsBuffer.Clear();
             foreach (RtsUnit u in selectedUnits) if (u != null) tempUnitsBuffer.Add(u);
-            if (tempUnitsBuffer.Count > 0) MoveInFormation(tempUnitsBuffer, point);
+            if (tempUnitsBuffer.Count > 0) { MoveInFormation(tempUnitsBuffer, point); GameSound.Play2D(GameSound.Kind.OrderMove); }
             tempUnitsBuffer.Clear();
         }
 
@@ -224,6 +232,7 @@ namespace BattleOfAges.RTS
                 foreach (RtsUnit unit in units)
                     if (unit.OnWall || unit.SendToWall(WallWalk.FreePost(hit.point, unit))) sent++;
                 if (sent == 0) StrategyHud.Notify("На стіну не піднятися: потрібна стіна зі сходами (і вільні місця)");
+                else GameSound.Play2D(GameSound.Kind.OrderMove);
                 return;
             }
 
@@ -231,6 +240,7 @@ namespace BattleOfAges.RTS
             if (enemy != null && enemy.IsAlive && enemy.GetComponent<BuildingNode>() == null) // not an own building
             {
                 foreach (RtsUnit unit in units) unit.IssueAttackCommand(enemy);
+                GameSound.Play2D(GameSound.Kind.OrderAttack);
                 return;
             }
 
@@ -238,6 +248,7 @@ namespace BattleOfAges.RTS
             if (mine != null)
             {
                 ForEachGatherer(units, g => { if (!mine.IsFullWorkers) g.AssignToWorkInMine(mine); });
+                GameSound.Play2D(GameSound.Kind.OrderWork);
                 return;
             }
 
@@ -246,18 +257,20 @@ namespace BattleOfAges.RTS
                 int called = 0;
                 foreach (RtsUnit unit in units) if (toBench.AssignWorker(unit)) called++;
                 if (called == 0 && toBench.IsWorkerFull) StrategyHud.Notify("Усі 4 місця біля верстака зайняті");
+                else if (called > 0) GameSound.Play2D(GameSound.Kind.OrderWork);
                 return;
             }
 
             ResourceNodeTree tree = target.GetComponentInParent<ResourceNodeTree>();
-            if (tree != null) { ForEachGatherer(units, g => g.CommandHarvestTree(tree)); return; }
+            if (tree != null) { ForEachGatherer(units, g => g.CommandHarvestTree(tree)); GameSound.Play2D(GameSound.Kind.OrderWork); return; }
 
             OrePebbleNode pebble = target.GetComponentInParent<OrePebbleNode>();
-            if (pebble != null) { ForEachGatherer(units, g => g.CommandHarvestPebble(pebble)); return; }
+            if (pebble != null) { ForEachGatherer(units, g => g.CommandHarvestPebble(pebble)); GameSound.Play2D(GameSound.Kind.OrderWork); return; }
 
-            if (target.GetComponentInParent<StorageChestNode>() != null) { ForEachGatherer(units, g => g.CommandDeliverToChest()); return; }
+            if (target.GetComponentInParent<StorageChestNode>() != null) { ForEachGatherer(units, g => g.CommandDeliverToChest()); GameSound.Play2D(GameSound.Kind.OrderWork); return; }
 
             MoveInFormation(units, hit.point);
+            GameSound.Play2D(GameSound.Kind.OrderMove);
         }
 
         private static void ForEachGatherer(List<RtsUnit> units, System.Action<NpcResourceGatherer> order)

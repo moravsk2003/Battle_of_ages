@@ -61,6 +61,7 @@ namespace BattleOfAges.RTS
         private int carriedOreAmount = 0;
 
         private float harvestTimer = 0f;
+        private float workSoundTimer; // the axe's next blow, the twigs' next snap
         private float searchTimer = 0f;
         /// <summary>An Auto worker that last chose to haul mine ore (the split by need, AutoShouldHaul).</summary>
         private bool autoHauling;
@@ -717,6 +718,15 @@ namespace BattleOfAges.RTS
             else if (targetTree != null)
             {
                 harvestTimer += Time.deltaTime;
+
+                bool chopping = currentDirective == GatherDirective.WoodChopTreesOnly
+                                || currentDirective != GatherDirective.WoodGatherBranchesOnly && targetTree.CurrentState != TreeState.WholeTree;
+                workSoundTimer -= Time.deltaTime;
+                if (workSoundTimer <= 0f)
+                {
+                    workSoundTimer = chopping ? 0.75f : 0.9f;
+                    UI.GameSound.At(chopping ? UI.GameSound.Kind.Chop : UI.GameSound.Kind.Branches, transform.position);
+                }
 
                 if (currentDirective == GatherDirective.WoodGatherBranchesOnly)
                 {

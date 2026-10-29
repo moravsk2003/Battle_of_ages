@@ -101,7 +101,15 @@ namespace BattleOfAges.Crafting
                 craftingQueue.SetWorkerCount(present);
             }
             craftingQueue.Tick(Time.deltaTime);
+
+            // Hammering while the smiths work an order
+            if (present > 0 && craftingQueue.ActiveTask != null && (hammerTimer -= Time.deltaTime) <= 0f)
+            {
+                hammerTimer = 0.9f / present + 0.25f;
+                GameSound.At(GameSound.Kind.Hammer, transform.position);
+            }
         }
+        private float hammerTimer;
 
         /// <summary>Calls the unit to a free place at the bench: a villager works there until called off, anyone else walks there.</summary>
         public bool AssignWorker(RtsUnit worker)

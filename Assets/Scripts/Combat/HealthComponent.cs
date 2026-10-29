@@ -77,6 +77,7 @@ namespace BattleOfAges.Combat
 
             if (currentHealth <= 0)
             {
+                UI.GameSound.Died(this);
                 OnDeath?.Invoke();
             }
         }

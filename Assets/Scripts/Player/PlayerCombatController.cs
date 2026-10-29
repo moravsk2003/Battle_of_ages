@@ -155,7 +155,7 @@ namespace BattleOfAges.Player
             if (viewmodelAnimation != null)
             {
                 if (!Gear[EquipSlot.Weapon].IsEmpty && Gear[EquipSlot.Weapon].Type == ItemType.Bow) viewmodelAnimation.PlayShotAnimation(combatUnit.Windup);
-                else viewmodelAnimation.PlayPunchAnimation();
+                else { viewmodelAnimation.PlayPunchAnimation(); GameSound.Play2D(GameSound.Kind.Swing); }
             }
 
             // Raycast forward from FPS camera
@@ -185,6 +185,7 @@ namespace BattleOfAges.Player
                         : 1.0f;
 
                     TreeState priorState = tree.CurrentState;
+                    GameSound.At(GameSound.Kind.Chop, hit.point);
                     if (tree.ChopWoodProgress(0.95f * eff))
                     {
                         int woodAmount = (priorState == TreeState.WholeTree) ? 4 : 2;

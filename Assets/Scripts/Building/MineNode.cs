@@ -84,9 +84,19 @@ namespace BattleOfAges.Building
             transform.position = pos;
         }
 
+        private float pickSoundTimer;
+
         private void Update()
         {
             if (assignedWorkerCount <= 0) return;
+
+            // Picks from inside: more often with more miners
+            pickSoundTimer -= Time.deltaTime;
+            if (pickSoundTimer <= 0f)
+            {
+                pickSoundTimer = Mathf.Lerp(1f, 0.35f, assignedWorkerCount / (float)MAX_WORKERS);
+                UI.GameSound.At(UI.GameSound.Kind.Pick, transform.position, 0.8f);
+            }
 
             productionTimer += Time.deltaTime;
             if (productionTimer >= 1.0f)

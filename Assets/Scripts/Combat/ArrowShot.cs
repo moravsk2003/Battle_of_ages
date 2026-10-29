@@ -36,6 +36,7 @@ namespace BattleOfAges.Combat
             if (a == null) a = Create();
             if (a == null) { Hit(shooter, target, damage, piercing); return; }
             a.gameObject.SetActive(true);
+            UI.GameSound.At(UI.GameSound.Kind.BowShot, shooter.transform.position);
             a.shooter = shooter;
             a.target = target;
             a.damage = damage;
@@ -54,6 +55,7 @@ namespace BattleOfAges.Combat
         private static void Hit(CombatUnit shooter, HealthComponent target, int damage, bool piercing)
         {
             if (target == null || !target.IsAlive) return;
+            UI.GameSound.At(UI.GameSound.Kind.ArrowHit, target.transform.position);
             if (shooter == null) { target.TakeDamage(damage); return; }
             shooter.DeliverHit(target, damage, ignoreArmor: false);
             if (piercing) shooter.PierceBehind(target, Mathf.RoundToInt(damage / GameBalance.PierceShotMultiplier)); // on through (shares of a normal shot)
