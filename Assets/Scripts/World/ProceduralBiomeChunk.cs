@@ -27,10 +27,20 @@ namespace BattleOfAges.World
         }
 
         /// <summary>The biomes' temperature and moisture fields, 0..1, shifted by the world's seed.</summary>
+        /// In a bounded world (a campaign) a slow field over kilometres weighs in, so deserts and forests are whole regions
+        /// and not a speckle every few hundred metres; the endless seed-0 world keeps its old fields.
         public static float Temperature(float worldX, float worldZ) =>
-            Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * 0.003f + 500f, (worldZ + WorldSettings.Shift.y) * 0.003f + 500f);
+            Regional(Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * 0.003f + 500f, (worldZ + WorldSettings.Shift.y) * 0.003f + 500f), worldX, worldZ, 1f / 7000f, 811f);
         public static float Moisture(float worldX, float worldZ) =>
-            Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * 0.004f + 1500f, (worldZ + WorldSettings.Shift.y) * 0.004f + 1500f);
+            Regional(Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * 0.004f + 1500f, (worldZ + WorldSettings.Shift.y) * 0.004f + 1500f), worldX, worldZ, 1f / 5500f, 1733f);
+
+        /// <summary>The local field mixed with a regional one (kilometres across) in a bounded world.</summary>
+        public static float Regional(float local, float worldX, float worldZ, float frequency, float offset)
+        {
+            if (!WorldSettings.Bounded) return local;
+            float region = Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * frequency + offset, (worldZ + WorldSettings.Shift.y) * frequency + offset * 0.37f);
+            return Mathf.Clamp01(0.5f + (Mathf.Lerp(local, region, 0.65f) - 0.5f) * 1.6f); // a mix of two is tamer: its contrast back
+        }
 
         /// <summary>0..1 sandiness (hot and dry), same formula as the desert blend in GetBlendedBiomeColor.</summary>
         public static float GetDesertWeight(float worldX, float worldZ)

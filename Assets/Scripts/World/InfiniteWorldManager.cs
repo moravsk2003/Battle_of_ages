@@ -385,6 +385,8 @@ namespace BattleOfAges.World
             worldX += WorldSettings.Shift.x; worldZ += WorldSettings.Shift.y; // (the spawn distance above stays unshifted)
             float region = Mathf.PerlinNoise(worldX * 0.0019f + 913f, worldZ * 0.0019f + 271f);
             float mask = ProceduralBiomeChunk.SmoothRange(0.40f, 0.70f, region) * zone;
+            if (WorldSettings.Bounded) // a campaign: mountain countries some kilometres across, wide lowlands between them
+                mask *= ProceduralBiomeChunk.SmoothRange(0.48f, 0.68f, Mathf.PerlinNoise(worldX * (1f / 6000f) + 377f, worldZ * (1f / 6000f) + 191f));
             if (mask <= 0f) return 0f;
 
             float r1 = 1f - Mathf.Abs(Mathf.PerlinNoise(worldX * 0.0065f + 55f, worldZ * 0.0065f + 77f) * 2f - 1f);
