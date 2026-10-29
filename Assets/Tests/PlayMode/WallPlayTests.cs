@@ -443,6 +443,7 @@ namespace BattleOfAges.PlayModeTests
         public IEnumerator OnTheWalkway_AClimberFightsTheDefender()
         {
             var (mob, wall, target) = Siege(AI.HostileMobType.Bandit);
+            mob.enabled = false; // still while the defender goes up (else it follows the villager to the stairs and climbs out of reach)
             Segment(BuildingType.WallStairs, OnGround(Far + new Vector3(-8f, 0f, 0f)), 0f);
             yield return null;
             yield return null;
@@ -457,6 +458,11 @@ namespace BattleOfAges.PlayModeTests
             for (float t = 0f; t < 25f && !unit.IsPostedOnWall; t += Time.deltaTime) yield return null;
             Assert.IsTrue(unit.IsPostedOnWall, "the defender is up");
 
+            CharacterController mobCc = mob.GetComponent<CharacterController>();
+            if (mobCc != null) mobCc.enabled = false;
+            mob.transform.position = OnGround(Far + new Vector3(0.5f, 0f, 8f)); // from in front of the defender's wall
+            if (mobCc != null) mobCc.enabled = true;
+            mob.enabled = true;
             mob.OrderAttack(target);
             HealthComponent mobHp = mob.GetComponent<HealthComponent>();
             bool fought = false;
