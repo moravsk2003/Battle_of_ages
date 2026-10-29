@@ -58,7 +58,7 @@ namespace BattleOfAges.Building
                 rm.ConsumeOreAtLeast(tier, ore);
             }
             level++;
-            StrategyHud.Notify($"Стіни {ItemTypeNames.Roman(level)}: +{Mathf.RoundToInt(DamageBonus * 100f)}% урону зі стін");
+            StrategyHud.Notify($"Стіни {ItemTypeNames.Roman(level)}: +{Mathf.RoundToInt(DamageBonus * 100f)}% шкоди зі стін");
             return true;
         }
 

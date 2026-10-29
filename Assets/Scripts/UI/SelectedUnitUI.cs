@@ -119,7 +119,7 @@ namespace BattleOfAges.UI
             int armour = Mathf.RoundToInt((hp != null ? hp.DamageReduction : 0f) * 100f);
             if (singleStats.Changed(c != null ? Shown.Key(c.AttackDamage, Mathf.RoundToInt(c.AttackCooldown * 10f), armour) : -1))
                 statsText.text = c != null
-                    ? $"Урон <color=#F5CC73>{c.AttackDamage}</color>  ·  удар раз на {c.AttackCooldown:0.0} с  ·  захист <color=#F5CC73>{armour}%</color>"
+                    ? $"Шкода <color=#F5CC73>{c.AttackDamage}</color>  ·  удар раз на {c.AttackCooldown:0.0} с  ·  захист <color=#F5CC73>{armour}%</color>"
                     : "";
 
             NpcResourceGatherer gatherer = singleGatherer;

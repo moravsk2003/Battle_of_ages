@@ -47,7 +47,7 @@ namespace BattleOfAges.Tests
             var a = (health: 100, damage: 10, cooldown: 2f, reduction: 0.1f, range: 3f);
             var b = (health: 100, damage: 14, cooldown: 2.5f, reduction: 0.1f, range: 3f);
             string text = TipText.Compare(a, b);
-            StringAssert.Contains("Урон  10 → 14", text);
+            StringAssert.Contains("Шкода  10 → 14", text);
             StringAssert.Contains(ColorUtility.ToHtmlStringRGB(UiTheme.Good) + ">+4", text, "more damage is better");
             StringAssert.Contains(ColorUtility.ToHtmlStringRGB(UiTheme.Bad) + ">+0.5 с", text.Replace(",", "."), "a slower hit is worse");
             StringAssert.DoesNotContain("Здоров'я", text, "health did not change");

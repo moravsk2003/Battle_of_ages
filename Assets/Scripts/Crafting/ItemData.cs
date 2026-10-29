@@ -119,14 +119,14 @@ namespace BattleOfAges.Crafting
             int l = ItemStatCalculator.ClampLevel(item.Level);
             switch (item.Type)
             {
-                case ItemType.Sword: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, швидкі удари";
-                case ItemType.Bow: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, дальність {ItemStatCalculator.BOW_RANGE:0} м";
-                case ItemType.Staff: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону; маг б'є лише з посохом";
-                case ItemType.Axe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, рубка ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
-                case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% урону, видобуток ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
-                case ItemType.Armor: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% урону, +{Pct(ItemStatCalculator.HealthBonus(item))}% здоров'я";
-                case ItemType.Gloves: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% урону, удари швидші на {Pct(1f - ItemStatCalculator.CooldownMultiplier(item))}%";
-                default: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% урону";
+                case ItemType.Sword: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, швидкі удари";
+                case ItemType.Bow: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, дальність {ItemStatCalculator.BOW_RANGE:0} м";
+                case ItemType.Staff: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди; маг б'є лише з посохом";
+                case ItemType.Axe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, рубка ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
+                case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, видобуток ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
+                case ItemType.Armor: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% шкоди, +{Pct(ItemStatCalculator.HealthBonus(item))}% здоров'я";
+                case ItemType.Gloves: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% шкоди, удари швидші на {Pct(1f - ItemStatCalculator.CooldownMultiplier(item))}%";
+                default: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% шкоди";
             }
         }
 

@@ -31,7 +31,7 @@ namespace BattleOfAges.Utils
         /// <summary>A flat blade: dull (a smooth one mirrors the sun over its whole face, a blinding glare with bloom).</summary>
         private static readonly Vector3 BladeS = new Vector3(3f, 0.7f, 0.28f);
         private static readonly Vector3 DarkS = new Vector3(1f, 0f, 0.05f);
-        private static readonly Vector3 WetS = new Vector3(1f, 0f, 0.85f);
+        private static readonly Vector3 WetS = new Vector3(1f, 0f, 0.5f); // still water mirrored the sun into a glare
 
         private static Mesh mesh, farMesh;
         private static MeshKit kit;

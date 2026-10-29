@@ -63,7 +63,7 @@ namespace BattleOfAges.UI
                 sb.Append($"\n{name}  {from.ToString(format)}{unit} → {to.ToString(format)}{unit}  ").Append(better ? Good(delta) : Bad(delta));
             }
             Line("Здоров'я", a.health, b.health, "0", "");
-            Line("Урон", a.damage, b.damage, "0", "");
+            Line("Шкода", a.damage, b.damage, "0", "");
             Line("Удар раз на", a.cooldown, b.cooldown, "0.0#", " с", true);
             Line("Поглинання", a.reduction * 100f, b.reduction * 100f, "0", "%");
             Line("Дальність", a.range, b.range, "0.#", " м");

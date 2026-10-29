@@ -99,11 +99,20 @@ namespace BattleOfAges.UI
                    $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
         }
 
+        private static string MineHowTo() =>
+            TipText.Title("Як працює шахта", UiTheme.Gold) +
+            "\n1. На мапі виділіть робітників і клацніть " + TipText.Key("ПКМ") + " по шахті: вони заходять усередину (до " + MineNode.MAX_WORKERS + ")." +
+            "\n2. Кожен копає 1 руду/с, з кайлом більше. Руда складається в шахті (число тут, на табличці)." +
+            "\n3. Інші робітники з наказом «Шахта» або «Самостійно» носять її в скриню — лише тоді вона у ваших запасах." +
+            "\n4. Зрідка трапляється руда вищого рангу (I, II…): з неї кують кращу зброю й броню." +
+            "\n" + TipText.Dim("«Вивести» — забрати одного робітника з шахти. Повна шахта (червоне число) стоїть: потрібні носії.");
+
         private (RectTransform, Text, Button) MineLabel(MineNode mine)
         {
             RectTransform rt = UiTheme.Rect(layer, "MineLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 56f));
             rt.pivot = new Vector2(0.5f, 0f);
-            UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f)).raycastTarget = false;
+            UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f));
+            Tooltip.Set(rt.gameObject, MineHowTo); // a tester could not make out how the ore comes about: the whole chain on hover
             RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(250f, 50f));
             Text text = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             text.supportRichText = true;
@@ -184,7 +193,7 @@ namespace BattleOfAges.UI
             if (!show) return;
             int level = Fortifications.Level;
             if (wallShown.Changed(level))
-                wallText.text = $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nурон зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>";
+                wallText.text = $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nшкода зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>";
             bool max = level >= Fortifications.MaxLevel;
             if (wallButton.gameObject.activeSelf == max) wallButton.gameObject.SetActive(!max);
             if (max) return;

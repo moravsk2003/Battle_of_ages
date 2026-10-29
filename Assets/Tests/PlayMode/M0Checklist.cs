@@ -57,14 +57,14 @@ namespace BattleOfAges.PlayModeTests
             report.AppendLine("# M0 — чек-лист у SampleScene").AppendLine();
             report.AppendLine("| # | Пункт | Результат | Деталі |").AppendLine("|---|---|---|---|");
 
-            yield return Check("1", "Ранги: герой-генерал 500 HP / сила 50 / 7,98 м/с; рицарі, селяни, моби — база свого рангу", Ranks());
-            yield return Check("2", "Один тип юніта: у всіх HP, бій, робота, ранг; рицарі стоять, селяни працюють; стеля рахує всіх", OneKindOfUnit());
+            yield return Check("1", "Ранги: герой-генерал 500 HP / сила 50 / 7,98 м/с; лицарі, селяни, моби — база свого рангу", Ranks());
+            yield return Check("2", "Один тип юніта: у всіх HP, бій, робота, ранг; лицарі стоять, селяни працюють; стеля рахує всіх", OneKindOfUnit());
             yield return Check("3", "Ратуша: стелі 6/15/25/40/60/85, побудова 10 дерева, апгрейди 30/60/100/160", HallTable());
             yield return Check("4", "Ігровий годинник: 1 хв = 1 ігрова година", Clock());
             yield return Check("5", "Приріст населення біля ратуші (прискорений годинник)", Growth());
             yield return Check("6", "Природний реген пораненого (прискорений годинник)", Regen());
             yield return Check("7", "Підвищення від роботи: людина → воїн", WorkPromotion());
-            yield return Check("8", "Підвищення від бою: воїн 100 досвіду → рицар", BattlePromotion());
+            yield return Check("8", "Підвищення від бою: воїн 100 досвіду → лицар", BattlePromotion());
             yield return Check("9", "Досвід героя за вбивство (бандит-воїн = 4)", HeroKillXp());
             yield return Check("10", "Вікно героя відкривається і закривається клавішею H", HeroWindow());
             yield return Check("11", "Клас: Танк +20% HP; очки +5 сили / +50 HP", ClassAndPoints());
@@ -145,7 +145,7 @@ namespace BattleOfAges.PlayModeTests
                 Assert.IsNotNull(r, m.name);
                 if (r.Rank == UnitRank.General) generals++; else { warriors++; Assert.AreEqual(40, m.GetComponent<Equipment>().BaseHealth, m.name); }
             }
-            yield return $"рицарів {knights}, людей {people}, мобів-воїнів {warriors}, генералів {generals}";
+            yield return $"лицарів {knights}, людей {people}, мобів-воїнів {warriors}, генералів {generals}";
         }
 
         private IEnumerator OneKindOfUnit()
@@ -218,7 +218,7 @@ namespace BattleOfAges.PlayModeTests
             yield return new WaitForSeconds(1.5f);
             GameBalance.GameHourSeconds = 60f;
             Assert.Greater(hp.CurrentHealth, before, "no healing");
-            yield return $"HP рицаря {before} → {hp.CurrentHealth} за ~30 ігрових год";
+            yield return $"HP лицаря {before} → {hp.CurrentHealth} за ~30 ігрових год";
         }
 
         private IEnumerator WorkPromotion()
@@ -240,7 +240,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(UnitRank.Knight, p.Rank);
             Assert.AreEqual(100, warrior.GetComponent<Equipment>().BaseHealth);
             yield return null;
-            yield return $"{warrior.name}: 10 вбивств → рицар";
+            yield return $"{warrior.name}: 10 вбивств → лицар";
         }
 
         private IEnumerator HeroKillXp()
@@ -310,7 +310,7 @@ namespace BattleOfAges.PlayModeTests
             Of<HeroProgress>().AddXp(10);
             Assert.AreEqual(xp + 12, Of<HeroProgress>().Xp, "wisdom +20%");
             yield return null;
-            yield return $"урон {Of<CombatUnit>().AttackDamage}, артефактів {bag.Held.Count}";
+            yield return $"шкода {Of<CombatUnit>().AttackDamage}, артефактів {bag.Held.Count}";
         }
 
         private IEnumerator SaveLoad()

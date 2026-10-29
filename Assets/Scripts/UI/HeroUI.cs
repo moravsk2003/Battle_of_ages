@@ -115,7 +115,7 @@ namespace BattleOfAges.UI
                 $"Тип: {RankName(rank != null ? rank.Rank : UnitRank.General)}   Клас: {HeroClassRules.Name(hero.Class)}\n" +
                 $"HP: {(hp != null ? hp.CurrentHealth : 0)} / {(hp != null ? hp.MaxHealth : 0)}   (вкладено: {hero.HealthPoints} × 50)\n" +
                 $"Сила: {(combat != null ? combat.Strength : 0f):0}   (вкладено: {hero.StrengthPoints} × 5)\n" +
-                $"Урон: {(combat != null ? combat.AttackDamage : 0)}   Швидкість: {(combat != null ? combat.MoveSpeed : 0f):0.0} м/с";
+                $"Шкода: {(combat != null ? combat.AttackDamage : 0)}   Швидкість: {(combat != null ? combat.MoveSpeed : 0f):0.0} м/с";
             points.text = $"Очки характеристик: {hero.AttributePoints}     Очки навиків: {hero.SkillPoints}";
             strengthButton.interactable = healthButton.interactable = hero.AttributePoints > 0;
             classPicker.SetActive(hero.Class == HeroClass.None);
@@ -148,7 +148,7 @@ namespace BattleOfAges.UI
                         break;
                     case HeroClass.Mage:
                         if (!s.FireFan) SkillButton(ref used, "Вогняне віяло (1)", s.LearnFireFan, "Уміння Q: віяло вогню по зоні перед собою, крізь броню.");
-                        else if (!s.Meteor) SkillButton(ref used, "Метеор (1)", s.LearnMeteor, "Уміння R: метеор на найближчого ворога, 5× урон мага в радіусі 2,5 м.");
+                        else if (!s.Meteor) SkillButton(ref used, "Метеор (1)", s.LearnMeteor, "Уміння R: метеор на найближчого ворога, 5× шкода мага в радіусі 2,5 м.");
                         break;
                     case HeroClass.Dd:
                         if (s.DashLevel < GameBalance.DashMaxLevel) SkillButton(ref used, $"Ривок ×{s.DashFactor + 1f:0}", s.LearnDash, "Уміння Q: на 1 с біг у кілька разів швидший; перезарядка 20 с.");
@@ -206,7 +206,7 @@ namespace BattleOfAges.UI
             {
                 case UnitRank.Person: return "людина";
                 case UnitRank.Warrior: return "воїн";
-                case UnitRank.Knight: return "рицар";
+                case UnitRank.Knight: return "лицар";
                 default: return "генерал";
             }
         }
@@ -245,7 +245,7 @@ namespace BattleOfAges.UI
                 () => { if (hero != null) hero.SpendOnStrength(); }, 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
                 () => { if (hero != null) hero.SpendOnHealth(); }, 22);
-            Tooltip.Set(strengthButton.gameObject, () => TipText.Title("+5 сили", UiTheme.Gold) + "\nСила — урон удару; сила разом зі здоров'ям — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
+            Tooltip.Set(strengthButton.gameObject, () => TipText.Title("+5 сили", UiTheme.Gold) + "\nСила — шкода удару; сила разом зі здоров'ям — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
             Tooltip.Set(healthButton.gameObject, () => TipText.Title("+50 HP", UiTheme.Gold) + "\nДо найбільшого здоров'я героя; разом із силою — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
             // Artifacts: the starting pick (once), one-shots and shards
             RectTransform art = UiTheme.Rect(panel, "Artifacts", new Vector2(0.5f, 0f), new Vector2(0f, 262f), new Vector2(500f, 62f));

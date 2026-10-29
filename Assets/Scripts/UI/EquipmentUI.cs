@@ -229,9 +229,9 @@ namespace BattleOfAges.UI
 
             stats.text =
                 $"Здоров'я  <color=#F5CC73>{t.MaxHealth}</color>\n" +
-                $"Урон  <color=#F5CC73>{t.Damage}</color>   ·   удар раз на {t.Cooldown:0.0} с\n" +
+                $"Шкода  <color=#F5CC73>{t.Damage}</color>   ·   удар раз на {t.Cooldown:0.0} с\n" +
                 $"Дальність  <color=#F5CC73>{t.Range:0.#} м</color>\n" +
-                $"Поглинання урону  <color=#F5CC73>{Mathf.RoundToInt(t.DamageReduction * 100f)}%</color>\n" +
+                $"Поглинання шкоди  <color=#F5CC73>{Mathf.RoundToInt(t.DamageReduction * 100f)}%</color>\n" +
                 $"Сила  <color=#F5CC73>{t.Strength:0.#}</color>   ·   швидкість {SpeedOf(t):0.#} м/с";
 
             for (int i = 0; i < filterButtons.Count; i++)

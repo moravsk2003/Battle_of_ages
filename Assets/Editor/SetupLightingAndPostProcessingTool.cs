@@ -106,6 +106,7 @@ namespace BattleOfAges.EditorTools
             bloom.threshold.Override(0.95f);
             bloom.intensity.Override(0.35f);
             bloom.scatter.Override(0.65f);
+            bloom.clamp.Override(3f); // a sun glint on smooth metal or water runs to hundreds: unclamped it blooms into a white ball
             bloom.tint.Override(new Color(1.0f, 0.96f, 0.90f));
             bloom.highQualityFiltering.Override(true);
 
