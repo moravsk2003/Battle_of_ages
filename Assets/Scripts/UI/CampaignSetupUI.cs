@@ -8,8 +8,8 @@ namespace BattleOfAges.UI
 {
     /// <summary>
     /// The new campaign screen of the main menu (docs/GAME_DESIGN.md §18.2, M1 step 6): the world on the left (its seed —
-    /// typed to share a world, or random — its size, how many heroes and kings), the player's hero on the right (class
-    /// and starting artifact with what they do, or "later" for the hero window), and the advisor's tips.
+    /// typed to share a world, or random — its size, how many heroes and kings), the player's hero on the right (its class
+    /// and starting artifact, both chosen here, with what they do), and the advisor's tips.
     /// </summary>
     public sealed class CampaignSetupUI
     {
@@ -18,12 +18,12 @@ namespace BattleOfAges.UI
         private Text summary, classText, classDescription, artifactText, artifactDescription;
         private int sizeIndex = Array.IndexOf(CampaignSetup.Sizes, World.WorldSettings.DefaultSize);
         private int heroesIndex = Array.IndexOf(CampaignSetup.HeroCounts, 16), shareIndex = 1;
-        private int classIndex, artifactIndex; // 0: later
+        private int classIndex, artifactIndex;
         private bool tips = !Advisor.Hidden;
 
         public RectTransform Panel { get; private set; }
 
-        private static readonly HeroClass[] Classes = { HeroClass.None, HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
+        private static readonly HeroClass[] Classes = { HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
 
         public static CampaignSetupUI Build(RectTransform root, Action back)
         {
@@ -58,9 +58,9 @@ namespace BattleOfAges.UI
 
             // The hero
             Heading(-92f, 290f, "Ваш герой");
-            Cycler(-150f, 290f, "Клас", () => classIndex == 0 ? "обрати пізніше" : HeroClassRules.Name(Classes[classIndex]), d => classIndex = Wrap(classIndex + d, Classes.Length), out classText);
+            Cycler(-150f, 290f, "Клас", () => HeroClassRules.Name(Classes[classIndex]), d => classIndex = Wrap(classIndex + d, Classes.Length), out classText);
             classDescription = Description(-195f, 290f);
-            Cycler(-330f, 290f, "Стартовий артефакт", () => artifactIndex == 0 ? "обрати пізніше" : Artifacts.Name(Artifacts.All[artifactIndex - 1]), d => artifactIndex = Wrap(artifactIndex + d, Artifacts.All.Length + 1), out artifactText);
+            Cycler(-330f, 290f, "Стартовий артефакт", () => Artifacts.Name(Artifacts.All[artifactIndex]), d => artifactIndex = Wrap(artifactIndex + d, Artifacts.All.Length), out artifactText);
             artifactDescription = Description(-375f, 290f);
 
             UiTheme.TextButton(Panel, "Start", "Почати", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), Start, 22)
@@ -103,7 +103,7 @@ namespace BattleOfAges.UI
         private Text Description(float y, float x)
         {
             RectTransform d = UiTheme.Rect(Panel, "Description", new Vector2(0.5f, 1f), new Vector2(x, y - 40f), new Vector2(520f, 100f));
-            Text t = UiTheme.Label(d, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.InkDim);
+            Text t = UiTheme.Label(d, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.Ink);
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
             return t;
         }
@@ -133,8 +133,8 @@ namespace BattleOfAges.UI
             float km = CampaignSetup.Sizes[sizeIndex] / 1000f;
             summary.text = $"Крім вас — {others} героїв: {kings} королів і {others - kings} вільних ватаг, кожен на своїй стоянці. "
                          + $"Світ {km:0} × {km:0} км, гори по краю, озера; ближчі сусіди — за 1,5–3 км.";
-            classDescription.text = classIndex == 0 ? "Клас можна обрати й у грі, у вікні героя. Обирають один раз." : HeroClassRules.Description(Classes[classIndex]);
-            artifactDescription.text = artifactIndex == 0 ? "Артефакт можна взяти й у грі, у вікні героя." : Artifacts.Description(Artifacts.All[artifactIndex - 1]);
+            classDescription.text = HeroClassRules.Description(Classes[classIndex]) + "\n" + TipText.Dim("Клас обирається один раз.");
+            artifactDescription.text = Artifacts.Description(Artifacts.All[artifactIndex]);
         }
 
         private void Start()
@@ -144,8 +144,8 @@ namespace BattleOfAges.UI
             setup.Heroes = CampaignSetup.HeroCounts[heroesIndex];
             setup.KingShare = CampaignSetup.KingShares[shareIndex];
             setup.Class = Classes[classIndex];
-            setup.HasArtifact = artifactIndex > 0;
-            if (setup.HasArtifact) setup.Artifact = Artifacts.All[artifactIndex - 1];
+            setup.HasArtifact = true;
+            setup.Artifact = Artifacts.All[artifactIndex];
             Advisor.Hidden = !tips;
             SaveSystem.NewGame(setup);
         }
