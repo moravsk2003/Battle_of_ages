@@ -8,6 +8,7 @@ namespace BattleOfAges.Utils
     /// <summary>
     /// Build check: started with "-smokeshot path.png", the player opens the game scene, waits for streaming, saves a
     /// screenshot and quits. Shows what a build really renders (shaders stripped from builds work in the Editor).
+    /// "-smokemap" shoots the map view (team rings, plates) instead of first person.
     /// </summary>
     public sealed class BuildSmokeShot : MonoBehaviour
     {
@@ -20,14 +21,15 @@ namespace BattleOfAges.Utils
             if (i < 0 || i + 1 >= args.Length) return;
             var go = new GameObject("BuildSmokeShot");
             DontDestroyOnLoad(go);
-            go.AddComponent<BuildSmokeShot>().StartCoroutine(Shoot(args[i + 1], Array.IndexOf(args, "-smokefx") >= 0));
+            go.AddComponent<BuildSmokeShot>().StartCoroutine(Shoot(args[i + 1], Array.IndexOf(args, "-smokefx") >= 0, Array.IndexOf(args, "-smokemap") >= 0));
         }
 
-        private static IEnumerator Shoot(string path, bool effects)
+        private static IEnumerator Shoot(string path, bool effects, bool map)
         {
             yield return SceneManager.LoadSceneAsync(SaveLoad.SaveSystem.GameScene);
             yield return new WaitForSecondsRealtime(8f);
             if (effects) yield return Effects();
+            if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
             ScreenCapture.CaptureScreenshot(path);
             yield return new WaitForSecondsRealtime(1.5f);
             Application.Quit();
