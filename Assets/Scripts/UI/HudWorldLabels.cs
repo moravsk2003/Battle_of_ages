@@ -14,12 +14,22 @@ namespace BattleOfAges.UI
     /// Plates that stand over things in the world, under the rest of the HUD: over each mine its workers and stock (with
     /// a button that sends a miner out), over the town hall its level and population with the upgrade (and the walls'
     /// level under it), and health bars over the selected units on the map. In first person the plates show only near.
+    /// Zoomed out on the map a plate is a one-line chip (a tester's town was buried under them); it opens in full with
+    /// its buttons while the cursor is on it or on its building, or zoomed in close (CloseZoom).
     /// </summary>
     public sealed class HudWorldLabels : MonoBehaviour
     {
         private static readonly string[] Roman = { "0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
 
+        /// <summary>On the map at this zoom (orthographic size) and closer the plates are always in full.</summary>
+        public const float CloseZoom = 22f;
+        private static readonly Vector2 MineFull = new Vector2(350f, 56f), MineChipSize = new Vector2(210f, 32f);
+        private static readonly Vector2 HallFull = new Vector2(400f, 60f), HallChipSize = new Vector2(220f, 32f);
+
         private RectTransform layer;
+        private MineNode hoveredMine;
+        private TownHall hoveredHall;
+        private bool closeUp;
         private readonly Dictionary<MineNode, (RectTransform rt, Text text, Button button)> mines = new Dictionary<MineNode, (RectTransform, Text, Button)>();
         private readonly Dictionary<MineNode, long> mineShown = new Dictionary<MineNode, long>();
         private readonly List<(RectTransform bar, RectTransform fill)> unitBars = new List<(RectTransform, RectTransform)>();
@@ -41,10 +51,38 @@ namespace BattleOfAges.UI
         {
             bool map = GameContext.MapOpen;
             Camera cam = ViewCamera.Current;
+            FindHovered(cam, map);
             UpdateMines(cam, map);
             UpdateHall(cam, map);
             if (map) UpdateUnitBars(cam);
             else HideUnitBars(0);
+        }
+
+        /// <summary>The building under the cursor on the map (its plate opens in full), and whether the map is zoomed in close.</summary>
+        private void FindHovered(Camera cam, bool map)
+        {
+            hoveredMine = null; hoveredHall = null;
+            closeUp = !map || cam == null || !cam.orthographic || cam.orthographicSize <= CloseZoom;
+            if (closeUp) return;
+            if (Physics.Raycast(cam.ScreenPointToRay(InputSystem.UniversalInput.GetMousePosition()), out RaycastHit hit, 2000f))
+            {
+                hoveredMine = hit.collider.GetComponentInParent<MineNode>();
+                hoveredHall = hit.collider.GetComponentInParent<TownHall>();
+            }
+        }
+
+        /// <summary>A plate is in full: zoomed in (or first person), its building or the plate itself under the cursor.</summary>
+        private bool Full(RectTransform plate, bool buildingHovered) =>
+            closeUp || buildingHovered || RectTransformUtility.RectangleContainsScreenPoint(plate, InputSystem.UniversalInput.GetMousePosition(), null);
+
+        private static void Size(RectTransform plate, Text text, bool full, Vector2 fullSize, Vector2 chipSize, float textWidth)
+        {
+            plate.sizeDelta = full ? fullSize : chipSize;
+            var box = (RectTransform)text.transform.parent;
+            box.sizeDelta = full ? new Vector2(textWidth, fullSize.y - 6f) : new Vector2(chipSize.x - 20f, chipSize.y - 4f);
+            box.anchoredPosition = new Vector2(full ? 12f : 10f, 0f);
+            text.fontSize = full ? 16 : 14;
+            text.alignment = full ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter; // the chip: clear of the frame on both sides
         }
 
         /// <summary>Where a world point is on this layer, or false when it is behind the camera.</summary>
@@ -72,14 +110,17 @@ namespace BattleOfAges.UI
                 if (label.rt.gameObject.activeSelf != show) label.rt.gameObject.SetActive(show);
                 if (!show) continue;
                 label.rt.anchoredPosition = local;
-                bool canRelease = map && mine.AssignedWorkerCount > 0;
+                bool full = Full(label.rt, hoveredMine == mine);
+                Size(label.rt, label.text, full, MineFull, MineChipSize, 250f);
+                bool canRelease = full && map && mine.AssignedWorkerCount > 0;
                 if (label.button.gameObject.activeSelf != canRelease) label.button.gameObject.SetActive(canRelease);
-                // only when something on it changed: workers, rate, stock and its two best tiers
-                long key = Shown.Key(mine.AssignedWorkerCount, Mathf.RoundToInt(mine.OrePerSecond * 10f), mine.AccumulatedOreCount, mine.MaxAccumulatedOre);
+                // only when something on it changed: the form, workers, rate, stock and its two best tiers
+                long key = Shown.Key(full ? 1 : 0, mine.AssignedWorkerCount, Mathf.RoundToInt(mine.OrePerSecond * 10f), mine.AccumulatedOreCount);
+                key = Shown.Key(key, mine.MaxAccumulatedOre);
                 for (int t = mine.HighestTierInStock, n2 = 0; t >= 1 && n2 < 2; t--) { int n = mine.OreOfTier(t); if (n > 0) { key = Shown.Key(key, t * 100000L + n); n2++; } }
                 if (mineShown.TryGetValue(mine, out long was) && was == key) continue;
                 mineShown[mine] = key;
-                label.text.text = MineText(mine);
+                label.text.text = full ? MineText(mine) : MineChip(mine);
             }
             if (mines.Count > MineNode.ActiveMines.Count + 4) PruneMines();
         }
@@ -98,6 +139,10 @@ namespace BattleOfAges.UI
             return $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  {mine.OrePerSecond:0.#}/с\n" +
                    $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
         }
+
+        /// <summary>The chip zoomed out: workers and the stock (red when full: haulers needed).</summary>
+        private static string MineChip(MineNode mine) =>
+            $"Шахта <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}</color>";
 
         private static string MineHowTo() =>
             TipText.Title("Як працює шахта", UiTheme.Gold) +
@@ -143,11 +188,15 @@ namespace BattleOfAges.UI
             if (hallLabel.gameObject.activeSelf != show) hallLabel.gameObject.SetActive(show);
             if (!show) return;
             hallLabel.anchoredPosition = local;
-            UpdateWallRow(map);
+            bool full = Full(hallLabel, hoveredHall == hall) || wallRow != null && wallRow.gameObject.activeSelf && Full(wallRow, false);
+            Size(hallLabel, hallText, full, HallFull, HallChipSize, 200f);
+            UpdateWallRow(map && full);
             int pop = TownHall.Population, cap = TownHall.PopulationCap;
-            if (hallShown.Changed(Shown.Key(hall.Level, pop, cap)))
-                hallText.text = $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення <color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
-            bool canShowButton = map && hall.Level < TownHall.MaxLevel;
+            string popText = $"<color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
+            if (hallShown.Changed(Shown.Key(full ? 1 : 0, hall.Level, pop, cap)))
+                hallText.text = full ? $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення {popText}"
+                                     : $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>  ·  люди {popText}";
+            bool canShowButton = full && map && hall.Level < TownHall.MaxLevel;
             if (hallButton.gameObject.activeSelf != canShowButton) hallButton.gameObject.SetActive(canShowButton);
             if (!canShowButton) return;
             TownHall.UpgradeCost(hall.Level + 1, out int wood, out int ore, out int tier);

@@ -21,6 +21,8 @@ namespace BattleOfAges.PlayModeTests
     [Explicit("Visual capture tool, run on demand")]
     public class UiCapture
     {
+        private float zoomWas;
+
         [UnityTest]
         public IEnumerator CaptureUi()
         {
@@ -60,8 +62,16 @@ namespace BattleOfAges.PlayModeTests
                     }
                     return Wait(0.4f);
                 }),
+                ("labels_close", () => // zoomed in, the plates open in full
+                {
+                    Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+                    if (cam != null) { zoomWas = cam.orthographicSize; cam.orthographicSize = BattleOfAges.UI.HudWorldLabels.CloseZoom - 4f; }
+                    return Wait(0.3f);
+                }),
                 ("rts_selection", () =>
                 {
+                    Camera cam = BattleOfAges.Utils.ViewCamera.Current;
+                    if (cam != null && zoomWas > 0f) cam.orthographicSize = zoomWas;
                     int n = 0;
                     foreach (RtsUnit u in UnityEngine.Object.FindObjectsByType<RtsUnit>(FindObjectsSortMode.None))
                         if (n < 4 && u.name != "Player") { select?.Invoke(commander, new object[] { u }); n++; }
