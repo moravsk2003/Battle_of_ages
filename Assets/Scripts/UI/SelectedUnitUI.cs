@@ -355,7 +355,7 @@ namespace BattleOfAges.UI
             CreateDirectiveButton(orders, UiTheme.Icon.Wood, "Гілки", GatherDirective.WoodGatherBranchesOnly,
                 "Збирати гілки", "Обтрушують дерева, не рубаючи їх: ліс лишається, деревини менше.");
             CreateDirectiveButton(orders, UiTheme.Icon.Hammer, "Рубати", GatherDirective.WoodChopTreesOnly,
-                "Рубати дерева", "Валять дерева на дрова: більше деревини, ліс рідшає.");
+                "Рубати дерева", "Валять дерева на дрова: більше деревини, ліс рідшає. Сокира рубає швидше (I — ×1,25); найкращу зі складу беруть самі.");
             CreateDirectiveButton(orders, UiTheme.Icon.Ore, "Руда", GatherDirective.OrePebblesOnly,
                 "Збирати руду", "Підбирають камінці руди з землі й несуть у скриню.");
             CreateDirectiveButton(orders, UiTheme.Icon.House, "Шахта", GatherDirective.HaulOreFromMineToChest,

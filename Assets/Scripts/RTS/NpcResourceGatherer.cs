@@ -62,6 +62,15 @@ namespace BattleOfAges.RTS
 
         private float harvestTimer = 0f;
         private float workSoundTimer; // the axe's next blow, the twigs' next snap
+        private Crafting.Equipment gear;
+        private Crafting.Equipment Gear => gear != null ? gear : gear = GetComponent<Crafting.Equipment>();
+
+        /// <summary>How much faster the worn axe fells (ItemStatCalculator.CalculateToolEfficiency: ×1.25 for an axe I), 1 without one.</summary>
+        public float AxeEfficiency()
+        {
+            int level = Gear != null ? Gear.LevelOf(Crafting.ItemType.Axe) : 0;
+            return level > 0 ? Crafting.ItemStatCalculator.CalculateToolEfficiency(level) : 1f;
+        }
         private float searchTimer = 0f;
         /// <summary>An Auto worker that last chose to haul mine ore (the split by need, AutoShouldHaul).</summary>
         private bool autoHauling;
@@ -634,6 +643,10 @@ namespace BattleOfAges.RTS
                 {
                     currentState = GathererState.Harvesting;
                     harvestTimer = 0f;
+                    // Going to fell it: the best axe from the store (an own villager; its sword stays in its hands)
+                    bool fells = currentDirective == GatherDirective.WoodChopTreesOnly
+                                 || currentDirective != GatherDirective.WoodGatherBranchesOnly && targetTree.CurrentState != TreeState.WholeTree;
+                    if (fells && rtsUnit != null) Crafting.GearDispenser.GiveTool(Gear, Crafting.ItemType.Axe);
                 }
                 else
                 {
@@ -717,10 +730,10 @@ namespace BattleOfAges.RTS
             }
             else if (targetTree != null)
             {
-                harvestTimer += Time.deltaTime;
-
                 bool chopping = currentDirective == GatherDirective.WoodChopTreesOnly
                                 || currentDirective != GatherDirective.WoodGatherBranchesOnly && targetTree.CurrentState != TreeState.WholeTree;
+                float axe = chopping ? AxeEfficiency() : 1f; // an axe chops faster, as a pickaxe digs faster (branches are picked by hand)
+                harvestTimer += Time.deltaTime * axe;
                 workSoundTimer -= Time.deltaTime;
                 if (workSoundTimer <= 0f)
                 {
@@ -734,12 +747,12 @@ namespace BattleOfAges.RTS
                 }
                 else if (currentDirective == GatherDirective.WoodChopTreesOnly)
                 {
-                    targetTree.ChopWoodProgress(Time.deltaTime);
+                    targetTree.ChopWoodProgress(Time.deltaTime * axe);
                 }
                 else
                 {
                     if (targetTree.CurrentState == TreeState.WholeTree) targetTree.GatherBranchesProgress(Time.deltaTime);
-                    else targetTree.ChopWoodProgress(Time.deltaTime);
+                    else targetTree.ChopWoodProgress(Time.deltaTime * axe);
                 }
 
                 if (harvestTimer >= 2.5f)
