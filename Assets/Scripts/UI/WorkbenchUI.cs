@@ -40,6 +40,9 @@ namespace BattleOfAges.UI
         private readonly List<Button> levelTabs = new List<Button>();
         private readonly List<(ItemType type, Image icon, Text name, Text desc, Text cost, Button craft)> cards = new List<(ItemType, Image, Text, Text, Text, Button)>();
         private RectTransform queueList;
+        private int smeltTier;
+        private Text smeltTierText, smeltInfoText;
+        private Button smeltTen, smeltAll;
 
         private void Awake()
         {
@@ -114,9 +117,11 @@ namespace BattleOfAges.UI
                 c.craft.interactable = woodOk && oreOk && bench != null;
             }
 
-            int workers = bench != null ? bench.AssignedWorkerCount : 0;
-            workersText.text = $"Робітники: <color=#F5CC73>{workers}/{CraftingQueue.MAX_WORKERS}</color>   ·   швидкість ×{CraftingQueue.CalculateSpeedMultiplier(workers):0.##}";
-            warningText.gameObject.SetActive(workers == 0);
+            int workers = bench != null ? bench.AssignedWorkerCount : 0, called = bench != null ? bench.CalledWorkerCount : 0;
+            workersText.text = $"Робітники: <color=#F5CC73>{workers}/{CraftingQueue.MAX_WORKERS}</color>" + (called > workers ? $" (ще йдуть: {called - workers})" : "")
+                               + $"   ·   швидкість ×{CraftingQueue.CalculateSpeedMultiplier(workers):0.##}";
+            warningText.gameObject.SetActive(called == 0);
+            RefreshSmelt();
             RefreshQueue();
             RefreshStore();
         }
@@ -131,7 +136,7 @@ namespace BattleOfAges.UI
                 percentText.text = "";
                 return;
             }
-            currentText.text = $"Виготовляється: {new Item(active.Type, active.Level)}";
+            currentText.text = active.IsSmelt ? active.ToString() : $"Виготовляється: {new Item(active.Type, active.Level)}";
             progressFill.anchorMax = new Vector2(active.NormalizedProgress, 1f);
             percentText.text = Mathf.RoundToInt(active.NormalizedProgress * 100f) + "%";
         }
@@ -148,9 +153,10 @@ namespace BattleOfAges.UI
                 UiTheme.PanelImage(row, UiTheme.SlotSprite);
                 RectTransform ic = UiTheme.Rect(row, "Icon", new Vector2(0f, 0.5f), new Vector2(6f, 0f), new Vector2(32f, 32f));
                 Image img = ic.gameObject.AddComponent<Image>();
-                img.sprite = UiTheme.ItemSprite(task.Type, task.Level); img.preserveAspect = true; img.raycastTarget = false;
-                RectTransform lbl = UiTheme.Rect(row, "Label", new Vector2(0f, 0.5f), new Vector2(46f, 0f), new Vector2(270f, 36f));
-                UiTheme.Label(lbl, "Text", new Item(task.Type, task.Level).ToString(), 17, TextAnchor.MiddleLeft, UiTheme.LevelColor(task.Level));
+                img.sprite = task.IsSmelt ? UiTheme.IconSprite(UiTheme.Icon.Ore) : UiTheme.ItemSprite(task.Type, task.Level); img.preserveAspect = true; img.raycastTarget = false;
+                RectTransform lbl = UiTheme.Rect(row, "Label", new Vector2(0f, 0.5f), new Vector2(46f, 0f), new Vector2(290f, 36f));
+                Text label = UiTheme.Label(lbl, "Text", task.ToString(), task.IsSmelt ? 14 : 17, TextAnchor.MiddleLeft, task.IsSmelt ? UiTheme.Ink : UiTheme.LevelColor(task.Level));
+                label.horizontalOverflow = HorizontalWrapMode.Wrap;
                 string id = task.TaskId;
                 UiTheme.TextButton(row, "Cancel", "×", new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(34f, 32f), () => { bench.CancelTask(id); RefreshAll(); }, 20)
                        .GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
@@ -166,6 +172,41 @@ namespace BattleOfAges.UI
                 UiTheme.Label(none, "Text", "Черга порожня", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
             }
         }
+
+        /// <summary>The smelting panel: the chosen tier, what ten of it make, how much the stock melts into.</summary>
+        private void RefreshSmelt()
+        {
+            if (smeltTierText == null) return;
+            int ratio = Combat.GameBalance.SmeltRatio, can = WorkbenchNode.SmeltableCount(smeltTier);
+            ResourceManager rm = ResourceManager.Instance;
+            int have = rm != null ? rm.GetOreTierCount(smeltTier) : 0;
+            smeltTierText.text = $"руда {CraftingTask.Tier(smeltTier)}  →  руда {CraftingTask.Tier(smeltTier + 1)}";
+            smeltInfoText.text = $"{ratio} шт. → 1 шт., {Combat.GameBalance.SmeltSecondsPerPiece:0.#} с за шматок\n"
+                                 + $"у вас руди {CraftingTask.Tier(smeltTier)}: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — вийде {can}" : "");
+            smeltTen.interactable = bench != null && can >= 1;
+            smeltAll.interactable = bench != null && can >= 2;
+            smeltAll.GetComponentInChildren<Text>().text = can >= 2 ? $"Усе ({can})" : "Усе";
+        }
+
+        private void Smelt(bool all)
+        {
+            if (bench == null) bench = WorkbenchNode.Instance;
+            if (bench == null) return;
+            int count = all ? WorkbenchNode.SmeltableCount(smeltTier) : 1;
+            if (count <= 0 || !bench.TryEnqueueSmelt(smeltTier, count)) StrategyHud.Notify($"Не вистачає руди {CraftingTask.Tier(smeltTier)}: потрібно {Combat.GameBalance.SmeltRatio}");
+            RefreshAll();
+        }
+
+        private void ShiftSmeltTier(int by)
+        {
+            smeltTier = Mathf.Clamp(smeltTier + by, 0, 8);
+            RefreshAll();
+        }
+
+        private static string SmeltTip() =>
+            TipText.Title("Переплавка руди", UiTheme.Gold)
+            + $"\n{Combat.GameBalance.SmeltRatio} руди одного рівня → 1 руда наступного. З шахти кожен рівень вдесятеро рідший, тож переплавка — певний шлях до рідкої руди."
+            + "\nРуду забирають зі скрині одразу, в черзі можна скасувати (руда повернеться). Йде як інші замовлення: потрібні робітники біля верстака.";
 
         private void RefreshStore()
         {
@@ -259,7 +300,24 @@ namespace BattleOfAges.UI
             percentText = UiTheme.Label(pct, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
             RectTransform qt = UiTheme.Rect(side, "QueueTitle", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(380f, 28f));
             UiTheme.Label(qt, "Text", "Далі в черзі", 17, TextAnchor.MiddleLeft, UiTheme.InkDim);
-            queueList = UiTheme.Rect(side, "List", new Vector2(0.5f, 1f), new Vector2(0f, -114f), new Vector2(380f, 530f));
+            queueList = UiTheme.Rect(side, "List", new Vector2(0.5f, 1f), new Vector2(0f, -114f), new Vector2(380f, 340f));
+
+            // Smelting: ten of a tier into one of the next (GameBalance.SmeltRatio)
+            RectTransform smelt = UiTheme.Rect(side, "Smelt", new Vector2(0.5f, 1f), new Vector2(0f, -462f), new Vector2(380f, 206f));
+            UiTheme.PanelImage(smelt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.9f));
+            Tooltip.Set(smelt.gameObject, SmeltTip);
+            RectTransform smt = UiTheme.Rect(smelt, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(350f, 28f));
+            UiTheme.Label(smt, "Text", "Переплавка руди", 18, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.TextButton(smelt, "Down", "‹", new Vector2(0f, 1f), new Vector2(14f, -40f), new Vector2(40f, 36f), () => ShiftSmeltTier(-1), 22);
+            UiTheme.TextButton(smelt, "Up", "›", new Vector2(1f, 1f), new Vector2(-14f, -40f), new Vector2(40f, 36f), () => ShiftSmeltTier(1), 22);
+            RectTransform stier = UiTheme.Rect(smelt, "Tier", new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(260f, 36f));
+            smeltTierText = UiTheme.Label(stier, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            RectTransform sinfo = UiTheme.Rect(smelt, "Info", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(350f, 56f));
+            smeltInfoText = UiTheme.Label(sinfo, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            smeltInfoText.supportRichText = true;
+            smeltInfoText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            smeltTen = UiTheme.TextButton(smelt, "One", $"Переплавити {Combat.GameBalance.SmeltRatio}", new Vector2(0f, 0f), new Vector2(14f, 12f), new Vector2(170f, 42f), () => Smelt(false), 16);
+            smeltAll = UiTheme.TextButton(smelt, "All", "Усе", new Vector2(1f, 0f), new Vector2(-14f, 12f), new Vector2(170f, 42f), () => Smelt(true), 16);
 
             RectTransform store = UiTheme.Rect(side, "Store", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(380f, 112f));
             UiTheme.PanelImage(store, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.9f));

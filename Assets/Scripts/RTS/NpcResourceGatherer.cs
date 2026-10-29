@@ -27,7 +27,9 @@ namespace BattleOfAges.RTS
         MovingToMine,
         HaulingFromMine,
         MovingToMineToWork,
-        WorkingInsideMine
+        WorkingInsideMine,
+        /// <summary>Called to a workbench: goes to its place there and crafts until called off.</summary>
+        WorkingAtBench
     }
 
     /// <summary>
@@ -60,6 +62,10 @@ namespace BattleOfAges.RTS
 
         private float harvestTimer = 0f;
         private float searchTimer = 0f;
+        /// <summary>An Auto worker that last chose to haul mine ore (the split by need, AutoShouldHaul).</summary>
+        private bool autoHauling;
+        private Crafting.WorkbenchNode assignedBench;
+        private float benchMoveTimer;
 
         public GatherDirective CurrentDirective => currentDirective;
         public GathererState CurrentState => currentState;
@@ -72,7 +78,7 @@ namespace BattleOfAges.RTS
         /// in a mine or as a hauler waiting at its mine.
         /// </summary>
         public bool IsIdle => IsWorking && searchingFor > IdleAfterSeconds && currentDirective != GatherDirective.HaulOreFromMineToChest
-                              && !IsInsideMine && (rtsUnit == null || (!rtsUnit.WallBound && !rtsUnit.HasAttackTarget));
+                              && !IsInsideMine && !AtBench && (rtsUnit == null || (!rtsUnit.WallBound && !rtsUnit.HasAttackTarget));
         public const float IdleAfterSeconds = 4f;
         private float searchingFor;
 
@@ -140,6 +146,57 @@ namespace BattleOfAges.RTS
         }
 
         public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
+        /// <summary>Called to a workbench (on the way or at its place): the job window leaves it there; the bench's button lets it go.</summary>
+        public bool AtBench => assignedBench != null;
+        /// <summary>In a mine or at a bench: the job distribution and "all to this job" leave it there.</summary>
+        public bool IsStationed => IsMiner || AtBench;
+        public Crafting.WorkbenchNode AssignedBench => assignedBench;
+
+        /// <summary>Goes to its place at the bench (WorkbenchNode.SlotOf) and works there until another order or "Відпустити".</summary>
+        public void AssignToBench(Crafting.WorkbenchNode bench)
+        {
+            if (bench == null || CentralEmpire.Active) return;
+            StartWorking();
+            ClearCurrentTargets();
+            assignedBench = bench;
+            currentState = GathererState.WorkingAtBench;
+            benchMoveTimer = 0f;
+        }
+
+        /// <summary>The bench let it go (WorkbenchNode.UnassignWorker): back to its job.</summary>
+        public void LeaveBench(Crafting.WorkbenchNode bench)
+        {
+            if (assignedBench == null || assignedBench != bench) return;
+            assignedBench = null;
+            if (currentState == GathererState.WorkingAtBench) currentState = GathererState.FindingResource;
+        }
+
+        /// <summary>Wood the next town hall step takes, at least AutoWoodReserve: below it most Auto workers fetch wood.</summary>
+        public static int WoodWanted()
+        {
+            TownHall hall = TownHall.Current;
+            int next = hall == null ? GameBalance.TownHallWood[1] : hall.Level < TownHall.MaxLevel ? GameBalance.TownHallWood[hall.Level + 1] : 0;
+            return Mathf.Max(GameBalance.AutoWoodReserve, next);
+        }
+
+        /// <summary>Whether one more Auto worker should haul mine ore: those already hauling against the share of all Auto workers.</summary>
+        public static bool AutoShouldHaul(int autoWorkers, int othersHauling, bool woodShort)
+        {
+            float share = woodShort ? GameBalance.AutoHaulShareWoodShort : GameBalance.AutoHaulShare;
+            return othersHauling < Mathf.RoundToInt(autoWorkers * share);
+        }
+
+        private bool AutoHaulNow(bool woodShort)
+        {
+            int auto = 0, hauling = 0;
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+            {
+                if (w == null || w.currentDirective != GatherDirective.Auto || w.IsMiner || w.AtBench) continue;
+                auto++;
+                if (w != this && w.autoHauling) hauling++;
+            }
+            return AutoShouldHaul(auto, hauling, woodShort);
+        }
         /// <summary>Works in a mine (inside, or on the way in): the job window leaves it there; the mine's button brings it out.</summary>
         public bool IsMiner => assignedMine != null;
         public MineNode AssignedMine => assignedMine;
@@ -311,6 +368,13 @@ namespace BattleOfAges.RTS
 
         private void ClearCurrentTargets()
         {
+            autoHauling = false;
+            if (assignedBench != null)
+            {
+                Crafting.WorkbenchNode bench = assignedBench;
+                assignedBench = null;
+                bench.UnassignWorker(rtsUnit);
+            }
             if (assignedMine != null)
             {
                 assignedMine.UnassignWorker(this);
@@ -335,6 +399,12 @@ namespace BattleOfAges.RTS
             if (currentState == GathererState.MovingToMineToWork)
             {
                 HandleMovingToMineToWorkState();
+                return;
+            }
+
+            if (currentState == GathererState.WorkingAtBench)
+            {
+                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound)) HandleWorkingAtBenchState();
                 return;
             }
 
@@ -390,6 +460,29 @@ namespace BattleOfAges.RTS
                     HandleDeliveringToChestState();
                     break;
             }
+        }
+
+        /// <summary>Walks to its place at the bench and stands there facing it (the bench counts it once it is there).</summary>
+        private void HandleWorkingAtBenchState()
+        {
+            if (assignedBench == null || !assignedBench.isActiveAndEnabled)
+            {
+                ClearCurrentTargets();
+                currentState = GathererState.FindingResource;
+                return;
+            }
+            Vector3 slot = assignedBench.SlotOf(rtsUnit);
+            Vector3 off = transform.position - slot;
+            off.y = 0f;
+            if (off.sqrMagnitude > Crafting.WorkbenchNode.SlotReach * Crafting.WorkbenchNode.SlotReach * 0.25f)
+            {
+                benchMoveTimer -= Time.deltaTime;
+                if (benchMoveTimer <= 0f && rtsUnit != null) { benchMoveTimer = 1f; rtsUnit.IssueMoveCommand(slot); }
+                return;
+            }
+            Vector3 look = assignedBench.transform.position - transform.position;
+            look.y = 0f;
+            if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(look), 6f * Time.deltaTime);
         }
 
         private void HandleMovingToMineToWorkState()
@@ -449,20 +542,17 @@ namespace BattleOfAges.RTS
             targetTree = null;
             targetPebble = null;
             targetMine = null;
+            autoHauling = false;
 
             Vector3 myPos = transform.position;
 
-            // 1. Check if there is an active Mine with accumulated ore to haul
-            if (currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.HaulOreFromMineToChest)
+            // 1. Haul ore from a mine: a hauler always, an Auto worker by need (wood short of the next hall step: most go for wood)
+            bool auto = currentDirective == GatherDirective.Auto;
+            ResourceManager rm = ResourceManager.Instance;
+            bool woodShort = auto && rm != null && rm.WoodCount < WoodWanted();
+            if (currentDirective == GatherDirective.HaulOreFromMineToChest || (auto && AutoHaulNow(woodShort)))
             {
-                MineNode mine = MineNode.GetNearestMineWithOre(myPos);
-                if (mine != null && mine.AccumulatedOreCount > 0)
-                {
-                    targetMine = mine;
-                    currentState = GathererState.MovingToMine;
-                    if (rtsUnit != null) rtsUnit.IssueMoveCommand(mine.GetOutputDepositPosition());
-                    return;
-                }
+                if (TryHaulFromMine(myPos)) return;
             }
 
             if (currentDirective == GatherDirective.HaulOreFromMineToChest)
@@ -473,7 +563,7 @@ namespace BattleOfAges.RTS
 
             // 2. Search for wild wood / ore pebbles on map (a tree with WorkersPerTree workers already is taken)
             CountTreeCrowds();
-            bool allowOre = currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.OrePebblesOnly;
+            bool allowOre = (auto && !woodShort) || currentDirective == GatherDirective.OrePebblesOnly;
             bool allowWood = currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.WoodGatherBranchesOnly
                              || currentDirective == GatherDirective.WoodChopTreesOnly;
             FindNearest(allowOre, allowWood, currentDirective == GatherDirective.WoodGatherBranchesOnly, true, out targetPebble, out targetTree, out _);
@@ -489,6 +579,21 @@ namespace BattleOfAges.RTS
                 currentState = GathererState.MovingToResource;
                 if (rtsUnit != null) rtsUnit.IssueMoveCommand(targetTree.transform.position);
             }
+            else if (auto)
+            {
+                TryHaulFromMine(myPos); // no wood or pebble in reach: a mine's ore rather than standing about
+            }
+        }
+
+        private bool TryHaulFromMine(Vector3 myPos)
+        {
+            MineNode mine = MineNode.GetNearestMineWithOre(myPos);
+            if (mine == null || mine.AccumulatedOreCount <= 0) return false;
+            targetMine = mine;
+            autoHauling = currentDirective == GatherDirective.Auto;
+            currentState = GathererState.MovingToMine;
+            if (rtsUnit != null) rtsUnit.IssueMoveCommand(mine.GetOutputDepositPosition());
+            return true;
         }
 
         private void HandleMovingToResourceState()
@@ -579,7 +684,7 @@ namespace BattleOfAges.RTS
             if (sqrDst <= 3.0f * 3.0f)
             {
                 // Arrived at Mine output: pick up ore from buffer
-                int takenOre = targetMine.TakeOre(3, out int takenTier);
+                int takenOre = targetMine.TakeOre(GameBalance.HaulerCarry, out int takenTier);
                 if (takenOre > 0)
                 {
                     carriedOreAmount = takenOre;

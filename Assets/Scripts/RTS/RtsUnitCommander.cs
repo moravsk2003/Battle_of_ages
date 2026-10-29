@@ -213,6 +213,9 @@ namespace BattleOfAges.RTS
         private static void OrderUnits(RaycastHit hit, List<RtsUnit> units)
         {
             Collider target = hit.collider;
+            // Any order but to its own bench calls a worker off the workbench (else it walked back once let go)
+            WorkbenchNode toBench = target.GetComponentInParent<WorkbenchNode>();
+            foreach (RtsUnit unit in units) WorkbenchNode.CallOff(unit, toBench);
 
             // Own wall: up onto it, to the free posts nearest the click (§10.5)
             if (target.GetComponentInParent<WallSegment>() != null || target.GetComponentInParent<WallPier>() != null)
@@ -238,10 +241,11 @@ namespace BattleOfAges.RTS
                 return;
             }
 
-            WorkbenchNode workbench = target.GetComponentInParent<WorkbenchNode>();
-            if (workbench != null)
+            if (toBench != null)
             {
-                foreach (RtsUnit unit in units) if (!workbench.IsWorkerFull) workbench.AssignWorker(unit);
+                int called = 0;
+                foreach (RtsUnit unit in units) if (toBench.AssignWorker(unit)) called++;
+                if (called == 0 && toBench.IsWorkerFull) StrategyHud.Notify("Усі 4 місця біля верстака зайняті");
                 return;
             }
 

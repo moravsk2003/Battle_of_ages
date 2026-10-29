@@ -271,6 +271,7 @@ namespace BattleOfAges.UI
                 case GathererState.HaulingFromMine: return "несе руду з шахти";
                 case GathererState.MovingToMineToWork: return "іде працювати в шахту";
                 case GathererState.WorkingInsideMine: return "працює в шахті";
+                case GathererState.WorkingAtBench: return "працює за верстаком";
                 default: return "рухається";
             }
         }
@@ -360,7 +361,7 @@ namespace BattleOfAges.UI
             CreateDirectiveButton(orders, UiTheme.Icon.House, "Шахта", GatherDirective.HaulOreFromMineToChest,
                 "Носити з шахти", "Носять видобуту руду з шахти в скриню. Щоб працювати в шахті — ПКМ по шахті.");
             CreateDirectiveButton(orders, UiTheme.Icon.Worker, "Авто", GatherDirective.Auto,
-                "Самостійно", "Самі беруться за найближчу роботу: руда з шахти, камінці, гілки, дерева.");
+                "Самостійно", "Самі беруться за роботу, якої бракує: поки дерева менше, ніж на наступну ратушу, більшість іде по дерево, решта носить руду з шахти; потім навпаки.");
             CreateGearButton(orders);
 
             RectTransform close = UiTheme.Rect(rect, "DeselectBtn", new Vector2(1f, 1f), new Vector2(14f, 14f), new Vector2(38f, 38f));

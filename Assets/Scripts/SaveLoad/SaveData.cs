@@ -102,6 +102,8 @@ namespace BattleOfAges.SaveLoad
     {
         public int Type, Level;
         public float Progress;
+        /// <summary>A smelting task: the ore tier + 1 (0: an item, so older saves read as items) and the pieces it makes.</summary>
+        public int Smelt, SmeltCount;
     }
 
     [Serializable]

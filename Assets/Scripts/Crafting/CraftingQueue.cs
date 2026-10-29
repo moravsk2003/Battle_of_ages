@@ -12,6 +12,10 @@ namespace BattleOfAges.Crafting
         public int Level;
         public float TargetDurationSeconds;
         public float ProgressSeconds;
+        /// <summary>A smelting task: ore of this tier (-1: an item) melted into SmeltCount pieces of the next tier, GameBalance.SmeltRatio each.</summary>
+        public int SmeltTier = -1;
+        public int SmeltCount;
+        public bool IsSmelt => SmeltTier >= 0;
 
         public float NormalizedProgress => (TargetDurationSeconds > 0f) ? Mathf.Clamp01(ProgressSeconds / TargetDurationSeconds) : 1.0f;
         public bool IsCompleted => ProgressSeconds >= TargetDurationSeconds;
@@ -24,6 +28,20 @@ namespace BattleOfAges.Crafting
             TargetDurationSeconds = ItemStatCalculator.CalculateCraftTime(type, level);
             ProgressSeconds = 0f;
         }
+
+        /// <summary>Melts count x SmeltRatio ore of the tier into count pieces of the next tier, SmeltSecondsPerPiece each with one worker.</summary>
+        public static CraftingTask Smelt(int tier, int count)
+        {
+            var task = new CraftingTask(ItemType.Sword, 1) { SmeltTier = Mathf.Max(0, tier), SmeltCount = Mathf.Max(1, count) };
+            task.TargetDurationSeconds = task.SmeltCount * Combat.GameBalance.SmeltSecondsPerPiece;
+            return task;
+        }
+
+        /// <summary>An ore tier as the HUD writes it (0, I .. V, then digits).</summary>
+        public static string Tier(int tier) { string r = ItemTypeNames.Roman(tier); return r.Length > 0 ? r : tier.ToString(); }
+
+        public override string ToString() =>
+            IsSmelt ? $"Переплавка: руда {Tier(SmeltTier)} ×{SmeltCount * Combat.GameBalance.SmeltRatio} → {Tier(SmeltTier + 1)} ×{SmeltCount}" : new Item(Type, Level).ToString();
     }
 
     /// <summary>
@@ -84,9 +102,12 @@ namespace BattleOfAges.Crafting
             }
         }
 
-        public CraftingTask EnqueueItem(ItemType type, int level)
+        public CraftingTask EnqueueItem(ItemType type, int level) => Enqueue(new CraftingTask(type, level));
+
+        public CraftingTask EnqueueSmelt(int tier, int count) => Enqueue(CraftingTask.Smelt(tier, count));
+
+        private CraftingTask Enqueue(CraftingTask task)
         {
-            CraftingTask task = new CraftingTask(type, level);
             queue.Add(task);
             OnTaskAdded?.Invoke(task);
             return task;

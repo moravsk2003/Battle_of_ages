@@ -130,6 +130,22 @@ namespace BattleOfAges.Combat
         public static float UnitLeashRadius = 25f, WorkerLeashRadius = 15f;
         /// <summary>Workers at one tree at most: the rest take the next tree instead of crowding round one.</summary>
         public static int WorkersPerTree = 2;
+        /// <summary>
+        /// Workers on their own (Auto) split by need: while the wood in stock is short of the next town hall step (at least
+        /// AutoWoodReserve) this share of them hauls mine ore and the rest fetch wood; with wood enough, AutoHaulShare
+        /// haul (the rest wood and pebbles). Before this they all hauled while a mine had ore, and a mine always had.
+        /// </summary>
+        public static int AutoWoodReserve = 40;
+        public static float AutoHaulShareWoodShort = 0.25f, AutoHaulShare = 0.6f;
+        /// <summary>Ore a hauler carries from the mine to the chest per trip (3 left a mine of 10 full).</summary>
+        public static int HaulerCarry = 6;
+        /// <summary>
+        /// The workbench melts SmeltRatio ore of a tier into one of the next (a tier is ten times rarer from the mine, so
+        /// the same worth), SmeltSecondsPerPiece per piece with one worker: the common ore is worth something, and the rare
+        /// a known amount of digging (town hall V from ~100 000 mined ore to ~24 000; docs/GAME_DESIGN.md §13).
+        /// </summary>
+        public static int SmeltRatio = 10;
+        public static float SmeltSecondsPerPiece = 1f;
         public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f;
         public static bool AutoAlarm = true;
 

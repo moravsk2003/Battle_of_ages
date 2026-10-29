@@ -193,7 +193,7 @@ namespace BattleOfAges.SaveLoad
                 WorkbenchNode bench = b.GetComponent<WorkbenchNode>();
                 if (bench != null)
                 {
-                    foreach (CraftingTask t in bench.Queue.Queue) s.Queue.Add(new TaskSave { Type = (int)t.Type, Level = t.Level, Progress = t.ProgressSeconds });
+                    foreach (CraftingTask t in bench.Queue.Queue) s.Queue.Add(new TaskSave { Type = (int)t.Type, Level = t.Level, Progress = t.ProgressSeconds, Smelt = t.SmeltTier + 1, SmeltCount = t.SmeltCount });
                     s.BenchWorkers = bench.AssignedWorkerCount;
                 }
                 d.Buildings.Add(s);
@@ -389,8 +389,8 @@ namespace BattleOfAges.SaveLoad
                 WorkbenchNode bench = go.GetComponent<WorkbenchNode>();
                 if (bench != null)
                 {
-                    var tasks = new List<(ItemType, int, float)>();
-                    foreach (TaskSave t in s.Queue) tasks.Add(((ItemType)t.Type, t.Level, t.Progress));
+                    var tasks = new List<(ItemType, int, float, int, int)>();
+                    foreach (TaskSave t in s.Queue) tasks.Add(((ItemType)t.Type, t.Level, t.Progress, t.Smelt - 1, t.SmeltCount));
                     bench.LoadQueue(tasks);
                 }
             }

@@ -10,8 +10,9 @@ using BattleOfAges.UI;
 namespace BattleOfAges.Crafting
 {
     /// <summary>
-    /// Workbench building component where up to 4 NPC workers craft weapons, armor and tools.
-    /// Features 4 worker station slots around the table and procedural 3D visuals.
+    /// Workbench building component where up to 4 NPC workers craft weapons, armor and tools, and melt ore up a tier
+    /// (GameBalance.SmeltRatio to one). A called worker goes to its place at the bench (two in front, two behind) and
+    /// stays there (NpcResourceGatherer.WorkingAtBench); the crafting speed counts those standing at their places.
     /// </summary>
     [DisallowMultipleComponent]
     public class WorkbenchNode : MonoBehaviour
@@ -33,8 +34,16 @@ namespace BattleOfAges.Crafting
                 return craftingQueue;
             }
         }
+        /// <summary>A called worker counts for the crafting speed once it stands within this of its place.</summary>
+        public const float SlotReach = 1.6f;
+        private static readonly Vector3[] Slots = { new Vector3(-0.7f, 0f, 1.45f), new Vector3(0.7f, 0f, 1.45f), new Vector3(-0.7f, 0f, -1.45f), new Vector3(0.7f, 0f, -1.45f) };
+        private int presentWorkers;
+
+        /// <summary>Workers at their places (the crafting speed).</summary>
         public int AssignedWorkerCount => Queue.AssignedWorkerCount;
-        public bool IsWorkerFull => Queue.IsWorkerFull;
+        /// <summary>Workers called to the bench, there or on the way.</summary>
+        public int CalledWorkerCount => assignedWorkers.Count;
+        public bool IsWorkerFull => assignedWorkers.Count >= CraftingQueue.MAX_WORKERS;
 
         private void EnsureQueueInitialized()
         {
@@ -77,43 +86,66 @@ namespace BattleOfAges.Crafting
 
         private void Update()
         {
+            // The speed counts the called workers standing at their places (one still walking up does not craft yet)
+            assignedWorkers.RemoveAll(w => w == null);
+            int present = 0;
+            for (int i = 0; i < assignedWorkers.Count; i++)
+            {
+                Vector3 off = assignedWorkers[i].transform.position - SlotFlat(i);
+                off.y = 0f;
+                if (off.sqrMagnitude <= SlotReach * SlotReach) present++;
+            }
+            if (present != presentWorkers)
+            {
+                presentWorkers = present;
+                craftingQueue.SetWorkerCount(present);
+            }
             craftingQueue.Tick(Time.deltaTime);
         }
 
+        /// <summary>Calls the unit to a free place at the bench: a villager works there until called off, anyone else walks there.</summary>
         public bool AssignWorker(RtsUnit worker)
         {
-            if (craftingQueue.IsWorkerFull) return false;
-            if (worker != null && !assignedWorkers.Contains(worker))
-            {
-                assignedWorkers.Add(worker);
-                craftingQueue.AssignWorker();
-
-                int slotIndex = assignedWorkers.Count - 1;
-                Vector3 slotPos = GetWorkerSlotPosition(slotIndex);
-                worker.IssueMoveCommand(slotPos);
-
-                return true;
-            }
-            return false;
+            if (worker == null || IsWorkerFull || assignedWorkers.Contains(worker)) return false;
+            CallOff(worker, this);
+            assignedWorkers.Add(worker);
+            if (worker.TryGetComponent(out NpcResourceGatherer gatherer)) gatherer.AssignToBench(this);
+            else worker.IssueMoveCommand(SlotOf(worker));
+            return true;
         }
 
         public bool UnassignWorker(RtsUnit worker)
         {
-            if (worker != null && assignedWorkers.Remove(worker))
-            {
-                craftingQueue.UnassignWorker();
-                return true;
-            }
-            return false;
+            if (worker == null || !assignedWorkers.Remove(worker)) return false;
+            if (worker.TryGetComponent(out NpcResourceGatherer gatherer)) gatherer.LeaveBench(this);
+            return true;
         }
+
+        /// <summary>A unit given another order leaves whatever bench it was called to (but the one it is sent to now).</summary>
+        public static void CallOff(RtsUnit unit, WorkbenchNode except = null)
+        {
+            if (unit == null) return;
+            foreach (WorkbenchNode bench in activeWorkbenches)
+                if (bench != null && bench != except && bench.assignedWorkers.Contains(unit)) { bench.UnassignWorker(unit); return; }
+        }
+
+        /// <summary>The unit's place at the bench (its own position when it is not called here).</summary>
+        public Vector3 SlotOf(RtsUnit unit)
+        {
+            int i = assignedWorkers.IndexOf(unit);
+            return i >= 0 ? GetWorkerSlotPosition(i) : (unit != null ? unit.transform.position : transform.position);
+        }
+
+        private Vector3 SlotFlat(int index) => transform.position + transform.rotation * Slots[index % Slots.Length];
 
         public IReadOnlyList<RtsUnit> Workers => assignedWorkers;
 
-        /// <summary>Restores a saved queue (resources were paid when it was queued).</summary>
-        public void LoadQueue(IEnumerable<(ItemType type, int level, float progress)> tasks)
+        /// <summary>Restores a saved queue (resources were paid when it was queued); smeltTier -1 for an item.</summary>
+        public void LoadQueue(IEnumerable<(ItemType type, int level, float progress, int smeltTier, int smeltCount)> tasks)
         {
             Queue.ClearQueue();
-            foreach (var t in tasks) Queue.EnqueueItem(t.type, t.level).ProgressSeconds = t.progress;
+            foreach (var t in tasks)
+                (t.smeltTier >= 0 ? Queue.EnqueueSmelt(t.smeltTier, t.smeltCount) : Queue.EnqueueItem(t.type, t.level)).ProgressSeconds = t.progress;
         }
 
         /// <summary>Calls the nearest villager who is not at the bench yet (falls back to any own unit).</summary>
@@ -125,7 +157,9 @@ namespace BattleOfAges.Crafting
             foreach (RtsUnit u in FindObjectsByType<RtsUnit>(FindObjectsSortMode.None))
             {
                 if (u == null || assignedWorkers.Contains(u) || u.GetComponent<FirstPersonController>() != null) continue;
-                float score = Vector3.Distance(transform.position, u.transform.position) + (u.GetComponent<NpcResourceGatherer>() != null ? 0f : 1000f);
+                NpcResourceGatherer g = u.GetComponent<NpcResourceGatherer>();
+                if (g != null && g.IsStationed) continue; // in a mine or at another bench
+                float score = Vector3.Distance(transform.position, u.transform.position) + (g != null ? 0f : 1000f);
                 if (score < bestScore) { bestScore = score; best = u; }
             }
             return best != null && AssignWorker(best) ? best : null;
@@ -146,7 +180,8 @@ namespace BattleOfAges.Crafting
             foreach (CraftingTask t in Queue.Queue) if (t.TaskId == taskId) { task = t; break; }
             if (task == null || !Queue.CancelTask(taskId)) return false;
             ResourceManager rm = ResourceManager.Instance;
-            if (rm != null)
+            if (rm != null && task.IsSmelt) rm.AddOre(task.SmeltTier, task.SmeltCount * Combat.GameBalance.SmeltRatio);
+            else if (rm != null)
             {
                 rm.AddResource(ResourceType.Wood, ItemStatCalculator.CalculateWoodCost(task.Type, task.Level));
                 rm.AddOre(ItemStatCalculator.CalculateRequiredOreTier(task.Level), ItemStatCalculator.CalculateOreCost(task.Type, task.Level));
@@ -163,20 +198,30 @@ namespace BattleOfAges.Crafting
                 && rm.GetOreCountAtLeast(ItemStatCalculator.CalculateRequiredOreTier(level)) >= ItemStatCalculator.CalculateOreCost(type, level);
         }
 
+        /// <summary>Two places in front of the bench and two behind it (the sides have the vise and the anvil).</summary>
         public Vector3 GetWorkerSlotPosition(int slotIndex)
         {
-            Vector3 offset = Vector3.forward * 1.8f;
-            switch (slotIndex % 4)
-            {
-                case 0: offset = transform.forward * 1.8f; break;
-                case 1: offset = -transform.forward * 1.8f; break;
-                case 2: offset = transform.right * 1.8f; break;
-                case 3: offset = -transform.right * 1.8f; break;
-            }
-
-            Vector3 pos = transform.position + offset;
+            Vector3 pos = SlotFlat(slotIndex);
             pos.y = RtsUnit.GetTerrainHeight(pos);
             return pos;
+        }
+
+        /// <summary>Pieces of the next tier the stock of this tier melts into now (GameBalance.SmeltRatio each).</summary>
+        public static int SmeltableCount(int tier)
+        {
+            ResourceManager rm = ResourceManager.Instance;
+            return rm == null || tier < 0 ? 0 : rm.GetOreTierCount(tier) / Combat.GameBalance.SmeltRatio;
+        }
+
+        /// <summary>Queues melting count x SmeltRatio ore of the tier into count pieces of the next; the ore is taken now (cancel gives it back).</summary>
+        public bool TryEnqueueSmelt(int tier, int count)
+        {
+            if (count <= 0 || tier < 0 || tier >= OreTierHelper.MAX_TIERS - 1) return false;
+            int ore = count * Combat.GameBalance.SmeltRatio;
+            ResourceManager rm = ResourceManager.Instance;
+            if (rm != null && (rm.GetOreTierCount(tier) < ore || !rm.ConsumeOre(tier, ore))) return false;
+            craftingQueue.EnqueueSmelt(tier, count);
+            return true;
         }
 
         public bool TryEnqueueItem(ItemType type, int level)
@@ -208,6 +253,12 @@ namespace BattleOfAges.Crafting
         private void HandleTaskCompleted(CraftingTask task)
         {
             if (task == null) return;
+            if (task.IsSmelt)
+            {
+                ResourceManager.Instance?.AddOre(task.SmeltTier + 1, task.SmeltCount);
+                StrategyHud.Notify($"Переплавлено: руда {CraftingTask.Tier(task.SmeltTier + 1)} ×{task.SmeltCount}");
+                return;
+            }
             var item = new Item(task.Type, task.Level);
             Armory.Instance.Add(item);
             OnItemCrafted?.Invoke(item);
