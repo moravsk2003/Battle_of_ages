@@ -26,11 +26,17 @@ namespace BattleOfAges.World
             return t * t * (3f - 2f * t);
         }
 
+        /// <summary>The biomes' temperature and moisture fields, 0..1, shifted by the world's seed.</summary>
+        public static float Temperature(float worldX, float worldZ) =>
+            Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * 0.003f + 500f, (worldZ + WorldSettings.Shift.y) * 0.003f + 500f);
+        public static float Moisture(float worldX, float worldZ) =>
+            Mathf.PerlinNoise((worldX + WorldSettings.Shift.x) * 0.004f + 1500f, (worldZ + WorldSettings.Shift.y) * 0.004f + 1500f);
+
         /// <summary>0..1 sandiness (hot and dry), same formula as the desert blend in GetBlendedBiomeColor.</summary>
         public static float GetDesertWeight(float worldX, float worldZ)
         {
-            float tempNoise = Mathf.PerlinNoise(worldX * 0.003f + 500f, worldZ * 0.003f + 500f);
-            float moistureNoise = Mathf.PerlinNoise(worldX * 0.004f + 1500f, worldZ * 0.004f + 1500f);
+            float tempNoise = Temperature(worldX, worldZ);
+            float moistureNoise = Moisture(worldX, worldZ);
             return SmoothRange(0.55f, 0.75f, tempNoise) * (1f - SmoothRange(0.3f, 0.5f, moistureNoise));
         }
 
@@ -232,8 +238,8 @@ namespace BattleOfAges.World
             Color desertColor = new Color(0.74f, 0.64f, 0.40f); // sand
             Color highlandColor = new Color(0.42f, 0.48f, 0.32f); // alpine meadow (snow and rock come from the shader)
 
-            float tempNoise = Mathf.PerlinNoise(worldX * 0.003f + 500f, worldZ * 0.003f + 500f);
-            float moistureNoise = Mathf.PerlinNoise(worldX * 0.004f + 1500f, worldZ * 0.004f + 1500f);
+            float tempNoise = Temperature(worldX, worldZ);
+            float moistureNoise = Moisture(worldX, worldZ);
 
             // 1. Base Steppe & Pine Forest smooth blend based on moisture
             float forestWeight = SmoothRange(0.35f, 0.65f, moistureNoise);
@@ -265,7 +271,7 @@ namespace BattleOfAges.World
         /// <summary>The chunk's content, by its own seed: the same whatever the LOD (that only sets the ground's mesh).</summary>
         private IEnumerator ScatterBiomeResources(float startX, float startZ, float size)
         {
-            int seed = Mathf.Abs((ChunkCoord.x * 73856093) ^ (ChunkCoord.y * 19349663));
+            int seed = WorldSettings.ChunkSeed(ChunkCoord);
             Random.InitState(seed);
 
             int baseTreeCount = (MainBiome == BiomeType.PineForest) ? 26 : (MainBiome == BiomeType.Steppe ? 7 : (MainBiome == BiomeType.SnowyPeaks ? 4 : 2));
@@ -355,7 +361,7 @@ namespace BattleOfAges.World
                 // On level ground within the chunk (a camp on a ridge stood on stilts and in the rock), or no camp here
                 bool level = Building.BuildSite.FindLevel(new Vector3(campX, 0f, campZ), 14f, Combat.GameBalance.CampSiteSearchRadius, Combat.GameBalance.CampSiteMaxRise,
                                                           p => InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), out Vector3 site);
-                if (level)
+                if (level && WorldSettings.Inside(site, 30f)) // not on the wall round the world
                 {
                     GameObject camp = new GameObject($"HostileCamp_{ChunkCoord.x}_{ChunkCoord.y}");
                     camp.transform.SetParent(transform);
@@ -378,7 +384,7 @@ namespace BattleOfAges.World
             if (alive || !scattered || coord != ChunkCoord) yield break;
             alive = true;
             float startX = coord.x * size - size * 0.5f, startZ = coord.y * size - size * 0.5f;
-            int seed = Mathf.Abs((ChunkCoord.x * 73856093) ^ (ChunkCoord.y * 19349663));
+            int seed = WorldSettings.ChunkSeed(ChunkCoord);
             Random.InitState(seed ^ 0x2545F491);
 
             // Wildlife Spawning (Deer, Boar, Rabbit)
@@ -392,6 +398,7 @@ namespace BattleOfAges.World
                     float worldX = startX + localX;
                     float worldZ = startZ + localZ;
                     float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
+                    if (!WorldSettings.Inside(new Vector3(worldX, y, worldZ), 10f)) continue; // none on the wall round the world
 
                     AI.AnimalType type = (MainBiome == BiomeType.PineForest) ? AI.AnimalType.Boar :
                                          (MainBiome == BiomeType.Desert) ? AI.AnimalType.Rabbit :

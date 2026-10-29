@@ -223,6 +223,11 @@ namespace BattleOfAges.CameraSystem
 
         private void ClampTargetPosition()
         {
+            if (World.WorldSettings.Bounded) // the map does not look far past the world's edge
+            {
+                Vector3 inside = World.WorldSettings.ClampInside(targetPosition, -World.WorldSettings.EdgeBand * 0.5f);
+                targetPosition = new Vector3(inside.x, targetPosition.y, inside.z);
+            }
             if (!useBounds) return;
 
             float clampedX = Mathf.Clamp(targetPosition.x, minBounds.x, maxBounds.x);

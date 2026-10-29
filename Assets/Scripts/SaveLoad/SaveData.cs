@@ -13,6 +13,9 @@ namespace BattleOfAges.SaveLoad
         public long SavedAtTicks;
         public float PlaySeconds;
         public double GameHours;          // WorldClock
+        /// <summary>The world (WorldSettings): 0 and 0 — the fixed endless world of saves before 0.2.0.</summary>
+        public int WorldSeed;
+        public float WorldSize;
 
         public int Wood;
         public List<TierCount> Ore = new List<TierCount>();

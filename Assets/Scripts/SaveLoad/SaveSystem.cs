@@ -123,7 +123,7 @@ namespace BattleOfAges.SaveLoad
 
         public static SaveData Capture()
         {
-            var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours };
+            var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours, WorldSeed = World.WorldSettings.Seed, WorldSize = World.WorldSettings.Size };
 
             ResourceManager res = ResourceManager.Instance;
             if (res != null)
@@ -260,6 +260,7 @@ namespace BattleOfAges.SaveLoad
         {
             pending = null;
             newGamePending = true;
+            World.WorldSettings.Set(World.WorldSettings.NewSeed(), World.WorldSettings.DefaultSize); // a world of its own (§5.1)
             AutosaveEnabled = true;
             WorldPersistence.Suspended = true;
             WorldPersistence.Clear();
@@ -277,7 +278,7 @@ namespace BattleOfAges.SaveLoad
         }
 
         // Called by SaveRunner when the game scene has loaded (before any Start).
-        internal static void OnGameSceneLoaded(MonoBehaviour runner)
+        internal static void OnGameSceneLoaded(MonoBehaviour runner, Scene scene)
         {
             // Buildings that come with the scene get a key (name + place) before anything moves them
             foreach (BuildingNode b in BuildingNode.Active)
@@ -285,6 +286,11 @@ namespace BattleOfAges.SaveLoad
                     b.SceneKey = b.name + "@" + Vector3Int.RoundToInt(b.transform.position);
             WorldPersistence.Suspended = false;
             sceneStartTime = Time.unscaledTime;
+            if (pending != null) World.WorldSettings.Set(pending.WorldSeed, pending.WorldSize); // the saved world
+            else if (!newGamePending) World.WorldSettings.Set(0, 0f); // the scene opened directly (editor, tests): the fixed world
+            var roots = new List<Transform>();
+            foreach (GameObject g in scene.GetRootGameObjects()) roots.Add(g.transform); // (the runner lives in DontDestroyOnLoad)
+            World.WorldSettings.Reground(roots); // the scene's own trees, rocks and people onto this world's ground
             if (pending != null)
             {
                 playSecondsAtLoad = pending.PlaySeconds;
@@ -506,7 +512,7 @@ namespace BattleOfAges.SaveLoad
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             autosaveTimer = SaveSystem.AutosaveSeconds;
-            if (scene.name == SaveSystem.GameScene) SaveSystem.OnGameSceneLoaded(this);
+            if (scene.name == SaveSystem.GameScene) SaveSystem.OnGameSceneLoaded(this, scene);
             else WorldPersistence.Suspended = false;
         }
 

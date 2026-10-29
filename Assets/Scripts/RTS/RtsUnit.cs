@@ -671,8 +671,8 @@ namespace BattleOfAges.RTS
             if (wallState == WallState.ToStairs) { wallState = WallState.None; Building.WallWalk.Release(this); PostedByAlarm = false; }
             attackTarget = null;
             leashed = false; // a new order: whatever fight it was in is over
-            targetPosition = destination;
-            targetPosition.y = GetTerrainHeight(destination);
+            targetPosition = World.WorldSettings.ClampInside(destination); // not onto the mountains round the world
+            targetPosition.y = GetTerrainHeight(targetPosition);
             hasTarget = true;
             stuckTimer = 0f;
         }

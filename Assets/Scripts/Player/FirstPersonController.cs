@@ -130,6 +130,10 @@ namespace BattleOfAges.Player
 
             velocity.y += gravity * Time.deltaTime;
             characterController.Move(velocity * Time.deltaTime);
+
+            // Not past the mountains round a bounded world
+            Vector3 p = transform.position, inside = World.WorldSettings.ClampInside(p);
+            if (inside.x != p.x || inside.z != p.z) characterController.Move(new Vector3(inside.x - p.x, 0f, inside.z - p.z));
         }
 
         private void HandleMouseLook()

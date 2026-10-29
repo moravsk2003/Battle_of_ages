@@ -295,12 +295,14 @@ namespace BattleOfAges.World
             snowMat.SetColor("_RockColor", new Color(0.45f, 0.43f, 0.40f));
         }
 
-        public BiomeType GetBiomeAtWorldPos(Vector3 worldPos)
-        {
-            float tempNoise = Mathf.PerlinNoise(worldPos.x * 0.003f + 500f, worldPos.z * 0.003f + 500f);
-            float moistureNoise = Mathf.PerlinNoise(worldPos.x * 0.004f + 1500f, worldPos.z * 0.004f + 1500f);
+        public BiomeType GetBiomeAtWorldPos(Vector3 worldPos) =>
+            BiomeAt(worldPos.x, worldPos.z, GetSampledTerrainHeight(worldPos.x, worldPos.z));
 
-            float height = GetSampledTerrainHeight(worldPos.x, worldPos.z);
+        /// <summary>The biome at a point of the given height (the chunks and the coarse map use the same rule).</summary>
+        public static BiomeType BiomeAt(float x, float z, float height)
+        {
+            float tempNoise = ProceduralBiomeChunk.Temperature(x, z);
+            float moistureNoise = ProceduralBiomeChunk.Moisture(x, z);
 
             if (height > ProceduralBiomeChunk.SnowLineHeight) return BiomeType.SnowyPeaks;
             if (tempNoise > 0.65f && moistureNoise < 0.4f) return BiomeType.Desert;
@@ -312,6 +314,9 @@ namespace BattleOfAges.World
         private const float BaseFlatRadius = 50f;
         private const float BaseBlendRadius = 85f;
         private static float? baseZoneHeight;
+
+        /// <summary>The world changed (WorldSettings.Set): heights cached from the old one are dropped.</summary>
+        public static void ResetHeightCaches() => baseZoneHeight = null;
 
         /// <summary>
         /// Height of the flat spawn plateau: the average natural terrain height on the outer edge of the
@@ -338,7 +343,7 @@ namespace BattleOfAges.World
 
         public static float GetSampledTerrainHeight(float worldX, float worldZ)
         {
-            float y = GetNaturalTerrainHeight(worldX, worldZ);
+            float y = GetNaturalTerrainHeight(worldX, worldZ) + WorldSettings.EdgeHeight(worldX, worldZ); // the wall round a bounded world
 
             // Flat spawn base plateau within 50m radius, smooth transition to natural terrain up to 85m
             float distFromOrigin = new Vector2(worldX, worldZ).magnitude;
@@ -359,11 +364,12 @@ namespace BattleOfAges.World
         /// <summary>Coherent Perlin noise heightmap across all chunks (without the base plateau).</summary>
         private static float GetNaturalTerrainHeight(float worldX, float worldZ)
         {
-            float continentNoise = Mathf.PerlinNoise(worldX * 0.005f + 100f, worldZ * 0.005f + 100f) * 22.0f;
-            float hillNoise = Mathf.PerlinNoise(worldX * 0.02f + 300f, worldZ * 0.02f + 300f) * 6.5f;
-            float detailNoise = Mathf.PerlinNoise(worldX * 0.08f + 700f, worldZ * 0.08f + 700f) * 1.5f;
+            float sx = worldX + WorldSettings.Shift.x, sz = worldZ + WorldSettings.Shift.y; // this world's own relief (the seed)
+            float continentNoise = Mathf.PerlinNoise(sx * 0.005f + 100f, sz * 0.005f + 100f) * 22.0f;
+            float hillNoise = Mathf.PerlinNoise(sx * 0.02f + 300f, sz * 0.02f + 300f) * 6.5f;
+            float detailNoise = Mathf.PerlinNoise(sx * 0.08f + 700f, sz * 0.08f + 700f) * 1.5f;
 
-            return continentNoise + hillNoise + detailNoise + GetMountainHeight(worldX, worldZ);
+            return continentNoise + hillNoise + detailNoise + GetMountainHeight(worldX, worldZ); // (it shifts by itself, from the spawn distance)
         }
 
         /// <summary>
@@ -376,6 +382,7 @@ namespace BattleOfAges.World
             float zone = ProceduralBiomeChunk.SmoothRange(260f, 560f, distFromOrigin);
             if (zone <= 0f) return 0f;
 
+            worldX += WorldSettings.Shift.x; worldZ += WorldSettings.Shift.y; // (the spawn distance above stays unshifted)
             float region = Mathf.PerlinNoise(worldX * 0.0019f + 913f, worldZ * 0.0019f + 271f);
             float mask = ProceduralBiomeChunk.SmoothRange(0.40f, 0.70f, region) * zone;
             if (mask <= 0f) return 0f;
