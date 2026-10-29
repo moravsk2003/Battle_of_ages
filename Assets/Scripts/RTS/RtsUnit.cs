@@ -653,10 +653,8 @@ namespace BattleOfAges.RTS
                 }
             }
 
-            if (selectionIndicator != null)
-            {
-                selectionIndicator.SetActive(selected);
-            }
+            // The map's TeamMarkers draw the selection as a bright ring (the old disc was too small zoomed out)
+            if (selectionIndicator != null) selectionIndicator.SetActive(false);
         }
 
         public void IssueMoveCommand(Vector3 destination)

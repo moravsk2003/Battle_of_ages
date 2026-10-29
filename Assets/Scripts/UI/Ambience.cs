@@ -49,7 +49,8 @@ namespace BattleOfAges.UI
         private void Update()
         {
             Camera cam = Camera.main;
-            float height = cam != null ? Mathf.Clamp01((cam.transform.position.y - RTS.RtsUnit.GetTerrainHeight(cam.transform.position)) / 120f) : 0.5f;
+            // How far out: the map's zoom (orthographic, 10..100), or first person near the ground
+            float height = cam == null ? 0.5f : cam.orthographic ? Mathf.Clamp01(cam.orthographicSize / 100f) : 0f;
             bool paused = Time.timeScale <= 0f;
             float windTarget = (0.07f + 0.1f * height) * (paused ? 0.5f : 1f);
             wind.volume = Mathf.MoveTowards(wind.volume, windTarget, Time.unscaledDeltaTime * 0.1f);

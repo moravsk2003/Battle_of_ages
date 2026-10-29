@@ -18,6 +18,7 @@ namespace BattleOfAges.PlayModeTests
         private readonly Texture2D sheet;
         private readonly int cols, rows;
         private readonly GrassFieldRenderer grass;
+        private BattleOfAges.RTS.TeamMarkers markers;
 
         public Camera Camera => cam;
 
@@ -56,6 +57,8 @@ namespace BattleOfAges.PlayModeTests
             cam.targetTexture = rt;
             BattleOfAges.Utils.SkinnedMeshLod.RefreshAll(cam); // crowd LOD meshes as seen from this camera
             if (grass != null) grass.SubmitFor(cam);
+            if (markers == null) markers = Object.FindFirstObjectByType<BattleOfAges.RTS.TeamMarkers>();
+            if (markers != null) markers.SubmitFor(cam, cam); // the map's team rings
             cam.Render();
 
             RenderTexture.active = rt;

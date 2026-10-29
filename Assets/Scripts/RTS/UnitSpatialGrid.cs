@@ -47,6 +47,8 @@ namespace BattleOfAges.RTS
         public static int Capacity => capacity;
         /// <summary>Re-reads every agent's position now (normally done once per frame on the first query).</summary>
         public static void Refresh() { builtFrame = -1; EnsureBuilt(); }
+        /// <summary>Positions as of this frame (read once per frame, like the queries do).</summary>
+        public static void EnsureCurrent() => EnsureBuilt();
 
         public static int Register(Component owner, HealthComponent health, int team, float radius)
         {

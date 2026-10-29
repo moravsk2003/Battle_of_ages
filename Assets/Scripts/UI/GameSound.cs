@@ -20,7 +20,7 @@ namespace BattleOfAges.UI
         }
 
         public const int Rate = 44100, Variants = 3;
-        /// <summary>Beyond this (metres from the camera's view point, height counted at a third) a sound is not heard.</summary>
+        /// <summary>Beyond this (metres from the camera's view point, zoom counted in) a sound is not heard.</summary>
         public const float HearRange = 90f;
         private const int Voices = 20, PerFrame = 6;
 
@@ -91,8 +91,9 @@ namespace BattleOfAges.UI
         }
 
         /// <summary>
-        /// How loud and where a world point sounds. Looking down at the map, the camera hears around the ground point in
-        /// the middle of the view (its height counts at a third); looking ahead (first person), from where it stands.
+        /// How loud and where a world point sounds. On the map (an orthographic camera) it hears around the ground point
+        /// in the middle of the view, zoomed out as from farther (half the view's half-height is added); in first person
+        /// from where it stands.
         /// </summary>
         public static bool Hear(Vector3 position, out float gain, out float pan)
         {
@@ -102,12 +103,11 @@ namespace BattleOfAges.UI
             Transform c = cam.transform;
             Vector3 cp = c.position, fwd = c.forward;
             float d;
-            if (fwd.y < -0.3f && cp.y - position.y > 4f)
+            if (cam.orthographic && fwd.y < -0.1f)
             {
-                float height = cp.y - position.y;
-                Vector3 focus = cp + fwd * (height / -fwd.y);
+                Vector3 focus = cp + fwd * ((cp.y - position.y) / -fwd.y);
                 Vector3 flat = position - focus; flat.y = 0f;
-                d = flat.magnitude + height / 3f;
+                d = flat.magnitude + cam.orthographicSize * 0.5f;
             }
             else d = Vector3.Distance(cp, position);
             gain = Loudness(d);
