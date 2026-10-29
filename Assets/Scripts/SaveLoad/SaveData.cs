@@ -42,6 +42,9 @@ namespace BattleOfAges.SaveLoad
         public int Hall, HallHealth;
         public float Wood, Ore, Births, Age, Interregnum;
         public bool Defeated;
+        /// <summary>A free hero's band (§7.4): no hall, no raids. Team: its side (the same ring colour whenever it is about).</summary>
+        public bool Free;
+        public int Team;
         public SubjectSave King = new SubjectSave(); public bool HasKing; public int KingClass, KingTotalXp;
         public List<SubjectSave> Subjects = new List<SubjectSave>();
     }

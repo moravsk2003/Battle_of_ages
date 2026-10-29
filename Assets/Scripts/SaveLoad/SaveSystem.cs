@@ -161,7 +161,8 @@ namespace BattleOfAges.SaveLoad
                 d.WorldEpoch = CentralEmpire.WorldEpoch;
                 d.WallLevel = Fortifications.Level;
                 d.KingdomsFounded = true;
-                foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.Kingdoms.Add(k.ToSave());
+                if (AI.KingdomRealm.Active) d.Kingdoms.AddRange(AI.KingdomRealm.AllStates()); // a campaign: the far ones too
+                else foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.Kingdoms.Add(k.ToSave());
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null)
                 {
@@ -311,12 +312,13 @@ namespace BattleOfAges.SaveLoad
         private static IEnumerator FoundKingdomsLater()
         {
             yield return null; // the player is in place
-            if (AI.NpcKingdom.All.Count == 0) FoundKingdoms();
+            if (AI.NpcKingdom.All.Count == 0 && AI.KingdomRealm.Far.Count == 0) FoundKingdoms();
         }
 
         /// <summary>The NPC kings of a new game around the player (docs/GAME_DESIGN.md §12, M0).</summary>
         private static void FoundKingdoms()
         {
+            if (AI.KingdomRealm.Active) { AI.KingdomRealm.FoundCampaign(); return; } // a campaign: the heroes on their sites (M1)
             GameObject player = Managers.GameContext.Player;
             AI.NpcKingdom.FoundAround(player != null ? player.transform.position : Vector3.zero);
         }
@@ -456,7 +458,8 @@ namespace BattleOfAges.SaveLoad
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }
             AI.NpcKingdom.RemoveAll();
-            if (d.KingdomsFounded) foreach (KingdomSave k in d.Kingdoms) AI.NpcKingdom.FromSave(k);
+            if (d.KingdomsFounded && AI.KingdomRealm.Active) AI.KingdomRealm.Load(d.Kingdoms); // near ones real, the rest as data
+            else if (d.KingdomsFounded) foreach (KingdomSave k in d.Kingdoms) AI.NpcKingdom.FromSave(k);
             else FoundKingdoms(); // a save from before the NPC kings
             var mapCam = Managers.GameContext.MapCamera;
             if (mapCam != null && d.Player.HasMapCamera) mapCam.transform.position = d.Player.MapCameraPosition;

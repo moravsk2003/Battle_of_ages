@@ -226,6 +226,16 @@ namespace BattleOfAges.Combat
 
         /// <summary>NPC kings around the player at a new game, this far from the player's start.</summary>
         public static int KingdomCount = 3;
+        /// <summary>
+        /// A campaign (M1, a bounded world): heroes in the world, the player's included, and the share of the others that
+        /// are kings (the rest free heroes); the kingdoms nearest the player's home that are always real (their raids);
+        /// any other is real while the hero is within MaterializeRadius of it, and folds back into its state past
+        /// DematerializeRadius (KingdomRealm).
+        /// </summary>
+        public static int CampaignHeroes = 16;
+        public static float CampaignKingShare = 0.75f;
+        public static int RealKingdomsNearHome = 3;
+        public static float MaterializeRadius = 1200f, DematerializeRadius = 1700f;
         public static float KingdomDistance = 600f;
         /// <summary>The start of every NPC king: a hero (a general, like the player) and this many people and wood, no hall.</summary>
         public static int KingdomStartPeople = 5, KingdomStartWood = 10;

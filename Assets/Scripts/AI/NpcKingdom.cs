@@ -36,6 +36,8 @@ namespace BattleOfAges.AI
         /// </summary>
         public int Team { get; private set; } = UnitSpatialGrid.TeamKingdomFirst;
         public bool AgainstPlayer => Team != UnitSpatialGrid.TeamPlayer;
+        /// <summary>A free hero's band (§7.4): it camps, it grows to a camp's cap, it builds no hall and sends no raids.</summary>
+        public bool Free { get; private set; }
         private static int nextTeam = UnitSpatialGrid.TeamKingdomFirst;
         /// <summary>A side of its own for a new NPC kingdom.</summary>
         private static int NewSide() => nextTeam++;
@@ -78,7 +80,7 @@ namespace BattleOfAges.AI
         // ------------------------------------------------------------------ founding
 
         /// <summary>A new kingdom here: a king (a general hero, like the player) and its starting people and wood, no hall.</summary>
-        public static NpcKingdom Found(Vector3 centre, string name, int people = -1, int wood = -1, HeroClass kingClass = HeroClass.None, int team = -1)
+        public static NpcKingdom Found(Vector3 centre, string name, int people = -1, int wood = -1, HeroClass kingClass = HeroClass.None, int team = -1, bool free = false)
         {
             // On level ground near the spot, not on a hillside or a ridge (the most level one about if there is none)
             Building.BuildSite.FindLevel(centre, 7f, GameBalance.KingdomSiteSearchRadius, GameBalance.KingdomSiteMaxRise, out centre);
@@ -87,6 +89,7 @@ namespace BattleOfAges.AI
             NpcKingdom k = root.AddComponent<NpcKingdom>();
             if (!all.Contains(k)) all.Add(k); // (OnEnable does not run in edit mode)
             k.KingdomName = name;
+            k.Free = free;
             k.Team = team >= 0 ? team : NewSide();
             k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * Random.Range(1f, 2f);
             k.Economy.Wood = wood >= 0 ? wood : GameBalance.KingdomStartWood;
@@ -293,6 +296,7 @@ namespace BattleOfAges.AI
         public void Think()
         {
             if (IsDefeated) return;
+            if (Free) return; // a free hero camps: no hall, no raids
             if (Economy.HallLevel == 0 || Population >= Economy.Cap - GameBalance.KingdomHallRoom) TryUpgradeHall(); // only when it needs the room
             if (!Raiding && !InInterregnum && Age >= FirstRaidAt && !UnderRaid() && Age >= LastRaidEnd + GameBalance.KingdomRaidCooldownHours) ConsiderRaid();
         }
@@ -544,6 +548,16 @@ namespace BattleOfAges.AI
 
         private static readonly string[] Names = { "Вовчий край", "Залізні пагорби", "Ясенова долина", "Кам'яний брід", "Сива рівнина", "Орлине гніздо" };
 
+        /// <summary>The names of a campaign's kingdoms and free heroes' bands (the first six are M0's).</summary>
+        public static readonly string[] CampaignNames =
+        {
+            "Вовчий край", "Залізні пагорби", "Ясенова долина", "Кам'яний брід", "Сива рівнина", "Орлине гніздо",
+            "Дубовий гай", "Червоний яр", "Мідна гора", "Тихі заводі", "Соколиний бір", "Вітряний кряж",
+            "Срібний потік", "Ведмежий кут", "Золоте поле", "Туманна гать", "Кленова балка", "Високий вал",
+            "Березовий луг", "Чорна скеля", "Лисячі нори", "Білий камінь", "Зелена діброва", "Старий шлях",
+            "Грозова вершина", "Медова пасіка", "Кремінний брід", "Озерний край", "Північна застава", "Сонячний схил"
+        };
+
         /// <summary>The NPC kings of a new game: KingdomCount of them on a ring KingdomDistance around this place.</summary>
         public static void FoundAround(Vector3 centre, int count = -1, float distance = -1f)
         {
@@ -559,6 +573,15 @@ namespace BattleOfAges.AI
         }
 
         private static void Kill(GameObject go) { if (Application.isPlaying) Destroy(go); else DestroyImmediate(go); }
+
+        /// <summary>Takes the kingdom out of the scene without a fall (KingdomRealm folds it into its state): its people, king and hall go.</summary>
+        public void Dissolve()
+        {
+            foreach (HostileMobAI m in subjects) if (m != null) Kill(m.gameObject);
+            if (King != null) Kill(King.gameObject);
+            all.Remove(this);
+            Kill(gameObject);
+        }
 
         public static void RemoveAll()
         {
@@ -585,7 +608,8 @@ namespace BattleOfAges.AI
             var s = new SaveLoad.KingdomSave
             {
                 Name = KingdomName, Home = Home, Hall = Economy.HallLevel, HallHealth = Hall != null ? Hall.CurrentHealth : 0,
-                Wood = Economy.Wood, Ore = Economy.Ore, Births = Economy.BirthCarry, Age = Age, Interregnum = InterregnumLeft, Defeated = IsDefeated
+                Wood = Economy.Wood, Ore = Economy.Ore, Births = Economy.BirthCarry, Age = Age, Interregnum = InterregnumLeft, Defeated = IsDefeated,
+                Free = Free, Team = Team
             };
             if (IsDefeated) return s;
             foreach (HostileMobAI m in subjects) s.Subjects.Add(SaveOf(m));
@@ -612,7 +636,9 @@ namespace BattleOfAges.AI
             NpcKingdom k = root.AddComponent<NpcKingdom>();
             if (!all.Contains(k)) all.Add(k);
             k.KingdomName = s.Name;
-            k.Team = NewSide();
+            k.Free = s.Free;
+            k.Team = s.Team >= UnitSpatialGrid.TeamKingdomFirst ? s.Team : NewSide();
+            if (k.Team >= nextTeam) nextTeam = k.Team + 1;
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
             k.Age = s.Age;
             k.BuildHall();
@@ -711,7 +737,7 @@ namespace BattleOfAges.AI
             StrategyHud.Notify($"{KingdomName} впало: {why}");
             Defeated?.Invoke(this);
             if (!AgainstPlayer) StrategyHud.Notify("Поразка: королівство гравця впало");
-            else if (all.TrueForAll(k => k == null || k.IsDefeated || !k.AgainstPlayer)) StrategyHud.Notify("Перемога! Усі сусідні королівства впали");
+            else if (all.TrueForAll(k => k == null || k.IsDefeated || !k.AgainstPlayer) && !KingdomRealm.AnyStandingFar()) StrategyHud.Notify("Перемога! Усі сусідні королівства впали");
         }
     }
 }

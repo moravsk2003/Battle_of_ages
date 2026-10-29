@@ -1,0 +1,198 @@
+using System.Collections.Generic;
+using UnityEngine;
+using BattleOfAges.Building;
+using BattleOfAges.Combat;
+using BattleOfAges.SaveLoad;
+using BattleOfAges.World;
+
+namespace BattleOfAges.AI
+{
+    /// <summary>
+    /// Every NPC hero of a campaign (M1 steps 4-5, docs/GAME_DESIGN.md §18.2): kings and free heroes on their start
+    /// sites. A kingdom is real (NpcKingdom, people and a hall) when it is one of the few nearest the player's home or
+    /// the hero comes near; otherwise it is only its state (the save's KingdomSave), and it grows by formula once a game
+    /// hour on the same numbers as a real one (work, births, promotions, the hall): the first small piece of the
+    /// abstract layer (§6.2, M6). Coming near makes it real from its state; leaving folds it back. The endless seed-0
+    /// world keeps M0's three kings at hand and does not use this.
+    /// </summary>
+    public sealed class KingdomRealm : MonoBehaviour
+    {
+        private static readonly List<KingdomSave> far = new List<KingdomSave>();
+        private static KingdomRealm instance;
+        private float hourClock, syncClock;
+
+        public static bool Active => WorldSettings.Bounded;
+        /// <summary>The kingdoms that are only data now.</summary>
+        public static IReadOnlyList<KingdomSave> Far => far;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { far.Clear(); instance = null; }
+
+        private static void Ensure()
+        {
+            if (instance == null) instance = new GameObject("KingdomRealm").AddComponent<KingdomRealm>();
+        }
+
+        /// <summary>Is any kingdom against the player still standing out of sight (no victory yet)?</summary>
+        public static bool AnyStandingFar()
+        {
+            foreach (KingdomSave s in far) if (!s.Defeated && !s.Free) return true;
+            return false;
+        }
+
+        // ------------------------------------------------------------------ a new campaign
+
+        /// <summary>The campaign's heroes on their sites: heroes - 1 of them (the player is one), a share kings, the rest free.</summary>
+        public static void FoundCampaign(int heroes = -1, float kingShare = -1f)
+        {
+            if (heroes < 0) heroes = GameBalance.CampaignHeroes;
+            if (kingShare < 0f) kingShare = GameBalance.CampaignKingShare;
+            NpcKingdom.RemoveAll();
+            far.Clear();
+            List<Vector3> sites = StartSites.Choose(Mathf.Max(0, heroes - 1));
+            int kings = Mathf.RoundToInt(sites.Count * kingShare);
+            var rng = new System.Random(WorldSettings.Seed ^ 0x4B49);
+            for (int i = 0; i < sites.Count; i++)
+            {
+                bool free = i >= kings;
+                string name = NpcKingdom.CampaignNames[i % NpcKingdom.CampaignNames.Length];
+                far.Add(NewState(sites[i], free ? "Ватага: " + name : name, free, RTS.UnitSpatialGrid.TeamKingdomFirst + i, rng));
+            }
+            Ensure();
+            instance.Sync();
+        }
+
+        /// <summary>A hero's start (§7.1): the hero, KingdomStartPeople people and KingdomStartWood wood on level ground, no hall.</summary>
+        public static KingdomSave NewState(Vector3 site, string name, bool free, int team, System.Random rng)
+        {
+            BuildSite.FindLevel(site, 7f, GameBalance.KingdomSiteSearchRadius, GameBalance.KingdomSiteMaxRise, out site);
+            var s = new KingdomSave
+            {
+                Name = name, Home = site, Hall = 0, Wood = GameBalance.KingdomStartWood, Free = free, Team = team, HasKing = true,
+                KingClass = rng.Next((int)HeroClass.Tank, (int)HeroClass.Dd + 1),
+                King = new SubjectSave { Rank = (int)UnitRank.General, Position = Around(site, rng) }
+            };
+            for (int i = 0; i < GameBalance.KingdomStartPeople; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Person, Position = Around(site, rng) });
+            return s;
+        }
+
+        private static Vector3 Around(Vector3 home, System.Random rng)
+        {
+            float a = (float)rng.NextDouble() * Mathf.PI * 2f, r = 5f + (float)rng.NextDouble() * 5f;
+            Vector3 p = home + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+            p.y = InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z);
+            return p;
+        }
+
+        // ------------------------------------------------------------------ saves
+
+        /// <summary>Every kingdom for a save, real or far.</summary>
+        public static List<KingdomSave> AllStates()
+        {
+            var list = new List<KingdomSave>(far);
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null) list.Add(k.ToSave());
+            return list;
+        }
+
+        /// <summary>A loaded campaign: all of them far first, then the ones that should be real become real.</summary>
+        public static void Load(List<KingdomSave> states)
+        {
+            NpcKingdom.RemoveAll();
+            far.Clear();
+            far.AddRange(states);
+            Ensure();
+            instance.Sync();
+        }
+
+        // ------------------------------------------------------------------ near and far
+
+        private void Update()
+        {
+            if (!Active) return;
+            float hours = WorldClock.HoursOf(Time.deltaTime);
+            hourClock += hours;
+            if (hourClock >= 1f)
+            {
+                foreach (KingdomSave s in far) Advance(s, hourClock);
+                hourClock = 0f;
+            }
+            syncClock -= Time.deltaTime;
+            if (syncClock <= 0f) { syncClock = 1f; Sync(); }
+        }
+
+        private static Vector3 HomeOfPlayer() => TownHall.Current != null ? TownHall.Current.transform.position : Vector3.zero;
+
+        private static Vector3 Hero()
+        {
+            GameObject p = Managers.GameContext.Player;
+            return p != null ? p.transform.position : HomeOfPlayer();
+        }
+
+        private static float Flat(Vector3 a, Vector3 b) { a.y = 0f; b.y = 0f; return Vector3.Distance(a, b); }
+
+        /// <summary>Makes real what should be (the nearest to home, those by the hero) and folds the rest into their states.</summary>
+        public void Sync()
+        {
+            if (!Active) return;
+            Vector3 home = HomeOfPlayer(), hero = Hero();
+            var standing = new List<(float d, KingdomSave s, NpcKingdom k)>();
+            foreach (KingdomSave s in far) if (!s.Defeated) standing.Add((Flat(s.Home, home), s, null));
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated) standing.Add((Flat(k.Home, home), null, k));
+            standing.Sort((a, b) => a.d.CompareTo(b.d));
+            for (int i = 0; i < standing.Count; i++)
+            {
+                var (_, s, k) = standing[i];
+                bool nearHome = i < GameBalance.RealKingdomsNearHome;
+                if (s != null)
+                {
+                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius) { far.Remove(s); NpcKingdom.FromSave(s); }
+                }
+                else if (!nearHome && Flat(k.Home, hero) > GameBalance.DematerializeRadius && !k.Raiding && !k.UnderRaid())
+                {
+                    far.Add(k.ToSave());
+                    k.Dissolve();
+                }
+            }
+        }
+
+        /// <summary>
+        /// A far kingdom over these game hours, by the rules a real one lives by: everyone works at home, births up to the
+        /// hall's cap, people become warriors from work, the hall is raised when the room runs out (not a free hero's),
+        /// an interregnum runs out into the strongest one's reign.
+        /// </summary>
+        public static void Advance(KingdomSave s, float hours)
+        {
+            if (s.Defeated || hours <= 0f) return;
+            s.Age += hours;
+            if (!s.HasKing)
+            {
+                s.Interregnum -= hours * GameBalance.GameHourSeconds;
+                if (s.Interregnum <= 0f) Crown(s);
+                return;
+            }
+            var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births };
+            int born = economy.Tick(hours, s.Subjects.Count, s.Subjects.Count);
+            var rng = new System.Random(s.Name.GetHashCode() ^ Mathf.FloorToInt(s.Age * 7f));
+            for (int i = 0; i < born; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Person, Position = Around(s.Home, rng) });
+            double chance = 1.0 - System.Math.Pow(1.0 - GameBalance.WorkPromotionPerHour, hours);
+            foreach (SubjectSave u in s.Subjects) if (u.Rank == (int)UnitRank.Person && rng.NextDouble() < chance) u.Rank = (int)UnitRank.Warrior;
+            if (!s.Free && (economy.HallLevel == 0 || s.Subjects.Count >= economy.Cap - GameBalance.KingdomHallRoom) && economy.TryUpgrade())
+                s.HallHealth = GameBalance.TownHallHealth[economy.HallLevel];
+            s.Wood = economy.Wood; s.Ore = economy.Ore; s.Hall = economy.HallLevel; s.Births = economy.BirthCarry;
+        }
+
+        /// <summary>The strongest one left reigns (§7.2); nobody left: the kingdom is gone.</summary>
+        private static void Crown(KingdomSave s)
+        {
+            if (s.Subjects.Count == 0) { s.Defeated = true; return; }
+            SubjectSave best = s.Subjects[0];
+            foreach (SubjectSave u in s.Subjects) if (u.Rank > best.Rank || (u.Rank == best.Rank && u.BattleXp > best.BattleXp)) best = u;
+            s.Subjects.Remove(best);
+            s.King = best;
+            s.HasKing = true;
+            s.KingClass = Random.Range((int)HeroClass.Tank, (int)HeroClass.Dd + 1);
+            s.KingTotalXp = 0;
+            s.Interregnum = 0f;
+        }
+    }
+}
