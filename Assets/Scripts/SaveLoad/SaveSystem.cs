@@ -316,6 +316,7 @@ namespace BattleOfAges.SaveLoad
             bool found = newGamePending || !Application.isBatchMode; // (batch test runs open the scene for other things)
             if (!newGamePending) WorldPersistence.Clear(); // the scene was opened directly (editor, tests)
             if (newGamePending && ResourceManager.Instance != null) ResourceManager.Instance.ResetToInitial();
+            WorldClock.GameHours = 0.0; // a new campaign (or the scene opened directly): day 1, morning
             if (newGamePending && startingSetup != null) { runner.StartCoroutine(ApplySetupLater(startingSetup)); startingSetup = null; }
             newGamePending = false;
             runner.StartCoroutine(RegisterSceneTreesLater());

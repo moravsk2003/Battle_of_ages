@@ -59,8 +59,7 @@ namespace BattleOfAges.UI
         /// <summary>"День 2 · 14:00" from the world clock.</summary>
         public static string ClockShort()
         {
-            double h = Combat.WorldClock.GameHours;
-            int day = (int)(h / 24.0) + 1, hour = (int)(h % 24.0);
+            int day = Combat.WorldClock.Day, hour = (int)Combat.WorldClock.HourOfDay;
             return $"День {day} · {hour:00}:00";
         }
 

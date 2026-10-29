@@ -14,6 +14,13 @@ namespace BattleOfAges.Combat
 
         public static float HoursOf(float realSeconds) => realSeconds / GameBalance.GameHourSeconds;
 
+        /// <summary>A campaign starts at this hour of its first day (morning: the day and night of §4, M1).</summary>
+        public const float DayStartHour = 8f;
+        /// <summary>The hour of the day, 0..24.</summary>
+        public static float HourOfDay => (float)((GameHours + DayStartHour) % 24.0);
+        /// <summary>The day of the campaign, from 1.</summary>
+        public static int Day => (int)((GameHours + DayStartHour) / 24.0) + 1;
+
         // Natural regeneration runs over every fighter once per real second (cheap for thousands of units)
         private const float RegenInterval = 1f;
         private static readonly List<HealthComponent> fighters = new List<HealthComponent>(256);
