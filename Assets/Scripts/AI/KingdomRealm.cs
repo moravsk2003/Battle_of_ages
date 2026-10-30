@@ -20,6 +20,8 @@ namespace BattleOfAges.AI
         private static readonly List<KingdomSave> far = new List<KingdomSave>();
         private static KingdomRealm instance;
         private float hourClock, syncClock;
+        /// <summary>People of a kingdom made real that come into the scene each frame.</summary>
+        public const int ArrivalsPerFrame = 2;
 
         public static bool Active => WorldSettings.Bounded;
         /// <summary>The kingdoms that are only data now.</summary>
@@ -119,6 +121,7 @@ namespace BattleOfAges.AI
                 foreach (KingdomSave s in far) Advance(s, hourClock);
                 hourClock = 0f;
             }
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null && k.Arriving > 0) k.ArriveMore(ArrivalsPerFrame);
             syncClock -= Time.deltaTime;
             if (syncClock <= 0f) { syncClock = 1f; Sync(); }
         }
@@ -148,7 +151,7 @@ namespace BattleOfAges.AI
                 bool nearHome = i < GameBalance.RealKingdomsNearHome;
                 if (s != null)
                 {
-                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius) { far.Remove(s); NpcKingdom.FromSave(s); }
+                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius) { far.Remove(s); NpcKingdom.FromSave(s, gradual: true); }
                 }
                 else if (!nearHome && Flat(k.Home, hero) > GameBalance.DematerializeRadius && !k.Raiding && !k.UnderRaid())
                 {

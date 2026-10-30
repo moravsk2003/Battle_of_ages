@@ -48,7 +48,15 @@ namespace BattleOfAges.PlayModeTests
             LogAssert.ignoreFailingMessages = true; // (a known SkinnedMeshRenderer error must not abort the review)
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
-            yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);
+            bool campaign = Environment.GetEnvironmentVariable("PERF_CAMPAIGN") == "1"; // M1: a new 16 km campaign (seed 777) instead of the fixed world
+            if (campaign)
+            {
+                BattleOfAges.SaveLoad.SaveSystem.FolderOverride = Path.Combine(Path.GetTempPath(), "boa_perf_saves");
+                BattleOfAges.SaveLoad.SaveSystem.NewGame(new BattleOfAges.SaveLoad.CampaignSetup { Seed = 777, Class = HeroClass.Tank, HasArtifact = true, Artifact = ArtifactType.Vampiric });
+                while (SceneManager.GetActiveScene().name != BattleOfAges.SaveLoad.SaveSystem.GameScene) yield return null;
+                yield return null;
+            }
+            else yield return SceneManager.LoadSceneAsync("SampleScene", LoadSceneMode.Single);
             string gfx = Environment.GetEnvironmentVariable("PERF_GRAPHICS"); // Low | Medium | High: measure a graphics preset
             if (!string.IsNullOrEmpty(gfx)) BattleOfAges.Managers.GraphicsQuality.Apply((BattleOfAges.Managers.GraphicsQuality.Level)Enum.Parse(typeof(BattleOfAges.Managers.GraphicsQuality.Level), gfx));
 
@@ -67,7 +75,7 @@ namespace BattleOfAges.PlayModeTests
             rt = new RenderTexture(1920, 1080, 24);
             cam.targetTexture = rt;
 
-            report.AppendLine("# Battle of Ages — performance probe");
+            report.AppendLine("# Battle of Ages — performance probe" + (campaign ? $" — campaign (seed {WorldSettings.Seed}, {WorldSettings.Size / 1000f:0} km, {NpcKingdom.All.Count} real + {KingdomRealm.Far.Count} far kingdoms, {Lakes.All.Count} lakes)" : ""));
             report.AppendLine($"Unity {Application.unityVersion}, {SystemInfo.processorType} ({SystemInfo.processorCount} threads), {SystemInfo.graphicsDeviceName}, quality '{QualitySettings.names[QualitySettings.GetQualityLevel()]}', render 1920x1080 each frame.");
             report.AppendLine($"Recorders valid: main {mainThread.Valid}, gc {gcAlloc.Valid}, batches {batches.Valid}, behaviour {behaviourUpdate.Valid}, physics {physics.Valid}, animators {animators.Valid}");
             report.AppendLine();
@@ -92,7 +100,29 @@ namespace BattleOfAges.PlayModeTests
                 player.transform.rotation = Quaternion.LookRotation(dir2);
             });
 
-            if (Environment.GetEnvironmentVariable("PERF_TRAVEL_ONLY") == "1")
+            if (campaign)
+            {
+                // M1: a long ride (lakes, regions), then to a far kingdom that turns real
+                Vector3 dir3 = new Vector3(-0.6f, 0f, 1f).normalized;
+                yield return Phase("campaign ride 40 m/s", 20f, dt =>
+                {
+                    Vector3 p = WorldSettings.ClampInside(player.transform.position + dir3 * 40f * dt, 50f);
+                    p.y = InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z) + 1f;
+                    cc.enabled = false; player.transform.position = p; cc.enabled = true;
+                    player.transform.rotation = Quaternion.LookRotation(dir3);
+                });
+                if (KingdomRealm.Far.Count > 0)
+                {
+                    for (int h = 0; h < 60; h++) KingdomRealm.Advance(KingdomRealm.Far[0], 1f); // a grown one (~45 people): the worst to make real
+                    report.AppendLine($"(the far kingdom made real has {KingdomRealm.Far[0].Subjects.Count} people, hall {KingdomRealm.Far[0].Hall})");
+                    Vector3 k = KingdomRealm.Far[0].Home + new Vector3(80f, 0f, 0f);
+                    k.y = InfiniteWorldManager.GetSampledTerrainHeight(k.x, k.z) + 1f;
+                    cc.enabled = false; player.transform.position = k; cc.enabled = true;
+                    yield return Phase("by a far kingdom (made real)", 6f, null);
+                }
+            }
+
+            if (Environment.GetEnvironmentVariable("PERF_TRAVEL_ONLY") == "1" || campaign)
             {
                 report.AppendLine(); report.AppendLine("Hitches:");
                 foreach (string h in pendingHitches) report.AppendLine(h);
@@ -102,6 +132,7 @@ namespace BattleOfAges.PlayModeTests
                 cam.targetTexture = null;
                 rt.Release();
                 foreach (ProfilerRecorder r in new[] { mainThread, gcAlloc, batches, setPass, tris, behaviourUpdate, lateBehaviour, fixedBehaviour, physics, animators }) r.Dispose();
+                if (campaign) { BattleOfAges.SaveLoad.SaveSystem.FolderOverride = null; NpcKingdom.RemoveAll(); KingdomRealm.Clear(); WorldSettings.Set(0, 0f); }
                 yield break;
             }
 

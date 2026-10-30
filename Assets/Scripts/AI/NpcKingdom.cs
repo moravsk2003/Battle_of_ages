@@ -613,6 +613,7 @@ namespace BattleOfAges.AI
             };
             if (IsDefeated) return s;
             foreach (HostileMobAI m in subjects) s.Subjects.Add(SaveOf(m));
+            s.Subjects.AddRange(arriving); // not in the scene yet: still its people
             if (King != null && King.Health.IsAlive)
             {
                 s.HasKing = true;
@@ -629,7 +630,7 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>A kingdom back from a save (its king grows again to the saved level, spending the points its usual way).</summary>
-        public static NpcKingdom FromSave(SaveLoad.KingdomSave s)
+        public static NpcKingdom FromSave(SaveLoad.KingdomSave s, bool gradual = false)
         {
             var root = new GameObject("NpcKingdom_" + s.Name);
             root.transform.position = s.Home;
@@ -644,7 +645,8 @@ namespace BattleOfAges.AI
             k.BuildHall();
             if (s.Hall > 0 && s.HallHealth > 0) k.Hall.SetCurrentHealth(s.HallHealth);
             if (s.Defeated) { k.IsDefeated = true; return k; }
-            foreach (SaveLoad.SubjectSave u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
+            if (gradual) k.arriving.AddRange(s.Subjects); // a few a frame (ArriveMore): a grown kingdom was a hitch of hundreds of ms
+            else foreach (SaveLoad.SubjectSave u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
             if (s.HasKing)
             {
                 HostileMobAI king = k.AddSubject((UnitRank)s.King.Rank, s.King.Position);
@@ -656,6 +658,23 @@ namespace BattleOfAges.AI
             }
             else if (s.Interregnum > 0f) k.InterregnumLeft = s.Interregnum;
             return k;
+        }
+
+        private readonly List<SaveLoad.SubjectSave> arriving = new List<SaveLoad.SubjectSave>();
+
+        /// <summary>People of a kingdom made real gradually, still to come into the scene.</summary>
+        public int Arriving => arriving.Count;
+
+        /// <summary>Brings up to this many of its people into the scene (KingdomRealm, each frame); false when none are left to come.</summary>
+        public bool ArriveMore(int max)
+        {
+            for (int i = 0; i < max && arriving.Count > 0; i++)
+            {
+                SaveLoad.SubjectSave u = arriving[0];
+                arriving.RemoveAt(0);
+                Restore(AddSubject((UnitRank)u.Rank, u.Position), u);
+            }
+            return arriving.Count > 0;
         }
 
         private static void Restore(HostileMobAI m, SaveLoad.SubjectSave u)
