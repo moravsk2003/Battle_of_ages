@@ -8,7 +8,8 @@ namespace BattleOfAges.Utils
     /// <summary>
     /// Build check: started with "-smokeshot path.png", the player opens the game scene, waits for streaming, saves a
     /// screenshot and quits. Shows what a build really renders (shaders stripped from builds work in the Editor).
-    /// "-smokemap" shoots the map view (team rings, plates) instead of first person.
+    /// "-smokemap" shoots the map view (team rings, plates) instead of first person; "-smokecampaign" starts a new
+    /// campaign (seed 777) instead of opening the fixed scene, "-smokelake" puts the hero by its nearest lake.
     /// </summary>
     public sealed class BuildSmokeShot : MonoBehaviour
     {
@@ -21,12 +22,29 @@ namespace BattleOfAges.Utils
             if (i < 0 || i + 1 >= args.Length) return;
             var go = new GameObject("BuildSmokeShot");
             DontDestroyOnLoad(go);
-            go.AddComponent<BuildSmokeShot>().StartCoroutine(Shoot(args[i + 1], Array.IndexOf(args, "-smokefx") >= 0, Array.IndexOf(args, "-smokemap") >= 0));
+            go.AddComponent<BuildSmokeShot>().StartCoroutine(Shoot(args[i + 1], Array.IndexOf(args, "-smokefx") >= 0, Array.IndexOf(args, "-smokemap") >= 0,
+                                                                   Array.IndexOf(args, "-smokecampaign") >= 0, Array.IndexOf(args, "-smokelake") >= 0));
         }
 
-        private static IEnumerator Shoot(string path, bool effects, bool map)
+        private static IEnumerator Shoot(string path, bool effects, bool map, bool campaign, bool lake)
         {
-            yield return SceneManager.LoadSceneAsync(SaveLoad.SaveSystem.GameScene);
+            if (campaign)
+            {
+                SaveLoad.SaveSystem.NewGame(new SaveLoad.CampaignSetup { Seed = 777, Class = Combat.HeroClass.Tank, HasArtifact = true, Artifact = Combat.ArtifactType.Vampiric });
+                while (SceneManager.GetActiveScene().name != SaveLoad.SaveSystem.GameScene) yield return null;
+            }
+            else yield return SceneManager.LoadSceneAsync(SaveLoad.SaveSystem.GameScene);
+            if (lake && World.Lakes.All.Count > 0)
+            {
+                yield return new WaitForSecondsRealtime(2f);
+                World.Lakes.Lake l = World.Lakes.All[0];
+                foreach (World.Lakes.Lake o in World.Lakes.All) if (o.Center.magnitude < l.Center.magnitude && o.Radius > 90f) l = o;
+                GameObject player = Managers.GameContext.Player;
+                Vector3 at = new Vector3(l.Center.x + l.ShoreRadius(0f) + 14f, 0f, l.Center.y);
+                at.y = World.InfiniteWorldManager.GetSampledTerrainHeight(at.x, at.z) + 1f;
+                var cc = player.GetComponent<CharacterController>();
+                cc.enabled = false; player.transform.position = at; player.transform.rotation = Quaternion.LookRotation(Vector3.left); cc.enabled = true;
+            }
             yield return new WaitForSecondsRealtime(8f);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
