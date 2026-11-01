@@ -79,7 +79,7 @@ namespace BattleOfAges.PlayModeTests
             float end = Time.time + 60f;
             while (site != null && Time.time < end)
             {
-                if (site.Progress > 0.5f) Assert.Greater(site.BuilderCount, 0, "they stay at the work"); // (workers left by earlier tests may come too)
+                if (site.Progress > 0.5f && site.Progress < 1f) Assert.Greater(site.BuilderCount, 0, "they stay at the work"); // (workers left by earlier tests may come too; at 1 it has let them go and is destroyed at the end of this frame)
                 yield return null;
             }
             Assert.IsTrue(site == null, "built");
