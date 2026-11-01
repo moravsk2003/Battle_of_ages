@@ -101,17 +101,17 @@ namespace BattleOfAges.Building
         public override string JobName => "працює в полі";
         protected override float SpotRadius => 5f;
 
-        private static float FoodDays()
+        private float FoodDays()
         {
             ResourceManager rm = ResourceManager.Instance;
-            float perDay = TownHall.Population * GameBalance.FoodPerPersonPerDay;
-            return rm == null || perDay <= 0f ? float.MaxValue : rm.Food / perDay;
+            float perDay = TownHall.PeopleAt(transform.position) * GameBalance.FoodPerPersonPerDay;
+            return rm == null || perDay <= 0f ? float.MaxValue : rm.For(transform.position).Food / perDay;
         }
 
         public override bool WantsHands => FoodDays() < GameBalance.FoodWantDays;
         public override bool Wanted => FoodDays() < GameBalance.FoodEnoughDays;
 
-        protected override void Yield(int present, float hours) => ResourceManager.Instance?.AddFood(present * GameBalance.FarmerFoodPerHour * hours);
+        protected override void Yield(int present, float hours) => ResourceManager.Instance?.For(transform.position).AddFood(present * GameBalance.FarmerFoodPerHour * hours);
     }
 
     /// <summary>A sawmill (zone "Ліс"): each sawyer brings wood per hour, more in dense forest (the coarse map).</summary>
@@ -123,7 +123,7 @@ namespace BattleOfAges.Building
         public override string JobName => "працює на лісопилці";
         protected override float SpotRadius => 4f;
 
-        private static int Wood() => ResourceManager.Instance != null ? ResourceManager.Instance.WoodCount : int.MaxValue;
+        private int Wood() => ResourceManager.Instance != null ? ResourceManager.Instance.For(transform.position).WoodCount : int.MaxValue;
         public override bool WantsHands => Wood() < GameBalance.SawmillWantWood;
         public override bool Wanted => Wood() < GameBalance.SawmillEnoughWood;
 
@@ -147,7 +147,7 @@ namespace BattleOfAges.Building
             int whole = Mathf.FloorToInt(carry);
             if (whole <= 0) return;
             carry -= whole;
-            ResourceManager.Instance?.AddResource(ResourceType.Wood, whole);
+            ResourceManager.Instance?.For(transform.position).AddResource(ResourceType.Wood, whole);
         }
     }
 
@@ -156,6 +156,12 @@ namespace BattleOfAges.Building
     {
         private static readonly List<MarketNode> all = new List<MarketNode>();
         public static bool Any => all.Count > 0;
+        /// <summary>This settlement has one.</summary>
+        public static bool In(TownHall hall)
+        {
+            foreach (MarketNode m in all) if (m != null && TownHall.Nearest(m.transform.position) == hall) return true;
+            return false;
+        }
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => all.Clear();
         private void OnEnable() { if (!all.Contains(this)) all.Add(this); }

@@ -80,7 +80,7 @@ namespace BattleOfAges.Building
         {
             BuildingDefinition def = BuildingData.GetDefinition(Type); // (a mine or workbench used to spawn a house's worker)
 
-            if (World.WorldSettings.Bounded && Type == BuildingType.WorkerHouse) ApplyEpochLook(TownHall.Current != null ? TownHall.Current.Level : 1);
+            if (World.WorldSettings.Bounded && Type == BuildingType.WorkerHouse) ApplyEpochLook(TownHall.Nearest(transform.position) != null ? TownHall.Nearest(transform.position).Level : 1);
 
             Combat.HealthComponent hp = GetComponent<Combat.HealthComponent>();
             WallSegment wall = GetComponent<WallSegment>();

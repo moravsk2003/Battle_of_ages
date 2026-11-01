@@ -22,6 +22,17 @@ namespace BattleOfAges.RTS
 
         private float lastEnemySeen, nextCheck;
         private bool gathered;
+        /// <summary>Raised by hand: everyone. By itself: only the settlements in danger.</summary>
+        private static bool everyone = true;
+        private static readonly List<TownHall> threatened = new List<TownHall>();
+
+        /// <summary>The alarm sounds for whoever is here (a settlement far off from the danger works on).</summary>
+        public static bool ActiveAt(Vector3 place)
+        {
+            if (!Active) return false;
+            if (everyone || TownHall.All.Count <= 1) return true;
+            return threatened.Contains(TownHall.Nearest(place));
+        }
         private static readonly int[] buffer = new int[128];
         private static readonly List<HealthComponent> enemies = new List<HealthComponent>(32);
 
@@ -57,6 +68,8 @@ namespace BattleOfAges.RTS
             SettlementAlarm a = Ensure();
             if (Active) return;
             Active = true;
+            everyone = true;
+            threatened.Clear();
             a.lastEnemySeen = Time.time;
             a.gathered = false;
             a.nextCheck = 0f;
@@ -102,6 +115,7 @@ namespace BattleOfAges.RTS
         /// <summary>Once a second: raise it by itself, or lead the defence and stand down when it is over.</summary>
         public void Tick()
         {
+            if (TownHall.All.Count > 1) { TickSeveral(); return; }
             if (!Home(out Vector3 home)) return;
             if (!Active)
             {
@@ -113,11 +127,50 @@ namespace BattleOfAges.RTS
             if (near.Count > 0) lastEnemySeen = Time.time;
             else if (Time.time - lastEnemySeen >= GameBalance.AlarmStandDownSeconds) { StandDown(); return; }
 
+            Defend(home, near, null);
+            if (near.Count == 0) gathered = true;
+        }
+
+        /// <summary>Several settlements: each looks out for itself, and the alarm calls those in danger.</summary>
+        private void TickSeveral()
+        {
+            var halls = TownHall.All;
+            if (!Active)
+            {
+                if (!GameBalance.AutoAlarm) return;
+                foreach (TownHall hall in halls)
+                {
+                    if (EnemiesNear(hall.transform.position, GameBalance.AlarmTriggerRadius).Count == 0) continue;
+                    Raise($"Тривога! Вороги біля: {hall.Title}");
+                    everyone = false;
+                    break;
+                }
+                if (!Active) return;
+            }
+
+            threatened.Clear();
+            foreach (TownHall hall in halls)
+                if (EnemiesNear(hall.transform.position, GameBalance.AlarmRadius).Count > 0) threatened.Add(hall);
+            if (threatened.Count > 0) lastEnemySeen = Time.time;
+            else if (Time.time - lastEnemySeen >= GameBalance.AlarmStandDownSeconds) { StandDown(); return; }
+
+            foreach (TownHall hall in halls)
+            {
+                if (!everyone && !threatened.Contains(hall)) continue;
+                Defend(hall.transform.position, EnemiesNear(hall.transform.position, GameBalance.AlarmRadius), hall);
+            }
+            if (threatened.Count == 0) gathered = true;
+        }
+
+        /// <summary>Sends this settlement's people (hall null: everyone) at the enemies near, or home with none about.</summary>
+        private void Defend(Vector3 home, List<HealthComponent> near, TownHall hall)
+        {
             var units = UnitRegistry.ActiveUnits;
             for (int i = 0; i < units.Count; i++)
             {
                 RtsUnit u = units[i];
                 if (u == null || u.IsHero || !u.IsAlive || u.InsideMine || u.HasAttackTarget || u.WallBound) continue;
+                if (hall != null && TownHall.Nearest(u.transform.position) != hall) continue;
                 if (near.Count > 0)
                 {
                     HealthComponent best = null;
@@ -137,7 +190,6 @@ namespace BattleOfAges.RTS
                     u.IssueMoveCommand(home + new Vector3(r.x, 0f, r.y)); // everyone home
                 }
             }
-            if (near.Count == 0) gathered = true;
         }
     }
 }

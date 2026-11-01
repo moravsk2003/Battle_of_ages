@@ -250,6 +250,18 @@ namespace BattleOfAges.Combat
         public static int FieldFarmers = 2, SawmillWorkers = 2, SawmillWantWood = 150, SawmillEnoughWood = 300;
         /// <summary>In a campaign workers on their own go down a mine, this many to each, while the ore (stock and mines' buffers) is under Want, and come out at Enough.</summary>
         public static int MineAutoMiners = 2, MineWantOre = 60, MineEnoughOre = 200;
+
+        /// <summary>
+        /// A new settlement (M5 step 7): a hall of this level at home, this far from the player's halls and from any
+        /// king's; it costs FoundingWood and FoundingOre at the settlement that pays, and starts with FoundingStart* (settlers' load).
+        /// </summary>
+        public static int FoundingHallLevel = 2, FoundingWood = 200, FoundingOre = 30, FoundingStartWood = 60, FoundingStartFood = 20;
+        public static float FoundingFromOwn = 500f, FoundingFromKing = 300f;
+
+        /// <summary>Caravans: m/s; at most one a route, each CaravanEveryHours; sent when the other runs under Short and this one stays over Spare.</summary>
+        public static float CaravanSpeed = 5f, CaravanEveryHours = 1f, CaravanFoodShortDays = 2f, CaravanFoodSpareDays = 4f;
+        public static int CaravanWoodShort = 100, CaravanWoodSpare = 300, CaravanOreShort = 30, CaravanOreSpare = 100;
+        public static int CaravanLoadWood = 100, CaravanLoadFood = 40, CaravanLoadOre = 40;
         public static float FarmerFoodPerHour = 0.5f, FoodWantDays = 3f, FoodEnoughDays = 6f, SawyerWoodPerHour = 25f, HouseBirthsPerHour = 0.1f;
         public static int KingdomCount = 3;
         /// <summary>

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using BattleOfAges.Building;
 using BattleOfAges.Combat;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Resources;
@@ -16,7 +17,14 @@ namespace BattleOfAges.UI
         private static TradeUI instance;
         private GameObject window;
         private Offer[] offers;
-        private Text stock;
+        private Text stock, caravanTitle;
+        private RectTransform panel;
+        private GameObject caravanRow;
+        private Button[] caravanButtons;
+        private static readonly (CaravanGood Good, int Amount, string Name)[] Loads =
+        {
+            (CaravanGood.Wood, 100, "100 дерева"), (CaravanGood.Food, 40, "40 їжі"), (CaravanGood.Ore, 40, "40 руди")
+        };
 
         public static bool IsOpen => instance != null && instance.window != null && instance.window.activeSelf;
 
@@ -67,6 +75,16 @@ namespace BattleOfAges.UI
         {
             stock.text = $"Є: дерева <color=#F5CC73>{Have(Good.Wood)}</color>  ·  їжі <color=#F5CC73>{Have(Good.Food)}</color>  ·  звичайної руди <color=#F5CC73>{Have(Good.Ore)}</color>";
             foreach (Offer o in offers) o.Button.interactable = Have(o.Give) >= o.GiveAmount;
+            TownHall here = TownHall.Viewed, other = here != null ? Caravans.NearestOther(here) : null;
+            bool several = other != null;
+            if (caravanRow.activeSelf != several)
+            {
+                caravanRow.SetActive(several);
+                panel.sizeDelta = new Vector2(620f, several ? 610f : 520f);
+            }
+            if (!several) return;
+            caravanTitle.text = $"Караван до: {other.Title}";
+            for (int i = 0; i < Loads.Length; i++) caravanButtons[i].interactable = here.Stock != null && Caravans.Have(here.Stock, Loads[i].Good) >= Loads[i].Amount;
         }
 
         private void Build()
@@ -74,7 +92,7 @@ namespace BattleOfAges.UI
             Canvas canvas = UiTheme.CreateCanvas("TradeCanvas", 118);
             canvas.transform.SetParent(transform, false);
             window = canvas.gameObject;
-            RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620f, 520f));
+            panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620f, 520f));
             UiTheme.PanelImage(panel);
             PopIn.On(panel);
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(400f, 44f));
@@ -99,6 +117,22 @@ namespace BattleOfAges.UI
                 Button b = UiTheme.TextButton(panel, "Offer" + i, $"{giveN} {Name(give)}  →  {takeN} {Name(take)}", new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(460f, 50f), () => { Trade(give, giveN, take, takeN); Refresh(); }, 19);
                 offers[i] = new Offer { Give = give, GiveAmount = giveN, Take = take, TakeAmount = takeN, Button = b };
             }
+            RectTransform row = UiTheme.Rect(panel, "Caravans", new Vector2(0.5f, 1f), new Vector2(0f, -490f), new Vector2(580f, 100f));
+            caravanRow = row.gameObject;
+            RectTransform rowHead = UiTheme.Rect(row, "Title", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(580f, 30f));
+            caravanTitle = UiTheme.Label(rowHead, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Gold);
+            caravanButtons = new Button[Loads.Length];
+            for (int i = 0; i < Loads.Length; i++)
+            {
+                var load = Loads[i];
+                caravanButtons[i] = UiTheme.TextButton(row, "Send" + i, load.Name, new Vector2(0.5f, 1f), new Vector2((i - 1) * 190f, -38f), new Vector2(180f, 50f), () =>
+                {
+                    TownHall here = TownHall.Viewed;
+                    if (here != null) Caravans.Send(here, Caravans.NearestOther(here), load.Good, load.Amount);
+                    Refresh();
+                }, 18);
+            }
+            caravanRow.SetActive(false);
             window.SetActive(false);
         }
     }

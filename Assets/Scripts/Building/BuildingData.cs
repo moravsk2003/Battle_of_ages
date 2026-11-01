@@ -147,7 +147,16 @@ namespace BattleOfAges.Building
             for (int i = 0; i < definitions.Length; i++)
             {
                 if (definitions[i].Type == type)
-                    return definitions[i];
+                {
+                    BuildingDefinition def = definitions[i];
+                    if (type == BuildingType.TownHall && World.WorldSettings.Bounded && TownHall.Current != null)
+                    {
+                        // Another hall is a new settlement: settlers and their load
+                        def.WoodCost = GameBalance.FoundingWood;
+                        def.OreCost = GameBalance.FoundingOre;
+                    }
+                    return def;
+                }
             }
             return definitions[0];
         }

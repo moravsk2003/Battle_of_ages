@@ -82,6 +82,15 @@ namespace BattleOfAges.World
         /// <summary>True once the chunk has ground (terrain mesh and collider) at ChunkCoord; a LOD rebuild keeps the old one meanwhile.</summary>
         public bool HasTerrain { get; private set; }
 
+        private bool groundShown = true;
+
+        /// <summary>Held for a settlement away from the viewer: its trees and ore stand, the far terrain shows the ground (its own would fight it).</summary>
+        public void SetGroundShown(bool shown)
+        {
+            groundShown = shown;
+            if (meshRenderer != null) meshRenderer.enabled = shown;
+        }
+
         /// <summary>Its trees, stones and camp are all placed (the same at any LOD).</summary>
         private bool scattered;
         /// <summary>Its animals and the camp's raiders are out: they come the first time the chunk is near (full LOD).</summary>
@@ -255,6 +264,7 @@ namespace BattleOfAges.World
 
             // Assign Material based on dominant Biome
             meshRenderer.sharedMaterial = GetBiomeMaterial(MainBiome, steppeMat, forestMat, desertMat, snowMat);
+            meshRenderer.enabled = groundShown;
         }
 
         /// <summary>Per-vertex biome colour (smoothly blended); used as the grass tint by the terrain shader.</summary>

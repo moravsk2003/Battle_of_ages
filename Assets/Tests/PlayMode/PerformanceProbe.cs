@@ -90,6 +90,30 @@ namespace BattleOfAges.PlayModeTests
             yield return Phase("startup (first 3 s)", 3f, null);
             yield return Phase("base idle", 6f, null);
 
+            if (Environment.GetEnvironmentVariable("PERF_SETTLEMENTS") == "1")
+            {
+                // M5 step 7: the land held round a capital and a second settlement, the hero away from both
+                foreach (Vector3 at in new[] { new Vector3(0f, 0f, -44f), new Vector3(700f, 0f, 400f) })
+                {
+                    GameObject hallObj = BattleOfAges.Building.BuildingPlacementSystem.CreateBuilding(BattleOfAges.Building.BuildingType.TownHall);
+                    hallObj.transform.position = new Vector3(at.x, InfiniteWorldManager.GetSampledTerrainHeight(at.x, at.z), at.z);
+                    hallObj.GetComponent<BattleOfAges.Building.BuildingNode>().OnBuilt();
+                }
+                Vector3 away = new Vector3(-700f, 0f, 400f);
+                away.y = InfiniteWorldManager.GetSampledTerrainHeight(away.x, away.z) + 1f;
+                cc.enabled = false; player.transform.position = away; cc.enabled = true;
+                yield return Phase("settling: land held round two halls loads", 8f, null);
+                yield return Phase("two halls held, the hero away", 8f, null);
+                report.AppendLine(); report.AppendLine("Hitches:");
+                foreach (string h in pendingHitches) report.AppendLine(h);
+                File.WriteAllText(Path.Combine(dir, "perf_report.md"), report.ToString());
+                cam.targetTexture = null;
+                rt.Release();
+                foreach (ProfilerRecorder r in new[] { mainThread, gcAlloc, batches, setPass, tris, behaviourUpdate, lateBehaviour, fixedBehaviour, physics, animators }) r.Dispose();
+                BattleOfAges.SaveLoad.SaveSystem.FolderOverride = null; NpcKingdom.RemoveAll(); KingdomRealm.Clear(); WorldSettings.Set(0, 0f);
+                yield break;
+            }
+
             // Phase 2: travel across the world at 14 m/s (sprint-ish) while chunks stream in
             Vector3 dir2 = new Vector3(1f, 0f, 0.6f).normalized;
             yield return Phase("travel 14 m/s (chunk streaming)", 18f, dt =>

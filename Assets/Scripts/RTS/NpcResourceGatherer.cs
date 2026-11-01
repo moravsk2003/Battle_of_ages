@@ -274,9 +274,10 @@ namespace BattleOfAges.RTS
         }
 
         /// <summary>Wood the next town hall step takes, at least AutoWoodReserve: below it most Auto workers fetch wood.</summary>
-        public static int WoodWanted()
+        public static int WoodWanted() => WoodWanted(TownHall.Current);
+
+        private static int WoodWanted(TownHall hall)
         {
-            TownHall hall = TownHall.Current;
             int next = hall == null ? GameBalance.TownHallWood[1] : hall.Level < TownHall.MaxLevel ? GameBalance.TownHallWood[hall.Level + 1] : 0;
             return Mathf.Max(GameBalance.AutoWoodReserve, next);
         }
@@ -505,7 +506,7 @@ namespace BattleOfAges.RTS
             // Inside a mine the worker stays hidden until the mine's "Вивести" button sends them out (LeaveMine)
             if (currentState == GathererState.WorkingInsideMine)
             {
-                if (autoMiner && MineNode.OrePlenty) LeaveMine();
+                if (autoMiner && assignedMine != null && assignedMine.OrePlenty) LeaveMine();
                 return;
             }
 
@@ -518,23 +519,23 @@ namespace BattleOfAges.RTS
 
             if (currentState == GathererState.WorkingAtBench)
             {
-                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound)) HandleWorkingAtBenchState();
+                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.ActiveAt(transform.position) || rtsUnit.WallBound)) HandleWorkingAtBenchState();
                 return;
             }
             if (currentState == GathererState.Building)
             {
-                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound)) HandleBuildingState();
+                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.ActiveAt(transform.position) || rtsUnit.WallBound)) HandleBuildingState();
                 return;
             }
             if (currentState == GathererState.WorkingAtPlace)
             {
-                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound)) HandleWorkingAtPlaceState();
+                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.ActiveAt(transform.position) || rtsUnit.WallBound)) HandleWorkingAtPlaceState();
                 return;
             }
 
             // Pause AI logic if worker is selected by player in RTS mode, while it fights or the alarm sounds;
             // afterwards it looks for its work again (the fight took it away from where it was going)
-            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound))
+            if (rtsUnit != null && (rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.ActiveAt(transform.position) || rtsUnit.WallBound))
             {
                 if (!rtsUnit.IsSelected) interrupted = true;
                 return;
@@ -691,7 +692,7 @@ namespace BattleOfAges.RTS
             // 1. Haul ore from a mine: a hauler always, an Auto worker by need (wood short of the next hall step: most go for wood)
             bool auto = currentDirective == GatherDirective.Auto;
             ResourceManager rm = ResourceManager.Instance;
-            bool woodShort = auto && rm != null && rm.WoodCount < WoodWanted();
+            bool woodShort = auto && rm != null && rm.For(myPos).WoodCount < WoodWanted(TownHall.Nearest(myPos));
             if (currentDirective == GatherDirective.HaulOreFromMineToChest || (auto && AutoHaulNow(woodShort)))
             {
                 if (TryHaulFromMine(myPos)) return;
@@ -919,13 +920,13 @@ namespace BattleOfAges.RTS
                 {
                     if (carriedWood > 0)
                     {
-                        ResourceManager.Instance.AddResource(ResourceType.Wood, carriedWood);
+                        ResourceManager.Instance.For(chestPos).AddResource(ResourceType.Wood, carriedWood);
                         carriedWood = 0;
                     }
 
                     if (carriedOreAmount > 0 && carriedOreTier >= 0)
                     {
-                        ResourceManager.Instance.AddOre(carriedOreTier, carriedOreAmount);
+                        ResourceManager.Instance.For(chestPos).AddOre(carriedOreTier, carriedOreAmount);
                         carriedOreAmount = 0;
                         carriedOreTier = -1;
                     }

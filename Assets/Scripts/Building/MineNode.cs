@@ -218,27 +218,34 @@ namespace BattleOfAges.Building
             return pos;
         }
 
-        public static MineNode GetNearestMineWithOre(Vector3 fromPos) => Nearest(fromPos, m => m.AccumulatedOreCount > 0);
-
-        /// <summary>The ore there is: the stock and what waits in the mines.</summary>
-        private static int OreInAll()
+        /// <summary>The nearest mine of the worker's own settlement with ore waiting.</summary>
+        public static MineNode GetNearestMineWithOre(Vector3 fromPos)
         {
-            int ore = ResourceManager.Instance != null ? ResourceManager.Instance.OreCount : 0;
-            foreach (MineNode m in activeMines) if (m != null) ore += m.accumulatedOre;
+            TownHall hall = TownHall.Nearest(fromPos);
+            return Nearest(fromPos, m => m.AccumulatedOreCount > 0 && TownHall.Nearest(m.transform.position) == hall);
+        }
+
+        /// <summary>The ore this mine's settlement has: its stock and what waits in its mines.</summary>
+        private int OreOfSettlement()
+        {
+            ResourceManager rm = ResourceManager.Instance;
+            int ore = rm != null ? rm.For(transform.position).OreCount : 0;
+            TownHall hall = TownHall.Nearest(transform.position);
+            foreach (MineNode m in activeMines) if (m != null && TownHall.Nearest(m.transform.position) == hall) ore += m.accumulatedOre;
             return ore;
         }
 
         /// <summary>Ore runs short: workers on their own go down (a campaign's rule).</summary>
-        public static bool OreShort => World.WorldSettings.Bounded && OreInAll() < GameBalance.MineWantOre;
+        public bool OreShort => World.WorldSettings.Bounded && OreOfSettlement() < GameBalance.MineWantOre;
         /// <summary>There is plenty: those who went on their own come out.</summary>
-        public static bool OrePlenty => OreInAll() >= GameBalance.MineEnoughOre;
+        public bool OrePlenty => OreOfSettlement() >= GameBalance.MineEnoughOre;
 
         /// <summary>The nearest mine in reach with room for a worker on their own while ore runs short, or null.</summary>
         public static MineNode NearestWantingHands(Vector3 fromPos, float reach)
         {
-            if (!OreShort) return null;
             MineNode mine = Nearest(fromPos, m =>
             {
+                if (!m.OreShort) return false;
                 int coming = 0;
                 foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null && w.AssignedMine == m) coming++;
                 return coming < GameBalance.MineAutoMiners && !m.IsFullWorkers;

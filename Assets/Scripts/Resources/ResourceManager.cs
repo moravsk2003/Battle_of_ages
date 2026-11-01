@@ -4,6 +4,10 @@ using UnityEngine;
 
 namespace BattleOfAges.Resources
 {
+    /// <summary>
+    /// The stocks of the game. Asked directly it answers for the settlement the player is looking at (Viewed), so the
+    /// HUD, the menus and whatever the player does there need nothing more; work done in a place goes through For(place).
+    /// </summary>
     [DisallowMultipleComponent]
     public class ResourceManager : MonoBehaviour
     {
@@ -13,22 +17,42 @@ namespace BattleOfAges.Resources
         [SerializeField] private int initialWood = 0;
         [SerializeField] private int initialOre = 0;
 
-        public int WoodCount { get; private set; }
-        /// <summary>Food in stock (a campaign, §10.3): whole pieces shown, eaten in fractions over the hours.</summary>
-        public float Food { get; private set; }
-        public int FoodCount => Mathf.FloorToInt(Food);
+        /// <summary>The first settlement's stock: the only one in the fixed world, and the one a settlement starts with before its hall.</summary>
+        public SettlementStock Main => main ?? (main = new SettlementStock(this));
+        private SettlementStock main;
+
+        /// <summary>The stock of the settlement the player is looking at.</summary>
+        public SettlementStock Viewed
+        {
+            get
+            {
+                if (!World.WorldSettings.Bounded) return Main;
+                Building.TownHall hall = Building.TownHall.Viewed;
+                return hall != null && hall.Stock != null ? hall.Stock : Main;
+            }
+        }
+
+        /// <summary>The stock of the settlement this place belongs to (its nearest hall).</summary>
+        public SettlementStock For(Vector3 place)
+        {
+            if (!World.WorldSettings.Bounded) return Main;
+            Building.TownHall hall = Building.TownHall.Nearest(place);
+            return hall != null && hall.Stock != null ? hall.Stock : Main;
+        }
+
+        public int WoodCount => Viewed.WoodCount;
+        public float Food => Viewed.Food;
+        public int FoodCount => Viewed.FoodCount;
         /// <summary>Food matters in a campaign only: the seed-0 world keeps M0's rules.</summary>
         public static bool FoodRules => World.WorldSettings.Bounded;
-        /// <summary>Births wait while nothing is left to eat.</summary>
-        public bool Hungry => FoodRules && Food <= 0f;
-        private bool warnedLow, warnedOut;
-        public int OreCount { get; private set; }
-        public int HighestOreTier { get; private set; } = 0;
-
-        private readonly Dictionary<int, int> oreTierCounts = new Dictionary<int, int>();
+        public bool Hungry => Viewed.Hungry;
+        public int OreCount => Viewed.OreCount;
+        public int HighestOreTier => Viewed.HighestOreTier;
 
         public event Action<ResourceType, int> OnResourceChanged;
         public event Action<int, int> OnOreTierAdded;
+
+        private SettlementStock lastViewed;
 
         private void Awake()
         {
@@ -41,192 +65,55 @@ namespace BattleOfAges.Resources
                 return;
             }
             Instance = this;
-
-            WoodCount = initialWood;
-            OreCount = initialOre;
-
-            for (int i = 0; i < OreTierHelper.MAX_TIERS; i++)
-            {
-                oreTierCounts[i] = 0;
-            }
+            Main.SetState(initialWood, initialOre > 0 ? new[] { new KeyValuePair<int, int>(0, initialOre) } : null);
         }
 
-        /// <summary>Ore stock per tier (only tiers that have ore), for saving.</summary>
-        public List<KeyValuePair<int, int>> OreTiers()
-        {
-            var list = new List<KeyValuePair<int, int>>();
-            foreach (var pair in oreTierCounts) if (pair.Value > 0) list.Add(pair);
-            return list;
-        }
+        /// <summary>A stock changed: what shows the numbers hears of the one on the screen.</summary>
+        internal void RaiseChanged(SettlementStock stock, ResourceType type, int value) { if (stock == Viewed) OnResourceChanged?.Invoke(type, value); }
+        internal void RaiseOreAdded(SettlementStock stock, int tier, int amount) { if (stock == Viewed) OnOreTierAdded?.Invoke(tier, amount); }
 
-        /// <summary>Replaces the whole stock (a new game: initial values; a loaded game: the saved stock).</summary>
-        public void SetState(int wood, IEnumerable<KeyValuePair<int, int>> ore)
-        {
-            WoodCount = Mathf.Max(0, wood);
-            OreCount = 0;
-            HighestOreTier = 0;
-            for (int i = 0; i < OreTierHelper.MAX_TIERS; i++) oreTierCounts[i] = 0;
-            if (ore != null)
-                foreach (var pair in ore)
-                {
-                    int t = Mathf.Clamp(pair.Key, 0, OreTierHelper.MAX_TIERS - 1);
-                    if (pair.Value <= 0) continue;
-                    oreTierCounts[t] += pair.Value;
-                    OreCount += pair.Value;
-                    if (t > HighestOreTier) HighestOreTier = t;
-                }
-            OnResourceChanged?.Invoke(ResourceType.Wood, WoodCount);
-            OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
-        }
+        public List<KeyValuePair<int, int>> OreTiers() => Viewed.OreTiers();
+        public void SetState(int wood, IEnumerable<KeyValuePair<int, int>> ore) => Viewed.SetState(wood, ore);
 
         public void ResetToInitial()
         {
-            SetState(initialWood, initialOre > 0 ? new[] { new KeyValuePair<int, int>(0, initialOre) } : null);
-            SetFood(Combat.GameBalance.FoodStart);
+            Main.SetState(initialWood, initialOre > 0 ? new[] { new KeyValuePair<int, int>(0, initialOre) } : null);
+            Main.SetFood(Combat.GameBalance.FoodStart);
         }
 
-        public void SetFood(float amount)
-        {
-            Food = Mathf.Max(0f, amount);
-            warnedLow = warnedOut = false;
-            OnResourceChanged?.Invoke(ResourceType.Food, FoodCount);
-        }
-
-        public void AddFood(float amount)
-        {
-            if (amount <= 0f) return;
-            Food += amount;
-            warnedLow = warnedOut = false;
-            OnResourceChanged?.Invoke(ResourceType.Food, FoodCount);
-        }
+        public void SetFood(float amount) => Viewed.SetFood(amount);
+        public void AddFood(float amount) => Viewed.AddFood(amount);
 
         /// <summary>How much this many people eat over these game hours.</summary>
         public static float Eaten(int people, float hours) => people * Combat.GameBalance.FoodPerPersonPerDay * hours / 24f;
 
-        /// <summary>Everyone eats over these game hours (saying so when it runs low and when it runs out).</summary>
-        public void Eat(int people, float hours)
-        {
-            if (Food <= 0f || people <= 0) return;
-            int before = FoodCount;
-            float eaten = Eaten(people, hours);
-            Food = Mathf.Max(0f, Food - eaten);
-            if (FoodCount != before) OnResourceChanged?.Invoke(ResourceType.Food, FoodCount);
-            if (!warnedLow && Food > 0f && Food < Eaten(people, 24f * Combat.GameBalance.FoodLowDays))
-            {
-                warnedLow = true;
-                UI.StrategyHud.Notify("Їжі лишилось менш ніж на день");
-            }
-            if (!warnedOut && Food <= 0f)
-            {
-                warnedOut = true;
-                UI.StrategyHud.Notify("Їжа скінчилась: приріст населення зупинився");
-            }
-        }
+        public void Eat(int people, float hours) => Viewed.Eat(people, hours);
 
         private void Update()
         {
-            if (FoodRules && SaveLoad.SaveSystem.InGame) Eat(Building.TownHall.Population, Combat.WorldClock.HoursOf(Time.deltaTime));
-        }
-
-        public void AddResource(ResourceType type, int amount)
-        {
-            if (amount <= 0) return;
-
-            if (type == ResourceType.Wood)
+            SettlementStock viewed = Viewed;
+            if (viewed != lastViewed)
             {
-                WoodCount += amount;
-                OnResourceChanged?.Invoke(ResourceType.Wood, WoodCount);
+                if (lastViewed != null && Building.TownHall.All.Count > 1) UI.StrategyHud.Notify("Склад: " + Building.TownHall.Viewed.Title);
+                lastViewed = viewed;
+                OnResourceChanged?.Invoke(ResourceType.Wood, viewed.WoodCount);
+                OnResourceChanged?.Invoke(ResourceType.Ore, viewed.OreCount);
+                OnResourceChanged?.Invoke(ResourceType.Food, viewed.FoodCount);
             }
-            else if (type == ResourceType.Ore)
-            {
-                AddOre(0, amount);
-            }
+            if (!FoodRules || !SaveLoad.SaveSystem.InGame) return;
+            float hours = Combat.WorldClock.HoursOf(Time.deltaTime);
+            var halls = Building.TownHall.All;
+            if (halls.Count == 0) Main.Eat(Building.TownHall.Population, hours);
+            foreach (Building.TownHall hall in halls) hall.Stock?.Eat(hall.People, hours);
         }
 
-        public void AddOre(int tierLevel, int amount)
-        {
-            if (amount <= 0) return;
-
-            tierLevel = Mathf.Clamp(tierLevel, 0, OreTierHelper.MAX_TIERS - 1);
-            OreCount += amount;
-
-            if (!oreTierCounts.ContainsKey(tierLevel)) oreTierCounts[tierLevel] = 0;
-            oreTierCounts[tierLevel] += amount;
-
-            if (tierLevel > HighestOreTier && oreTierCounts[tierLevel] > 0)
-            {
-                HighestOreTier = tierLevel;
-            }
-
-            OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
-            OnOreTierAdded?.Invoke(tierLevel, amount);
-        }
-
-        public int GetOreTierCount(int tierLevel)
-        {
-            return oreTierCounts.TryGetValue(tierLevel, out int count) ? count : 0;
-        }
-
-        public bool HasResource(ResourceType type, int amount)
-        {
-            if (type == ResourceType.Wood) return WoodCount >= amount;
-            if (type == ResourceType.Ore) return OreCount >= amount;
-            return false;
-        }
-
-        public bool ConsumeResource(ResourceType type, int amount)
-        {
-            if (!HasResource(type, amount)) return false;
-
-            if (type == ResourceType.Wood)
-            {
-                WoodCount -= amount;
-                OnResourceChanged?.Invoke(ResourceType.Wood, WoodCount);
-            }
-            else if (type == ResourceType.Ore)
-            {
-                OreCount -= amount;
-                OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Consumes ore of a specific tier level.
-        /// Returns true if successful, false if not enough ore of that tier.
-        /// </summary>
-        public bool ConsumeOre(int tierLevel, int amount)
-        {
-            tierLevel = Mathf.Clamp(tierLevel, 0, OreTierHelper.MAX_TIERS - 1);
-
-            int currentCount = GetOreTierCount(tierLevel);
-            if (currentCount < amount) return false;
-
-            oreTierCounts[tierLevel] -= amount;
-            OreCount -= amount;
-
-            OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
-            return true;
-        }
-
-        /// <summary>Ore of this tier or any higher one.</summary>
-        public int GetOreCountAtLeast(int minTier)
-        {
-            int n = 0;
-            foreach (var pair in oreTierCounts) if (pair.Key >= minTier) n += pair.Value;
-            return n;
-        }
-
-        /// <summary>Consumes ore of at least minTier, the lowest qualifying tiers first (better ore is kept).</summary>
-        public bool ConsumeOreAtLeast(int minTier, int amount)
-        {
-            if (GetOreCountAtLeast(minTier) < amount) return false;
-            for (int t = Mathf.Max(0, minTier); t < OreTierHelper.MAX_TIERS && amount > 0; t++)
-            {
-                int take = Mathf.Min(amount, GetOreTierCount(t));
-                if (take > 0) { ConsumeOre(t, take); amount -= take; }
-            }
-            return true;
-        }
+        public void AddResource(ResourceType type, int amount) => Viewed.AddResource(type, amount);
+        public void AddOre(int tierLevel, int amount) => Viewed.AddOre(tierLevel, amount);
+        public int GetOreTierCount(int tierLevel) => Viewed.GetOreTierCount(tierLevel);
+        public bool HasResource(ResourceType type, int amount) => Viewed.HasResource(type, amount);
+        public bool ConsumeResource(ResourceType type, int amount) => Viewed.ConsumeResource(type, amount);
+        public bool ConsumeOre(int tierLevel, int amount) => Viewed.ConsumeOre(tierLevel, amount);
+        public int GetOreCountAtLeast(int minTier) => Viewed.GetOreCountAtLeast(minTier);
+        public bool ConsumeOreAtLeast(int minTier, int amount) => Viewed.ConsumeOreAtLeast(minTier, amount);
     }
 }

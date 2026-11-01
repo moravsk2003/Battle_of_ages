@@ -22,6 +22,7 @@ namespace BattleOfAges.Building
         public static int CapWithoutHall => GameBalance.TownHallCaps[0];
 
         private static readonly List<TownHall> active = new List<TownHall>();
+        /// <summary>The first hall (the capital), as the one settlement of the fixed world.</summary>
         public static TownHall Current
         {
             get
@@ -29,6 +30,157 @@ namespace BattleOfAges.Building
                 for (int i = active.Count - 1; i >= 0; i--) if (active[i] == null) active.RemoveAt(i);
                 return active.Count > 0 ? active[0] : null;
             }
+        }
+
+        /// <summary>All the player's standing halls: one for each settlement.</summary>
+        public static IReadOnlyList<TownHall> All { get { _ = Current; return active; } }
+
+        /// <summary>The settlement a place belongs to: its nearest hall, null with none.</summary>
+        public static TownHall Nearest(Vector3 place)
+        {
+            TownHall first = Current;
+            if (active.Count <= 1) return first;
+            float best = float.MaxValue;
+            foreach (TownHall h in active)
+            {
+                Vector3 off = h.transform.position - place;
+                off.y = 0f;
+                if (off.sqrMagnitude < best) { best = off.sqrMagnitude; first = h; }
+            }
+            return first;
+        }
+
+        private static TownHall viewed;
+        private static int viewedFrame = -1;
+
+        /// <summary>The settlement the player is looking at: nearest the middle of the map view, or the hero.</summary>
+        public static TownHall Viewed
+        {
+            get
+            {
+                TownHall first = Current;
+                if (active.Count <= 1) return first;
+                if (viewedFrame == Time.frameCount && viewed != null && viewed.isActiveAndEnabled) return viewed;
+                viewedFrame = Time.frameCount;
+                viewed = Nearest(ViewFocus(first.transform.position.y));
+                return viewed;
+            }
+        }
+
+        private static Vector3 ViewFocus(float ground)
+        {
+            Camera cam = ViewCamera.Current;
+            GameObject player = Managers.GameContext.Player;
+            if (cam != null && cam.orthographic && cam.transform.forward.y < -0.01f)
+                return cam.transform.position + cam.transform.forward * ((cam.transform.position.y - ground) / -cam.transform.forward.y);
+            return player != null ? player.transform.position : cam != null ? cam.transform.position : Vector3.zero;
+        }
+
+        /// <summary>Its name on the screen.</summary>
+        public string Title { get { int i = active.IndexOf(this); return i <= 0 ? "Столиця" : "Поселення " + (i + 1); } }
+
+        // ------------------------------------------------------------------ a settlement of its own (M5 step 7)
+
+        private SettlementStock stock;
+
+        /// <summary>What this settlement has: its own in a campaign (the first hall takes the main one); the fixed world has only that.</summary>
+        public SettlementStock Stock
+        {
+            get
+            {
+                ResourceManager rm = ResourceManager.Instance;
+                if (rm == null) return null;
+                if (!World.WorldSettings.Bounded) return rm.Main;
+                if (stock != null && stock.Owner == rm) return stock;
+                TownHall first = Current;
+                if (first != null && first != this) _ = first.Stock; // the capital chooses first
+                bool taken = false;
+                foreach (TownHall h in active) if (h != this && h.stock == rm.Main) taken = true;
+                stock = taken ? new SettlementStock(rm) : rm.Main;
+                return stock;
+            }
+        }
+
+        /// <summary>A loaded game's own stock of this settlement (not the main one).</summary>
+        public void AdoptStock(int wood, float food, IEnumerable<KeyValuePair<int, int>> ore)
+        {
+            if (ResourceManager.Instance == null) return;
+            stock = new SettlementStock(ResourceManager.Instance);
+            stock.SetState(wood, ore);
+            stock.SetFood(food);
+        }
+
+        /// <summary>Holds a stock other than the main one (the save keeps it with the hall).</summary>
+        public bool HasOwnStock => stock != null && ResourceManager.Instance != null && stock != ResourceManager.Instance.Main;
+
+        private static int peopleFrame = -1;
+        private static readonly Dictionary<TownHall, int> peopleOf = new Dictionary<TownHall, int>();
+
+        /// <summary>People of this settlement: those nearest this hall (they belong where they are).</summary>
+        public int People
+        {
+            get
+            {
+                if (active.Count <= 1) return Population;
+                if (peopleFrame != Time.frameCount)
+                {
+                    peopleFrame = Time.frameCount;
+                    peopleOf.Clear();
+                    foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+                    {
+                        if (w == null) continue;
+                        TownHall h = Nearest(w.transform.position);
+                        peopleOf.TryGetValue(h, out int n);
+                        peopleOf[h] = n + 1;
+                    }
+                }
+                return peopleOf.TryGetValue(this, out int count) ? count : 0;
+            }
+        }
+
+        public static int PeopleAt(Vector3 place)
+        {
+            TownHall hall = Nearest(place);
+            return hall != null ? hall.People : Population;
+        }
+
+        /// <summary>Why a new settlement cannot stand here, or null: too near a hall of the player's or a king's.</summary>
+        public static string FoundingForbidden(Vector3 at)
+        {
+            foreach (TownHall h in All)
+            {
+                Vector3 off = h.transform.position - at;
+                off.y = 0f;
+                if (off.magnitude < GameBalance.FoundingFromOwn) return $"Надто близько до поселення: треба щонайменше {GameBalance.FoundingFromOwn:0} м від ратуші";
+            }
+            foreach (AI.NpcKingdom k in AI.NpcKingdom.All)
+            {
+                if (k == null) continue;
+                Vector3 off = k.Home - at;
+                off.y = 0f;
+                if (off.magnitude < GameBalance.FoundingFromKing) return "Чужа земля: тут живуть люди короля";
+            }
+            return null;
+        }
+
+        /// <summary>Built: another hall is a new settlement, with a chest beside it and what the settlers brought.</summary>
+        public void Founded()
+        {
+            if (!World.WorldSettings.Bounded || active.Count <= 1 || Current == this) return;
+            SettlementStock own = Stock;
+            if (own != null)
+            {
+                own.AddResource(ResourceType.Wood, GameBalance.FoundingStartWood);
+                own.AddFood(GameBalance.FoundingStartFood);
+            }
+            GameObject chest = BuildingPlacementSystem.CreateBuilding(BuildingType.StorageChest);
+            if (chest == null) return;
+            Vector3 at = transform.position + new Vector3(7f, 0f, 3f);
+            at.y = RtsUnit.GetTerrainHeight(at);
+            chest.transform.position = at;
+            BuildingNode node = chest.GetComponent<BuildingNode>();
+            if (node != null) { node.SetType(BuildingType.StorageChest); node.OnBuilt(); }
+            StrategyHud.Notify("Нове поселення! Робітників сюди посилайте наказом; склад у нього свій");
         }
 
         [SerializeField, Range(1, MaxLevel)] private int level = 1;
@@ -45,7 +197,18 @@ namespace BattleOfAges.Building
         }
 
         public static int CapForLevel(int lvl) => GameBalance.TownHallCaps[Mathf.Clamp(lvl, 0, MaxLevel)];
-        public static int PopulationCap => Current != null ? CapForLevel(Current.level) : CapWithoutHall;
+        /// <summary>All the halls' caps together: each settlement is limited by its own (Cap).</summary>
+        public static int PopulationCap
+        {
+            get
+            {
+                if (Current == null) return CapWithoutHall;
+                int cap = 0;
+                foreach (TownHall h in active) cap += CapForLevel(h.level);
+                return cap;
+            }
+        }
+        public int Cap => CapForLevel(level);
         public static int Population => WorkerRegistry.WorkerCount;
         public static bool HasRoom(int extra = 1) => Population + extra <= PopulationCap;
 
@@ -64,7 +227,7 @@ namespace BattleOfAges.Building
             reason = null;
             if (level >= MaxLevel) { reason = "Найвищий рівень"; return false; }
             UpgradeCost(level + 1, out int wood, out int ore, out int tier);
-            ResourceManager rm = ResourceManager.Instance;
+            SettlementStock rm = Stock;
             if (rm == null) return true;
             if (rm.WoodCount < wood) { reason = $"Потрібно {wood} деревини"; return false; }
             if (rm.GetOreCountAtLeast(tier) < ore) { reason = $"Потрібно {ore} руди {ItemTypeNames.Roman(tier)}+ (або переплавте нижчу на верстаці)"; return false; }
@@ -79,7 +242,7 @@ namespace BattleOfAges.Building
                 return false;
             }
             UpgradeCost(level + 1, out int wood, out int ore, out int tier);
-            ResourceManager rm = ResourceManager.Instance;
+            SettlementStock rm = Stock;
             if (rm != null)
             {
                 rm.ConsumeResource(ResourceType.Wood, wood);
@@ -96,8 +259,8 @@ namespace BattleOfAges.Building
         private float birthCarry;
 
         /// <summary>Births per game hour for this population: base + per-capita share.</summary>
-        public static float GrowthPerHour(int population) =>
-            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population + GameBalance.HouseBirthsPerHour * Houses();
+        public static float GrowthPerHour(int population, TownHall hall = null) =>
+            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population + GameBalance.HouseBirthsPerHour * (hall != null ? hall.OwnHouses() : Houses());
 
         private static int housesFrame = -1, housesCount;
 
@@ -113,15 +276,25 @@ namespace BattleOfAges.Building
             return housesCount;
         }
 
+        /// <summary>This settlement's finished houses.</summary>
+        private int OwnHouses()
+        {
+            if (active.Count <= 1) return Houses();
+            int n = 0;
+            foreach (BuildingNode b in BuildingNode.Active)
+                if (b != null && b.Type == BuildingType.WorkerHouse && b.GetComponent<ConstructionSite>() == null && Nearest(b.transform.position) == this) n++;
+            return n;
+        }
+
         /// <summary>
         /// Accumulates births over the elapsed game hours and returns how many people are born now (never above the
         /// room under the cap; with no room the growth waits instead of piling up).
         /// </summary>
-        public static int Births(ref float carry, float gameHours, int population, int cap)
+        public static int Births(ref float carry, float gameHours, int population, int cap, TownHall hall = null)
         {
             int room = cap - population;
             if (room <= 0) { carry = Mathf.Min(carry, 1f); return 0; }
-            carry += GrowthPerHour(population) * gameHours;
+            carry += GrowthPerHour(population, hall) * gameHours;
             int born = Mathf.Min((int)carry, room);
             carry -= born;
             return born;
@@ -153,14 +326,15 @@ namespace BattleOfAges.Building
         {
             float hours = WorldClock.HoursOf(Time.deltaTime);
             promotionClock += hours;
+            if (promotionClock >= 1f && Current != this) promotionClock = 0f; // the rolls go over everyone: one hall makes them
             if (promotionClock >= 1f)
             {
                 promotionClock -= 1f;
                 if (PromoteWorkers(GameBalance.WorkPromotionPerHour) > 0) StrategyHud.Notify("Робота загартувала: новий воїн");
             }
 
-            ResourceManager food = ResourceManager.Instance;
-            int born = food != null && food.Hungry ? 0 : Births(ref birthCarry, hours, Population, PopulationCap); // no births on an empty larder (§10.3)
+            SettlementStock food = Stock;
+            int born = food != null && food.Hungry ? 0 : Births(ref birthCarry, hours, People, Cap, this); // no births on an empty larder (§10.3)
             for (int i = 0; i < born; i++)
             {
                 Vector2 ring = Random.insideUnitCircle.normalized * 6f;
@@ -171,7 +345,13 @@ namespace BattleOfAges.Building
         }
 
         private void OnEnable() { if (!active.Contains(this)) active.Add(this); }
-        private void OnDisable() => active.Remove(this);
+        private void OnDisable()
+        {
+            active.Remove(this);
+            HealthComponent hp = GetComponent<HealthComponent>();
+            if (active.Count > 0 && hp != null && !hp.IsAlive) stock?.Clear(); // it fell, and what it had with it; the last one's stays for the next hall
+            stock = null;
+        }
 
         /// <summary>A large timber hall with a banner (the cottage mesh, enlarged).</summary>
         public static GameObject CreatePrefab(string name = "TownHall")

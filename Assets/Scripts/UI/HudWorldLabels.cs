@@ -213,7 +213,7 @@ namespace BattleOfAges.UI
         /// <summary>Over the town hall: level, population against its cap, and the upgrade with its ore requirement.</summary>
         private void UpdateHall(Camera cam, bool map)
         {
-            TownHall hall = TownHall.Current;
+            TownHall hall = TownHall.Viewed;
             Vector2 local = default;
             bool show = hall != null && cam != null && OnScreen(cam, hall.transform.position + Vector3.up * 7.5f, out local, out float depth) && (map || depth < 40f);
             if (hallLabel == null)
@@ -227,11 +227,13 @@ namespace BattleOfAges.UI
             bool full = Full(hallLabel, hoveredHall == hall) || wallRow != null && wallRow.gameObject.activeSelf && Full(wallRow, false);
             Size(hallLabel, hallText, full, HallFull, HallChipSize, 200f);
             UpdateWallRow(map && full);
-            int pop = TownHall.Population, cap = TownHall.PopulationCap;
+            int pop = hall.People, cap = hall.Cap;
             string popText = $"<color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
-            if (hallShown.Changed(Shown.Key(full ? 1 : 0, hall.Level, pop, cap)))
-                hallText.text = full ? $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення {popText}"
-                                     : $"Ратуша <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>  ·  люди {popText}";
+            bool several = TownHall.All.Count > 1;
+            string who = several ? hall.Title : "Ратуша";
+            if (hallShown.Changed(Shown.Key((full ? 1 : 0) + (several ? 2 + 2L * hall.GetInstanceID() : 0L), hall.Level, pop, cap)))
+                hallText.text = full ? $"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення {popText}"
+                                     : $"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>  ·  люди {popText}";
             bool canShowButton = full && map && hall.Level < TownHall.MaxLevel;
             if (hallButton.gameObject.activeSelf != canShowButton) hallButton.gameObject.SetActive(canShowButton);
             if (!canShowButton) return;
@@ -249,7 +251,7 @@ namespace BattleOfAges.UI
             RectTransform tr = UiTheme.Rect(hallLabel, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 52f));
             hallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             hallText.supportRichText = true;
-            hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Current != null && TownHall.Current.TryUpgrade()) GameSound.Play2D(GameSound.Kind.Fanfare); }, 13);
+            hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Viewed != null && TownHall.Viewed.TryUpgrade()) GameSound.Play2D(GameSound.Kind.Fanfare); }, 13);
             hallButtonText = hallButton.GetComponentInChildren<Text>();
             hallButtonText.supportRichText = true;
             hallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;

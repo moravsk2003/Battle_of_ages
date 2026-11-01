@@ -141,7 +141,7 @@ namespace BattleOfAges.PlayModeTests
             MineNode mine = mineObj.GetComponent<MineNode>();
             ResourceManager.Instance.SetState(5000, new[] { new KeyValuePair<int, int>(0, 0) });
             yield return null;
-            Assert.IsTrue(MineNode.OreShort);
+            Assert.IsTrue(mine.OreShort);
 
             var people = new List<NpcResourceGatherer>();
             for (int i = 0; i < GameBalance.MineAutoMiners + 2; i++) people.Add(Worker(at + new Vector3(6f + i, 0f, 4f), "NPC_Miner_" + i));

@@ -263,7 +263,7 @@ namespace BattleOfAges.Crafting
             if (task == null) return;
             if (task.IsSmelt)
             {
-                ResourceManager.Instance?.AddOre(task.SmeltTier + 1, task.SmeltCount);
+                ResourceManager.Instance?.For(transform.position).AddOre(task.SmeltTier + 1, task.SmeltCount);
                 StrategyHud.Notify($"Переплавлено: руда {CraftingTask.Tier(task.SmeltTier + 1)} ×{task.SmeltCount}");
                 return;
             }

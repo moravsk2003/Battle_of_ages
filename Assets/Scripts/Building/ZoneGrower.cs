@@ -65,26 +65,40 @@ namespace BattleOfAges.Building
             if (clock > 0f) return;
             clock = 1.5f;
             Tick();
+            Caravans.Tick();
         }
 
         /// <summary>Sets out what the zones and the stock allow now.</summary>
         public void Tick()
         {
+            var halls = TownHall.All;
+            if (halls.Count <= 1) { TickFor(halls.Count == 1 ? halls[0] : null); return; }
+            foreach (TownHall hall in halls) TickFor(hall);
+        }
+
+        /// <summary>A settlement's zones grow by its own stock and hands, a few sites at a time (null: the one there is, no hall yet).</summary>
+        private void TickFor(TownHall hall)
+        {
+            ResourceManager rm = ResourceManager.Instance;
+            if (rm == null) return;
+            SettlementStock stock = hall != null ? hall.Stock : rm.Main;
+            bool Ours(Vector3 p) => TownHall.All.Count <= 1 || TownHall.Nearest(p) == hall;
             int sites = 0;
-            foreach (ConstructionSite s in ConstructionSite.All) if (s != null && ZoneMap.At(s.transform.position) != ZoneType.None) sites++;
+            foreach (ConstructionSite s in ConstructionSite.All) if (s != null && ZoneMap.At(s.transform.position) != ZoneType.None && Ours(s.transform.position)) sites++;
             foreach (ZoneType zone in ZoneMap.Types)
             {
                 if (sites >= GameBalance.ZoneSitesAtOnce) return;
-                if (ZoneMap.Count(zone) == 0) continue;
+                int cells = ZoneMap.CountFor(zone, hall);
+                if (cells == 0) continue;
                 BuildingType type = BuildingOf(zone);
                 int have = 0;
                 foreach (BuildingNode b in BuildingNode.Active)
-                    if (b != null && b.Type == type && ZoneMap.At(b.transform.position) == zone) have++;
-                if (have >= Wanted(zone, ZoneMap.Count(zone))) continue;
+                    if (b != null && b.Type == type && ZoneMap.At(b.transform.position) == zone && Ours(b.transform.position)) have++;
+                if (have >= Wanted(zone, cells)) continue;
                 BuildingDefinition def = BuildingData.GetDefinition(type);
-                if (!Affordable(def)) { SayShort(zone, def); continue; }
-                if (!TryFindSpot(zone, def, out Vector3 spot)) continue;
-                Pay(def);
+                if (!Affordable(def, stock)) { SayShort(zone, def); continue; }
+                if (!TryFindSpot(zone, def, out Vector3 spot, hall)) continue;
+                Pay(def, stock);
                 GameObject building = BuildingPlacementSystem.CreateBuilding(type);
                 if (building == null) continue;
                 building.transform.SetPositionAndRotation(OnHighest(spot, def), Quaternion.Euler(0f, Mathf.Round(spot.x * 7f) % 4 * 90f, 0f));
@@ -104,16 +118,14 @@ namespace BattleOfAges.Building
             return spot;
         }
 
-        private static bool Affordable(BuildingDefinition def)
+        private static bool Affordable(BuildingDefinition def, SettlementStock rm)
         {
-            ResourceManager rm = ResourceManager.Instance;
             return rm != null && (CentralEmpire.Active || (rm.WoodCount >= def.WoodCost && rm.GetOreCountAtLeast(def.OreTierRequired) >= def.OreCost));
         }
 
-        private static void Pay(BuildingDefinition def)
+        private static void Pay(BuildingDefinition def, SettlementStock rm)
         {
             if (CentralEmpire.Active) return;
-            ResourceManager rm = ResourceManager.Instance;
             if (def.WoodCost > 0) rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
             if (def.OreCost > 0) rm.ConsumeOreAtLeast(def.OreTierRequired, def.OreCost);
         }
@@ -126,9 +138,11 @@ namespace BattleOfAges.Building
         }
 
         /// <summary>The free cell of the zone nearest the hall: no building's footprint there, no tree (a forest zone may stand among trees).</summary>
-        public static bool TryFindSpot(ZoneType zone, BuildingDefinition def, out Vector3 spot)
+        public static bool TryFindSpot(ZoneType zone, BuildingDefinition def, out Vector3 spot, TownHall hall = null)
         {
-            Vector3 home = TownHall.Current != null ? TownHall.Current.transform.position : Vector3.zero;
+            TownHall homeHall = hall != null ? hall : TownHall.Current;
+            bool several = hall != null && TownHall.All.Count > 1;
+            Vector3 home = homeHall != null ? homeHall.transform.position : Vector3.zero;
             float best = float.MaxValue, reach = Mathf.Max(def.Size.x, def.Size.z) * 0.5f;
             spot = default;
             bool found = false;
@@ -138,6 +152,7 @@ namespace BattleOfAges.Building
                 Vector3 c = new Vector3((pair.Key.x + 0.5f) * ZoneMap.CellSize, 0f, (pair.Key.y + 0.5f) * ZoneMap.CellSize);
                 float d = (c - new Vector3(home.x, 0f, home.z)).sqrMagnitude;
                 if (d >= best) continue;
+                if (several && TownHall.Nearest(c) != hall) continue;
                 c.y = InfiniteWorldManager.GetSampledTerrainHeight(c.x, c.z);
                 if (!Free(c, reach, zone)) continue;
                 best = d;

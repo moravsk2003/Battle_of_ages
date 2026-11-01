@@ -50,23 +50,33 @@ namespace BattleOfAges.World
         public static ZoneType At(Vector3 p) => cells.TryGetValue(CellOf(p), out ZoneType t) ? t : ZoneType.None;
         public static int Count(ZoneType type) => counts[(int)type];
 
-        private static Vector3 Home() => TownHall.Current != null ? TownHall.Current.transform.position : Vector3.zero;
+        /// <summary>Cells of this type in a settlement (the nearest hall's); null or a single hall: all of them.</summary>
+        public static int CountFor(ZoneType type, TownHall hall)
+        {
+            if (hall == null || TownHall.All.Count <= 1) return Count(type);
+            int n = 0;
+            foreach (var pair in cells) if (pair.Value == type && TownHall.Nearest(CenterOf(pair.Key)) == hall) n++;
+            return n;
+        }
 
         /// <summary>How far from its hall a settlement marks zones (§5.3 without the population term: R = 300 m, more with each epoch).</summary>
-        public static float Reach()
+        public static float Reach() => Reach(TownHall.Current);
+
+        private static float Reach(TownHall hall)
         {
-            int level = TownHall.Current != null ? TownHall.Current.Level : 1;
+            int level = hall != null ? hall.Level : 1;
             return GameBalance.ZoneReachBase * (1f + 0.6f * (level - 1));
         }
 
         /// <summary>Why a cell cannot be of this type, or null if it can.</summary>
         public static string Forbidden(Vector2Int c, ZoneType type)
         {
-            if (type == ZoneType.Trade && (TownHall.Current == null || TownHall.Current.Level < 2)) return "Торгівля — від ратуші II";
             Vector3 p = CenterOf(c);
+            TownHall hall = TownHall.Nearest(p);
+            if (type == ZoneType.Trade && (hall == null || hall.Level < 2)) return "Торгівля — від ратуші II";
             if (!WorldSettings.Inside(p, CellSize)) return "Тут край світу";
-            Vector3 flat = p - Home(); flat.y = 0f;
-            if (flat.magnitude > Reach()) return "Надто далеко від поселення: покращте ратушу";
+            Vector3 flat = p - (hall != null ? hall.transform.position : Vector3.zero); flat.y = 0f;
+            if (flat.magnitude > Reach(hall)) return "Надто далеко від поселення: покращте ратушу";
             if (Lakes.InWater(p.x, p.z, CellSize * 0.5f)) return "На воді не можна";
             float half = CellSize * 0.5f;
             float rise = Mathf.Max(

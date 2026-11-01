@@ -216,7 +216,7 @@ namespace BattleOfAges.RTS
         /// <summary>On a leash in a fight it picked itself: the point it will not chase further than the leash from.</summary>
         public bool Leashed => leashed;
         public Vector3 LeashOrigin => leashOrigin;
-        public float LeashRadius => defending ? GameBalance.AlarmChaseRadius : IsWorking && !SettlementAlarm.Active ? GameBalance.WorkerLeashRadius : GameBalance.UnitLeashRadius;
+        public float LeashRadius => defending ? GameBalance.AlarmChaseRadius : IsWorking && !SettlementAlarm.ActiveAt(transform.position) ? GameBalance.WorkerLeashRadius : GameBalance.UnitLeashRadius;
 
         private void StartLeash()
         {
@@ -360,7 +360,7 @@ namespace BattleOfAges.RTS
 
             // Soldiers (and everyone during an alarm) engage raiders that come near on their own; a worker goes for an
             // enemy close to it (one kind of unit: people fight too), even on the way to work. Not the hero, not in a mine.
-            bool soldier = !IsWorking || SettlementAlarm.Active;
+            bool soldier = !IsWorking || SettlementAlarm.ActiveAt(transform.position);
             if (!isPlayerControlled && !InsideMine && combatUnit != null && attackTarget == null && (!hasTarget || !soldier))
             {
                 engageTimer -= Time.deltaTime;

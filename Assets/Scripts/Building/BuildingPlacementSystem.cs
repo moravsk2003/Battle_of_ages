@@ -282,6 +282,7 @@ namespace BattleOfAges.Building
         private bool CheckLocationValid(Vector3 position, Quaternion rot, BuildingDefinition def)
         {
             if (World.Lakes.InWater(position.x, position.z, 3f)) return false; // the ghost turns red over water
+            if (def.Type == BuildingType.TownHall && World.WorldSettings.Bounded && TownHall.FoundingForbidden(position) != null) return false;
             CheckBox(def, out Vector3 local, out Vector3 size);
             Vector3 center = position + rot * local;
             Vector3 halfExtents = size * 0.5f;
@@ -356,6 +357,11 @@ namespace BattleOfAges.Building
                 return;
             }
 
+            if (def.Type == BuildingType.TownHall && World.WorldSettings.Bounded && TownHall.FoundingForbidden(buildPos) is string foundingNo)
+            {
+                StrategyHud.Notify(foundingNo);
+                return;
+            }
             if (!CheckLocationValid(buildPos, buildRot, def))
             {
                 Debug.Log($"[Building] Неможливо побудувати тут: занадто близько до іншої будівлі або об'єкта! Потрібен прохід для NPC.");
@@ -414,7 +420,8 @@ namespace BattleOfAges.Building
         public static bool IsAllowed(BuildingType type, out string reason)
         {
             reason = null;
-            if (type == BuildingType.TownHall && TownHall.Current != null) { reason = "Ратуша вже є: її можна покращити"; return false; }
+            if (type == BuildingType.TownHall && TownHall.Current != null && !World.WorldSettings.Bounded) { reason = "Ратуша вже є: її можна покращити"; return false; }
+            if (type == BuildingType.TownHall && TownHall.Current != null && TownHall.Current.Level < Combat.GameBalance.FoundingHallLevel) { reason = $"Нове поселення — від ратуші {ItemTypeNames.Roman(Combat.GameBalance.FoundingHallLevel)}"; return false; }
             if (type == BuildingType.TownHall && ConstructionSite.IsBuilding(type)) { reason = "Ратуша вже будується"; return false; }
             if (type == BuildingType.WorkerHouse && !TownHall.HasRoom(BuildingData.GetDefinition(type).NpcSpawnCount))
             {

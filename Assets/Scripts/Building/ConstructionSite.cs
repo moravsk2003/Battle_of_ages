@@ -159,6 +159,7 @@ namespace BattleOfAges.Building
             foreach (Behaviour b in switchedOff) if (b != null) b.enabled = true;
             all.Remove(this);
             GetComponent<BuildingNode>()?.OnBuilt();
+            GetComponent<TownHall>()?.Founded();
             StrategyHud.Notify("Збудовано: " + DisplayName);
             GameSound.At(GameSound.Kind.Place, transform.position);
             Destroy(this);

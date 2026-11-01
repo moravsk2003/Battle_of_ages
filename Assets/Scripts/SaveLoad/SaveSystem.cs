@@ -129,10 +129,12 @@ namespace BattleOfAges.SaveLoad
             ResourceManager res = ResourceManager.Instance;
             if (res != null)
             {
-                d.Wood = res.WoodCount;
-                d.Food = res.Food;
-                foreach (var p in res.OreTiers()) d.Ore.Add(new TierCount(p.Key, p.Value));
+                d.Wood = res.Main.WoodCount;
+                d.Food = res.Main.Food;
+                foreach (var p in res.Main.OreTiers()) d.Ore.Add(new TierCount(p.Key, p.Value));
             }
+            foreach (Caravan c in Caravan.All)
+                if (c != null && c.To != null) d.Caravans.Add(new CaravanSave { Position = c.transform.position, To = c.To.transform.position, Good = (int)c.Good, Amount = c.Amount });
             d.Armory.AddRange(Armory.Instance.Items);
 
             // Player
@@ -192,7 +194,17 @@ namespace BattleOfAges.SaveLoad
                 MineNode mine = b.GetComponent<MineNode>();
                 if (mine != null) foreach (var p in mine.OreStock()) s.MineOre.Add(new TierCount(p.Key, p.Value));
                 TownHall hall = b.GetComponent<TownHall>();
-                if (hall != null) s.Level = hall.Level;
+                if (hall != null)
+                {
+                    s.Level = hall.Level;
+                    if (hall.HasOwnStock)
+                    {
+                        s.OwnStock = true;
+                        s.StockWood = hall.Stock.WoodCount;
+                        s.StockFood = hall.Stock.Food;
+                        foreach (var p in hall.Stock.OreTiers()) s.StockOre.Add(new TierCount(p.Key, p.Value));
+                    }
+                }
                 WallSegment wall = b.GetComponent<WallSegment>();
                 if (wall != null) s.OreTier = wall.OreTier;
                 WorkbenchNode bench = b.GetComponent<WorkbenchNode>();
@@ -377,8 +389,8 @@ namespace BattleOfAges.SaveLoad
             {
                 var ore = new List<KeyValuePair<int, int>>();
                 foreach (TierCount t in d.Ore) ore.Add(new KeyValuePair<int, int>(t.Tier, t.Count));
-                ResourceManager.Instance.SetState(d.Wood, ore);
-                ResourceManager.Instance.SetFood(d.Food >= 0f ? d.Food : GameBalance.FoodStart);
+                ResourceManager.Instance.Main.SetState(d.Wood, ore);
+                ResourceManager.Instance.Main.SetFood(d.Food >= 0f ? d.Food : GameBalance.FoodStart);
                 World.ZoneMap.Load(d.Zones);
             }
             Armory.Instance.Clear();
@@ -422,6 +434,12 @@ namespace BattleOfAges.SaveLoad
                 if (s.UnderConstruction) ConstructionSite.Begin(go, (BuildingType)s.Type, s.ConstructionProgress);
                 TownHall hall = go.GetComponent<TownHall>();
                 if (hall != null && s.Level > 0) hall.Level = s.Level;
+                if (hall != null && s.OwnStock)
+                {
+                    var ownOre = new List<KeyValuePair<int, int>>();
+                    foreach (TierCount t in s.StockOre) ownOre.Add(new KeyValuePair<int, int>(t.Tier, t.Count));
+                    hall.AdoptStock(s.StockWood, s.StockFood, ownOre);
+                }
                 MineNode mine = go.GetComponent<MineNode>();
                 if (mine != null)
                 {
@@ -486,6 +504,8 @@ namespace BattleOfAges.SaveLoad
                 player.GetComponent<HeroArtifacts>()?.Restore(d.Player.Artifacts, d.Player.Shards, d.Player.StartArtifactChosen);
                 CentralEmpire.WorldEpoch = d.WorldEpoch;
                 Fortifications.Level = d.WallLevel;
+                foreach (Caravan c in new List<Caravan>(Caravan.All)) if (c != null) { c.gameObject.SetActive(false); UnityEngine.Object.Destroy(c.gameObject); }
+                foreach (CaravanSave c in d.Caravans) Caravan.Create(c.Position, null, TownHall.Nearest(c.To), (CaravanGood)c.Good, c.Amount);
                 foreach (ArtifactPickup p in new List<ArtifactPickup>(ArtifactPickup.Active)) UnityEngine.Object.Destroy(p.gameObject);
                 foreach (ArtifactSave a in d.Pickups)
                     ArtifactPickup.Spawn((ArtifactType)a.Type, a.Position, a.Shard, a.OwnedByPlayer ? player.GetComponent<HeroSuccession>() : null);

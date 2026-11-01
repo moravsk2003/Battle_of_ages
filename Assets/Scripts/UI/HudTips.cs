@@ -22,7 +22,7 @@ namespace BattleOfAges.UI
         public static string Food()
         {
             ResourceManager res = ResourceManager.Instance;
-            int pop = TownHall.Population;
+            int pop = TownHall.Viewed != null ? TownHall.Viewed.People : TownHall.Population;
             float perDay = pop * Combat.GameBalance.FoodPerPersonPerDay;
             float days = res != null && perDay > 0f ? res.Food / perDay : 0f;
             return TipText.Title($"Їжа: {(res != null ? res.FoodCount : 0)}", res != null && res.Hungry ? UiTheme.Bad : UiTheme.Gold) +

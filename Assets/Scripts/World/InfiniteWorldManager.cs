@@ -97,12 +97,29 @@ namespace BattleOfAges.World
             }
 
             Vector2Int newChunkPos = GetChunkCoordFromWorldPos(viewerTarget.position);
-            if (newChunkPos != currentViewerChunk)
+            int settlements = SettlementsKey();
+            if (newChunkPos != currentViewerChunk || settlements != settlementsKey)
             {
                 currentViewerChunk = newChunkPos;
+                settlementsKey = settlements;
                 UpdateChunksAroundViewer();
             }
             StreamChunks(unbounded: false);
+        }
+
+        private int settlementsKey;
+
+        /// <summary>Changes when a campaign's settlements do (the fixed world streams round the viewer alone).</summary>
+        private int SettlementsKey()
+        {
+            if (!WorldSettings.Bounded) return 0;
+            int key = 17;
+            foreach (Building.TownHall hall in Building.TownHall.All)
+            {
+                Vector2Int c = GetChunkCoordFromWorldPos(hall.transform.position);
+                key = key * 31 + c.x * 73856093 + c.y * 19349663;
+            }
+            return key;
         }
 
         private int RingOf(Vector2Int coord) => Mathf.Max(Mathf.Abs(coord.x - currentViewerChunk.x), Mathf.Abs(coord.y - currentViewerChunk.y));
@@ -218,12 +235,39 @@ namespace BattleOfAges.World
                     {
                         QueueChunk(chunk, chunkCoord, isLowLOD);
                     }
+                    activeChunks[chunkCoord].SetGroundShown(true);
                 }
             }
+            HoldSettlements();
 
             // Out-of-range chunks not built yet go at once; the rest (and the far terrain's hole) once the new ground is in
             RemoveChunks(onlyWithoutGround: true);
             swapPending = true;
+        }
+
+        /// <summary>
+        /// A settlement goes on working while the hero is away: the land round each hall stays, trees and ore (no life:
+        /// low detail, as at the edge of the view), its ground left to the far terrain.
+        /// </summary>
+        private void HoldSettlements()
+        {
+            if (!WorldSettings.Bounded) return;
+            foreach (Building.TownHall hall in Building.TownHall.All)
+            {
+                Vector2Int center = GetChunkCoordFromWorldPos(hall.transform.position);
+                for (int x = -renderDistanceRadius; x <= renderDistanceRadius; x++)
+                {
+                    for (int z = -renderDistanceRadius; z <= renderDistanceRadius; z++)
+                    {
+                        Vector2Int coord = new Vector2Int(center.x + x, center.y + z);
+                        if (IsBaseZoneChunk(coord) || !requiredChunksBuffer.Add(coord)) continue;
+                        if (!activeChunks.TryGetValue(coord, out ProceduralBiomeChunk chunk) || chunk == null)
+                            activeChunks[coord] = chunk = QueueChunk(AcquireChunk(coord), coord, true);
+                        else if (!chunk.IsLowLOD) QueueChunk(chunk, coord, true);
+                        chunk.SetGroundShown(false);
+                    }
+                }
+            }
         }
 
         private void CreateFarTerrain()

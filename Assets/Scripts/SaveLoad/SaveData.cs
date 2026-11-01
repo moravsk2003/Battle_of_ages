@@ -30,6 +30,7 @@ namespace BattleOfAges.SaveLoad
 
         public PlayerSave Player = new PlayerSave();
         public List<BuildingSave> Buildings = new List<BuildingSave>();
+        public List<CaravanSave> Caravans = new List<CaravanSave>();
         public List<UnitSave> Units = new List<UnitSave>();
         public WorldSave World = new WorldSave();
         public List<ArtifactSave> Pickups = new List<ArtifactSave>(); // artifacts and shards on the ground
@@ -110,6 +111,18 @@ namespace BattleOfAges.SaveLoad
         public int OreTier;              // a wall: the ore it is built of
         public bool UnderConstruction;   // still a site (ConstructionSite), this far along
         public float ConstructionProgress;
+        public bool OwnStock;            // a town hall with its own stock, not the main one (M5 step 7)
+        public int StockWood;
+        public float StockFood;
+        public List<TierCount> StockOre = new List<TierCount>();
+    }
+
+    /// <summary>A cart on the road, and the hall it goes to (by where it stands).</summary>
+    [Serializable]
+    public class CaravanSave
+    {
+        public Vector3 Position, To;
+        public int Good, Amount;
     }
 
     [Serializable]
