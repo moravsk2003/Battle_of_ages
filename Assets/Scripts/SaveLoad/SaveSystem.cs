@@ -123,7 +123,7 @@ namespace BattleOfAges.SaveLoad
 
         public static SaveData Capture()
         {
-            var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours, WorldSeed = World.WorldSettings.Seed, WorldSize = World.WorldSettings.Size };
+            var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours, WorldSeed = World.WorldSettings.Seed, WorldSize = World.WorldSettings.Size, BanditNextRaid = AI.BanditRaids.NextRaidHour, BanditRaids = AI.BanditRaids.RaidCount };
 
             ResourceManager res = ResourceManager.Instance;
             if (res != null)
@@ -308,6 +308,8 @@ namespace BattleOfAges.SaveLoad
             {
                 playSecondsAtLoad = pending.PlaySeconds;
                 WorldClock.GameHours = pending.GameHours;
+                AI.BanditRaids.RaidCount = pending.BanditRaids;
+                AI.BanditRaids.NextRaidHour = pending.BanditNextRaid > 0.0 ? pending.BanditNextRaid : pending.GameHours + GameBalance.BanditFirstRaidHours;
                 runner.StartCoroutine(ApplyWhenReady(pending));
                 pending = null;
                 return;
@@ -317,6 +319,7 @@ namespace BattleOfAges.SaveLoad
             if (!newGamePending) WorldPersistence.Clear(); // the scene was opened directly (editor, tests)
             if (newGamePending && ResourceManager.Instance != null) ResourceManager.Instance.ResetToInitial();
             WorldClock.GameHours = 0.0; // a new campaign (or the scene opened directly): day 1, morning
+            AI.BanditRaids.Reset();
             if (newGamePending && startingSetup != null) { runner.StartCoroutine(ApplySetupLater(startingSetup)); startingSetup = null; }
             newGamePending = false;
             runner.StartCoroutine(RegisterSceneTreesLater());

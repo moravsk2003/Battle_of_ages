@@ -225,6 +225,15 @@ namespace BattleOfAges.Combat
         // ------------------------------------------------------------------ NPC kingdoms (§12, M0)
 
         /// <summary>NPC kings around the player at a new game, this far from the player's start.</summary>
+        /// <summary>
+        /// Bandit raids on a campaign's settlement (BanditRaids): the game hour of the first, the hours between them (from
+        /// when the last one's over at the earliest), the band's size, how far off it appears. Camps: one chunk in so many
+        /// (M0's world: one in five), none this near the base.
+        /// </summary>
+        public static float BanditFirstRaidHours = 6f, BanditRaidEveryHours = 6f, BanditSpawnDistance = 220f;
+        public static int BanditRaidFirst = 3, BanditRaidGrowth = 2, BanditRaidMax = 20;
+        public static int CampaignCampEvery = 20;
+        public static float CampaignCampClearance = 300f;
         public static int KingdomCount = 3;
         /// <summary>
         /// A campaign (M1, a bounded world): heroes in the world, the player's included, and the share of the others that

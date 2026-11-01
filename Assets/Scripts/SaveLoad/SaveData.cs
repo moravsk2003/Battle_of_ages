@@ -16,6 +16,9 @@ namespace BattleOfAges.SaveLoad
         /// <summary>The world (WorldSettings): 0 and 0 — the fixed endless world of saves before 0.2.0.</summary>
         public int WorldSeed;
         public float WorldSize;
+        /// <summary>Bandit raids (BanditRaids): the next one's game hour (0: from before 0.2.1) and how many came.</summary>
+        public double BanditNextRaid;
+        public int BanditRaids;
 
         public int Wood;
         public List<TierCount> Ore = new List<TierCount>();

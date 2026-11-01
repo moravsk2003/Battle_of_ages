@@ -26,6 +26,16 @@ namespace BattleOfAges.World
             return t * t * (3f - 2f * t);
         }
 
+        /// <summary>Does this chunk get a raider camp? One in five by the M0 rule; a campaign's world is wide: rarer, none by the base.</summary>
+        public static bool CampChunk(Vector2Int coord, float size)
+        {
+            if (Mathf.Abs(coord.x) < 2 && Mathf.Abs(coord.y) < 2) return false;
+            int seed = WorldSettings.ChunkSeed(coord);
+            if (!WorldSettings.Bounded) return seed % 5 == 0;
+            if (new Vector2(coord.x * size, coord.y * size).magnitude < Combat.GameBalance.CampaignCampClearance) return false;
+            return seed % Combat.GameBalance.CampaignCampEvery == 0;
+        }
+
         /// <summary>The biomes' temperature and moisture fields, 0..1, shifted by the world's seed.</summary>
         /// In a bounded world (a campaign) a slow field over kilometres weighs in, so deserts and forests are whole regions
         /// and not a speckle every few hundred metres; the endless seed-0 world keeps its old fields.
@@ -366,7 +376,7 @@ namespace BattleOfAges.World
             }
 
             // Hostile Raider Camp Spawning (At distance >= 2 chunks from spawn): its tents now, its raiders with LifeSteps
-            if ((Mathf.Abs(ChunkCoord.x) >= 2 || Mathf.Abs(ChunkCoord.y) >= 2) && (seed % 5 == 0))
+            if (CampChunk(ChunkCoord, size))
             {
                 float campX = startX + size * 0.5f;
                 float campZ = startZ + size * 0.5f;

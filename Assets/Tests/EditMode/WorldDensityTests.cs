@@ -9,7 +9,7 @@ namespace BattleOfAges.Tests
 {
     /// <summary>
     /// Content density (docs/GAME_DESIGN.md §5.1, M1): on the way from the player's base to every other hero there is
-    /// something on the road — raider camps by the chunks' own rule (a fifth of the chunks, on level dry ground).
+    /// something on the road — raider camps by the chunks' own rule (on level dry ground).
     /// </summary>
     [TestFixture]
     public class WorldDensityTests
@@ -22,8 +22,7 @@ namespace BattleOfAges.Tests
         /// <summary>Does this chunk get a raider camp (ProceduralBiomeChunk.ScatterBiomeResources' rule)?</summary>
         private static bool Camp(Vector2Int c)
         {
-            if (Mathf.Abs(c.x) < 2 && Mathf.Abs(c.y) < 2) return false;
-            if (WorldSettings.ChunkSeed(c) % 5 != 0) return false;
+            if (!ProceduralBiomeChunk.CampChunk(c, Chunk)) return false;
             var centre = new Vector3(c.x * Chunk, 0f, c.y * Chunk);
             bool level = BuildSite.FindLevel(centre, 14f, GameBalance.CampSiteSearchRadius, GameBalance.CampSiteMaxRise,
                                              p => InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z), out Vector3 site);
