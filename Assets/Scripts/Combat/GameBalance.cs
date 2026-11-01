@@ -120,11 +120,12 @@ namespace BattleOfAges.Combat
         /// The player's people (one kind of unit: they work and fight): a hit worker fights back unless its HP is below
         /// WorkerFleeShare (then it runs to the chest); a worker goes for an enemy within WorkerEngageRadius of it. The alarm
         /// (key T, or by itself when an enemy comes within AlarmTriggerRadius of the hall) sends everyone at the enemies
-        /// within AlarmRadius of the hall, and stands down AlarmStandDownSeconds after the last one is gone.
+        /// within AlarmRadius of the hall, no further than AlarmChaseRadius from it, and stands down AlarmStandDownSeconds
+        /// after the last one is gone.
         /// </summary>
         public static float WorkerFleeShare = 0.25f, WorkerEngageRadius = 8f;
         /// <summary>
-        /// A fight a unit picked itself (not ordered by the player or the alarm) ends this far from where it began: the
+        /// A fight a unit picked itself (not ordered by the player) ends this far from where it began: the
         /// unit lets the enemy run and goes back (a soldier to its place, a worker to its job).
         /// </summary>
         public static float UnitLeashRadius = 25f, WorkerLeashRadius = 15f;
@@ -146,7 +147,7 @@ namespace BattleOfAges.Combat
         /// </summary>
         public static int SmeltRatio = 10;
         public static float SmeltSecondsPerPiece = 1f;
-        public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f;
+        public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f, AlarmChaseRadius = 90f;
         public static bool AutoAlarm = true;
 
         // ------------------------------------------------------------------ promotions (§11.1)

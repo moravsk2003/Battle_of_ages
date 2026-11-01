@@ -58,7 +58,7 @@ namespace BattleOfAges.PlayModeTests
 
             var report = new StringBuilder("# Zones left to the workers\n\n");
             foreach (ZoneType t in ZoneMap.Types) report.AppendLine($"- {ZoneMap.Name(t)}: {ZoneMap.Count(t)} cells, calls for {ZoneGrower.Wanted(t, ZoneMap.Count(t))}");
-            report.AppendLine("\n| game hour | sites | built | wood | food | workers | at places |\n|---|---|---|---|---|---|---|");
+            report.AppendLine("\n| game hour | sites | built | wood | food | workers | at places | state |\n|---|---|---|---|---|---|---|---|");
             Time.timeScale = speed;
             float nextRow = 0f;
             while (WorldClock.GameHours < hours)
@@ -68,7 +68,15 @@ namespace BattleOfAges.PlayModeTests
                     nextRow += 0.5f;
                     int atPlaces = 0;
                     foreach (WorkPlace p in WorkPlace.All) atPlaces += p.Present;
-                    report.AppendLine($"| {WorldClock.GameHours:0.0} | {ConstructionSite.All.Count} | {BuildingNode.Active.Count - ConstructionSite.All.Count} | {rm.WoodCount} | {rm.FoodCount} | {WorkerRegistry.WorkerCount} | {atPlaces} |");
+                    var states = new Dictionary<string, int>();
+                    foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null) { string k = w.CurrentState.ToString(); states.TryGetValue(k, out int c); states[k] = c + 1; }
+                    var parts = new List<string>();
+                    foreach (var st in states) parts.Add(st.Key + " " + st.Value);
+                    int raiding = 0;
+                    foreach (NpcKingdom k in NpcKingdom.All) if (k != null && k.Raiding) raiding++;
+                    int chasing = 0;
+                    foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null && w.GetComponent<RtsUnit>().HasAttackTarget) chasing++;
+                    report.AppendLine($"| {WorldClock.GameHours:0.0} | {ConstructionSite.All.Count} | {BuildingNode.Active.Count - ConstructionSite.All.Count} | {rm.WoodCount} | {rm.FoodCount} | {WorkerRegistry.WorkerCount} | {atPlaces} | alarm {SettlementAlarm.Active}, raids {raiding}, fighting {chasing}; {string.Join(", ", parts)} |");
                 }
                 yield return null;
             }

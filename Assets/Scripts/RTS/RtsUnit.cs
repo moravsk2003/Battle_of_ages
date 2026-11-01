@@ -164,13 +164,14 @@ namespace BattleOfAges.RTS
         private CombatUnit combatUnit;
 
         /// <summary>
-        /// Attack this target. ordered: the player's order or the alarm — the unit follows it anywhere. Otherwise (a
+        /// Attack this target. ordered: the player's order — the unit follows it anywhere. Otherwise (a
         /// fight it picked itself, a worker hitting back) it is on a leash: it gives up past the leash from where the
         /// fight began and goes back there (GameBalance.UnitLeashRadius, WorkerLeashRadius).
         /// </summary>
         public void IssueAttackCommand(HealthComponent target, bool ordered = true)
         {
             bool keepLeash = !ordered && leashed; // the next enemy of the same fight keeps where the fight began
+            bool keepDefending = keepLeash && defending;
             Vector3 keepOrigin = leashOrigin;
             if (target != null && wallState == WallState.Posted && combatUnit != null
                 && Vector3.Distance(transform.position, target.transform.position) <= combatUnit.AttackRange)
@@ -185,19 +186,37 @@ namespace BattleOfAges.RTS
             if (OnWall) leaveTarget = target; // after coming down
             else attackTarget = target;       // ...so the new one is set afterwards (was lost before)
             if (ordered) leashed = false;
-            else if (keepLeash) { leashed = true; leashOrigin = keepOrigin; }
+            else if (keepLeash) { leashed = true; leashOrigin = keepOrigin; defending = keepDefending; }
             else StartLeash();
+        }
+
+        /// <summary>The alarm's order: at this enemy, but only as far as AlarmChaseRadius from home - a raid that runs is let go.</summary>
+        public void IssueDefendCommand(HealthComponent target, Vector3 home)
+        {
+            IssueAttackCommand(target);
+            leashed = true;
+            leashOrigin = home;
+            defending = true;
+        }
+
+        /// <summary>The alarm is over: a fight it ordered ends with it.</summary>
+        public void StopDefending()
+        {
+            if (!defending) return;
+            attackTarget = null;
+            hasTarget = false;
+            EndLeash();
         }
 
         // ------------------------------------------------------------------ the leash
 
-        private bool leashed;
+        private bool leashed, defending;
         private Vector3 leashOrigin;
 
         /// <summary>On a leash in a fight it picked itself: the point it will not chase further than the leash from.</summary>
         public bool Leashed => leashed;
         public Vector3 LeashOrigin => leashOrigin;
-        public float LeashRadius => IsWorking && !SettlementAlarm.Active ? GameBalance.WorkerLeashRadius : GameBalance.UnitLeashRadius;
+        public float LeashRadius => defending ? GameBalance.AlarmChaseRadius : IsWorking && !SettlementAlarm.Active ? GameBalance.WorkerLeashRadius : GameBalance.UnitLeashRadius;
 
         private void StartLeash()
         {
@@ -211,6 +230,7 @@ namespace BattleOfAges.RTS
         {
             if (!leashed) return;
             leashed = false;
+            defending = false;
             if (!IsWorking && FlatDistance(transform.position, leashOrigin) > 2f) IssueMoveCommand(leashOrigin);
         }
 
@@ -670,7 +690,7 @@ namespace BattleOfAges.RTS
             }
             if (wallState == WallState.ToStairs) { wallState = WallState.None; Building.WallWalk.Release(this); PostedByAlarm = false; }
             attackTarget = null;
-            leashed = false; // a new order: whatever fight it was in is over
+            leashed = defending = false; // a new order: whatever fight it was in is over
             targetPosition = World.WorldSettings.ClampInside(destination); // not onto the mountains round the world
             targetPosition.y = GetTerrainHeight(targetPosition);
             hasTarget = true;

@@ -98,6 +98,31 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest, Timeout(300000)]
+        public IEnumerator ARaidThatRuns_IsLetGo_AndThePeopleGoBack()
+        {
+            GameObject hall = TownHall.CreatePrefab("TestHall");
+            hall.transform.position = Far;
+            spawned.Add(hall);
+            List<RtsUnit> people = Workers(4);
+            yield return null;
+            HostileMobAI bandit = Bandit(Far + new Vector3(0f, 0f, 30f));
+            yield return Until(() => people.FindAll(p => p != null && p.HasAttackTarget).Count >= 3, 15f);
+            Assert.GreaterOrEqual(people.FindAll(p => p != null && p.HasAttackTarget).Count, 3, "the alarm sent them at it");
+            bandit.enabled = false;
+            bandit.transform.position = Far + new Vector3(0f, 0f, 800f); // it ran
+            yield return Until(() => !SettlementAlarm.Active && !people.Exists(p => p != null && p.HasAttackTarget), GameBalance.AlarmStandDownSeconds + 30f);
+            Assert.IsFalse(SettlementAlarm.Active, "the alarm stood down");
+            foreach (RtsUnit p in people)
+            {
+                if (p == null) continue;
+                Assert.IsFalse(p.HasAttackTarget, "no one runs after it");
+                Vector3 off = p.transform.position - Far;
+                off.y = 0f;
+                Assert.Less(off.magnitude, GameBalance.AlarmChaseRadius + 10f, "no further than the chase goes");
+            }
+        }
+
+        [UnityTest, Timeout(300000)]
         public IEnumerator HitWorker_FightsBack()
         {
             GameBalance.AutoAlarm = false; // only the worker's own reaction

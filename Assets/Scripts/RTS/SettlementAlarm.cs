@@ -67,7 +67,12 @@ namespace BattleOfAges.RTS
         {
             if (!Active) return;
             Active = false;
-            foreach (RtsUnit u in UnitRegistry.ActiveUnits) if (u != null) u.StandDownFromWall(); // the archers come down
+            foreach (RtsUnit u in UnitRegistry.ActiveUnits)
+            {
+                if (u == null) continue;
+                u.StandDownFromWall(); // the archers come down
+                u.StopDefending();     // and no one runs after a raid that has gone
+            }
             StrategyHud.Notify(why ?? "Відбій: усі до роботи");
         }
 
@@ -124,7 +129,7 @@ namespace BattleOfAges.RTS
                     }
                     // Archers to the walls, to the free post nearest the enemy (§10.5); the rest go for the enemy
                     if (u.IsRanged && u.SendToWall(WallWalk.FreePost(best.transform.position), true)) continue;
-                    u.IssueAttackCommand(best);
+                    u.IssueDefendCommand(best, home);
                 }
                 else if (!gathered && (u.transform.position - home).sqrMagnitude > GameBalance.AlarmGatherRadius * GameBalance.AlarmGatherRadius)
                 {
