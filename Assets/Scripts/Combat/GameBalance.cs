@@ -257,6 +257,8 @@ namespace BattleOfAges.Combat
         /// </summary>
         public static int FoundingHallLevel = 2, FoundingWood = 200, FoundingOre = 30, FoundingStartWood = 60, FoundingStartFood = 20;
         public static float FoundingFromOwn = 500f, FoundingFromKing = 300f;
+        /// <summary>...and this many chunks (64 m) clear of a raiders' camp.</summary>
+        public static int FoundingFromCampChunks = 3;
 
         /// <summary>Caravans: m/s; at most one a route, each CaravanEveryHours; sent when the other runs under Short and this one stays over Spare.</summary>
         public static float CaravanSpeed = 5f, CaravanEveryHours = 1f, CaravanFoodShortDays = 2f, CaravanFoodSpareDays = 4f;

@@ -160,6 +160,12 @@ namespace BattleOfAges.Building
                 off.y = 0f;
                 if (off.magnitude < GameBalance.FoundingFromKing) return "Чужа земля: тут живуть люди короля";
             }
+            // A raiders' camp comes alive when the hero comes: not at the settlers' door
+            const float chunk = 64f;
+            int cx = Mathf.FloorToInt((at.x + chunk * 0.5f) / chunk), cz = Mathf.FloorToInt((at.z + chunk * 0.5f) / chunk);
+            for (int x = -GameBalance.FoundingFromCampChunks; x <= GameBalance.FoundingFromCampChunks; x++)
+                for (int z = -GameBalance.FoundingFromCampChunks; z <= GameBalance.FoundingFromCampChunks; z++)
+                    if (World.ProceduralBiomeChunk.CampChunk(new Vector2Int(cx + x, cz + z), chunk)) return "Поруч табір розбійників: спершу розбийте його або оберіть інше місце";
             return null;
         }
 

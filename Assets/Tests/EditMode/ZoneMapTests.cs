@@ -66,6 +66,19 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void NoNewSettlement_NextToARaidersCamp()
+        {
+            for (int x = 10; x < 200; x++)
+                for (int z = 10; z < 200; z++)
+                {
+                    if (!ProceduralBiomeChunk.CampChunk(new Vector2Int(x, z), 64f)) continue;
+                    StringAssert.Contains("табір", Building.TownHall.FoundingForbidden(new Vector3(x * 64f, 0f, z * 64f)));
+                    return;
+                }
+            Assert.Fail("no camp in this part of the world");
+        }
+
+        [Test]
         public void ASave_RestoresTheZones()
         {
             ZoneMap.Paint(new Vector3(40f, 0f, 40f), 14f, ZoneType.Crafts, out _);
