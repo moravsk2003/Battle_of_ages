@@ -72,6 +72,8 @@ namespace BattleOfAges.Building
             }
         }
 
+        private void OnDisable() => activeMines.Remove(this); // a site's mine, a destroyed one
+
         private void Start()
         {
             SnapToTerrain();

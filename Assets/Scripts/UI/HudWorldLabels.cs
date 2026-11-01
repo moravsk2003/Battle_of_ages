@@ -52,6 +52,7 @@ namespace BattleOfAges.UI
             bool map = GameContext.MapOpen;
             Camera cam = ViewCamera.Current;
             FindHovered(cam, map);
+            UpdateSites(cam, map);
             UpdateMines(cam, map);
             UpdateHall(cam, map);
             if (map) UpdateUnitBars(cam);
@@ -94,6 +95,41 @@ namespace BattleOfAges.UI
             if (sp.z <= 0f) return false;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(layer, sp, null, out local);
             return true;
+        }
+
+        // ------------------------------------------------------------------ building sites
+
+        private readonly List<(RectTransform plate, Text text)> sitePlates = new List<(RectTransform, Text)>();
+
+        /// <summary>Over each site: what it is, how far along, how many hands (on the map; in first person when near).</summary>
+        private void UpdateSites(Camera cam, bool map)
+        {
+            int used = 0;
+            foreach (ConstructionSite s in ConstructionSite.All)
+            {
+                if (s == null || cam == null) continue;
+                BuildingDefinition def = BuildingData.GetDefinition(s.Type);
+                if (!OnScreen(cam, s.transform.position + Vector3.up * (def.Size.y + 1.5f), out Vector2 local, out float depth) || (!map && depth > 30f)) continue;
+                while (sitePlates.Count <= used)
+                {
+                    RectTransform rt = UiTheme.Rect(layer, "SiteLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(260f, 32f));
+                    rt.pivot = new Vector2(0.5f, 0f);
+                    UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f));
+                    Tooltip.Set(rt.gameObject, () => TipText.Title("Будівництво", UiTheme.Gold)
+                        + $"\nРобітники «Авто» приходять самі; інших виділіть і клацніть {TipText.Key("ПКМ")} по ділянці. До {ConstructionSite.MaxBuilders} робітників, що більше — то швидше."
+                        + "\n" + TipText.Dim("Без робітників будівництво стоїть."));
+                    RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240f, 28f));
+                    Text t = UiTheme.Label(tr, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink);
+                    t.supportRichText = true;
+                    sitePlates.Add((rt, t));
+                }
+                var (plate, text) = sitePlates[used++];
+                if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
+                plate.anchoredPosition = local;
+                string hands = s.PresentBuilders == 0 ? "<color=#DB5242>немає робітників</color>" : $"<color=#F5CC73>{s.PresentBuilders}</color> працюють";
+                text.text = $"{s.DisplayName} {Mathf.FloorToInt(s.Progress * 100f)}%  ·  {hands}";
+            }
+            for (int i = used; i < sitePlates.Count; i++) if (sitePlates[i].plate.gameObject.activeSelf) sitePlates[i].plate.gameObject.SetActive(false);
         }
 
         // ------------------------------------------------------------------ mines

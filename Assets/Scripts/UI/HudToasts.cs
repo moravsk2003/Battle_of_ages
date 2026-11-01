@@ -96,7 +96,7 @@ namespace BattleOfAges.UI
             if (lastOre >= 0 && ore > lastOre) Show("ore", ore - lastOre, n => $"+{n} руди");
             if (lastWorkers >= 0 && workers > lastWorkers) Show("worker", workers - lastWorkers, n => n > 1 ? $"Нові робітники: {n}" : "Новий робітник");
             int buildings = BuildingNode.Active.Count;
-            if (lastBuildings >= 0 && buildings > lastBuildings)
+            if (lastBuildings >= 0 && buildings > lastBuildings && !World.WorldSettings.Bounded) // (a campaign's sites say so when done)
             {
                 BuildingNode b = BuildingNode.Active[buildings - 1];
                 Show("build" + buildings, 1, n => "Збудовано: " + BuildingData.GetDefinition(b.Type).DisplayName);

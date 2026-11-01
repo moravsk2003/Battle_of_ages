@@ -23,7 +23,7 @@ namespace BattleOfAges.UI
         public static readonly Color Good = new Color(0.45f, 0.78f, 0.38f);
         public static readonly Color Bad = new Color(0.86f, 0.32f, 0.26f);
 
-        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall, Fire, Bolt, Clock, Bell }
+        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall, Fire, Bolt, Clock, Bell, Food }
 
         private static Font font;
         private static Sprite panel, button, bar, slot, round;
@@ -298,6 +298,15 @@ namespace BattleOfAges.UI
             }
             switch (icon)
             {
+                case Icon.Food: // a round loaf with two cuts
+                {
+                    float d = new Vector2(p.x, p.y * 1.45f + 0.12f).magnitude;
+                    Layer(d - 0.86f, new Color(0.45f, 0.27f, 0.12f));
+                    Layer(d - 0.72f, new Color(0.82f, 0.58f, 0.28f));
+                    foreach (float cut in new[] { -0.28f, 0.28f })
+                        Layer(Mathf.Abs(p.x - cut - p.y * 0.35f) - 0.05f + Mathf.Max(0f, Mathf.Abs(p.y + 0.05f) - 0.34f), new Color(0.95f, 0.82f, 0.55f));
+                    break;
+                }
                 case Icon.Wood:
                     foreach (Vector2 c in new[] { new Vector2(-0.38f, -0.32f), new Vector2(0.38f, -0.32f), new Vector2(0f, 0.32f) })
                     {

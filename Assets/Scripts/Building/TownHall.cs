@@ -145,7 +145,8 @@ namespace BattleOfAges.Building
                 if (PromoteWorkers(GameBalance.WorkPromotionPerHour) > 0) StrategyHud.Notify("Робота загартувала: новий воїн");
             }
 
-            int born = Births(ref birthCarry, hours, Population, PopulationCap);
+            ResourceManager food = ResourceManager.Instance;
+            int born = food != null && food.Hungry ? 0 : Births(ref birthCarry, hours, Population, PopulationCap); // no births on an empty larder (§10.3)
             for (int i = 0; i < born; i++)
             {
                 Vector2 ring = Random.insideUnitCircle.normalized * 6f;

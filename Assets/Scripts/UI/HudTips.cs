@@ -19,6 +19,18 @@ namespace BattleOfAges.UI
                    $"\n{TipText.Dim($"Сам: гілки {TipText.Key(Key(KeyAction.InteractGather))}, рубка {TipText.Key(Key(KeyAction.ChopTree))}. Робітники: накази «Гілки» й «Рубати».")}";
         }
 
+        public static string Food()
+        {
+            ResourceManager res = ResourceManager.Instance;
+            int pop = TownHall.Population;
+            float perDay = pop * Combat.GameBalance.FoodPerPersonPerDay;
+            float days = res != null && perDay > 0f ? res.Food / perDay : 0f;
+            return TipText.Title($"Їжа: {(res != null ? res.FoodCount : 0)}", res != null && res.Hungry ? UiTheme.Bad : UiTheme.Gold) +
+                   $"\nЛюдина їсть {Combat.GameBalance.FoodPerPersonPerDay:0.#} на ігровий день: зараз {perDay:0.#} на день, запасу на {days:0.#} дн." +
+                   (res != null && res.Hungry ? "\n" + TipText.Bad("Без їжі приріст населення стоїть.") : "") +
+                   "\n" + TipText.Dim("Їжу дають поля.");
+        }
+
         public static string Ore()
         {
             ResourceManager res = ResourceManager.Instance;

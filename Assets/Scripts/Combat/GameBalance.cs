@@ -234,6 +234,12 @@ namespace BattleOfAges.Combat
         public static int BanditRaidFirst = 3, BanditRaidGrowth = 2, BanditRaidMax = 20;
         public static int CampaignCampEvery = 20;
         public static float CampaignCampClearance = 300f;
+        /// <summary>Food (§10.3, a campaign): eaten per person per game day; the stock of a new campaign; "running low" under this many days.</summary>
+        public static float FoodPerPersonPerDay = 1f, FoodStart = 40f, FoodLowDays = 1f;
+        /// <summary>Building by workers (ConstructionSite): one worker's seconds for a building, and more per wood or ore it costs; how far Auto workers come from.</summary>
+        public static float BuildBaseSeconds = 8f, BuildSecondsPerResource = 2f, BuildersComeFrom = 400f;
+        /// <summary>How far from its hall a settlement marks zones at hall I (§5.3; +60% each hall level).</summary>
+        public static float ZoneReachBase = 300f;
         public static int KingdomCount = 3;
         /// <summary>
         /// A campaign (M1, a bounded world): heroes in the world, the player's included, and the share of the others that

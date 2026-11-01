@@ -19,11 +19,11 @@ namespace BattleOfAges.UI
         private static readonly string[] Roman = { "0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
 
         private RectTransform root, mode, fpGroup, rtsGroup, alarmBanner;
-        private Text woodText, oreText, workerText, armyText, clockText, modeText, alarmText, idleText;
+        private Text woodText, oreText, foodText, workerText, armyText, clockText, modeText, alarmText, idleText;
         private Button alarmButton, idleButton;
         private bool alarmShown;
         private float idleTimer;
-        private Shown clockShown, woodShown, oreShown, workerShown, armyShown;
+        private Shown clockShown, woodShown, oreShown, foodShown, workerShown, armyShown;
 
         private void Start()
         {
@@ -70,6 +70,7 @@ namespace BattleOfAges.UI
 
             woodText = Entry(bar, UiTheme.Icon.Wood, "Деревина", HudTips.Wood);
             oreText = Entry(bar, UiTheme.Icon.Ore, "Руда", HudTips.Ore);
+            foodText = Entry(bar, UiTheme.Icon.Food, "Їжа", HudTips.Food);
             workerText = Entry(bar, UiTheme.Icon.Worker, "Робітники", HudTips.Workers);
             armyText = Entry(bar, UiTheme.Icon.Army, "Військо", HudTips.Army);
             clockText = Entry(bar, UiTheme.Icon.Clock, "Час", HudTips.Clock);
@@ -148,6 +149,17 @@ namespace BattleOfAges.UI
             ResourceManager res = ResourceManager.Instance;
             int wood = res != null ? res.WoodCount : 0, ore = res != null ? res.OreCount : 0;
             if (woodShown.Changed(wood)) woodText.text = wood.ToString();
+            bool foodRules = ResourceManager.FoodRules;
+            if (foodText.transform.parent.gameObject.activeSelf != foodRules) foodText.transform.parent.gameObject.SetActive(foodRules);
+            if (foodRules && ResourceManager.Instance != null)
+            {
+                int food = ResourceManager.Instance.FoodCount;
+                if (foodShown.Changed(food))
+                {
+                    foodText.text = food.ToString();
+                    foodText.color = ResourceManager.Instance.Hungry ? UiTheme.Bad : UiTheme.Ink;
+                }
+            }
             if (oreShown.Changed(OreKey(res, ore))) oreText.text = OreSummary(res, ore);
             int workers = WorkerRegistry.WorkerCount, army = Mathf.Max(0, UnitRegistry.ActiveUnits.Count - workers);
             if (workerShown.Changed(Shown.Key(workers, TownHall.PopulationCap)))

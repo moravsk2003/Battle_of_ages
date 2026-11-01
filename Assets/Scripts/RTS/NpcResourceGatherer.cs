@@ -29,7 +29,8 @@ namespace BattleOfAges.RTS
         MovingToMineToWork,
         WorkingInsideMine,
         /// <summary>Called to a workbench: goes to its place there and crafts until called off.</summary>
-        WorkingAtBench
+        WorkingAtBench,
+        Building
     }
 
     /// <summary>
@@ -158,8 +159,12 @@ namespace BattleOfAges.RTS
         public bool IsInsideMine => currentState == GathererState.WorkingInsideMine;
         /// <summary>Called to a workbench (on the way or at its place): the job window leaves it there; the bench's button lets it go.</summary>
         public bool AtBench => assignedBench != null;
+        /// <summary>Building a site (ConstructionSite): the job window leaves it there.</summary>
+        public bool AtSite => assignedSite != null;
+        private ConstructionSite assignedSite;
+        private float siteMoveTimer;
         /// <summary>In a mine or at a bench: the job distribution and "all to this job" leave it there.</summary>
-        public bool IsStationed => IsMiner || AtBench;
+        public bool IsStationed => IsMiner || AtBench || AtSite;
         public Crafting.WorkbenchNode AssignedBench => assignedBench;
 
         /// <summary>Goes to its place at the bench (WorkbenchNode.SlotOf) and works there until another order or "Відпустити".</summary>
@@ -171,6 +176,48 @@ namespace BattleOfAges.RTS
             assignedBench = bench;
             currentState = GathererState.WorkingAtBench;
             benchMoveTimer = 0f;
+        }
+
+        /// <summary>Goes to build this site (false when it is full).</summary>
+        public bool AssignToSite(ConstructionSite site)
+        {
+            if (site == null || CentralEmpire.Active) return false;
+            if (assignedSite == site) return true;
+            if (!site.NeedsHands) return false;
+            StartWorking();
+            ClearCurrentTargets();
+            site.Join(this);
+            assignedSite = site;
+            currentState = GathererState.Building;
+            siteMoveTimer = 0f;
+            return true;
+        }
+
+        /// <summary>The site is done (or the worker is called away): back to its job.</summary>
+        public void LeaveSite(ConstructionSite site)
+        {
+            if (assignedSite == null || (site != null && assignedSite != site)) return;
+            assignedSite.Leave(this);
+            assignedSite = null;
+            if (currentState == GathererState.Building) currentState = GathererState.FindingResource;
+        }
+
+        /// <summary>Walks to its place round the site and works there (the site counts it once it is there).</summary>
+        private void HandleBuildingState()
+        {
+            if (assignedSite == null) { LeaveSite(null); currentState = GathererState.FindingResource; return; }
+            Vector3 spot = assignedSite.SpotFor(this);
+            Vector3 off = transform.position - spot;
+            off.y = 0f;
+            if (off.sqrMagnitude > 1f)
+            {
+                siteMoveTimer -= Time.deltaTime;
+                if (siteMoveTimer <= 0f && rtsUnit != null) { siteMoveTimer = 1f; rtsUnit.IssueMoveCommand(spot); }
+                return;
+            }
+            Vector3 look = assignedSite.transform.position - transform.position;
+            look.y = 0f;
+            if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), 360f * Time.deltaTime);
         }
 
         /// <summary>The bench let it go (WorkbenchNode.UnassignWorker): back to its job.</summary>
@@ -379,6 +426,7 @@ namespace BattleOfAges.RTS
         private void ClearCurrentTargets()
         {
             autoHauling = false;
+            if (assignedSite != null) LeaveSite(assignedSite);
             if (assignedBench != null)
             {
                 Crafting.WorkbenchNode bench = assignedBench;
@@ -415,6 +463,11 @@ namespace BattleOfAges.RTS
             if (currentState == GathererState.WorkingAtBench)
             {
                 if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound)) HandleWorkingAtBenchState();
+                return;
+            }
+            if (currentState == GathererState.Building)
+            {
+                if (rtsUnit == null || !(rtsUnit.IsSelected || rtsUnit.HasAttackTarget || SettlementAlarm.Active || rtsUnit.WallBound)) HandleBuildingState();
                 return;
             }
 
@@ -555,6 +608,9 @@ namespace BattleOfAges.RTS
             autoHauling = false;
 
             Vector3 myPos = transform.position;
+
+            // 0. A worker on its own lends a hand where something is being built
+            if (currentDirective == GatherDirective.Auto && AssignToSite(ConstructionSite.NearestNeedingHands(myPos, GameBalance.BuildersComeFrom))) return;
 
             // 1. Haul ore from a mine: a hauler always, an Auto worker by need (wood short of the next hall step: most go for wood)
             bool auto = currentDirective == GatherDirective.Auto;

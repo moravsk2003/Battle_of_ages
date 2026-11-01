@@ -398,7 +398,8 @@ namespace BattleOfAges.Building
                 BuildingNode node = building.GetComponent<BuildingNode>();
                 if (node != null)
                 {
-                    node.OnBuilt();
+                    if (World.WorldSettings.Bounded) ConstructionSite.Begin(building, currentBuildingType); // a campaign: workers build it (M5)
+                    else node.OnBuilt();
                 }
             }
 
@@ -414,6 +415,7 @@ namespace BattleOfAges.Building
         {
             reason = null;
             if (type == BuildingType.TownHall && TownHall.Current != null) { reason = "Ратуша вже є: її можна покращити"; return false; }
+            if (type == BuildingType.TownHall && ConstructionSite.IsBuilding(type)) { reason = "Ратуша вже будується"; return false; }
             if (type == BuildingType.WorkerHouse && !TownHall.HasRoom(BuildingData.GetDefinition(type).NpcSpawnCount))
             {
                 reason = TownHall.Current == null

@@ -272,6 +272,7 @@ namespace BattleOfAges.UI
                 case GathererState.MovingToMineToWork: return "іде працювати в шахту";
                 case GathererState.WorkingInsideMine: return "працює в шахті";
                 case GathererState.WorkingAtBench: return "працює за верстаком";
+                case GathererState.Building: return "будує";
                 default: return "рухається";
             }
         }

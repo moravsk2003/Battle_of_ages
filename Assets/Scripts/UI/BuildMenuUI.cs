@@ -176,7 +176,42 @@ namespace BattleOfAges.UI
                 rows[i] = CreateBuildingButton(row, defs[i]);
             }
 
+            if (World.WorldSettings.Bounded) BuildZonesPanel(panelRect);
             if (menuPanelObj != null) menuPanelObj.SetActive(false);
+        }
+
+        /// <summary>A campaign's zones beside the buildings (M5): pick one, then paint it on the map.</summary>
+        private void BuildZonesPanel(RectTransform buildings)
+        {
+            const float rowH = 62f, gap = 6f;
+            float height = 58f + World.ZoneMap.Types.Length * (rowH + gap) + 44f;
+            RectTransform panel = UiTheme.Rect(buildings, "ZonesPanel", new Vector2(0f, 0f), new Vector2(-452f, 0f), new Vector2(440f, height));
+            panel.pivot = new Vector2(0f, 0f);
+            UiTheme.PanelImage(panel);
+            RectTransform head = UiTheme.Child(panel, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f), new Vector2(-22f, -6f));
+            UiTheme.Label(head, "Title", "Зони", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Divider(panel, -54f, 400f);
+            for (int i = 0; i < World.ZoneMap.Types.Length; i++)
+            {
+                World.ZoneType type = World.ZoneMap.Types[i];
+                RectTransform row = UiTheme.Child(panel, "Zone_" + type, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                    new Vector2(16f, -58f - (i + 1) * (rowH + gap) + gap), new Vector2(-16f, -58f - i * (rowH + gap)));
+                UiTheme.PanelImage(row, UiTheme.ButtonSprite);
+                Button b = UiTheme.AddButton(row.gameObject);
+                b.onClick.AddListener(() => { ZonePainter.Begin(type); CloseMenu(); });
+                RectTransform swatch = UiTheme.Child(row, "Swatch", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(10f, 12f), new Vector2(48f, -12f));
+                Color c = World.ZoneMap.Colour(type);
+                swatch.gameObject.AddComponent<Image>().color = c;
+                swatch.GetComponent<Image>().raycastTarget = false;
+                UiTheme.Label(UiTheme.Child(row, "Name", new Vector2(0f, 0.5f), new Vector2(1f, 1f), new Vector2(60f, 0f), new Vector2(-10f, -3f)), "Text", World.ZoneMap.Name(type), 18, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+                Text d = UiTheme.Label(UiTheme.Child(row, "Description", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(60f, 3f), new Vector2(-10f, 0f)), "Text", World.ZoneMap.Description(type), 14, TextAnchor.MiddleLeft, UiTheme.InkDim);
+                d.horizontalOverflow = HorizontalWrapMode.Wrap;
+                Tooltip.Set(row.gameObject, () => TipText.Title(World.ZoneMap.Name(type), UiTheme.Gold) + "\n" + World.ZoneMap.Description(type)
+                    + $"\nПозначено клітинок: {World.ZoneMap.Count(type)}."
+                    + "\n" + TipText.Dim("ЛКМ на мапі — малювати, ПКМ — стерти, Esc — готово. Робітники самі зведуть споруди в зоні."));
+            }
+            RectTransform hint = UiTheme.Child(panel, "Hint", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(16f, 8f), new Vector2(-16f, 42f));
+            UiTheme.Label(hint, "Text", "Оберіть зону й малюйте на мапі", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
         }
 
         private void UpdateHeaderText()

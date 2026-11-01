@@ -125,10 +125,12 @@ namespace BattleOfAges.SaveLoad
         {
             var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours, WorldSeed = World.WorldSettings.Seed, WorldSize = World.WorldSettings.Size, BanditNextRaid = AI.BanditRaids.NextRaidHour, BanditRaids = AI.BanditRaids.RaidCount };
 
+            d.Zones = World.ZoneMap.Save();
             ResourceManager res = ResourceManager.Instance;
             if (res != null)
             {
                 d.Wood = res.WoodCount;
+                d.Food = res.Food;
                 foreach (var p in res.OreTiers()) d.Ore.Add(new TierCount(p.Key, p.Value));
             }
             d.Armory.AddRange(Armory.Instance.Items);
@@ -183,6 +185,8 @@ namespace BattleOfAges.SaveLoad
                 if (b == null || BuildGhost.Is(b)) continue;
                 buildings.Add(b);
                 var s = new BuildingSave { Type = (int)b.Type, Name = b.name, Position = b.transform.position, Yaw = b.transform.eulerAngles.y, SceneKey = b.SceneKey };
+                ConstructionSite site = b.GetComponent<ConstructionSite>();
+                if (site != null) { s.UnderConstruction = true; s.ConstructionProgress = site.Progress; }
                 HealthComponent hp = b.GetComponent<HealthComponent>();
                 s.Health = hp != null ? hp.CurrentHealth : 0;
                 MineNode mine = b.GetComponent<MineNode>();
@@ -269,6 +273,7 @@ namespace BattleOfAges.SaveLoad
             startingSetup = setup;
             pending = null;
             AI.KingdomRealm.Clear(); // not the last campaign's heroes
+            World.ZoneMap.Clear();
             newGamePending = true;
             World.WorldSettings.Set(setup.SeedOrRandom(), setup.Size); // a world of its own (§5.1)
             GameBalance.CampaignHeroes = setup.Heroes;
@@ -373,6 +378,8 @@ namespace BattleOfAges.SaveLoad
                 var ore = new List<KeyValuePair<int, int>>();
                 foreach (TierCount t in d.Ore) ore.Add(new KeyValuePair<int, int>(t.Tier, t.Count));
                 ResourceManager.Instance.SetState(d.Wood, ore);
+                ResourceManager.Instance.SetFood(d.Food >= 0f ? d.Food : GameBalance.FoodStart);
+                World.ZoneMap.Load(d.Zones);
             }
             Armory.Instance.Clear();
             foreach (Item i in d.Armory) Armory.Instance.Add(i);
@@ -412,6 +419,7 @@ namespace BattleOfAges.SaveLoad
                     if (!kept.Contains(s.SceneKey ?? "")) hp.InitializeHealth(wall != null ? WallSegment.MaxHealthFor((BuildingType)s.Type, s.OreTier) : BuildingData.GetDefinition((BuildingType)s.Type).MaxHealth);
                     if (s.Health > 0) hp.SetCurrentHealth(s.Health);
                 }
+                if (s.UnderConstruction) ConstructionSite.Begin(go, (BuildingType)s.Type, s.ConstructionProgress);
                 TownHall hall = go.GetComponent<TownHall>();
                 if (hall != null && s.Level > 0) hall.Level = s.Level;
                 MineNode mine = go.GetComponent<MineNode>();

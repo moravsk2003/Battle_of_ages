@@ -19,6 +19,10 @@ namespace BattleOfAges.SaveLoad
         /// <summary>Bandit raids (BanditRaids): the next one's game hour (0: from before 0.2.1) and how many came.</summary>
         public double BanditNextRaid;
         public int BanditRaids;
+        /// <summary>Marked zones (ZoneMap): x, z, type per cell.</summary>
+        public List<int> Zones = new List<int>();
+        /// <summary>Food in stock; -1: a save from before food (a full start stock then).</summary>
+        public float Food = -1f;
 
         public int Wood;
         public List<TierCount> Ore = new List<TierCount>();
@@ -104,6 +108,8 @@ namespace BattleOfAges.SaveLoad
         public int BenchWorkers;
         public int Level;                // town hall
         public int OreTier;              // a wall: the ore it is built of
+        public bool UnderConstruction;   // still a site (ConstructionSite), this far along
+        public float ConstructionProgress;
     }
 
     [Serializable]

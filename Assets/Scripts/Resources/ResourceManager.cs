@@ -14,6 +14,14 @@ namespace BattleOfAges.Resources
         [SerializeField] private int initialOre = 0;
 
         public int WoodCount { get; private set; }
+        /// <summary>Food in stock (a campaign, §10.3): whole pieces shown, eaten in fractions over the hours.</summary>
+        public float Food { get; private set; }
+        public int FoodCount => Mathf.FloorToInt(Food);
+        /// <summary>Food matters in a campaign only: the seed-0 world keeps M0's rules.</summary>
+        public static bool FoodRules => World.WorldSettings.Bounded;
+        /// <summary>Births wait while nothing is left to eat.</summary>
+        public bool Hungry => FoodRules && Food <= 0f;
+        private bool warnedLow, warnedOut;
         public int OreCount { get; private set; }
         public int HighestOreTier { get; private set; } = 0;
 
@@ -71,7 +79,54 @@ namespace BattleOfAges.Resources
             OnResourceChanged?.Invoke(ResourceType.Ore, OreCount);
         }
 
-        public void ResetToInitial() => SetState(initialWood, initialOre > 0 ? new[] { new KeyValuePair<int, int>(0, initialOre) } : null);
+        public void ResetToInitial()
+        {
+            SetState(initialWood, initialOre > 0 ? new[] { new KeyValuePair<int, int>(0, initialOre) } : null);
+            SetFood(Combat.GameBalance.FoodStart);
+        }
+
+        public void SetFood(float amount)
+        {
+            Food = Mathf.Max(0f, amount);
+            warnedLow = warnedOut = false;
+            OnResourceChanged?.Invoke(ResourceType.Food, FoodCount);
+        }
+
+        public void AddFood(float amount)
+        {
+            if (amount <= 0f) return;
+            Food += amount;
+            warnedLow = warnedOut = false;
+            OnResourceChanged?.Invoke(ResourceType.Food, FoodCount);
+        }
+
+        /// <summary>How much this many people eat over these game hours.</summary>
+        public static float Eaten(int people, float hours) => people * Combat.GameBalance.FoodPerPersonPerDay * hours / 24f;
+
+        /// <summary>Everyone eats over these game hours (saying so when it runs low and when it runs out).</summary>
+        public void Eat(int people, float hours)
+        {
+            if (Food <= 0f || people <= 0) return;
+            int before = FoodCount;
+            float eaten = Eaten(people, hours);
+            Food = Mathf.Max(0f, Food - eaten);
+            if (FoodCount != before) OnResourceChanged?.Invoke(ResourceType.Food, FoodCount);
+            if (!warnedLow && Food > 0f && Food < Eaten(people, 24f * Combat.GameBalance.FoodLowDays))
+            {
+                warnedLow = true;
+                UI.StrategyHud.Notify("Їжі лишилось менш ніж на день");
+            }
+            if (!warnedOut && Food <= 0f)
+            {
+                warnedOut = true;
+                UI.StrategyHud.Notify("Їжа скінчилась: приріст населення зупинився");
+            }
+        }
+
+        private void Update()
+        {
+            if (FoodRules && SaveLoad.SaveSystem.InGame) Eat(Building.TownHall.Population, Combat.WorldClock.HoursOf(Time.deltaTime));
+        }
 
         public void AddResource(ResourceType type, int amount)
         {

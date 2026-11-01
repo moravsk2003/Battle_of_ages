@@ -89,6 +89,7 @@ namespace BattleOfAges.RTS
                 if (mapCamera == null || !mapCamera.enabled) return;
             }
 
+            if (ZonePainter.Painting) return; // the mouse is the brush now
             HandleSelectionInput();
             HandleMovementInput();
         }
@@ -224,6 +225,16 @@ namespace BattleOfAges.RTS
             // Any order but to its own bench calls a worker off the workbench (else it walked back once let go)
             WorkbenchNode toBench = target.GetComponentInParent<WorkbenchNode>();
             foreach (RtsUnit unit in units) WorkbenchNode.CallOff(unit, toBench);
+            ConstructionSite toSite = target.GetComponentInParent<ConstructionSite>();
+            ForEachGatherer(units, g => { if (g.AtSite) g.LeaveSite(null); }); // any order takes it off the site it was building
+            if (toSite != null)
+            {
+                int builders = 0;
+                ForEachGatherer(units, g => { if (g.AssignToSite(toSite)) builders++; });
+                if (builders == 0) StrategyHud.Notify($"Біля будівництва всі {ConstructionSite.MaxBuilders} місця зайняті");
+                else GameSound.Play2D(GameSound.Kind.OrderWork);
+                return;
+            }
 
             // Own wall: up onto it, to the free posts nearest the click (§10.5)
             if (target.GetComponentInParent<WallSegment>() != null || target.GetComponentInParent<WallPier>() != null)
