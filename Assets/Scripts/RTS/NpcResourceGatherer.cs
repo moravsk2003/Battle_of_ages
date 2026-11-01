@@ -53,6 +53,7 @@ namespace BattleOfAges.RTS
         private RtsUnit rtsUnit;
         private GathererState currentState = GathererState.FindingResource;
         private float stateWatchdogTimer = 0f;
+        private Vector3 watchdogFrom;
 
         private ResourceNodeTree targetTree;
         private OrePebbleNode targetPebble;
@@ -311,9 +312,14 @@ namespace BattleOfAges.RTS
             SetRenderersActive(false);
         }
 
+        /// <summary>Went down on its own, while ore ran short: comes out once there is plenty (one sent stays).</summary>
+        private bool autoMiner;
+        public bool AutoMiner => autoMiner;
+
         /// <summary>Comes out of the mine at its entrance and goes back to the current directive.</summary>
         public void LeaveMine()
         {
+            autoMiner = false;
             if (assignedMine != null)
             {
                 Vector3 exit = assignedMine.GetOutputDepositPosition() + Random.insideUnitSphere.normalized * 0.8f;
@@ -334,6 +340,7 @@ namespace BattleOfAges.RTS
         {
             if (mine == null) return;
             StartWorking();
+            autoMiner = false;
 
             if (assignedMine != null && assignedMine != mine)
             {
@@ -496,7 +503,11 @@ namespace BattleOfAges.RTS
         private void Update()
         {
             // Inside a mine the worker stays hidden until the mine's "Вивести" button sends them out (LeaveMine)
-            if (currentState == GathererState.WorkingInsideMine) return;
+            if (currentState == GathererState.WorkingInsideMine)
+            {
+                if (autoMiner && MineNode.OrePlenty) LeaveMine();
+                return;
+            }
 
             // Always process MovingToMineToWork so selected units complete their journey into the Mine
             if (currentState == GathererState.MovingToMineToWork)
@@ -537,6 +548,12 @@ namespace BattleOfAges.RTS
 
             if (currentState == GathererState.MovingToResource || currentState == GathererState.DeliveringToChest)
             {
+                // Stuck, not merely far: the time counts only while it does not get anywhere
+                if ((transform.position - watchdogFrom).sqrMagnitude > 1f)
+                {
+                    watchdogFrom = transform.position;
+                    stateWatchdogTimer = 0f;
+                }
                 stateWatchdogTimer += Time.deltaTime;
                 if (stateWatchdogTimer > 10.0f)
                 {
@@ -648,6 +665,7 @@ namespace BattleOfAges.RTS
         private void HandleFindingResourceState()
         {
             if (!IsWorking) return; // a soldier waits for orders
+            if (carriedWood > 0 || carriedOreAmount > 0) { currentState = GathererState.DeliveringToChest; return; } // a load from before a fight goes in first
             searchTimer += Time.deltaTime;
             if (searchTimer < 0.8f) return; // Stagger searches across frames
             searchTimer = 0f;
@@ -663,6 +681,12 @@ namespace BattleOfAges.RTS
             if (currentDirective == GatherDirective.Auto && AssignToSite(ConstructionSite.NearestNeedingHands(myPos, GameBalance.BuildersComeFrom))) return;
             // and to the fields or the sawmill while food or wood runs short
             if (currentDirective == GatherDirective.Auto && AssignToPlace(WorkPlace.NearestWanting(myPos, GameBalance.BuildersComeFrom), false)) return;
+            // and down a mine while ore runs short
+            if (currentDirective == GatherDirective.Auto)
+            {
+                MineNode wanting = MineNode.NearestWantingHands(myPos, GameBalance.BuildersComeFrom);
+                if (wanting != null) { AssignToWorkInMine(wanting); autoMiner = true; return; }
+            }
 
             // 1. Haul ore from a mine: a hauler always, an Auto worker by need (wood short of the next hall step: most go for wood)
             bool auto = currentDirective == GatherDirective.Auto;

@@ -247,8 +247,10 @@ namespace BattleOfAges.Combat
         /// game hour a house adds (§10.3).
         /// </summary>
         public static int ZoneCellsHouse = 3, ZoneCellsField = 6, ZoneCellsSawmill = 12, ZoneCellsBench = 10, ZoneCellsMine = 10, ZoneCellsMarket = 12, ZoneSitesAtOnce = 2;
-        public static int FieldFarmers = 2, SawmillWorkers = 2, SawmillWantWood = 60, SawmillEnoughWood = 150;
-        public static float FarmerFoodPerHour = 0.5f, FoodWantDays = 3f, FoodEnoughDays = 6f, SawyerWoodPerHour = 15f, HouseBirthsPerHour = 0.1f;
+        public static int FieldFarmers = 2, SawmillWorkers = 2, SawmillWantWood = 150, SawmillEnoughWood = 300;
+        /// <summary>In a campaign workers on their own go down a mine, this many to each, while the ore (stock and mines' buffers) is under Want, and come out at Enough.</summary>
+        public static int MineAutoMiners = 2, MineWantOre = 60, MineEnoughOre = 200;
+        public static float FarmerFoodPerHour = 0.5f, FoodWantDays = 3f, FoodEnoughDays = 6f, SawyerWoodPerHour = 25f, HouseBirthsPerHour = 0.1f;
         public static int KingdomCount = 3;
         /// <summary>
         /// A campaign (M1, a bounded world): heroes in the world, the player's included, and the share of the others that

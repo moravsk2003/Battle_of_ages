@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using BattleOfAges.Combat;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
 using BattleOfAges.Crafting;
@@ -218,6 +219,32 @@ namespace BattleOfAges.Building
         }
 
         public static MineNode GetNearestMineWithOre(Vector3 fromPos) => Nearest(fromPos, m => m.AccumulatedOreCount > 0);
+
+        /// <summary>The ore there is: the stock and what waits in the mines.</summary>
+        private static int OreInAll()
+        {
+            int ore = ResourceManager.Instance != null ? ResourceManager.Instance.OreCount : 0;
+            foreach (MineNode m in activeMines) if (m != null) ore += m.accumulatedOre;
+            return ore;
+        }
+
+        /// <summary>Ore runs short: workers on their own go down (a campaign's rule).</summary>
+        public static bool OreShort => World.WorldSettings.Bounded && OreInAll() < GameBalance.MineWantOre;
+        /// <summary>There is plenty: those who went on their own come out.</summary>
+        public static bool OrePlenty => OreInAll() >= GameBalance.MineEnoughOre;
+
+        /// <summary>The nearest mine in reach with room for a worker on their own while ore runs short, or null.</summary>
+        public static MineNode NearestWantingHands(Vector3 fromPos, float reach)
+        {
+            if (!OreShort) return null;
+            MineNode mine = Nearest(fromPos, m =>
+            {
+                int coming = 0;
+                foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null && w.AssignedMine == m) coming++;
+                return coming < GameBalance.MineAutoMiners && !m.IsFullWorkers;
+            });
+            return mine != null && (mine.transform.position - fromPos).sqrMagnitude <= reach * reach ? mine : null;
+        }
 
         private static MineNode Nearest(Vector3 fromPos, System.Predicate<MineNode> suits)
         {

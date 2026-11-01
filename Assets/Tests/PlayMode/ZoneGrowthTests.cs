@@ -127,6 +127,42 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(sent.AtPlace, "one sent there stays, plenty or not");
         }
 
+        [UnityTest, Timeout(120000)]
+        public IEnumerator AMine_GetsAutoMinersWhenOreIsShort_NoMoreThanItsShare_TheyComeOutAtPlenty()
+        {
+            foreach (MineNode left in new List<MineNode>(MineNode.ActiveMines)) if (left != null) Object.Destroy(left.gameObject); // (other tests' ore counts too)
+            foreach (NpcResourceGatherer left in new List<NpcResourceGatherer>(WorkerRegistry.ActiveWorkers)) if (left != null) Object.Destroy(left.gameObject); // (and their free workers would take the places)
+            yield return null;
+            Vector3 at = new Vector3(-90f, 0f, -60f);
+            at.y = RtsUnit.GetTerrainHeight(at);
+            GameObject mineObj = MineNode.CreateMinePrefab("ShortMine");
+            mineObj.transform.position = at;
+            spawned.Add(mineObj);
+            MineNode mine = mineObj.GetComponent<MineNode>();
+            ResourceManager.Instance.SetState(5000, new[] { new KeyValuePair<int, int>(0, 0) });
+            yield return null;
+            Assert.IsTrue(MineNode.OreShort);
+
+            var people = new List<NpcResourceGatherer>();
+            for (int i = 0; i < GameBalance.MineAutoMiners + 2; i++) people.Add(Worker(at + new Vector3(6f + i, 0f, 4f), "NPC_Miner_" + i));
+            NpcResourceGatherer sent = Worker(at + new Vector3(4f, 0f, 8f), "NPC_SentMiner");
+            sent.AssignToWorkInMine(mine);
+            Time.timeScale = 4f;
+            float end = Time.time + 40f;
+            while (Time.time < end && people.FindAll(p => p.IsInsideMine).Count < GameBalance.MineAutoMiners - 1) yield return null;
+            Time.timeScale = 1f;
+            int auto = people.FindAll(p => p.AutoMiner).Count;
+            Assert.GreaterOrEqual(auto, GameBalance.MineAutoMiners - 1, "workers go down on their own");
+            Assert.LessOrEqual(auto + 1, GameBalance.MineAutoMiners, "no more than a mine's share, the one sent counted");
+
+            ResourceManager.Instance.SetState(5000, new[] { new KeyValuePair<int, int>(0, GameBalance.MineEnoughOre) });
+            yield return null;
+            yield return null;
+            Assert.AreEqual(0, people.FindAll(p => p.IsMiner).Count, "those who went on their own come out");
+            Assert.IsTrue(sent.IsMiner, "one sent stays");
+            Assert.IsNull(MineNode.NearestWantingHands(at, 100f), "and no one goes while there is plenty");
+        }
+
         [UnityTest, Timeout(60000)]
         public IEnumerator AHouse_QuickensBirths_AMineFollowsTheVein()
         {

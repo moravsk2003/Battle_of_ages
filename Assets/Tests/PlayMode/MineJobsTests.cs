@@ -66,6 +66,29 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest, Timeout(120000)]
+        public IEnumerator HaulerOnALongRoad_BringsTheOreIn()
+        {
+            GameObject chest = Resources.StorageChestNode.CreateStorageChestPrefab("TestChest");
+            chest.transform.position = Far;
+            spawned.Add(chest);
+            if (Resources.ResourceManager.Instance == null) spawned.Add(new GameObject("Resources", typeof(Resources.ResourceManager)));
+            MineNode mine = Mine(Far + new Vector3(90f, 0f, 0f)); // further than ten seconds' walk
+            mine.Produce(50);
+            NpcResourceGatherer hauler = Worker(mine.GetOutputDepositPosition() + new Vector3(2f, 0f, 2f), "NPC_Hauler_Test");
+            yield return null;
+            hauler.SetGatherDirective(GatherDirective.HaulOreFromMineToChest);
+            int before = Resources.ResourceManager.Instance.OreCount;
+            Time.timeScale = 4f;
+            try
+            {
+                float end = Time.time + 80f;
+                while (Time.time < end && Resources.ResourceManager.Instance.OreCount == before) yield return null;
+            }
+            finally { Time.timeScale = 1f; }
+            Assert.Greater(Resources.ResourceManager.Instance.OreCount, before, "the load reached the chest");
+        }
+
+        [UnityTest, Timeout(120000)]
         public IEnumerator HaulerWithNoOre_WaitsByTheMine()
         {
             MineNode mine = Mine(Far);

@@ -39,7 +39,7 @@ namespace BattleOfAges.PlayModeTests
             GameBalance.BanditFirstRaidHours = 1000f; BanditRaids.NextRaidHour = 1000.0; // the look, not the fight
 
             ResourceManager rm = ResourceManager.Instance;
-            rm.SetState(400, new[] { new KeyValuePair<int, int>(0, 80), new KeyValuePair<int, int>(1, 30) });
+            rm.SetState(400, new[] { new KeyValuePair<int, int>(0, 20) });
             GameObject hallObj = BuildingPlacementSystem.CreateBuilding(BuildingType.TownHall);
             Vector3 hallAt = new Vector3(0f, 0f, -44f);
             hallAt.y = RtsUnit.GetTerrainHeight(hallAt);
@@ -58,7 +58,7 @@ namespace BattleOfAges.PlayModeTests
 
             var report = new StringBuilder("# Zones left to the workers\n\n");
             foreach (ZoneType t in ZoneMap.Types) report.AppendLine($"- {ZoneMap.Name(t)}: {ZoneMap.Count(t)} cells, calls for {ZoneGrower.Wanted(t, ZoneMap.Count(t))}");
-            report.AppendLine("\n| game hour | sites | built | wood | food | workers | at places | state |\n|---|---|---|---|---|---|---|---|");
+            report.AppendLine("\n| game hour | sites | built | wood | ore | food | workers | at places | state |\n|---|---|---|---|---|---|---|---|---|");
             Time.timeScale = speed;
             float nextRow = 0f;
             while (WorldClock.GameHours < hours)
@@ -76,7 +76,7 @@ namespace BattleOfAges.PlayModeTests
                     foreach (NpcKingdom k in NpcKingdom.All) if (k != null && k.Raiding) raiding++;
                     int chasing = 0;
                     foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null && w.GetComponent<RtsUnit>().HasAttackTarget) chasing++;
-                    report.AppendLine($"| {WorldClock.GameHours:0.0} | {ConstructionSite.All.Count} | {BuildingNode.Active.Count - ConstructionSite.All.Count} | {rm.WoodCount} | {rm.FoodCount} | {WorkerRegistry.WorkerCount} | {atPlaces} | alarm {SettlementAlarm.Active}, raids {raiding}, fighting {chasing}; {string.Join(", ", parts)} |");
+                    report.AppendLine($"| {WorldClock.GameHours:0.0} | {ConstructionSite.All.Count} | {BuildingNode.Active.Count - ConstructionSite.All.Count} | {rm.WoodCount} | {rm.OreCount} | {rm.FoodCount} | {WorkerRegistry.WorkerCount} | {atPlaces} | alarm {SettlementAlarm.Active}, raids {raiding}, fighting {chasing}; {string.Join(", ", parts)} |");
                 }
                 yield return null;
             }
