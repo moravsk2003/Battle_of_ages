@@ -9,7 +9,9 @@ namespace BattleOfAges.Utils
     /// Build check: started with "-smokeshot path.png", the player opens the game scene, waits for streaming, saves a
     /// screenshot and quits. Shows what a build really renders (shaders stripped from builds work in the Editor).
     /// "-smokemap" shoots the map view (team rings, plates) instead of first person; "-smokecampaign" starts a new
-    /// campaign (seed 777) instead of opening the fixed scene, "-smokelake" puts the hero by its nearest lake.
+    /// campaign (seed 777) instead of opening the fixed scene, "-smokelake" puts the hero by its nearest lake;
+    /// "-smokezones" (with a campaign): zones, a field, a market, a site, a second settlement and a caravan by the base,
+    /// and a second shot of the market's window beside path (path + ".market.png").
     /// </summary>
     public sealed class BuildSmokeShot : MonoBehaviour
     {
@@ -23,10 +25,10 @@ namespace BattleOfAges.Utils
             var go = new GameObject("BuildSmokeShot");
             DontDestroyOnLoad(go);
             go.AddComponent<BuildSmokeShot>().StartCoroutine(Shoot(args[i + 1], Array.IndexOf(args, "-smokefx") >= 0, Array.IndexOf(args, "-smokemap") >= 0,
-                                                                   Array.IndexOf(args, "-smokecampaign") >= 0, Array.IndexOf(args, "-smokelake") >= 0));
+                                                                   Array.IndexOf(args, "-smokecampaign") >= 0, Array.IndexOf(args, "-smokelake") >= 0, Array.IndexOf(args, "-smokezones") >= 0));
         }
 
-        private static IEnumerator Shoot(string path, bool effects, bool map, bool campaign, bool lake)
+        private static IEnumerator Shoot(string path, bool effects, bool map, bool campaign, bool lake, bool zones)
         {
             if (campaign)
             {
@@ -46,11 +48,58 @@ namespace BattleOfAges.Utils
                 cc.enabled = false; player.transform.position = at; player.transform.rotation = Quaternion.LookRotation(Vector3.left); cc.enabled = true;
             }
             yield return new WaitForSecondsRealtime(8f);
+            if (zones) Settlements();
+            if (zones) yield return new WaitForSecondsRealtime(3f);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
             ScreenCapture.CaptureScreenshot(path);
             yield return new WaitForSecondsRealtime(1.5f);
+            if (zones)
+            {
+                UI.TradeUI.Open();
+                yield return new WaitForSecondsRealtime(1f);
+                ScreenCapture.CaptureScreenshot(path + ".market.png");
+                yield return new WaitForSecondsRealtime(1.5f);
+            }
             Application.Quit();
+        }
+
+        /// <summary>With "-smokezones": what M5 makes at run time, in view of the map camera over the base.</summary>
+        private static void Settlements()
+        {
+            GameObject Build(Building.BuildingType type, Vector3 at)
+            {
+                GameObject go = Building.BuildingPlacementSystem.CreateBuilding(type);
+                at.y = RTS.RtsUnit.GetTerrainHeight(at);
+                go.transform.position = at;
+                go.GetComponent<Building.BuildingNode>().OnBuilt();
+                return go;
+            }
+            Building.TownHall capital = Build(Building.BuildingType.TownHall, new Vector3(0f, 0f, -14f)).GetComponent<Building.TownHall>();
+            capital.Level = 2;
+            capital.Stock.SetState(1000, new[] { new System.Collections.Generic.KeyValuePair<int, int>(0, 200) });
+            capital.Stock.SetFood(500f);
+            World.ZoneMap.Paint(new Vector3(-30f, 0f, 20f), 14f, World.ZoneType.Fields, out _);
+            World.ZoneMap.Paint(new Vector3(30f, 0f, 20f), 14f, World.ZoneType.Housing, out _);
+            World.ZoneMap.Paint(new Vector3(-30f, 0f, -30f), 14f, World.ZoneType.Trade, out _);
+            Build(Building.BuildingType.Field, new Vector3(-30f, 0f, 20f));
+            Build(Building.BuildingType.Market, new Vector3(-30f, 0f, -30f));
+            GameObject site = Building.BuildingPlacementSystem.CreateBuilding(Building.BuildingType.Mine);
+            Vector3 siteAt = new Vector3(30f, 0f, -30f);
+            siteAt.y = RTS.RtsUnit.GetTerrainHeight(siteAt);
+            site.transform.position = siteAt;
+            Building.ConstructionSite.Begin(site, Building.BuildingType.Mine, 0.5f);
+            Vector3 place = Vector3.zero;
+            for (float r = 650f; r < 2000f && place == Vector3.zero; r += 100f)
+                for (int i = 0; i < 16 && place == Vector3.zero; i++)
+                {
+                    Vector3 p = Quaternion.Euler(0f, i * 22.5f, 0f) * Vector3.forward * r;
+                    if (!World.Lakes.InWater(p.x, p.z, 40f) && Building.TownHall.FoundingForbidden(p) == null) place = p;
+                }
+            Building.TownHall second = Build(Building.BuildingType.TownHall, place).GetComponent<Building.TownHall>();
+            second.Founded();
+            Building.Caravans.Send(capital, second, Building.CaravanGood.Wood, 100);
+            Debug.Log($"[Smoke] settlements {Building.TownHall.All.Count}, caravans {Building.Caravan.All.Count}, second at {place}, zones {World.ZoneMap.Count(World.ZoneType.Fields)} field cells");
         }
 
         /// <summary>With "-smokefx": runtime-made looks in front of the camera (mage bolts, fire fan, an artifact).</summary>
