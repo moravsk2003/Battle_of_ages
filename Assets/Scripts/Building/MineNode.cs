@@ -60,7 +60,7 @@ namespace BattleOfAges.Building
                     int pick = gear != null ? gear.LevelOf(ItemType.Pickaxe) : 0;
                     rate += pick > 0 ? ItemStatCalculator.CalculateToolEfficiency(pick) : 1f;
                 }
-                return rate + Mathf.Max(0, assignedWorkerCount - counted); // workers without a record (tests, old saves)
+                return (rate + Mathf.Max(0, assignedWorkerCount - counted)) * Richness; // workers without a record (tests, old saves)
             }
         }
 
@@ -73,6 +73,23 @@ namespace BattleOfAges.Building
         }
 
         private void OnDisable() => activeMines.Remove(this); // a site's mine, a destroyed one
+
+        private float richness = -1f;
+
+        /// <summary>The vein under it (the coarse map, §5.1): 0.7..1.6 of the rate in a campaign, 1 in the fixed world.</summary>
+        public float Richness
+        {
+            get
+            {
+                if (!World.WorldSettings.Bounded) return 1f;
+                if (richness < 0f)
+                {
+                    World.CoarseWorldMap map = World.CoarseWorldMap.Current;
+                    richness = map.TryCell(transform.position, out int x, out int z) ? Mathf.Lerp(0.7f, 1.6f, map.Ore(x, z)) : 1f;
+                }
+                return richness;
+            }
+        }
 
         private void Start()
         {

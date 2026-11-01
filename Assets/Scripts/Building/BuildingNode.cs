@@ -80,6 +80,8 @@ namespace BattleOfAges.Building
         {
             BuildingDefinition def = BuildingData.GetDefinition(Type); // (a mine or workbench used to spawn a house's worker)
 
+            if (World.WorldSettings.Bounded && Type == BuildingType.WorkerHouse) ApplyEpochLook(TownHall.Current != null ? TownHall.Current.Level : 1);
+
             Combat.HealthComponent hp = GetComponent<Combat.HealthComponent>();
             WallSegment wall = GetComponent<WallSegment>();
             if (hp != null && def.MaxHealth > 0)
@@ -87,11 +89,30 @@ namespace BattleOfAges.Building
                 hp.InitializeHealth(wall != null ? WallSegment.MaxHealthFor(Type, wall.OreTier) : def.MaxHealth);
             }
 
-            for (int i = 0; i < def.NpcSpawnCount && TownHall.HasRoom(); i++) // the town hall caps the population
+            // (in a campaign a house quickens births instead: TownHall.GrowthPerHour)
+            for (int i = 0; !World.WorldSettings.Bounded && i < def.NpcSpawnCount && TownHall.HasRoom(); i++) // the town hall caps the population
             {
                 SpawnWorkerNpc(i);
             }
 
+        }
+
+        private static MaterialPropertyBlock epochTint;
+
+        /// <summary>A house's size for a hall level: a hut under hall II, a house, a stone house from hall IV (§10.1).</summary>
+        public static float HouseScale(int hallLevel) => 0.8f + 0.12f * (Mathf.Clamp(hallLevel, 1, TownHall.MaxLevel) - 1);
+
+        /// <summary>The look of the epoch it is built in: hut → house → stone house (§10.1, M5 step 5).</summary>
+        public void ApplyEpochLook(int hallLevel)
+        {
+            transform.localScale = Vector3.one * HouseScale(hallLevel);
+            if (hallLevel < 4) return;
+            if (epochTint == null)
+            {
+                epochTint = new MaterialPropertyBlock();
+                epochTint.SetColor("_BaseColor", new Color(0.78f, 0.78f, 0.82f)); // the plaster goes to stone
+            }
+            foreach (Renderer r in GetComponentsInChildren<Renderer>()) r.SetPropertyBlock(epochTint);
         }
 
         private void SpawnWorkerNpc(int index)

@@ -155,7 +155,7 @@ namespace BattleOfAges.UI
             }
             if (gameObject.GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
 
-            BuildingDefinition[] defs = BuildingData.GetAllDefinitions();
+            BuildingDefinition[] defs = BuildingData.MenuDefinitions();
             const float rowH = 74f, gap = 6f;
             float height = 58f + defs.Length * (rowH + gap) + 44f;
             RectTransform panelRect = UiTheme.Rect(transform, "BuildMenuPanel", new Vector2(0.5f, 0f), new Vector2(0f, 160f), new Vector2(640f, height)); // above the unit command panel

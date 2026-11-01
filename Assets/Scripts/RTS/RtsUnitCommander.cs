@@ -157,6 +157,8 @@ namespace BattleOfAges.RTS
                     WorkbenchUI.EnsureInstance().OpenUI(wb);
                     return;
                 }
+                MarketNode market = hit.collider.GetComponentInParent<MarketNode>();
+                if (market != null && market.enabled) { TradeUI.Open(); return; }
 
                 // Fallback nearest check at hit point
                 RtsUnit nearestUnit = UnitRegistry.FindNearestUnit(hit.point, singleClickRadius);
@@ -226,7 +228,16 @@ namespace BattleOfAges.RTS
             WorkbenchNode toBench = target.GetComponentInParent<WorkbenchNode>();
             foreach (RtsUnit unit in units) WorkbenchNode.CallOff(unit, toBench);
             ConstructionSite toSite = target.GetComponentInParent<ConstructionSite>();
-            ForEachGatherer(units, g => { if (g.AtSite) g.LeaveSite(null); }); // any order takes it off the site it was building
+            WorkPlace toPlace = target.GetComponentInParent<WorkPlace>();
+            ForEachGatherer(units, g => { if (g.AtSite) g.LeaveSite(null); if (g.AtPlace && g.AssignedPlace != toPlace) g.LeavePlace(null); }); // any order takes it off the site or field it was at
+            if (toPlace != null)
+            {
+                int hands = 0;
+                ForEachGatherer(units, g => { if (g.AssignToPlace(toPlace, true)) hands++; });
+                if (hands == 0) StrategyHud.Notify("Тут усі місця зайняті");
+                else GameSound.Play2D(GameSound.Kind.OrderWork);
+                return;
+            }
             if (toSite != null)
             {
                 int builders = 0;

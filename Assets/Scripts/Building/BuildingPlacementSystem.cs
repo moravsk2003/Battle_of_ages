@@ -439,6 +439,9 @@ namespace BattleOfAges.Building
                 case BuildingType.WallStairs:
                 case BuildingType.WallGate: return BuildingNode.CreateWallPrefab(type, type.ToString());
                 case BuildingType.TownHall: return TownHall.CreatePrefab("TownHall");
+                case BuildingType.Field: return Utils.ZoneBuildingBuilder.CreateField();
+                case BuildingType.Sawmill: return Utils.ZoneBuildingBuilder.CreateSawmill();
+                case BuildingType.Market: return Utils.ZoneBuildingBuilder.CreateMarket();
                 default: return null;
             }
         }

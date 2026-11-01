@@ -240,6 +240,14 @@ namespace BattleOfAges.Combat
         public static float BuildBaseSeconds = 8f, BuildSecondsPerResource = 2f, BuildersComeFrom = 400f;
         /// <summary>How far from its hall a settlement marks zones at hall I (§5.3; +60% each hall level).</summary>
         public static float ZoneReachBase = 300f;
+        /// <summary>
+        /// Zones (ZoneGrower, WorkPlace): marked cells per building; sites at once; farmers and food (a farmer feeds a dozen);
+        /// the food days under which Auto workers go to the fields, and over which they leave; sawyers and wood; births per
+        /// game hour a house adds (§10.3).
+        /// </summary>
+        public static int ZoneCellsHouse = 3, ZoneCellsField = 6, ZoneCellsSawmill = 12, ZoneCellsBench = 10, ZoneCellsMine = 10, ZoneCellsMarket = 12, ZoneSitesAtOnce = 2;
+        public static int FieldFarmers = 2, SawmillWorkers = 2, SawmillWantWood = 60, SawmillEnoughWood = 150;
+        public static float FarmerFoodPerHour = 0.5f, FoodWantDays = 3f, FoodEnoughDays = 6f, SawyerWoodPerHour = 15f, HouseBirthsPerHour = 0.1f;
         public static int KingdomCount = 3;
         /// <summary>
         /// A campaign (M1, a bounded world): heroes in the world, the player's included, and the share of the others that

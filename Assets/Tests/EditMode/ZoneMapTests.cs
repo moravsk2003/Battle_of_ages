@@ -53,6 +53,19 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void MarkedLand_IsClearedOfTrees_ExceptAForest_AndHousesGrowWithTheEpoch()
+        {
+            Vector3 fields = new Vector3(40f, 0f, 40f), forest = new Vector3(-60f, 0f, 30f);
+            ZoneMap.Paint(fields, 14f, ZoneType.Fields, out _);
+            ZoneMap.Paint(forest, 14f, ZoneType.Forest, out _);
+            Assert.IsTrue(ProceduralBiomeChunk.ZoneClearsTrees(fields));
+            Assert.IsFalse(ProceduralBiomeChunk.ZoneClearsTrees(forest), "a forest keeps its trees");
+            Assert.IsFalse(ProceduralBiomeChunk.ZoneClearsTrees(new Vector3(200f, 0f, 200f)), "unmarked land too");
+            Assert.Less(Building.BuildingNode.HouseScale(1), Building.BuildingNode.HouseScale(3));
+            Assert.Less(Building.BuildingNode.HouseScale(3), Building.BuildingNode.HouseScale(5));
+        }
+
+        [Test]
         public void ASave_RestoresTheZones()
         {
             ZoneMap.Paint(new Vector3(40f, 0f, 40f), 14f, ZoneType.Crafts, out _);

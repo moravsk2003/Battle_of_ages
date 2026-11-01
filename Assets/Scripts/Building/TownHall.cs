@@ -97,7 +97,21 @@ namespace BattleOfAges.Building
 
         /// <summary>Births per game hour for this population: base + per-capita share.</summary>
         public static float GrowthPerHour(int population) =>
-            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population;
+            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population + GameBalance.HouseBirthsPerHour * Houses();
+
+        private static int housesFrame = -1, housesCount;
+
+        /// <summary>A campaign's finished houses (each quickens births, §18.3; the fixed world's houses give a worker instead).</summary>
+        public static int Houses()
+        {
+            if (!World.WorldSettings.Bounded) return 0;
+            if (housesFrame == Time.frameCount) return housesCount;
+            housesFrame = Time.frameCount;
+            housesCount = 0;
+            foreach (BuildingNode b in BuildingNode.Active)
+                if (b != null && b.Type == BuildingType.WorkerHouse && b.GetComponent<ConstructionSite>() == null) housesCount++;
+            return housesCount;
+        }
 
         /// <summary>
         /// Accumulates births over the elapsed game hours and returns how many people are born now (never above the

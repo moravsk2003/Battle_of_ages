@@ -34,7 +34,26 @@ namespace BattleOfAges.UI
         private static bool Has(BuildingType t) { foreach (BuildingNode b in BuildingNode.Active) if (b != null && b.Type == t) return true; return false; }
 
         /// <summary>The goals in order: (what to do, how, done?).</summary>
-        public static readonly (string goal, Func<string> how, Func<bool> done)[] Goals =
+        public static (string goal, Func<string> how, Func<bool> done)[] Goals => World.WorldSettings.Bounded ? CampaignGoals : FixedGoals;
+
+        /// <summary>A campaign: most buildings grow from marked zones (M5).</summary>
+        private static string ToZones() => $"{K(KeyAction.ToggleGameMode)} мапа → {K(KeyAction.BuildMenu)} → панель «Зони»:";
+
+        private static readonly (string goal, Func<string> how, Func<bool> done)[] CampaignGoals =
+        {
+            ("Збудуйте скриню-склад", () => $"{ToBuild()} «Скриня-склад», ЛКМ — поставити. Робітники «Авто» самі її збудують; у скриню вони зносять дерево й руду.", () => StorageChestNode.ActiveChests.Count > 0),
+            ("Назбирайте 20 деревини", () => $"Самі: {K(KeyAction.ChopTree)} біля дерева. Або на мапі: виділіть робітників і ПКМ по дереву.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
+            ("Розмітьте рудню", () => $"{ToZones()} «Рудня», ЛКМ малює зону. Робітники зведуть шахту; ПКМ по ній — шахтарі, носії — наказ «Шахта» або «Авто».", () => MineNode.ActiveMines.Count > 0),
+            ("Розмітьте поля", () => $"{ToZones()} «Поля». Їжа витрачається щодня; коли її мало, робітники «Авто» самі стають у поле.", () => Has(BuildingType.Field)),
+            ("Викуйте першу річ", () => $"Верстак: на мапі виділіть робітника, ПКМ по верстаку; ЛКМ по ньому — вікно, рецепт → «Виготовити». Ще верстаки — зона «Ремесла».", () => Armory.Instance.Items.Count > 0),
+            ("Озбройте робітника", () => $"На мапі виділіть людей, {K(KeyAction.Equipment)} — спорядження: клік по мечу чи броні на складі дає по одній кожному. Вище за воїна (лицар, генерал) піднімають лише бої.", () => ArmedVillager()),
+            ("Збудуйте ратушу", () => $"{ToBuild()} «Ратуша»: без неї населення не росте. Стелю задає її рівень, приріст прискорюють хати.", () => TownHall.Current != null),
+            ("Розмітьте житло", () => $"{ToZones()} «Житло». Кожна хата прискорює приріст населення.", () => Has(BuildingType.WorkerHouse)),
+            ("Покращте ратушу до II", () => $"На мапі наведіть на ратушу — кнопка «Покращити». Треба {Combat.GameBalance.TownHallWood[2]} дерева й {Combat.GameBalance.TownHallOre[2]} руди I+: з шахти зрідка або переплавкою на верстаці (10 → 1).", () => TownHall.Current != null && TownHall.Current.Level >= 2),
+            ("Збудуйте стіну з воротами", () => $"{ToBuild()} «Стіна» і «Ворота». Виділені робітники ПКМ по стіні стають на пости; {K(KeyAction.Alarm)} — тривога, усі до зброї.", () => Has(BuildingType.WallGate)),
+        };
+
+        private static readonly (string goal, Func<string> how, Func<bool> done)[] FixedGoals =
         {
             ("Збудуйте скриню-склад", () => $"{ToBuild()} «Скриня», ЛКМ — поставити. У скриню робітники зносять дерево й руду.", () => StorageChestNode.ActiveChests.Count > 0),
             ("Назбирайте 20 деревини", () => $"Самі: {K(KeyAction.ChopTree)} біля дерева — рубати, {K(KeyAction.InteractGather)} — підняти гілку. Або на мапі: виділіть робітників і ПКМ по дереву.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),

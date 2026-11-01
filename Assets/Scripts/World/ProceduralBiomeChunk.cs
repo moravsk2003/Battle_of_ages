@@ -26,6 +26,13 @@ namespace BattleOfAges.World
             return t * t * (3f - 2f * t);
         }
 
+        /// <summary>Marked land is cleared: only a forest zone keeps its trees.</summary>
+        public static bool ZoneClearsTrees(Vector3 p)
+        {
+            ZoneType z = ZoneMap.At(p);
+            return z != ZoneType.None && z != ZoneType.Forest;
+        }
+
         /// <summary>Does this chunk get a raider camp? One in five by the M0 rule; a campaign's world is wide: rarer, none by the base.</summary>
         public static bool CampChunk(Vector2Int coord, float size)
         {
@@ -317,6 +324,7 @@ namespace BattleOfAges.World
                 float y = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
                 if (y > SnowLineHeight + 4f) continue; // Don't spawn trees on high snow peaks
                 if (Lakes.InWater(worldX, worldZ, 1.5f)) continue; // nor in a lake
+                if (ZoneClearsTrees(new Vector3(worldX, y, worldZ))) continue; // nor on a marked field or street
 
                 // No trees on cliffs (rise over 2 m of more than ~1.3 m = steeper than ~33 degrees)
                 float rise = Mathf.Max(

@@ -12,7 +12,11 @@ namespace BattleOfAges.Building
         CastleWall,
         TownHall,
         WallStairs,
-        WallGate
+        WallGate,
+        // A campaign's zones (M5; added last so saved numbers hold)
+        Field,
+        Sawmill,
+        Market
     }
 
     /// <summary>
@@ -132,7 +136,10 @@ namespace BattleOfAges.Building
                 NpcSpawnCount = 0,
                 Size = new Vector3(5.6f, 5.0f, 5.6f),
                 MaxHealth = GameBalance.TownHallHealth[1] // grows with the level (TownHall)
-            }
+            },
+            new BuildingDefinition { Type = BuildingType.Field, DisplayName = "Поле", Description = "Селяни на ньому дають їжу", WoodCost = 2, OreCost = 0, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(13f, 0.6f, 13f), MaxHealth = 100 },
+            new BuildingDefinition { Type = BuildingType.Sawmill, DisplayName = "Лісопилка", Description = "Пилярі дають дерево, більше в густому лісі", WoodCost = 6, OreCost = 1, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(7f, 3.4f, 6f), MaxHealth = 400 },
+            new BuildingDefinition { Type = BuildingType.Market, DisplayName = "Ринок", Description = "Обмін дерева, їжі й руди", WoodCost = 12, OreCost = 4, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(9f, 3f, 9f), MaxHealth = 500 }
         };
 
         public static BuildingDefinition GetDefinition(BuildingType type)
@@ -148,6 +155,22 @@ namespace BattleOfAges.Building
         public static BuildingDefinition[] GetAllDefinitions()
         {
             return definitions;
+        }
+
+        /// <summary>Does this building grow from a zone in a campaign (not placed by hand there; §10.1)?</summary>
+        public static bool GrowsFromZone(BuildingType t) =>
+            t == BuildingType.WorkerHouse || t == BuildingType.Mine || t == BuildingType.Workbench || t == BuildingType.Field || t == BuildingType.Sawmill || t == BuildingType.Market;
+
+        /// <summary>What the build menu offers: in a campaign the key buildings; in the fixed world M0's list.</summary>
+        public static BuildingDefinition[] MenuDefinitions()
+        {
+            var list = new System.Collections.Generic.List<BuildingDefinition>();
+            foreach (BuildingDefinition d in definitions)
+            {
+                bool zoneOnly = d.Type == BuildingType.Field || d.Type == BuildingType.Sawmill || d.Type == BuildingType.Market;
+                if (World.WorldSettings.Bounded ? !GrowsFromZone(d.Type) : !zoneOnly) list.Add(d);
+            }
+            return list.ToArray();
         }
     }
 }
