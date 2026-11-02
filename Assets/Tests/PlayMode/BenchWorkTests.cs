@@ -52,6 +52,10 @@ namespace BattleOfAges.PlayModeTests
         [UnityTest, Timeout(180000)]
         public IEnumerator ACalledWorker_StaysAtTheBench_Smelts_AndAnotherOrderTakesItOff()
         {
+            // Earlier tests' free workers would bring their own ore to the one stock this test counts
+            foreach (NpcResourceGatherer left in new List<NpcResourceGatherer>(WorkerRegistry.ActiveWorkers)) if (left != null) Object.Destroy(left.gameObject);
+            foreach (MineNode left in new List<MineNode>(MineNode.ActiveMines)) if (left != null) Object.Destroy(left.gameObject);
+            yield return null;
             GameObject benchObj = WorkbenchNode.CreateWorkbenchPrefab("TestBench");
             benchObj.transform.position = Far;
             spawned.Add(benchObj);

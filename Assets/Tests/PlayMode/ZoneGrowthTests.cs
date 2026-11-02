@@ -28,6 +28,8 @@ namespace BattleOfAges.PlayModeTests
             ResourceManager.Instance.SetState(200, new[] { new KeyValuePair<int, int>(0, 100) });
             ResourceManager.Instance.SetFood(100f);
             foreach (BuildingNode b in new List<BuildingNode>(BuildingNode.Active)) if (b != null) Object.Destroy(b.gameObject);
+            // Earlier tests' free workers would take the places a test means for its own (a field has two)
+            foreach (NpcResourceGatherer w in new List<NpcResourceGatherer>(WorkerRegistry.ActiveWorkers)) if (w != null) Object.Destroy(w.gameObject);
             yield return null;
         }
 
@@ -189,7 +191,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(GatherDirective.Auto, auto.CurrentDirective);
             Assert.IsTrue(field.WantsHands, "food is short");
             yield return new WaitForSeconds(1.5f);
-            Assert.AreEqual(GathererState.WorkingAtPlace, auto.CurrentState, "an Auto worker goes to the field");
+            Assert.AreEqual(GathererState.WorkingAtPlace, auto.CurrentState, $"an Auto worker goes to the field; on it {field.WorkerCount}/{field.Slots}, people {WorkerRegistry.WorkerCount}");
             Assert.AreSame(field, auto.AssignedPlace);
 
             ResourceManager.Instance.SetFood(10000f);
