@@ -66,6 +66,25 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void AFastStroke_LeavesNoGaps_AndTheBrushShowsTheCellsItTakes()
+        {
+            Vector3 from = new Vector3(20f, 0f, 40f), to = new Vector3(120f, 0f, 40f);
+            UI.ZonePainter.PaintStroke(from, to, 8f, ZoneType.Fields, out _);
+            for (float x = 20f; x <= 120f; x += ZoneMap.CellSize)
+                if (ZoneMap.Forbidden(ZoneMap.CellOf(new Vector3(x, 0f, 40f)), ZoneType.Fields) == null)
+                    Assert.AreEqual(ZoneType.Fields, ZoneMap.At(new Vector3(x, 0f, 40f)), "at x " + x);
+
+            ZoneMap.Clear();
+            var cells = new System.Collections.Generic.List<Vector2Int>();
+            Vector3 at = new Vector3(44f, 0f, 44f);
+            ZoneMap.CellsIn(at, 14f, cells);
+            int marked = ZoneMap.Paint(at, 14f, ZoneType.Housing, out _);
+            Assert.GreaterOrEqual(cells.Count, marked);
+            foreach (Vector2Int c in cells)
+                if (ZoneMap.Forbidden(c, ZoneType.Housing) == null) Assert.AreEqual(ZoneType.Housing, ZoneMap.At(ZoneMap.CenterOf(c)), "what it shows is what it takes");
+        }
+
+        [Test]
         public void NoNewSettlement_NextToARaidersCamp()
         {
             for (int x = 10; x < 200; x++)

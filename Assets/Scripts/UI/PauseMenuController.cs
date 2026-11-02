@@ -187,6 +187,11 @@ namespace BattleOfAges.UI
                     GameWindows.CloseAllModals();
                     return;
                 }
+                if (ZonePainter.Painting)
+                {
+                    ZonePainter.Stop(); // the brush goes down, the map stays
+                    return;
+                }
                 // Escape cancels a building being placed (BuildingPlacementSystem) and takes the map back to the first
                 // person view; only there it pauses
                 var placement = Building.BuildingPlacementSystem.Instance;

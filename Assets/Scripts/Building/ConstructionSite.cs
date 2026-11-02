@@ -80,15 +80,15 @@ namespace BattleOfAges.Building
         {
             Type = type;
             Progress = Mathf.Clamp01(progress);
-            BuildingDefinition def = BuildingData.GetDefinition(type);
-            WorkSeconds = SecondsFor(def);
-            radius = Mathf.Max(def.Size.x, def.Size.z) * 0.5f + 1.2f;
             foreach (Behaviour b in GetComponentsInChildren<Behaviour>())
             {
                 if (b == this || b is BuildingNode || !b.enabled) continue;
                 b.enabled = false;
                 switchedOff.Add(b);
             }
+            BuildingDefinition def = BuildingData.GetDefinition(type); // (after: a hall that stands no more does not count itself as the first)
+            WorkSeconds = SecondsFor(def);
+            radius = Mathf.Max(def.Size.x, def.Size.z) * 0.5f + 1.2f;
             foreach (Renderer r in GetComponentsInChildren<Renderer>())
             {
                 if (!r.enabled) continue;

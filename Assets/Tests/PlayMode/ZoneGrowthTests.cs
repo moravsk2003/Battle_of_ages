@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
+using BattleOfAges.UI;
 using BattleOfAges.Building;
 using BattleOfAges.Combat;
 using BattleOfAges.Resources;
@@ -53,6 +55,83 @@ namespace BattleOfAges.PlayModeTests
         {
             ZoneGrower g = Object.FindFirstObjectByType<ZoneGrower>();
             return g != null ? g : new GameObject("ZoneGrower").AddComponent<ZoneGrower>();
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator BeforeTheFirstHall_TheZonesLeaveItsPrice()
+        {
+            foreach (TownHall h in Object.FindObjectsByType<TownHall>(FindObjectsSortMode.None)) Object.Destroy(h.gameObject);
+            yield return null;
+            BuildingDefinition hall = BuildingData.GetDefinition(BuildingType.TownHall);
+            BuildingDefinition field = BuildingData.GetDefinition(BuildingType.Field);
+            Assert.Greater(ZoneMap.Paint(new Vector3(60f, 0f, 60f), 14f, ZoneType.Fields, out _), 0);
+            ResourceManager.Instance.SetState(hall.WoodCost + field.WoodCost - 1, new[] { new KeyValuePair<int, int>(0, hall.OreCost) });
+            Grower().Tick();
+            yield return null;
+            Assert.AreEqual(0, ConstructionSite.All.Count, "the hall's wood is not for fields");
+            ResourceManager.Instance.AddResource(ResourceType.Wood, 1);
+            Grower().Tick();
+            yield return null;
+            Assert.AreEqual(1, ConstructionSite.All.Count, "what is over it is");
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator WithNoOre_AnAutoWorker_GoesForPebbles_ThoughTreesAreNearer()
+        {
+            Vector3 at = new Vector3(90f, 0f, 90f);
+            at.y = RtsUnit.GetTerrainHeight(at);
+            foreach (MineNode left in new List<MineNode>(MineNode.ActiveMines)) if (left != null) Object.Destroy(left.gameObject);
+            foreach (NpcResourceGatherer left in new List<NpcResourceGatherer>(WorkerRegistry.ActiveWorkers)) if (left != null) Object.Destroy(left.gameObject);
+            yield return null;
+            ResourceManager.Instance.SetState(200, null);
+            GameObject chest = StorageChestNode.CreateStorageChestPrefab("TestChest");
+            chest.transform.position = at;
+            spawned.Add(chest);
+            GameObject pebble = OrePebbleNode.CreatePebblePrefab("TestPebble");
+            Vector3 pebbleAt = at + new Vector3(7f, 0f, 2f); // (near: an earlier test's world may still be loaded, cliffs and all)
+            pebbleAt.y = RtsUnit.GetTerrainHeight(pebbleAt);
+            pebble.transform.position = pebbleAt;
+            spawned.Add(pebble);
+            GameObject tree = BattleOfAges.Utils.SteppeTreeBuilder.CreateSteppeTree("TestTree");
+            Vector3 treeAt = at + new Vector3(2f, 0f, 4f);
+            treeAt.y = RtsUnit.GetTerrainHeight(treeAt);
+            tree.transform.position = treeAt;
+            spawned.Add(tree);
+            yield return null;
+            NpcResourceGatherer pebbler = Worker(at + new Vector3(2f, 0f, 2f), "NPC_Pebbler");
+            Time.timeScale = 6f;
+            float end = Time.time + 90f;
+            while (Time.time < end && ResourceManager.Instance.OreCount == 0) yield return null;
+            Time.timeScale = 1f;
+            Assert.Greater(ResourceManager.Instance.OreCount, 0, $"the ore reached the chest; state {pebbler.CurrentState}, at {pebbler.transform.position}, chest {at}, pebble taken {pebble.GetComponent<OrePebbleNode>().IsPickedUp}, alarm {SettlementAlarm.Active}, halls {TownHall.All.Count}, chests {StorageChestNode.ActiveChests.Count}, target {pebbler.GetComponent<RtsUnit>().HasAttackTarget}, stock wood {ResourceManager.Instance.Main.WoodCount} ore {ResourceManager.Instance.Main.OreCount}");
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator TheToolbar_TakesUpAndPutsDownTheBrush_AndSaysWhatComesNext()
+        {
+            var parent = new GameObject("TestCanvas", typeof(RectTransform), typeof(Canvas));
+            spawned.Add(parent);
+            ZoneToolbar bar = ZoneToolbar.Create(parent.transform);
+            yield return null;
+            Button fields = bar.transform.Find("Row/Zone_Fields").GetComponent<Button>();
+            fields.onClick.Invoke();
+            Assert.AreEqual(ZoneType.Fields, ZonePainter.Tool, "one click takes it up");
+            StringAssert.Contains("золотого кола", ZoneToolbar.StatusText(), "nothing marked: what to do");
+            Assert.Greater(ZoneMap.Paint(new Vector3(60f, 0f, 60f), 14f, ZoneType.Fields, out _), 0);
+            StringAssert.Contains("Розмічено", ZoneToolbar.StatusText(), "marked: how far along");
+            ResourceManager.Instance.SetState(0, null);
+            StringAssert.Contains("треба", ZoneToolbar.StatusText(), "and what is short");
+            bar.transform.Find("Row/Eraser").GetComponent<Button>().onClick.Invoke();
+            Assert.IsTrue(ZonePainter.Erasing);
+            Assert.AreEqual(ZoneType.None, ZonePainter.Tool, "the eraser in its place");
+            bar.transform.Find("Row/Zone_Housing").GetComponent<Button>().onClick.Invoke();
+            Assert.IsFalse(ZonePainter.Erasing);
+            bar.transform.Find("Row/Zone_Housing").GetComponent<Button>().onClick.Invoke();
+            Assert.IsFalse(ZonePainter.Painting, "a second click puts it down");
+            bar.transform.Find("Row/Size2").GetComponent<Button>().onClick.Invoke();
+            Assert.AreEqual(ZonePainter.Brushes[2], ZonePainter.Brush);
+            ZonePainter.BrushIndex = 1;
+            ZonePainter.Stop();
         }
 
         [Test]

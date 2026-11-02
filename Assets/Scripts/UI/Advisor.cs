@@ -37,7 +37,7 @@ namespace BattleOfAges.UI
         public static (string goal, Func<string> how, Func<bool> done)[] Goals => World.WorldSettings.Bounded ? CampaignGoals : FixedGoals;
 
         /// <summary>A campaign: most buildings grow from marked zones (M5).</summary>
-        private static string ToZones() => $"{K(KeyAction.ToggleGameMode)} мапа → {K(KeyAction.BuildMenu)} → панель «Зони»:";
+        private static string ToZones() => $"{K(KeyAction.ToggleGameMode)} мапа → панель зон угорі:";
 
         private static readonly (string goal, Func<string> how, Func<bool> done)[] CampaignGoals =
         {

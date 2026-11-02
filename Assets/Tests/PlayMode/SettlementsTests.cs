@@ -89,6 +89,7 @@ namespace BattleOfAges.PlayModeTests
             ConstructionSite.Begin(go, BuildingType.TownHall);
             ConstructionSite site = go.GetComponent<ConstructionSite>();
             Assert.AreEqual(1, TownHall.All.Count, "a site is no settlement yet");
+            Assert.AreEqual(GameBalance.BuildBaseSeconds + GameBalance.BuildSecondsPerResource * (GameBalance.FoundingWood + GameBalance.FoundingOre), site.WorkSeconds, 1e-3f, "a new settlement's is the long work");
             site.Work(site.WorkSeconds + 1f);
             yield return null;
             done(a, go.GetComponent<TownHall>());
@@ -102,6 +103,13 @@ namespace BattleOfAges.PlayModeTests
             GameBalance.BanditFirstRaidHours = 1000f;
             BanditRaids.NextRaidHour = 1000.0;
             Assert.AreEqual(GameBalance.TownHallWood[1], BuildingData.GetDefinition(BuildingType.TownHall).WoodCost, "the first hall costs as ever");
+            GameObject firstSite = BuildingPlacementSystem.CreateBuilding(BuildingType.TownHall);
+            firstSite.transform.position = new Vector3(40f, RtsUnit.GetTerrainHeight(new Vector3(40f, 0f, -44f)), -44f);
+            ConstructionSite founding = ConstructionSite.Begin(firstSite, BuildingType.TownHall);
+            Assert.AreEqual(GameBalance.BuildBaseSeconds + GameBalance.BuildSecondsPerResource * (GameBalance.TownHallWood[1] + GameBalance.TownHallOre[1]), founding.WorkSeconds, 1e-3f,
+                "the first hall's site does not take itself for a second settlement");
+            Object.Destroy(firstSite);
+            yield return null;
             TownHall first = Hall(new Vector3(0f, 0f, -44f));
             Assert.IsFalse(BuildingPlacementSystem.IsAllowed(BuildingType.TownHall, out string early));
             StringAssert.Contains("ратуші II", early);

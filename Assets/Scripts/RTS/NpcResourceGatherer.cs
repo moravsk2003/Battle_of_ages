@@ -78,6 +78,8 @@ namespace BattleOfAges.RTS
         private float searchTimer = 0f;
         /// <summary>An Auto worker that last chose to haul mine ore (the split by need, AutoShouldHaul).</summary>
         private bool autoHauling;
+        /// <summary>An Auto worker that last chose to pick up pebbles for lack of ore.</summary>
+        private bool autoPebbling;
         private Crafting.WorkbenchNode assignedBench;
         private float benchMoveTimer;
 
@@ -478,6 +480,7 @@ namespace BattleOfAges.RTS
         private void ClearCurrentTargets()
         {
             autoHauling = false;
+            autoPebbling = false;
             if (assignedSite != null) LeaveSite(assignedSite);
             if (assignedPlace != null) LeavePlace(assignedPlace);
             if (assignedBench != null)
@@ -675,6 +678,7 @@ namespace BattleOfAges.RTS
             targetPebble = null;
             targetMine = null;
             autoHauling = false;
+            autoPebbling = false;
 
             Vector3 myPos = transform.position;
 
@@ -706,6 +710,18 @@ namespace BattleOfAges.RTS
 
             // 2. Search for wild wood / ore pebbles on map (a tree with WorkersPerTree workers already is taken)
             CountTreeCrowds();
+            if (auto && AutoPebbleNow(myPos))
+            {
+                FindNearest(true, false, false, true, out targetPebble, out targetTree, out _);
+                if (targetPebble != null)
+                {
+                    autoPebbling = true;
+                    targetPebble.TargetedBy = this;
+                    currentState = GathererState.MovingToResource;
+                    if (rtsUnit != null) rtsUnit.IssueMoveCommand(targetPebble.transform.position);
+                    return;
+                }
+            }
             bool allowOre = (auto && !woodShort) || currentDirective == GatherDirective.OrePebblesOnly;
             bool allowWood = currentDirective == GatherDirective.Auto || currentDirective == GatherDirective.WoodGatherBranchesOnly
                              || currentDirective == GatherDirective.WoodChopTreesOnly;
@@ -726,6 +742,27 @@ namespace BattleOfAges.RTS
             {
                 TryHaulFromMine(myPos); // no wood or pebble in reach: a mine's ore rather than standing about
             }
+        }
+
+        /// <summary>Ore runs out in a campaign, and not enough of the others have gone for pebbles.</summary>
+        private bool AutoPebbleNow(Vector3 myPos)
+        {
+            if (!World.WorldSettings.Bounded) return false;
+            ResourceManager rm = ResourceManager.Instance;
+            if (rm == null) return false;
+            int ore = rm.For(myPos).OreCount;
+            TownHall hall = TownHall.Nearest(myPos);
+            foreach (MineNode m in MineNode.ActiveMines)
+                if (m != null && TownHall.Nearest(m.transform.position) == hall) ore += m.AccumulatedOreCount;
+            if (ore >= GameBalance.AutoPebbleOre) return false;
+            int auto = 0, going = 0;
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+            {
+                if (w == null || w.currentDirective != GatherDirective.Auto || w.IsMiner || w.AtBench) continue;
+                auto++;
+                if (w != this && w.autoPebbling) going++;
+            }
+            return going < Mathf.Max(1, Mathf.RoundToInt(auto * GameBalance.AutoPebbleShare));
         }
 
         private bool TryHaulFromMine(Vector3 myPos)

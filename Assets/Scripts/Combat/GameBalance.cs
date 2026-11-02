@@ -138,6 +138,12 @@ namespace BattleOfAges.Combat
         /// </summary>
         public static int AutoWoodReserve = 40;
         public static float AutoHaulShareWoodShort = 0.25f, AutoHaulShare = 0.6f;
+        /// <summary>
+        /// In a campaign, under this much ore (stock and mines' buffers) this share of Auto workers, at least one, goes for
+        /// pebbles even with trees nearer: a tree is nearly always nearer, and without ore there is neither a hall nor a mine.
+        /// </summary>
+        public static int AutoPebbleOre = 15;
+        public static float AutoPebbleShare = 0.4f;
         /// <summary>Ore a hauler carries from the mine to the chest per trip (3 left a mine of 10 full).</summary>
         public static int HaulerCarry = 6;
         /// <summary>

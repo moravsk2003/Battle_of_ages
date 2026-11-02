@@ -76,6 +76,23 @@ namespace BattleOfAges.Building
             foreach (TownHall hall in halls) TickFor(hall);
         }
 
+        /// <summary>How a zone of a settlement stands: cells marked, buildings they call for, those there (sites among them), the sites.</summary>
+        public static void Progress(ZoneType zone, TownHall hall, out int cells, out int wanted, out int have, out int sites)
+        {
+            cells = ZoneMap.CountFor(zone, hall);
+            wanted = Wanted(zone, cells);
+            have = sites = 0;
+            BuildingType type = BuildingOf(zone);
+            bool several = hall != null && TownHall.All.Count > 1;
+            foreach (BuildingNode b in BuildingNode.Active)
+            {
+                if (b == null || b.Type != type || ZoneMap.At(b.transform.position) != zone) continue;
+                if (several && TownHall.Nearest(b.transform.position) != hall) continue;
+                have++;
+                if (b.GetComponent<ConstructionSite>() != null) sites++;
+            }
+        }
+
         /// <summary>A settlement's zones grow by its own stock and hands, a few sites at a time (null: the one there is, no hall yet).</summary>
         private void TickFor(TownHall hall)
         {
@@ -96,7 +113,7 @@ namespace BattleOfAges.Building
                     if (b != null && b.Type == type && ZoneMap.At(b.transform.position) == zone && Ours(b.transform.position)) have++;
                 if (have >= Wanted(zone, cells)) continue;
                 BuildingDefinition def = BuildingData.GetDefinition(type);
-                if (!Affordable(def, stock)) { SayShort(zone, def); continue; }
+                if (!Affordable(def, stock) || (hall == null && TakesTheHallsShare(def, stock))) { SayShort(zone, def); continue; }
                 if (!TryFindSpot(zone, def, out Vector3 spot, hall)) continue;
                 Pay(def, stock);
                 GameObject building = BuildingPlacementSystem.CreateBuilding(type);
@@ -121,6 +138,14 @@ namespace BattleOfAges.Building
         private static bool Affordable(BuildingDefinition def, SettlementStock rm)
         {
             return rm != null && (CentralEmpire.Active || (rm.WoodCount >= def.WoodCost && rm.GetOreCountAtLeast(def.OreTierRequired) >= def.OreCost));
+        }
+
+        /// <summary>Before the first hall its price is kept back: without it no one is born, and the zones would eat the ore as it comes in.</summary>
+        private static bool TakesTheHallsShare(BuildingDefinition def, SettlementStock rm)
+        {
+            if (rm == null || ConstructionSite.IsBuilding(BuildingType.TownHall)) return false;
+            BuildingDefinition first = BuildingData.GetDefinition(BuildingType.TownHall);
+            return rm.WoodCount - def.WoodCost < first.WoodCost || rm.GetOreCountAtLeast(first.OreTierRequired) - def.OreCost < first.OreCost;
         }
 
         private static void Pay(BuildingDefinition def, SettlementStock rm)

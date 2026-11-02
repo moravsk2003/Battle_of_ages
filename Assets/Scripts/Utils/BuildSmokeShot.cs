@@ -52,6 +52,7 @@ namespace BattleOfAges.Utils
             if (zones) yield return new WaitForSecondsRealtime(3f);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
+            if (zones && map) { UI.ZonePainter.Begin(World.ZoneType.Fields); yield return new WaitForSecondsRealtime(1f); } // the toolbar's line, the brush and the ring
             ScreenCapture.CaptureScreenshot(path);
             yield return new WaitForSecondsRealtime(1.5f);
             if (zones)

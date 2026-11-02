@@ -62,7 +62,7 @@ namespace BattleOfAges.World
         /// <summary>How far from its hall a settlement marks zones (§5.3 without the population term: R = 300 m, more with each epoch).</summary>
         public static float Reach() => Reach(TownHall.Current);
 
-        private static float Reach(TownHall hall)
+        public static float Reach(TownHall hall)
         {
             int level = hall != null ? hall.Level : 1;
             return GameBalance.ZoneReachBase * (1f + 0.6f * (level - 1));
@@ -113,6 +113,21 @@ namespace BattleOfAges.World
                 }
             if (changed > 0) Changed?.Invoke();
             return changed;
+        }
+
+        /// <summary>The cells within a brush round a point (into the list given).</summary>
+        public static void CellsIn(Vector3 at, float radius, List<Vector2Int> into)
+        {
+            into.Clear();
+            int r = Mathf.CeilToInt(radius / CellSize);
+            Vector2Int mid = CellOf(at);
+            for (int dz = -r; dz <= r; dz++)
+                for (int dx = -r; dx <= r; dx++)
+                {
+                    var c = new Vector2Int(mid.x + dx, mid.y + dz);
+                    Vector3 p = new Vector3((c.x + 0.5f) * CellSize, at.y, (c.y + 0.5f) * CellSize);
+                    if ((p - at).sqrMagnitude <= radius * radius) into.Add(c);
+                }
         }
 
         /// <summary>Clears the cells within a brush; returns how many.</summary>

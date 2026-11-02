@@ -115,6 +115,7 @@ namespace BattleOfAges.UI
         private void BuildMapButtons()
         {
             float x = 18f, w = HudMinimap.FramePx, above = HudMinimap.FramePx + 30f;
+            ZoneToolbar.Create(rtsGroup);
             alarmButton = UiTheme.TextButton(rtsGroup, "Alarm", "", new Vector2(0f, 0f), new Vector2(x, above), new Vector2(w, 46f), SettlementAlarm.Toggle, 16);
             alarmText = alarmButton.GetComponentInChildren<Text>();
             Tooltip.Set(alarmButton.gameObject, HudTips.Alarm);
