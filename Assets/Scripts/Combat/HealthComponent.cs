@@ -27,6 +27,34 @@ namespace BattleOfAges.Combat
             currentHealth = maxHealth;
         }
 
+        private BoxCollider body;
+        private bool bodyLooked;
+
+        /// <summary>
+        /// From the middle of a building to its wall (half its box's smaller side), 0 for a unit: a building's middle is out of
+        /// anyone's reach, as nobody may walk into it, and swords never touched a hall.
+        /// </summary>
+        public float BodyRadius
+        {
+            get
+            {
+                if (!bodyLooked)
+                {
+                    bodyLooked = true;
+                    if (GetComponent<CharacterController>() == null && TryGetComponent(out BoxCollider box) && !box.isTrigger) body = box;
+                }
+                if (body == null || !body.enabled) return 0f;
+                Vector3 s = body.transform.lossyScale;
+                return Mathf.Min(body.size.x * Mathf.Abs(s.x), body.size.z * Mathf.Abs(s.z)) * 0.5f;
+            }
+        }
+
+        /// <summary>How far a strike from this point has to go: to the wall of a building, to the middle of a unit.</summary>
+        public float DistanceFrom(Vector3 point) => Mathf.Max(0f, Vector3.Distance(point, transform.position) - BodyRadius);
+
+        /// <summary>When it last took a hit (Time.time): a building shows its health for a while after.</summary>
+        public float LastHitAt { get; private set; } = float.NegativeInfinity;
+
         /// <summary>Sets the current health directly (a loaded save), clamped to 1..max.</summary>
         public void SetCurrentHealth(int health)
         {
@@ -69,6 +97,7 @@ namespace BattleOfAges.Combat
             if (!ignoreArmor && DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, GameBalance.MaxDamageReduction))));
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
+            LastHitAt = Time.time;
             OnTakeDamage?.Invoke(damage);
             AnyDamaged?.Invoke(this, damage);
             OnHealthChanged?.Invoke(currentHealth, maxHealth);

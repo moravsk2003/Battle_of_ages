@@ -65,7 +65,7 @@ namespace BattleOfAges.Combat
         {
             if (h.Target == null || !h.Target.IsAlive) return;
             Vector3 from = h.Striker != null ? h.Striker.transform.position : h.From;
-            if (Vector3.Distance(from, h.Target.transform.position) > h.Reach + 1f + ReachSlack) return; // it got away
+            if (h.Target.DistanceFrom(from) > h.Reach + 1f + ReachSlack) return; // it got away
             if (h.Striker == null) { h.Target.TakeDamage(h.Damage); return; }
             if (h.Bolts) { UI.GameSound.At(UI.GameSound.Kind.Magic, h.Striker.transform.position); MageBolt.Volley(h.Striker, h.Target, h.Damage); return; }
             if (h.Striker.IsRanged) { ArrowShot.Fire(h.Striker, h.Target, h.Damage, h.Piercing); return; } // the draw is over: the arrow flies, the hit lands on arrival

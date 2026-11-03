@@ -55,6 +55,7 @@ namespace BattleOfAges.UI
             UpdateSites(cam, map);
             UpdateMines(cam, map);
             UpdateHall(cam, map);
+            UpdateBuildingHealth(cam, map);
             if (map) UpdateUnitBars(cam);
             else HideUnitBars(0);
         }
@@ -131,6 +132,65 @@ namespace BattleOfAges.UI
             }
             for (int i = used; i < sitePlates.Count; i++) if (sitePlates[i].plate.gameObject.activeSelf) sitePlates[i].plate.gameObject.SetActive(false);
             UpdatePlaces(cam, map);
+        }
+
+        // ------------------------------------------------------------------ the health of buildings
+
+        /// <summary>How long after a hit a building shows its health in first person, and how far from the viewer.</summary>
+        public const float HitShowSeconds = 5f, FirstPersonHealthRange = 45f, MapHealthRange = 110f;
+
+        private readonly List<(RectTransform plate, Text text)> healthPlates = new List<(RectTransform, Text)>();
+
+        /// <summary>
+        /// Whether a building's health shows: on the map all in sight (a wall or a field only once hit, there are too many of
+        /// them), in first person only for a while after a hit.
+        /// </summary>
+        public static bool ShowsHealth(bool map, bool plentiful, bool damaged, float sinceHit, float distance)
+        {
+            if (map) return distance <= MapHealthRange && (!plentiful || damaged);
+            return sinceHit <= HitShowSeconds && distance <= FirstPersonHealthRange;
+        }
+
+        private void UpdateBuildingHealth(Camera cam, bool map)
+        {
+            int used = 0;
+            if (cam != null)
+            {
+                foreach (BuildingNode b in BuildingNode.Active)
+                {
+                    if (b == null || BuildGhost.Is(b) || !b.TryGetComponent(out HealthComponent hp) || !hp.IsAlive) continue;
+                    bool plentiful = b.Type == BuildingType.Field || b.Type == BuildingType.CastleWall || b.Type == BuildingType.WallStairs || b.Type == BuildingType.WallGate;
+                    used = HealthPlate(used, cam, map, hp, plentiful, BuildingData.GetDefinition(b.Type).Size.y + 0.8f);
+                }
+                foreach (AI.NpcKingdom k in AI.NpcKingdom.All)
+                    if (k != null && k.Hall != null && k.Hall.IsAlive && k.Economy.HallLevel > 0) used = HealthPlate(used, cam, map, k.Hall, false, 6.5f);
+            }
+            for (int i = used; i < healthPlates.Count; i++) if (healthPlates[i].plate.gameObject.activeSelf) healthPlates[i].plate.gameObject.SetActive(false);
+        }
+
+        private int HealthPlate(int used, Camera cam, bool map, HealthComponent hp, bool plentiful, float height)
+        {
+            Vector3 at = hp.transform.position + Vector3.up * height;
+            float distance = Vector3.Distance(cam.transform.position, at);
+            if (!ShowsHealth(map, plentiful, hp.CurrentHealth < hp.MaxHealth, Time.time - hp.LastHitAt, distance)) return used;
+            if (!OnScreen(cam, at, out Vector2 local, out _)) return used;
+            while (healthPlates.Count <= used)
+            {
+                RectTransform rt = UiTheme.Rect(layer, "HealthLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(112f, 24f));
+                rt.pivot = new Vector2(0.5f, 0f);
+                UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
+                rt.GetComponent<Image>().raycastTarget = false;
+                RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(106f, 20f));
+                Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
+                t.raycastTarget = false;
+                healthPlates.Add((rt, t));
+            }
+            var (plate, text) = healthPlates[used];
+            if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
+            plate.anchoredPosition = local;
+            text.color = hp.CurrentHealth * 3 < hp.MaxHealth ? UiTheme.Bad : UiTheme.Ink;
+            text.text = $"HP {hp.CurrentHealth}/{hp.MaxHealth}";
+            return used + 1;
         }
 
         private readonly List<(RectTransform plate, Text text)> placePlates = new List<(RectTransform, Text)>();

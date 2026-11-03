@@ -86,8 +86,7 @@ namespace BattleOfAges.Combat
             if (target == null || !target.IsAlive) return false;
             if (!CanAttack || NeedsStaff) return false;
 
-            float dst = Vector3.Distance(transform.position, target.transform.position);
-            if (dst > AttackRange + 1.0f) return false;
+            if (target.DistanceFrom(transform.position) > AttackRange + 1.0f) return false;
 
             nextAttackTime = Time.time + attackCooldown;
             // The swing lands after its wind-up (PendingHits), so the one walked up to can swing back (docs/GAME_DESIGN.md §11.1).
@@ -217,9 +216,10 @@ namespace BattleOfAges.Combat
                 }
                 else
                 {
+                    // A swordsman's step into the blow, about 0.47 m (who strikes from afar stays put: mages crept up to their
+                    // targets); assaults on walls are timed with this step (docs/KNOWN_ISSUES.md)
                     float offset = Mathf.Sin(punchProgress) * 0.35f;
-                    // Visual punch impulse in forward direction
-                    transform.Translate(Vector3.forward * offset * Time.deltaTime * 4f, Space.Self);
+                    if (!IsRanged) transform.Translate(Vector3.forward * offset * Time.deltaTime * 4f, Space.Self);
                 }
             }
         }

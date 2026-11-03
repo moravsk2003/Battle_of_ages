@@ -15,6 +15,15 @@ namespace BattleOfAges.World
         private const float Spacing = 16f;          // grid step; chunk size (64) must be a multiple of it
         private const int HalfExtentCells = 96;     // 96 * 16 = 1536 m in every direction
 
+        /// <summary>This chunk lies wholly on the far terrain of a viewer in that chunk (the grid goes no further than ReachMetres).</summary>
+        public static bool Covers(Vector2Int viewerChunk, Vector2Int chunk, float chunkSize)
+        {
+            float off = (Mathf.Max(Mathf.Abs(chunk.x - viewerChunk.x), Mathf.Abs(chunk.y - viewerChunk.y)) + 1f) * chunkSize;
+            return off <= ReachMetres;
+        }
+
+        public const float ReachMetres = HalfExtentCells * Spacing;
+
         private Mesh mesh;
         private Vector3[] vertices, spareVertices;
         private Color[] colors, spareColors;

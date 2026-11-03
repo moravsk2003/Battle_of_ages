@@ -349,12 +349,17 @@ namespace BattleOfAges.AI
             nextSiegeCheck = Time.time + 0.5f;
         }
 
-        public Vector3 GetFlankingDestination(Vector3 targetPos, float desiredRadius)
+        /// <summary>
+        /// Its own place round the target, at this reach (from the wall of a building). circling: the place turns round the
+        /// target, a swordsman's footwork between blows; a place always turning made anyone with a long reach run round its
+        /// target at 20 degrees a second, 9 m/s at a mage's range, and no one could catch it.
+        /// </summary>
+        public Vector3 GetFlankingDestination(HealthComponent target, float desiredRadius, bool circling = false)
         {
             int id = Mathf.Abs(gameObject.GetInstanceID());
-            float angle = ((id % 8) * 45.0f + Time.time * 20.0f) * Mathf.Deg2Rad;
-            Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * desiredRadius;
-            Vector3 flankPos = targetPos + offset;
+            float angle = ((id % 8) * 45.0f + (circling ? Time.time * 20.0f : 0f)) * Mathf.Deg2Rad;
+            Vector3 offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * (desiredRadius + target.BodyRadius);
+            Vector3 flankPos = target.transform.position + offset;
             flankPos.y = RtsUnit.GetTerrainHeight(flankPos);
             return flankPos;
         }
@@ -463,7 +468,7 @@ namespace BattleOfAges.AI
         {
             HostileMobAI mob = controller as HostileMobAI;
             if (mob == null || mob.CurrentCombatTarget == null) return;
-            Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget.transform.position, mob.AttackRange * 0.9f);
+            Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.AttackRange * 0.9f);
             mob.SetMoveDestination(flankTarget);
         }
 
@@ -486,7 +491,7 @@ namespace BattleOfAges.AI
                 return;
             }
 
-            float dist = Vector3.Distance(mob.transform.position, mob.CurrentCombatTarget.transform.position);
+            float dist = mob.CurrentCombatTarget.DistanceFrom(mob.transform.position);
             if (!mob.IsOnAssaultOrder && !mob.IsProvoked && dist > mob.AggroRadius * 1.6f)
             {
                 // Lost target
@@ -507,7 +512,7 @@ namespace BattleOfAges.AI
             if (mob.HandleWallInWay(mob.CurrentCombatTarget.transform.position)) return;
             if (dist > mob.AttackRange)
             {
-                Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget.transform.position, mob.AttackRange * 0.9f);
+                Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.AttackRange * 0.9f);
                 mob.SetMoveDestination(flankTarget);
             }
         }
@@ -519,7 +524,13 @@ namespace BattleOfAges.AI
     {
         public AIStateType StateType => AIStateType.Attack;
 
-        public void Enter(AIBaseController controller) { }
+        public void Enter(AIBaseController controller)
+        {
+            // In reach: who strikes from afar stops here, not at its place round the target (far from the viewer the AI thinks
+            // once in 2 s, a mage ran a quarter of the way round in that time)
+            HostileMobAI mob = controller as HostileMobAI;
+            if (mob != null && mob.Combat != null && mob.Combat.IsRanged) mob.StopMovement();
+        }
 
         public void UpdateState(AIBaseController controller, float deltaTime)
         {
@@ -541,7 +552,7 @@ namespace BattleOfAges.AI
             }
 
             if (mob.IsClimbing) return;
-            float dist = Vector3.Distance(mob.transform.position, mob.CurrentCombatTarget.transform.position);
+            float dist = mob.CurrentCombatTarget.DistanceFrom(mob.transform.position);
             bool melee = mob.Combat == null || !mob.Combat.IsRanged;
             if (dist > mob.AttackRange + 1.8f || (melee && Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false)))
             {
@@ -562,11 +573,15 @@ namespace BattleOfAges.AI
                 mob.Combat.TryAttack(mob.CurrentCombatTarget);
                 mob.StopMovement();
             }
-            else
+            else if (melee && mob.CurrentCombatTarget.BodyRadius <= 0f)
             {
                 // Combat Strafe: Move laterally around target during attack cooldown
-                Vector3 strafePos = mob.GetFlankingDestination(mob.CurrentCombatTarget.transform.position, mob.AttackRange * 0.95f);
+                Vector3 strafePos = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.AttackRange * 0.95f, circling: true);
                 mob.SetMoveDestination(strafePos);
+            }
+            else
+            {
+                mob.StopMovement(); // who shoots stands and shoots; a building does not dodge
             }
         }
 

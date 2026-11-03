@@ -44,8 +44,9 @@ namespace BattleOfAges.Tests
         {
             Vector3 targetCenter = new Vector3(10f, 0f, 10f);
             float desiredRadius = 2.5f;
+            playerHp.transform.position = targetCenter;
 
-            Vector3 flankPos = mobAI.GetFlankingDestination(targetCenter, desiredRadius);
+            Vector3 flankPos = mobAI.GetFlankingDestination(playerHp, desiredRadius);
             float distToTarget = Vector3.Distance(new Vector3(flankPos.x, 0, flankPos.z), targetCenter);
 
             Assert.AreEqual(desiredRadius, distToTarget, 0.05f, "Flanking destination should be positioned on the circle around target.");

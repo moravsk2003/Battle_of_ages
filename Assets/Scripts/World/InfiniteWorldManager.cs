@@ -247,7 +247,8 @@ namespace BattleOfAges.World
 
         /// <summary>
         /// A settlement goes on working while the hero is away: the land round each hall stays, trees and ore (no life:
-        /// low detail, as at the edge of the view), its ground left to the far terrain.
+        /// low detail, as at the edge of the view), its ground left to the far terrain, or its own beyond the far terrain's
+        /// reach (trees hung in the void there once the hero had walked 1.5 km off).
         /// </summary>
         private void HoldSettlements()
         {
@@ -264,7 +265,7 @@ namespace BattleOfAges.World
                         if (!activeChunks.TryGetValue(coord, out ProceduralBiomeChunk chunk) || chunk == null)
                             activeChunks[coord] = chunk = QueueChunk(AcquireChunk(coord), coord, true);
                         else if (!chunk.IsLowLOD) QueueChunk(chunk, coord, true);
-                        chunk.SetGroundShown(false);
+                        chunk.SetGroundShown(!FarTerrainRenderer.Covers(currentViewerChunk, coord, chunkSize));
                     }
                 }
             }

@@ -175,7 +175,7 @@ namespace BattleOfAges.RTS
             bool keepDefending = keepLeash && defending;
             Vector3 keepOrigin = leashOrigin;
             if (target != null && wallState == WallState.Posted && combatUnit != null
-                && Vector3.Distance(transform.position, target.transform.position) <= combatUnit.AttackRange)
+                && target.DistanceFrom(transform.position) <= combatUnit.AttackRange)
             {
                 attackTarget = target; // in reach from the post: stays up there
                 return;
@@ -335,7 +335,7 @@ namespace BattleOfAges.RTS
         {
             if (combatUnit == null) return;
             float range = combatUnit.AttackRange;
-            if (attackTarget != null && (!attackTarget.IsAlive || Vector3.Distance(transform.position, attackTarget.transform.position) > range + 0.5f)) attackTarget = null;
+            if (attackTarget != null && (!attackTarget.IsAlive || attackTarget.DistanceFrom(transform.position) > range + 0.5f)) attackTarget = null;
             if (attackTarget == null)
             {
                 engageTimer -= Time.deltaTime;
@@ -392,7 +392,7 @@ namespace BattleOfAges.RTS
                 }
                 else
                 {
-                    float distToTarget = Vector3.Distance(transform.position, attackTarget.transform.position);
+                    float distToTarget = attackTarget.DistanceFrom(transform.position);
                     float range = (combatUnit != null) ? combatUnit.AttackRange : 2.5f;
 
                     if (distToTarget <= range)
