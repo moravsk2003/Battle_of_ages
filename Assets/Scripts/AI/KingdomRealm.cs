@@ -57,14 +57,38 @@ namespace BattleOfAges.AI
             List<Vector3> sites = StartSites.Choose(Mathf.Max(0, heroes - 1));
             int kings = Mathf.RoundToInt(sites.Count * kingShare);
             var rng = new System.Random(WorldSettings.Seed ^ 0x4B49);
+            int empire = CentralEmpire.Active ? -1 : EmpireSite(sites);
             for (int i = 0; i < sites.Count; i++)
             {
-                bool free = i >= kings;
+                bool free = i >= kings && i != empire;
                 string name = NpcKingdom.CampaignNames[i % NpcKingdom.CampaignNames.Length];
-                far.Add(NewState(sites[i], free ? "Ватага: " + name : name, free, RTS.UnitSpatialGrid.TeamKingdomFirst + i, rng));
+                KingdomSave state = NewState(sites[i], i == empire ? "Центральна імперія" : free ? "Ватага: " + name : name, free, RTS.UnitSpatialGrid.TeamKingdomFirst + i, rng);
+                if (i == empire)
+                {
+                    state.Empire = true;
+                    state.Hall = 1;
+                    state.HallHealth = GameBalance.TownHallHealth[1];
+                }
+                far.Add(state);
             }
             Ensure();
             instance.Sync();
+        }
+
+        /// <summary>
+        /// Every world has its Central Empire (§9.1.1), unless the player's hero is its bearer: on the site furthest from the
+        /// player's start, the middle of the map, so that the strongest of all is not at the door at the start of the game.
+        /// </summary>
+        private static int EmpireSite(List<Vector3> sites)
+        {
+            int best = -1;
+            float bestSqr = -1f;
+            for (int i = 0; i < sites.Count; i++)
+            {
+                float d = sites[i].x * sites[i].x + sites[i].z * sites[i].z;
+                if (d > bestSqr) { bestSqr = d; best = i; }
+            }
+            return best;
         }
 
         /// <summary>A hero's start (§7.1): the hero, KingdomStartPeople people and KingdomStartWood wood on level ground, no hall.</summary>
@@ -176,12 +200,12 @@ namespace BattleOfAges.AI
                 if (s.Interregnum <= 0f) Crown(s);
                 return;
             }
-            var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births };
-            int born = economy.Tick(hours, s.Subjects.Count, s.Subjects.Count);
+            var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births, Free = s.Empire };
+            int born = economy.Tick(hours, s.Empire ? 0 : s.Subjects.Count, s.Subjects.Count);
             var rng = new System.Random(s.Name.GetHashCode() ^ Mathf.FloorToInt(s.Age * 7f));
             for (int i = 0; i < born; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Person, Position = Around(s.Home, rng) });
             double chance = 1.0 - System.Math.Pow(1.0 - GameBalance.WorkPromotionPerHour, hours);
-            foreach (SubjectSave u in s.Subjects) if (u.Rank == (int)UnitRank.Person && rng.NextDouble() < chance) u.Rank = (int)UnitRank.Warrior;
+            if (!s.Empire) foreach (SubjectSave u in s.Subjects) if (u.Rank == (int)UnitRank.Person && rng.NextDouble() < chance) u.Rank = (int)UnitRank.Warrior;
             if (!s.Free && (economy.HallLevel == 0 || s.Subjects.Count >= economy.Cap - GameBalance.KingdomHallRoom) && economy.TryUpgrade())
                 s.HallHealth = GameBalance.TownHallHealth[economy.HallLevel];
             s.Wood = economy.Wood; s.Ore = economy.Ore; s.Hall = economy.HallLevel; s.Births = economy.BirthCarry;

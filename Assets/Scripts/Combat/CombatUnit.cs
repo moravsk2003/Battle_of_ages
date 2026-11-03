@@ -73,6 +73,14 @@ namespace BattleOfAges.Combat
             attackRange = range;
         }
 
+        /// <summary>The shot's time and stance with no target: the arrow goes on its own (the hero's, at nothing).</summary>
+        public void StartLooseShot()
+        {
+            nextAttackTime = Time.time + attackCooldown;
+            recoveryFactor = 0f;
+            recoveryUntil = Time.time + Windup + GameBalance.RangedRootSeconds;
+        }
+
         public bool TryAttack(HealthComponent target)
         {
             if (target == null || !target.IsAlive) return false;

@@ -60,6 +60,13 @@ namespace BattleOfAges.Building
                 hp.OnDeath -= HandleBuildingDestroyed;
                 hp.OnDeath += HandleBuildingDestroyed;
             }
+            if (GetComponent<ConstructionSite>() == null) LightChimney(); // (a scene's house, a loaded one)
+        }
+
+        /// <summary>Someone lives here: smoke from the chimney. Not over a ghost being placed or a site.</summary>
+        private void LightChimney()
+        {
+            if (Application.isPlaying && (Type == BuildingType.WorkerHouse || Type == BuildingType.TownHall) && !BuildGhost.Is(this)) Utils.ChimneySmoke.Ensure(gameObject);
         }
 
         private void OnDestroy()
@@ -78,6 +85,7 @@ namespace BattleOfAges.Building
 
         public void OnBuilt()
         {
+            LightChimney();
             BuildingDefinition def = BuildingData.GetDefinition(Type); // (a mine or workbench used to spawn a house's worker)
 
             if (World.WorldSettings.Bounded && Type == BuildingType.WorkerHouse) ApplyEpochLook(TownHall.Nearest(transform.position) != null ? TownHall.Nearest(transform.position).Level : 1);

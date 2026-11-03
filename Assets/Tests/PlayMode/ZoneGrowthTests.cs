@@ -60,6 +60,86 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest, Timeout(60000)]
+        public IEnumerator AnAnimal_KilledByThePlayersSide_GivesFood_ByAnEnemy_None()
+        {
+            GameObject Animal(string name)
+            {
+                GameObject a = BattleOfAges.Utils.AnimalModelBuilder.CreateAnimalPrefab(BattleOfAges.AI.AnimalType.Deer, name);
+                a.transform.position = new Vector3(40f, RtsUnit.GetTerrainHeight(new Vector3(40f, 0f, 40f)), 40f);
+                spawned.Add(a);
+                return a;
+            }
+            var ours = new GameObject("OurHunter", typeof(BattleOfAges.Combat.HealthComponent), typeof(BattleOfAges.Combat.CombatUnit));
+            var theirs = new GameObject("TheirHunter", typeof(BattleOfAges.Combat.HealthComponent), typeof(BattleOfAges.Combat.CombatUnit));
+            spawned.Add(ours);
+            spawned.Add(theirs);
+            ours.GetComponent<BattleOfAges.Combat.CombatUnit>().Team = UnitSpatialGrid.TeamPlayer;
+            theirs.GetComponent<BattleOfAges.Combat.CombatUnit>().Team = UnitSpatialGrid.TeamHostile;
+            GameObject one = Animal("HuntedDeer"), two = Animal("OtherDeer");
+            yield return null;
+            ResourceManager.Instance.SetFood(5f);
+            BattleOfAges.Combat.HealthComponent hp = one.GetComponent<BattleOfAges.Combat.HealthComponent>();
+            hp.LastAttacker = ours.GetComponent<BattleOfAges.Combat.CombatUnit>();
+            hp.TakeDamage(100000, ignoreArmor: true);
+            Assert.AreEqual(5f + GameBalance.FoodPerAnimal, ResourceManager.Instance.Food, 0.01f, "one piece");
+            hp = two.GetComponent<BattleOfAges.Combat.HealthComponent>();
+            hp.LastAttacker = theirs.GetComponent<BattleOfAges.Combat.CombatUnit>();
+            hp.TakeDamage(100000, ignoreArmor: true);
+            Assert.AreEqual(5f + GameBalance.FoodPerAnimal, ResourceManager.Instance.Food, 0.01f, "an enemy's kill feeds no one of ours");
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator AFarmer_GetsToAFieldThatLiesHigher_AndItFollowsTheLand()
+        {
+            Vector3 at = new Vector3(-60f, 0f, -60f);
+            at.y = RtsUnit.GetTerrainHeight(at) + 2f; // higher than the ground it comes over
+            GameObject fieldObj = BattleOfAges.Utils.ZoneBuildingBuilder.CreateField();
+            fieldObj.transform.position = at;
+            spawned.Add(fieldObj);
+            FieldNode field = fieldObj.GetComponent<FieldNode>();
+            yield return null;
+            Assert.IsTrue(fieldObj.GetComponent<BoxCollider>().isTrigger, "for the mouse, not in the way");
+            Vector3 corner = at + new Vector3(4f, 0f, 4f);
+            float built = fieldObj.transform.TransformPoint(fieldObj.GetComponentInChildren<MeshFilter>().sharedMesh.bounds.max).y;
+            Assert.Less(built, RtsUnit.GetTerrainHeight(corner) + 3f, "the wheat stands on the land, not on the height the field was set at");
+            NpcResourceGatherer farmer = Worker(at + new Vector3(-16f, 0f, -16f), "NPC_Climber");
+            Assert.IsTrue(farmer.AssignToPlace(field, true));
+            Time.timeScale = 4f;
+            float end = Time.time + 40f;
+            while (Time.time < end && field.Present == 0) yield return null;
+            Time.timeScale = 1f;
+            Assert.AreEqual(1, field.Present, $"at its place: the farmer at {farmer.transform.position}, the field at {at}");
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator AClickOnTheLeaves_FindsTheTree_AndNoGrassGrowsOnAField()
+        {
+            Vector3 at = new Vector3(150f, 0f, -150f);
+            at.y = RtsUnit.GetTerrainHeight(at);
+            GameObject tree = BattleOfAges.Utils.SteppeTreeBuilder.CreateSteppeTree("TestTree");
+            tree.transform.position = at;
+            spawned.Add(tree);
+            yield return null;
+            // From a map camera's angle, through the crown, reaching the ground well beyond the trunk
+            Vector3 crown = at + Vector3.up * 4.6f + new Vector3(1.5f, 0f, 0f);
+            Ray ray = new Ray(crown + new Vector3(0f, 60f, -35f), new Vector3(0f, -60f, 35f).normalized);
+            Vector3 ground = crown + ray.direction * (crown.y - at.y) / -ray.direction.y;
+            Assert.AreSame(tree.GetComponent<ResourceNodeTree>(), ResourceGrid.CrownUnderRay(ray, ground), "the leaves are the tree");
+            Ray beside = new Ray(ray.origin + new Vector3(12f, 0f, 0f), ray.direction);
+            Assert.IsNull(ResourceGrid.CrownUnderRay(beside, ground + new Vector3(12f, 0f, 0f)), "open ground is open ground");
+
+            Vector3 fieldAt = new Vector3(40f, 0f, 150f);
+            fieldAt.y = RtsUnit.GetTerrainHeight(fieldAt);
+            Assert.IsFalse(FieldNode.IsFieldAt(fieldAt.x, fieldAt.z));
+            GameObject fieldObj = BattleOfAges.Utils.ZoneBuildingBuilder.CreateField();
+            fieldObj.transform.position = fieldAt;
+            spawned.Add(fieldObj);
+            yield return null;
+            Assert.IsTrue(FieldNode.IsFieldAt(fieldAt.x + 3f, fieldAt.z - 3f));
+            Assert.AreEqual(0f, BattleOfAges.World.GrassFieldRenderer.GrassDensity(fieldAt.x + 3f, fieldAt.z - 3f, out _), 1e-4f, "ploughed");
+        }
+
+        [UnityTest, Timeout(60000)]
         public IEnumerator BeforeTheFirstHall_TheZonesLeaveItsPrice()
         {
             foreach (TownHall h in Object.FindObjectsByType<TownHall>(FindObjectsSortMode.None)) Object.Destroy(h.gameObject);

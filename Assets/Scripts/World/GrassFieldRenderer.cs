@@ -43,6 +43,10 @@ namespace BattleOfAges.World
         private Material material;
         private readonly Batch near = new Batch(), far = new Batch(), flowers = new Batch();
         private readonly Dictionary<Vector2Int, Tile> tileCache = new Dictionary<Vector2Int, Tile>();
+        private static GrassFieldRenderer current;
+
+        /// <summary>The land changed (a field): tiles are made anew.</summary>
+        public static void ForgetTiles() { if (current != null) current.tileCache.Clear(); }
         private readonly List<Vector2Int> evictBuffer = new List<Vector2Int>();
         private readonly Plane[] frustum = new Plane[6];
         private static readonly int BiomeTintId = Shader.PropertyToID("_BiomeTint");
@@ -50,6 +54,7 @@ namespace BattleOfAges.World
 
         public void Initialize(Shader grassShader)
         {
+            current = this;
             if (grassShader == null) { enabled = false; return; }
             material = new Material(grassShader) { name = "MAT_GrassBlades", enableInstancing = true };
             near.Mesh = BuildClumpMesh("GrassClump", blades: 9, segments: 3, widthScale: 1f, seed: 7);
@@ -182,6 +187,7 @@ namespace BattleOfAges.World
         {
             y = InfiniteWorldManager.GetSampledTerrainHeight(x, z);
             if (y > ProceduralBiomeChunk.SnowLineHeight - 6f) return 0f;
+            if (Building.FieldNode.IsFieldAt(x, z)) return 0f; // ploughed
 
             float hx = InfiniteWorldManager.GetSampledTerrainHeight(x + 1f, z);
             float hz = InfiniteWorldManager.GetSampledTerrainHeight(x, z + 1f);

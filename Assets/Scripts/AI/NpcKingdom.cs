@@ -111,12 +111,13 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>The kit of a unit of this rank: people an axe, soldiers a sword and armour from the kingdom's smiths.</summary>
-        public Item[] KitFor(UnitRank rank)
-        {
-            if (rank == UnitRank.Person) return new[] { new Item(ItemType.Axe, 1) };
-            int l = Economy.GearLevel;
-            return new[] { new Item(ItemType.Sword, l), new Item(ItemType.Armor, l), new Item(ItemType.Shield, l) };
-        }
+        public Item[] KitFor(UnitRank rank) => IsEmpire ? UnitStats.EmpireKit(rank) : UnitStats.Kit(rank, Economy.GearLevel);
+
+        /// <summary>The Central Empire of this world (§9.1.1): everyone armed by rank, no one works, the hall rises for nothing; its emperor's death ends it and opens an epoch.</summary>
+        public bool IsEmpire { get; private set; }
+
+        /// <summary>Its side, set directly (the calibration's two armies).</summary>
+        public int TeamForTests { set => Team = value; }
 
         private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
         {
@@ -155,7 +156,7 @@ namespace BattleOfAges.AI
         {
             // A new soldier gets its kit from the kingdom's smiths
             Equipment gear = p.GetComponent<Equipment>();
-            if (gear != null && p.Rank != UnitRank.Person) foreach (Item it in KitFor(p.Rank)) gear.Equip(it);
+            if (gear != null && p.Rank != UnitRank.Person) foreach (Item it in KitFor(p.Rank)) if (!it.IsEmpty) gear.Equip(it);
         }
 
         /// <summary>Makes this unit the king: a hero of its rank (x2), level 1, this class.</summary>
@@ -266,14 +267,14 @@ namespace BattleOfAges.AI
 
             if (!InInterregnum && King != null && King.Health.IsAlive) HeroAutoPilot.UseSkills(King.Combat, King.Health, King.CurrentCombatTarget);
 
-            int born = Economy.Tick(hours, Workers(), subjects.Count);
+            int born = Economy.Tick(hours, IsEmpire ? 0 : Workers(), subjects.Count);
             for (int i = 0; i < born; i++) AddSubject(UnitRank.Person, Spot());
 
             promotionClock += hours;
             while (promotionClock >= 1f)
             {
                 promotionClock -= 1f;
-                PromoteWorkers();
+                if (!IsEmpire) PromoteWorkers();
             }
 
             secondClock += seconds;
@@ -609,7 +610,7 @@ namespace BattleOfAges.AI
             {
                 Name = KingdomName, Home = Home, Hall = Economy.HallLevel, HallHealth = Hall != null ? Hall.CurrentHealth : 0,
                 Wood = Economy.Wood, Ore = Economy.Ore, Births = Economy.BirthCarry, Age = Age, Interregnum = InterregnumLeft, Defeated = IsDefeated,
-                Free = Free, Team = Team
+                Free = Free, Team = Team, Empire = IsEmpire
             };
             if (IsDefeated) return s;
             foreach (HostileMobAI m in subjects) s.Subjects.Add(SaveOf(m));
@@ -638,6 +639,8 @@ namespace BattleOfAges.AI
             if (!all.Contains(k)) all.Add(k);
             k.KingdomName = s.Name;
             k.Free = s.Free;
+            k.IsEmpire = s.Empire;
+            k.Economy.Free = s.Empire;
             k.Team = s.Team >= UnitSpatialGrid.TeamKingdomFirst ? s.Team : NewSide();
             if (k.Team >= nextTeam) nextTeam = k.Team + 1;
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
@@ -689,6 +692,13 @@ namespace BattleOfAges.AI
         private void OnKingDied()
         {
             if (IsDefeated) return;
+            if (IsEmpire)
+            {
+                // No succession: the empire is its emperor's (§9.1.1, §9.3), and the artifact breaks into a shard where he fell
+                if (King != null) ArtifactPickup.Spawn(ArtifactType.CentralEmpire, King.transform.position, shard: true, owner: null);
+                Fall("імператор загинув");
+                return;
+            }
             if (Raiding) EndRaid(retreat: true);
             InterregnumLeft = GameBalance.InterregnumSeconds;
             StrategyHud.Notify($"Король {KingdomName} загинув! Міжцарів'я");
@@ -748,6 +758,7 @@ namespace BattleOfAges.AI
         {
             if (IsDefeated) return;
             IsDefeated = true;
+            if (IsEmpire) CentralEmpire.NpcEmpireFell();
             if (Raiding) EndRaid(retreat: false);
             foreach (HostileMobAI m in subjects) if (m != null) m.Kingdom = null;
             if (King != null) King.Kingdom = null;

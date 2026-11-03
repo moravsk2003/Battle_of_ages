@@ -89,13 +89,13 @@ namespace BattleOfAges.UI
         {
             title.text = saving ? "Зберегти гру" : "Завантажити гру";
             for (int i = list.childCount - 1; i >= 0; i--) Destroy(list.GetChild(i).gameObject);
-            for (int slot = 0; slot <= SaveSystem.ManualSlots; slot++) Row(slot, (slot) * 112f);
+            for (int slot = 0; slot <= SaveSystem.ManualSlots; slot++) Row(slot, (slot / 2) * 112f, slot % 2 == 0 ? -386f : 386f);
         }
 
-        private void Row(int slot, float y)
+        private void Row(int slot, float y, float x0)
         {
             SaveMeta m = SaveSystem.Meta(slot);
-            RectTransform row = UiTheme.Rect(list, "Slot" + slot, new Vector2(0.5f, 1f), new Vector2(0f, -y), new Vector2(760f, 102f));
+            RectTransform row = UiTheme.Rect(list, "Slot" + slot, new Vector2(0.5f, 1f), new Vector2(x0, -y), new Vector2(760f, 102f));
             UiTheme.PanelImage(row, UiTheme.SlotSprite, slot == SaveSystem.AutoSlot ? new Color(0.85f, 0.85f, 0.95f) : Color.white);
             RectTransform nm = UiTheme.Rect(row, "Name", new Vector2(0f, 1f), new Vector2(18f, -10f), new Vector2(420f, 32f));
             UiTheme.Label(nm, "Text", SaveSystem.SlotName(slot), 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
@@ -141,7 +141,7 @@ namespace BattleOfAges.UI
             RectTransform dim = UiTheme.Rect(canvas.transform, "Dim", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             dim.anchorMin = Vector2.zero; dim.anchorMax = Vector2.one; dim.sizeDelta = Vector2.zero;
             dim.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.55f);
-            RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820f, 600f));
+            RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1600f, 720f));
             PopIn.On(panel);
             UiTheme.PanelImage(panel);
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -16f), new Vector2(600f, 44f));
@@ -149,7 +149,7 @@ namespace BattleOfAges.UI
             title = UiTheme.Label(head, "Text", "", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-16f, -14f), new Vector2(46f, 44f), Close, 28)
                    .GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
-            list = UiTheme.Rect(panel, "List", new Vector2(0.5f, 1f), new Vector2(0f, -78f), new Vector2(760f, 450f));
+            list = UiTheme.Rect(panel, "List", new Vector2(0.5f, 1f), new Vector2(0f, -78f), new Vector2(1540f, 570f));
             RectTransform hint = UiTheme.Rect(panel, "Hint", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(760f, 28f));
             UiTheme.Label(hint, "Text", "F5 — швидке збереження  ·  F9 — швидке завантаження  ·  автозбереження кожні 5 хв", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
         }

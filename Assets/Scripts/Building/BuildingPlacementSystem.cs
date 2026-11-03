@@ -36,6 +36,9 @@ namespace BattleOfAges.Building
         /// <summary>The ore tier walls are built of (Tab picks another the player has enough of).</summary>
         private int wallTier;
         private bool snapped;
+        /// <summary>The turn at a wall's end set with Z / X: it stays for the next segments, so that a ring is a matter of clicks.</summary>
+        private float? wallTurn;
+        private float usedWallTurn;
 
         public bool IsPlacing => isPlacing;
         public const float TurnStep = 15f;
@@ -50,7 +53,7 @@ namespace BattleOfAges.Building
             get
             {
                 if (!isPlacing) return "";
-                long key = ((long)currentBuildingType * 1000 + wallTier) * 2 + (snapped ? 1 : 0);
+                long key = ((long)currentBuildingType * 1000 + wallTier) * 2000 + (snapped ? 1000 + Mathf.RoundToInt(usedWallTurn) + 90 : 0);
                 if (key == hintKey && hint != null) return hint;
                 hintKey = key;
                 return hint = MakeHint();
@@ -62,7 +65,7 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
             if (!WallSegment.IsWall(currentBuildingType)) return $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати";
             return $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
-                 + (snapped ? "прилипла до стіни" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
+                 + (snapped ? $"прилипла, кут {usedWallTurn:+0;-0;0}°: Z / X — змінити" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
         }
 
         /// <summary>The frame a placement was last cancelled (that Escape is not also the pause or the way out of the map).</summary>
@@ -109,8 +112,18 @@ namespace BattleOfAges.Building
                 if (mapCamera == null) return;
             }
 
-            if (UniversalInput.IsKeyDown(KeyCode.Z)) ghostYaw -= TurnStep;
-            if (UniversalInput.IsKeyDown(KeyCode.X)) ghostYaw += TurnStep;
+            bool atWallEnd = snapped && WallSegment.IsWall(currentBuildingType);
+            float wallStep = Combat.GameBalance.WallTurnStep;
+            if (UniversalInput.IsKeyDown(KeyCode.Z))
+            {
+                if (atWallEnd) wallTurn = Mathf.Clamp(usedWallTurn - wallStep, -90f, 90f);
+                else ghostYaw -= TurnStep;
+            }
+            if (UniversalInput.IsKeyDown(KeyCode.X))
+            {
+                if (atWallEnd) wallTurn = Mathf.Clamp(usedWallTurn + wallStep, -90f, 90f);
+                else ghostYaw += TurnStep;
+            }
             if (WallSegment.IsWall(currentBuildingType) && UniversalInput.IsKeyDown(KeyCode.Tab)) wallTier = NextWallTier(wallTier, BuildingData.GetDefinition(currentBuildingType).OreCost);
 
             UpdateGhostPosition();
@@ -183,7 +196,7 @@ namespace BattleOfAges.Building
                 BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
                 Quaternion rot = Quaternion.Euler(0f, ghostYaw, 0f);
                 float yaw = 0f, endY = 0f;
-                snapped = WallSegment.IsWall(currentBuildingType) && WallSegment.Snap(pos, def.Size.x, out pos, out yaw, out endY);
+                snapped = WallSegment.IsWall(currentBuildingType) && WallSegment.Snap(pos, def.Size.x, wallTurn, out pos, out yaw, out endY, out usedWallTurn);
                 if (snapped) rot = Quaternion.Euler(0f, yaw, 0f);
                 bool level = FootprintLevel(currentBuildingType, pos, rot, out float h);
                 // A snapped segment keeps its neighbour's height (one walkway) while its foundation still reaches the ground

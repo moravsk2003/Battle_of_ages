@@ -15,6 +15,8 @@ namespace BattleOfAges.AI
         /// <summary>0: no hall yet (a camp), 1..5: hall I..V.</summary>
         public int HallLevel;
         public float BirthCarry;
+        /// <summary>The Central Empire: its hall rises for nothing (§9.1.1).</summary>
+        public bool Free;
 
         public int Cap => TownHall.CapForLevel(HallLevel);
         public bool MaxedOut => HallLevel >= TownHall.MaxLevel;
@@ -25,8 +27,8 @@ namespace BattleOfAges.AI
         public void NextCost(out int wood, out int ore)
         {
             int to = Mathf.Clamp(HallLevel + 1, 1, TownHall.MaxLevel);
-            wood = GameBalance.TownHallWood[to];
-            ore = GameBalance.TownHallOre[to];
+            wood = Free ? 0 : GameBalance.TownHallWood[to];
+            ore = Free ? 0 : GameBalance.TownHallOre[to];
         }
 
         public bool CanUpgrade

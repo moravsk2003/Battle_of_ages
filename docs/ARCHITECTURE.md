@@ -79,6 +79,20 @@
 - Редакторські інструменти перебудови (`Assets/Editor`): моделі персонажів, руки від першої особи, сцена, збірки
   (`BuildGameTool`).
 
+## 6.1 Поселення, зони, абстрактний шар (M5, M6)
+
+- **Склади:** `SettlementStock` на кожну ратушу (`TownHall.Stock`). `ResourceManager` сам віддає склад поселення на екрані (`Viewed`), а робота на місці йде через `For(place)`.
+- **Належність:** усе належить до найближчої ратуші (`TownHall.Nearest`), людей рахує `People`.
+- **Земля:** `InfiniteWorldManager.HoldSettlements` тримає чанки навколо кожної ратуші, навіть коли герой далеко.
+- **Зони:** `ZoneMap` (клітинки 8 м), `ZonePainter` (пензель), `ZoneToolbar` (кнопки мапи), `ZoneGrower` (ставить ділянки), `ConstructionSite` (будують робітники), `WorkPlace` (поле,
+  лісопилка), `Caravans` (між поселеннями).
+- **Рух:** `GroundMotor` (рельєф, озера, стіни, `Footprints` будівель); `GameBalance.WalkerSeparation`, `StandingSeparation`, `PressBeforeBypass`.
+- **Абстрактний шар:** `KingdomRealm` (далекі королівства даними), `KingdomEconomy`, `AbstractBattle` / `UnitStats` (бій цифрами). Після зміни бойового балансу зіграти заново
+  `AbstractBattleCalibration.PlayTheBattles`.
+- **Імперія:** `NpcKingdom.IsEmpire` у кожній кампанії, `CentralEmpire.Active` лише коли її тримає гравець.
+
+Заміри: `PaceSim` (темп зі справжнього старту; `SIM_ZONES`: що дає кожна зона), `ZoneCapture`, `SettlementCapture`, `PushProbe`.
+
 ## 7. Відомий борг
 
 1. **Стан і показ змішані** в MonoBehaviour, дії викликаються напряму — для мережі (M8) потрібні команди й окремий стан

@@ -10,6 +10,7 @@ namespace BattleOfAges.RTS
     /// </summary>
     public static class GroundMotor
     {
+        private const float OutOfBuildingSpeed = 3f;
         /// <summary>Max rise per horizontal metre (~55 degrees), like the units' CharacterController slope limit.</summary>
         private const float MaxClimb = 1.43f;
 
@@ -20,6 +21,15 @@ namespace BattleOfAges.RTS
         public static Vector3 Move(Transform t, int gridId, Vector3 desiredVelocity, float radius, float dt, bool own = false)
         {
             Vector3 p = t.position;
+            if (dt > 0f && Building.Footprints.Inside(p, radius, out Vector3 outWay))
+            {
+                // Inside a building, whatever it wants: straight out
+                Vector3 outStep = Vector3.ClampMagnitude(outWay, Mathf.Max(desiredVelocity.magnitude, OutOfBuildingSpeed) * dt);
+                Vector3 outAt = p + outStep;
+                outAt.y = RtsUnit.GetTerrainHeight(outAt);
+                t.position = outAt;
+                return outStep / dt;
+            }
             Vector3 v = desiredVelocity;
             v.y = 0f;
             if (gridId >= 0) v += UnitSpatialGrid.Separation(gridId, p, radius, v.sqrMagnitude > 0.01f ? Combat.GameBalance.WalkerSeparation : Combat.GameBalance.StandingSeparation);
@@ -33,6 +43,15 @@ namespace BattleOfAges.RTS
             if (step.sqrMagnitude < 1e-10f) return Vector3.zero;
             v = step / dt;
             Vector3 np = p + step;
+            // Not through a building: along the wall, or it stays
+            if (Building.Footprints.Inside(np, radius, out _))
+            {
+                Vector3 alongX = new Vector3(p.x + step.x, p.y, p.z), alongZ = new Vector3(p.x, p.y, p.z + step.z);
+                if (!Building.Footprints.Inside(alongX, radius, out _)) np = alongX;
+                else if (!Building.Footprints.Inside(alongZ, radius, out _)) np = alongZ;
+                else return Vector3.zero;
+                v = (np - p) / dt;
+            }
             float ground = RtsUnit.GetTerrainHeight(np);
             float run = v.magnitude * dt;
             if (ground - p.y > run * MaxClimb + 0.05f)

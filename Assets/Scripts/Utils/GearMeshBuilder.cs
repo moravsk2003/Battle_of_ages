@@ -775,6 +775,7 @@ namespace BattleOfAges.Utils
             if (hand < 0) return;
             // As the role weapons: out of the fist along palm +X (villager rig) or -X (knight rig); built along +Y
             Vector3 blade = -r.BoneX[hand]; // (both skeletons: the bind matrices are mirrored relative to the attachment frames)
+            if (blade.z < 0f) blade = -blade; // out of the fist forward, whatever the skeleton: villagers carried their axes behind them, head last
             Matrix4x4 m = Matrix4x4.TRS(r.BonePos[hand], Quaternion.LookRotation(Vector3.ProjectOnPlane(r.BoneZ[hand], blade).normalized, blade), Vector3.one);
             Finish f = WeaponFinish(level);
             switch (type)

@@ -163,6 +163,17 @@ namespace BattleOfAges.Player
             transform.Rotate(Vector3.up * mouseX);
         }
 
+        /// <summary>The view's tilt up or down, degrees (a save keeps it).</summary>
+        public float Pitch
+        {
+            get => pitch;
+            set
+            {
+                pitch = Mathf.Clamp(value, minPitchAngle, maxPitchAngle);
+                if (cameraTransform != null) cameraTransform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+            }
+        }
+
         public void EnableControl(bool enable)
         {
             isControlEnabled = enable;

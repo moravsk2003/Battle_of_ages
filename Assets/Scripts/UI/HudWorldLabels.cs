@@ -112,13 +112,13 @@ namespace BattleOfAges.UI
                 if (!OnScreen(cam, s.transform.position + Vector3.up * (def.Size.y + 1.5f), out Vector2 local, out float depth) || (!map && depth > 30f)) continue;
                 while (sitePlates.Count <= used)
                 {
-                    RectTransform rt = UiTheme.Rect(layer, "SiteLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(260f, 32f));
+                    RectTransform rt = UiTheme.Rect(layer, "SiteLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(420f, 32f));
                     rt.pivot = new Vector2(0.5f, 0f);
                     UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f));
                     Tooltip.Set(rt.gameObject, () => TipText.Title("Будівництво", UiTheme.Gold)
                         + $"\nРобітники «Авто» приходять самі; інших виділіть і клацніть {TipText.Key("ПКМ")} по ділянці. До {ConstructionSite.MaxBuilders} робітників, що більше — то швидше."
                         + "\n" + TipText.Dim("Без робітників будівництво стоїть."));
-                    RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240f, 28f));
+                    RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(400f, 28f));
                     Text t = UiTheme.Label(tr, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink);
                     t.supportRichText = true;
                     sitePlates.Add((rt, t));
@@ -126,7 +126,7 @@ namespace BattleOfAges.UI
                 var (plate, text) = sitePlates[used++];
                 if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
                 plate.anchoredPosition = local;
-                string hands = s.PresentBuilders == 0 ? "<color=#DB5242>немає робітників</color>" : $"<color=#F5CC73>{s.PresentBuilders}</color> працюють";
+                string hands = s.PresentBuilders == 0 ? "<color=#DB5242>немає робітників</color>  <size=11>ПКМ виділеними — послати</size>" : $"<color=#F5CC73>{s.PresentBuilders}</color> працюють";
                 text.text = $"{s.DisplayName} {Mathf.FloorToInt(s.Progress * 100f)}%  ·  {hands}";
             }
             for (int i = used; i < sitePlates.Count; i++) if (sitePlates[i].plate.gameObject.activeSelf) sitePlates[i].plate.gameObject.SetActive(false);

@@ -14,6 +14,7 @@ namespace BattleOfAges.Player
     public class PlayerCombatController : MonoBehaviour
     {
         [Header("Attack Settings")]
+        private const float LooseArrowRange = 60f;
         [SerializeField] private float attackRange = 3.5f;
 
         private HealthComponent healthComponent;
@@ -158,6 +159,8 @@ namespace BattleOfAges.Player
                 else { viewmodelAnimation.PlayPunchAnimation(); GameSound.Play2D(GameSound.Kind.Swing); }
             }
 
+            bool bowReady = combatUnit.CanAttack && combatUnit.IsRanged && !combatUnit.FiresBolts;
+
             // Raycast forward from FPS camera
             Ray ray = (fpsCamera != null)
                 ? new Ray(fpsCamera.transform.position, fpsCamera.transform.forward)
@@ -196,6 +199,16 @@ namespace BattleOfAges.Player
                     }
                     return;
                 }
+            }
+
+            // A bow looses its arrow though no one is in reach: where the crosshair is, or as far as it carries
+            if (bowReady)
+            {
+                combatUnit.StartLooseShot();
+                Vector3 to = Physics.Raycast(ray, out RaycastHit ground, LooseArrowRange) ? ground.point : ray.GetPoint(LooseArrowRange);
+                Vector3 from = ray.origin + ray.direction * 0.6f + Vector3.down * 0.12f;
+                PendingHits.AddAction(combatUnit.Windup, () => ArrowShot.FireLoose(combatUnit, from, to));
+                return;
             }
 
             // Trigger cooldown and punch even if swing misses

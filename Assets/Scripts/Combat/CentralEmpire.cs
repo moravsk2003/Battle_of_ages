@@ -54,6 +54,13 @@ namespace BattleOfAges.Combat
             });
         }
 
+        /// <summary>The world's empire under an NPC emperor fell: a new epoch, as with the player's (§9.1.1).</summary>
+        public static void NpcEmpireFell()
+        {
+            WorldEpoch++;
+            UI.StrategyHud.Notify($"Центральну імперію знищено — настала нова епоха світу ({WorldEpoch})");
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { Active = false; WorldEpoch = 0; }
     }

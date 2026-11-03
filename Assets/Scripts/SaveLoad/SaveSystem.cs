@@ -27,7 +27,7 @@ namespace BattleOfAges.SaveLoad
     {
         public const string GameScene = "SampleScene";
         public const string MenuScene = "MainMenu";
-        public const int ManualSlots = 3;
+        public const int ManualSlots = 9;
         public const int AutoSlot = 0;
         public const float AutosaveSeconds = 300f;
 
@@ -143,6 +143,8 @@ namespace BattleOfAges.SaveLoad
             {
                 d.Player.Position = player.transform.position;
                 d.Player.Yaw = player.transform.eulerAngles.y;
+                FirstPersonController look = player.GetComponent<FirstPersonController>();
+                if (look != null) d.Player.Pitch = look.Pitch;
                 HealthComponent hp = player.GetComponent<HealthComponent>();
                 d.Player.Health = hp != null ? hp.CurrentHealth : 0;
                 d.Player.Gear = player.Gear.SlotsCopy();
@@ -495,6 +497,8 @@ namespace BattleOfAges.SaveLoad
             if (player != null)
             {
                 Place(player.gameObject, d.Player.Position, d.Player.Yaw);
+                FirstPersonController look = player.GetComponent<FirstPersonController>();
+                if (look != null) look.Pitch = d.Player.Pitch;
                 player.Gear.LoadSlots(d.Player.Gear);
                 HeroProgress hero = player.GetComponent<HeroProgress>();
                 if (hero != null) hero.Restore(d.Player.Level, d.Player.Xp, d.Player.AttributePoints, d.Player.SkillPoints, d.Player.StrengthPoints, d.Player.HealthPoints, (HeroClass)d.Player.Class);

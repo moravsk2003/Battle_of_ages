@@ -221,7 +221,7 @@ namespace BattleOfAges.UI
 
             BuildingDefinition def = BuildingData.GetDefinition(ZoneGrower.BuildingOf(zone));
             int next = ZoneGrower.CellsPerBuilding(zone) * wanted + 1 - cells;
-            string text = head + $"Розмічено {cells} кл.: споруд {wanted}, стоїть {have - sites}" + (sites > 0 ? $", будується {sites}" : "") + $". Ще одна — за {next} кл.";
+            string text = head + $"Розмічено {cells} кл.: споруд {wanted}, стоїть {have - sites}" + (sites > 0 ? $", будується {sites}" : "") + $". Ще одна — за {next} кл. Вільні люди йдуть самі; інших: виділити, ПКМ по споруді.";
             if (have >= wanted) return text;
             ResourceManager rm = ResourceManager.Instance;
             SettlementStock stock = rm == null ? null : hall != null ? hall.Stock : rm.Main;

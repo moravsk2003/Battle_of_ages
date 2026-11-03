@@ -60,7 +60,7 @@ namespace BattleOfAges.AI
         {
             spawnOrigin = transform.position;
             base.Awake();
-            if (Health != null) Health.OnDeath += OnDied;
+            if (Health != null) { Health.OnDeath += OnDied; Health.OnDeath += GiveFood; }
             CacheVisualNodes();
             ConfigureAnimalStats();
         }
@@ -288,6 +288,17 @@ namespace BattleOfAges.AI
                 ? (Vector3.Dot(transform.right, transform.position - killer.transform.position) >= 0f ? 1f : -1f)
                 : ((GetInstanceID() & 1) == 0 ? 1f : -1f);
             StartCoroutine(Collapse(side)); // (runs on though the corpse switches this component off)
+        }
+
+        /// <summary>Killed by the player's side: its meat goes to the nearest settlement's stock (a campaign has food rules).</summary>
+        private void GiveFood()
+        {
+            Combat.CombatUnit killer = Health != null ? Health.LastAttacker : null;
+            if (killer == null || killer.Team != UnitSpatialGrid.TeamPlayer || !Resources.ResourceManager.FoodRules) return;
+            Resources.ResourceManager rm = Resources.ResourceManager.Instance;
+            if (rm == null) return;
+            rm.For(transform.position).AddFood(BattleOfAges.Combat.GameBalance.FoodPerAnimal);
+            UI.StrategyHud.Notify($"+{BattleOfAges.Combat.GameBalance.FoodPerAnimal:0} їжі");
         }
 
         /// <summary>How far the body reaches to that side of its middle (the edge it rolls over), in the animal's frame.</summary>

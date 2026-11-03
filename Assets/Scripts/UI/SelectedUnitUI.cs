@@ -99,9 +99,13 @@ namespace BattleOfAges.UI
                 singleHead.Reset(); singleHpShown.Reset(); singleStats.Reset(); singleJob.Reset();
             }
             UnitRank rank = RankOf(unit);
-            if (singleHead.Changed(Shown.Key(unit.GetInstanceID(), (int)rank)))
+            UnitProgress progress = unit.IsHero ? null : unit.GetComponent<UnitProgress>();
+            int xp = progress != null ? progress.BattleXp : 0;
+            if (singleHead.Changed(Shown.Key(unit.GetInstanceID(), (int)rank, xp)))
             {
-                titleText.text = DisplayName(unit);
+                int need = UnitProgress.XpToPromote(rank);
+                titleText.supportRichText = true;
+                titleText.text = DisplayName(unit) + (progress != null && need > 0 ? $"  <size=14>до рангу «{HeroUI.RankName(rank + 1)}»: {xp}/{need} досвіду</size>" : "");
                 titleText.color = RankColor(rank, unit.IsHero);
                 SetPortrait(portrait, unit, rank);
             }

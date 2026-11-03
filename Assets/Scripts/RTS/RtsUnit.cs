@@ -92,8 +92,9 @@ namespace BattleOfAges.RTS
             gatherer = GetComponent<NpcResourceGatherer>();
             if (!isPlayerControlled)
             {
-                // One kind of unit (docs/GAME_DESIGN.md §11.1): every unit can also work; one without a job stands by as a soldier
-                if (gatherer == null) { gatherer = gameObject.AddComponent<NpcResourceGatherer>(); gatherer.SetGatherDirective(GatherDirective.Idle); }
+                // One kind of unit (docs/GAME_DESIGN.md §11.1): a soldier works as a villager does, a villager fights as a soldier
+                // does; one stands by only when told to stand somewhere (RtsUnitCommander.MoveInFormation)
+                if (gatherer == null) gatherer = gameObject.AddComponent<NpcResourceGatherer>();
                 EnsureStartingKit();
                 CentralEmpire.ApplyTo(gameObject); // the empire's units wear its gear and do not work
             }

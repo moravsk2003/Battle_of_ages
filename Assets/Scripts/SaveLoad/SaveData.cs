@@ -52,6 +52,8 @@ namespace BattleOfAges.SaveLoad
         public bool Defeated;
         /// <summary>A free hero's band (§7.4): no hall, no raids. Team: its side (the same ring colour whenever it is about).</summary>
         public bool Free;
+        /// <summary>The world's Central Empire (§9.1.1).</summary>
+        public bool Empire;
         public int Team;
         public SubjectSave King = new SubjectSave(); public bool HasKing; public int KingClass, KingTotalXp;
         public List<SubjectSave> Subjects = new List<SubjectSave>();
@@ -75,7 +77,7 @@ namespace BattleOfAges.SaveLoad
     public class PlayerSave
     {
         public Vector3 Position;
-        public float Yaw;
+        public float Yaw, Pitch;
         public int Health;
         public Item[] Gear = new Item[6];
         public int Mode;                 // GameMode

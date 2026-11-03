@@ -53,7 +53,9 @@ namespace BattleOfAges.UI
             if (commander == null || commander.SelectedUnits.Count == 0) return Look.Arrow;
             Camera cam = ViewCamera.Current;
             if (cam == null || !Physics.Raycast(cam.ScreenPointToRay(InputSystem.UniversalInput.GetMousePosition()), out RaycastHit hit, 1000f)) return Look.Arrow;
-            return LookAt(hit.collider);
+            Look look = LookAt(hit.collider);
+            if (look == Look.Arrow && RtsUnitCommander.IsOpenGround(hit.collider) && ResourceGrid.CrownUnderRay(cam.ScreenPointToRay(InputSystem.UniversalInput.GetMousePosition()), hit.point) != null) return Look.Wood;
+            return look;
         }
 
         /// <summary>What the cursor shows over this collider, with units selected.</summary>
@@ -64,6 +66,7 @@ namespace BattleOfAges.UI
             CombatUnit cu = c.GetComponentInParent<CombatUnit>();
             if (cu != null && cu.Team != UnitSpatialGrid.TeamPlayer && cu.Team != UnitSpatialGrid.TeamNeutral) return Look.Attack;
             if (c.GetComponentInParent<PeacefulAnimalAI>() != null) return Look.Attack;
+            if (c.GetComponentInParent<ConstructionSite>() != null || c.GetComponentInParent<WorkPlace>() != null) return Look.Build; // send them to work here
             if (c.GetComponentInParent<ResourceNodeTree>() != null) return Look.Wood;
             if (c.GetComponentInParent<OrePebbleNode>() != null || c.GetComponentInParent<MineNode>() != null) return Look.Ore;
             return Look.Arrow;

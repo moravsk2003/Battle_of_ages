@@ -39,6 +39,7 @@ namespace BattleOfAges.PlayModeTests
             RtsUnit knight = CreateKnight(new Vector3(4f, 0f, 0f));
             yield return null;
 
+            knight.GetComponent<NpcResourceGatherer>().SetGatherDirective(GatherDirective.Idle); // (as a move order on the map does)
             knight.IssueMoveCommand(tree.transform.position);
             yield return Wait(4f);
 
@@ -48,7 +49,7 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator Knight_CanWork_ButStandsByAsASoldierUntilToldTo()
+        public IEnumerator Knight_Works_LikeAnyone_UntilToldToStand()
         {
             CreateGround();
             int before = WorkerRegistry.WorkerCount, workingBefore = WorkerRegistry.WorkingCount;
@@ -57,11 +58,13 @@ namespace BattleOfAges.PlayModeTests
 
             var job = knight.GetComponent<NpcResourceGatherer>();
             Assert.IsNotNull(job, "Every unit can work (one kind of unit).");
-            Assert.IsFalse(job.IsWorking, "Without an order a knight stands by as a soldier.");
+            Assert.IsTrue(job.IsWorking, "Fighters and villagers both work (one kind of unit).");
             Assert.AreEqual(before + 1, WorkerRegistry.WorkerCount, "The town hall cap counts soldiers too.");
-            Assert.AreEqual(workingBefore, WorkerRegistry.WorkingCount);
+            Assert.AreEqual(workingBefore + 1, WorkerRegistry.WorkingCount);
             Assert.AreEqual(UnitRanks.Health(UnitRank.Knight), knight.GetComponent<Crafting.Equipment>().BaseHealth);
 
+            job.SetGatherDirective(GatherDirective.Idle);
+            Assert.IsFalse(job.IsWorking, "Told to stand, it stands.");
             WorkerRegistry.ApplyJobDistribution(0, 0, 0, 0, 0);
             Assert.IsFalse(job.IsWorking, "The job window only shares out units that already work.");
 

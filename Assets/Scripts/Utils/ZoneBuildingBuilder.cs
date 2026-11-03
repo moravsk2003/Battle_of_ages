@@ -33,6 +33,7 @@ namespace BattleOfAges.Utils
         {
             if (field == null) field = FieldMesh();
             GameObject go = Root(name, BuildingType.Field, field, new Vector3(13f, 0.6f, 13f));
+            go.GetComponent<BoxCollider>().isTrigger = true; // for the mouse only: farmers walk on it, and a solid one above the ground kept them off
             go.AddComponent<FieldNode>();
             return go;
         }
@@ -53,21 +54,71 @@ namespace BattleOfAges.Utils
             return go;
         }
 
+        /// <summary>A copy of a flat mesh laid over the land under this place: each vertex up or down by the ground under it.</summary>
+        public static Mesh Draped(Mesh flat, Transform at)
+        {
+            Mesh mesh = Object.Instantiate(flat);
+            mesh.name = flat.name + "_Draped";
+            Vector3[] v = mesh.vertices;
+            float y = at.position.y;
+            for (int i = 0; i < v.Length; i++)
+            {
+                Vector3 w = at.TransformPoint(v[i]);
+                v[i].y += RTS.RtsUnit.GetTerrainHeight(w) - y;
+            }
+            mesh.vertices = v;
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
         private static void B(MeshKit kit, Vector3 at, Vector3 size, Color c, float yaw = 0f) =>
             kit.Box(Matrix4x4.TRS(at, Quaternion.Euler(0f, yaw, 0f), Vector3.one), size, 0.02f, Vector3.zero, _ => c);
 
+        /// <summary>The ploughed land alone, no thicker than paint: a fine sheet to lie on the relief (Draped), furrows in its colour.</summary>
+        private static void Tilth(MeshKit kit)
+        {
+            const int n = 27;
+            const float half = 6.5f;
+            var p = new Vector3[n, n];
+            var rng = new System.Random(77);
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++)
+                {
+                    bool edge = i == 0 || j == 0 || i == n - 1 || j == n - 1;
+                    float jx = edge ? (float)rng.NextDouble() * 0.5f - 0.25f : 0f, jz = edge ? (float)rng.NextDouble() * 0.5f - 0.25f : 0f;
+                    p[i, j] = new Vector3(-half + 2f * half * i / (n - 1) + jx, 0.07f, -half + 2f * half * j / (n - 1) + jz);
+                }
+            kit.Grid(p, false, new Vector3(1f, 0f, 0.05f), (i, j) =>
+            {
+                float furrow = 0.5f + 0.5f * Mathf.Sin(j * Mathf.PI * 2f / 3.2f);
+                return Color.Lerp(Soil * 0.72f, Soil * 1.1f, furrow);
+            }, Vector3.up);
+        }
+
+        /// <summary>A field's site: the land ploughed, nothing yet growing.</summary>
+        public static Mesh FieldSite { get { if (fieldSite == null) { var kit = new MeshKit(); Tilth(kit); fieldSite = kit.ToMesh("FieldSite"); } return fieldSite; } }
+        private static Mesh fieldSite;
+
+        /// <summary>Ploughed land with wheat on it: no platform, the ground itself changes (lying on the relief, FieldNode). Thin round stalks with tapering ears, leaning each its own way.</summary>
         private static Mesh FieldMesh()
         {
             var kit = new MeshKit();
-            B(kit, new Vector3(0f, -1.45f, 0f), new Vector3(13f, 3f, 13f), Soil); // deep: on a slope its footing goes into the ground
+            Tilth(kit);
+            var rng = new System.Random(4217);
+            float Rand(float lo, float hi) => lo + (float)rng.NextDouble() * (hi - lo);
+            Vector3 straw = new Vector3(1f, 0f, 0.15f);
             for (int r = 0; r < 8; r++)
             {
                 float z = -5.6f + r * 1.6f;
-                B(kit, new Vector3(0f, 0.2f, z), new Vector3(12f, 0.2f, 0.5f), Soil * 1.15f);
-                for (int i = 0; i < 12; i++)
+                for (int i = 0; i < 72; i++)
                 {
-                    float h = 0.45f + 0.2f * Mathf.Abs(Mathf.Sin(r * 3.1f + i * 1.7f));
-                    B(kit, new Vector3(-5.5f + i, 0.25f + h * 0.5f, z), new Vector3(0.5f, h, 0.32f), Color.Lerp(Crop, Crop * 0.8f, (i + r) % 3 / 2f));
+                    float h = Rand(0.8f, 1.2f), x = Rand(-6.1f, 6.1f), side = Rand(-0.45f, 0.45f);
+                    Quaternion lean = Quaternion.Euler(Rand(-11f, 11f), Rand(0f, 180f), Rand(-11f, 11f));
+                    Vector3 foot = new Vector3(x, 0.05f, z + side);
+                    Color stalk = Color.Lerp(new Color(0.55f, 0.58f, 0.24f), Crop * 0.92f, Rand(0f, 1f));
+                    Color ear = Color.Lerp(Crop, new Color(0.88f, 0.72f, 0.33f), Rand(0f, 1f));
+                    kit.Lathe(Matrix4x4.TRS(foot, lean, Vector3.one), new[] { new Vector2(0.012f, 0f), new Vector2(0.007f, h) }, 3, straw, (a, b0) => stalk);
+                    kit.Lathe(Matrix4x4.TRS(foot + lean * new Vector3(0f, h, 0f), lean, Vector3.one), new[] { new Vector2(0.005f, 0f), new Vector2(0.024f, 0.07f), new Vector2(0.02f, 0.17f), new Vector2(0.002f, 0.27f) }, 4, straw, (a, b0) => ear);
                 }
             }
             return kit.ToMesh("Field");

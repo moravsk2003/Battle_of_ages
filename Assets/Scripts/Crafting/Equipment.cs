@@ -289,7 +289,7 @@ namespace BattleOfAges.Crafting
             switch (type)
             {
                 case HumanoidModelBuilder.HumanType.KnightGuard:
-                    return new[] { I(ItemType.Sword, 3), I(ItemType.Shield, 3), I(ItemType.Helmet, 3), I(ItemType.Armor, 3), I(ItemType.Gloves, 2), I(ItemType.Boots, 2) };
+                    return new[] { I(ItemType.Sword, 1), I(ItemType.Shield, 1), Item.None, I(ItemType.Armor, 1) }; // a start, not a fortress: better gear is made or found
                 case HumanoidModelBuilder.HumanType.HeroPlayer:
                     return new[] { I(ItemType.Sword, 0), I(ItemType.Shield, 1) };
                 case HumanoidModelBuilder.HumanType.Bandit:

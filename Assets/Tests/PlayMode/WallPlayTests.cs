@@ -95,6 +95,59 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(0f, doors.Angle, 0.5f, "shut again");
         }
 
+        [UnityTest, Timeout(60000)]
+        public IEnumerator ANewSegment_JoinsAWallStillBeingBuilt()
+        {
+            Ground();
+            WallSegment first = Segment(BuildingType.CastleWall, Far, 0f);
+            ConstructionSite.Begin(first.gameObject, BuildingType.CastleWall);
+            yield return null;
+            Assert.IsFalse(first.isActiveAndEnabled, "a site, switched off");
+            Vector3 toEnd = first.EndB;
+            Assert.IsTrue(WallSegment.Snap(toEnd + new Vector3(1f, 0f, 0f), first.Length, out Vector3 center, out _, out _), "a site's end takes the next segment");
+            Assert.AreEqual(first.Length * 0.5f, Vector3.Distance(new Vector3(center.x, 0f, center.z), new Vector3(toEnd.x, 0f, toEnd.z)), 0.01f);
+            WallSegment second = Segment(BuildingType.CastleWall, center, 0f);
+            yield return null;
+            first.GetComponent<ConstructionSite>().Work(first.GetComponent<ConstructionSite>().WorkSeconds + 1f);
+            yield return null;
+            Assert.IsTrue(first.isActiveAndEnabled, "built, it is a wall like any");
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator ARing_CanBeClosedTurnByTurn_AndNoTurnIsBlockedByTheNeighbour()
+        {
+            Ground();
+            WallSegment first = Segment(BuildingType.CastleWall, Far, 0f);
+            yield return null;
+            Physics.SyncTransforms();
+            BuildingDefinition def = BuildingData.GetDefinition(BuildingType.CastleWall);
+            BuildingPlacementSystem.CheckBox(def, out Vector3 local, out Vector3 size);
+            var buffer = new Collider[32];
+            // Every allowed turn at the end: the place is free of the neighbour itself
+            for (float turn = -90f; turn <= 90f; turn += GameBalance.WallTurnStep)
+            {
+                Assert.IsTrue(WallSegment.Snap(first.EndB, first.Length, turn, out Vector3 c, out float yaw, out _, out float used));
+                Assert.AreEqual(turn, used, 0.01f);
+                Quaternion rot = Quaternion.Euler(0f, yaw, 0f);
+                int n = Physics.OverlapBoxNonAlloc(c + rot * local, size * 0.5f, buffer, rot);
+                for (int i = 0; i < n; i++)
+                    Assert.IsFalse(buffer[i].transform.IsChildOf(first.transform), $"at {turn}: the new segment's place overlaps the neighbour");
+            }
+            // Twenty-four turns of 15 degrees come round to the start
+            var ring = new List<WallSegment> { first };
+            WallSegment last = first;
+            for (int i = 1; i < 24; i++)
+            {
+                Assert.IsTrue(WallSegment.Snap(last.EndB, first.Length, GameBalance.WallTurnStep, out Vector3 c, out float yaw, out _, out _), "segment " + i);
+                last = Segment(BuildingType.CastleWall, c, yaw);
+                ring.Add(last);
+                yield return null;
+            }
+            Vector3 gap = last.EndA - first.EndA, gap2 = last.EndB - first.EndA;
+            gap.y = gap2.y = 0f;
+            Assert.Less(Mathf.Min(gap.magnitude, gap2.magnitude), 0.5f, "the ring closes");
+        }
+
         private void Ground()
         {
             var ground = new GameObject("Ground");

@@ -55,6 +55,7 @@ namespace BattleOfAges.PlayModeTests
             capture.Shoot(1, "sets_I_to_V_back", c + new Vector3(0f, 1.6f, 6.5f), mid);
             capture.Shoot(2, "close_III_V", c + new Vector3(1.9f, 1.45f, -2.6f), c + new Vector3(1.9f, 1.15f, 0f));
             capture.Shoot(3, "weapons", wCam, w + Vector3.up * 1f);
+            capture.Shoot(6, "weapons_side", w + new Vector3(-7f, 1.2f, -1f), w + Vector3.up * 1f); // they face the -z camera: the blades should point that way
             capture.Shoot(4, "hero_warlord_IV", kCam, k + Vector3.up * 1.1f);
             capture.Shoot(5, "close_I_II_side", c + new Vector3(-4.8f, 1.4f, -1.6f), c + new Vector3(-2.1f, 1.1f, 0f));
             yield return null;

@@ -118,22 +118,12 @@ namespace BattleOfAges.Building
                 Pay(def, stock);
                 GameObject building = BuildingPlacementSystem.CreateBuilding(type);
                 if (building == null) continue;
-                building.transform.SetPositionAndRotation(OnHighest(spot, def), Quaternion.Euler(0f, Mathf.Round(spot.x * 7f) % 4 * 90f, 0f));
+                building.transform.SetPositionAndRotation(spot, Quaternion.Euler(0f, Mathf.Round(spot.x * 7f) % 4 * 90f, 0f));
                 ConstructionSite.Begin(building, type);
                 sites++;
             }
         }
 
-        /// <summary>A wide flat building (a field) sits on the highest of its corners: its footing goes down into the slope.</summary>
-        private static Vector3 OnHighest(Vector3 spot, BuildingDefinition def)
-        {
-            if (def.Type != BuildingType.Field) return spot;
-            float h = Mathf.Max(def.Size.x, def.Size.z) * 0.5f;
-            foreach (float x in new[] { -h, h })
-                foreach (float z in new[] { -h, h })
-                    spot.y = Mathf.Max(spot.y, InfiniteWorldManager.GetSampledTerrainHeight(spot.x + x, spot.z + z));
-            return spot;
-        }
 
         private static bool Affordable(BuildingDefinition def, SettlementStock rm)
         {

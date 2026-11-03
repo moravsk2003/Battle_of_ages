@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using UnityEngine;
 
@@ -44,7 +45,12 @@ namespace BattleOfAges.Utils
         public static Mesh FarMesh => farMesh != null ? farMesh : (farMesh = BuildFar());
 
         /// <summary>Adds the mine model under the building root (full near, light past ~35 m).</summary>
-        public static GameObject Attach(Transform root) => MeshKit.AttachWithLod(root, "MineModel", Mesh, FarMesh, 0.1f);
+        public static GameObject Attach(Transform root)
+        {
+            GameObject model = MeshKit.AttachWithLod(root, "MineModel", Mesh, FarMesh, 0.1f);
+            AttachDark(root);
+            return model;
+        }
 
         private static float Rand(float a, float b) => a + (b - a) * (float)rng.NextDouble();
 
@@ -134,6 +140,75 @@ namespace BattleOfAges.Utils
                 float s = Rand(0.55f, 1.0f) * (1f - t * 0.4f);
                 Stone(c, new Vector3(s, s * Rand(0.5f, 0.8f), s * Rand(0.7f, 1f)), a * Mathf.Rad2Deg + Rand(-30f, 30f), (k % 3 == 0 ? RockDark : Rock) * Rand(0.88f, 1.1f));
             }
+        }
+
+        // ------------------------------------------------------------------ the dark of the adit
+
+        private static Mesh darkMesh;
+
+        /// <summary>
+        /// The mouth's dark, drawn unlit so that neither sun nor moon lights it: pure black at the heart, a little of the rock's
+        /// brown at the edge, and smaller and dimmer timber frames and rails going away in it, so the eye sees depth.
+        /// </summary>
+        private static void AttachDark(Transform parent)
+        {
+            Shader s = Shader.Find("Sprites/Default");
+            if (s == null) return;
+            if (darkMesh == null) darkMesh = BuildDark();
+            var go = new GameObject("AditDark");
+            go.transform.SetParent(parent, false);
+            go.AddComponent<MeshFilter>().sharedMesh = darkMesh;
+            MeshRenderer r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = new Material(s) { name = "MAT_AditDark" };
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+        }
+
+        private static Mesh BuildDark()
+        {
+            var v = new List<Vector3>();
+            var c = new List<Color>();
+            var t = new List<int>();
+            float z = AditZ + 0.06f, w = AditHalfW - 0.03f, h = AditH;
+            void Quad(Vector3 a, Vector3 b, Vector3 d, Vector3 e, Color ca, Color cb, Color cd, Color ce)
+            {
+                int i = v.Count;
+                v.Add(a); v.Add(b); v.Add(d); v.Add(e);
+                c.Add(ca); c.Add(cb); c.Add(cd); c.Add(ce);
+                t.Add(i); t.Add(i + 1); t.Add(i + 2);
+                t.Add(i); t.Add(i + 2); t.Add(i + 3);
+            }
+            Color black = Color.black, edge = new Color(0.075f, 0.058f, 0.045f);
+            // The heart is smaller than the mouth and low: the walls fade into it
+            Vector3 bl = new Vector3(-w * 0.42f, h * 0.05f, z), br = new Vector3(w * 0.42f, h * 0.05f, z), tl = new Vector3(-w * 0.42f, h * 0.58f, z), tr = new Vector3(w * 0.42f, h * 0.58f, z);
+            Vector3 obl = new Vector3(-w, 0f, z), obr = new Vector3(w, 0f, z), otl = new Vector3(-w, h, z), otr = new Vector3(w, h, z);
+            Quad(bl, tl, tr, br, black, black, black, black);
+            Quad(obl, otl, tl, bl, edge, edge, black, black);
+            Quad(br, tr, otr, obr, black, black, edge, edge);
+            Quad(tl, otl, otr, tr, black, edge, edge, black);
+            Quad(obl, bl, br, obr, edge, black, black, edge);
+
+            // Timber sets further and further in
+            float front = z + 0.002f;
+            foreach ((float share, float glow) in new[] { (0.74f, 0.05f), (0.52f, 0.025f), (0.36f, 0.012f) })
+            {
+                float fw = w * share, fh = h * (0.08f + share * 0.84f), foot = h * (0.32f * (1f - share)), thick = 0.09f * share;
+                Color wood = new Color(glow * 1.25f, glow, glow * 0.75f);
+                Quad(new Vector3(-fw, foot, front), new Vector3(-fw, fh, front), new Vector3(-fw + thick, fh, front), new Vector3(-fw + thick, foot, front), wood, wood, wood, wood);
+                Quad(new Vector3(fw - thick, foot, front), new Vector3(fw - thick, fh, front), new Vector3(fw, fh, front), new Vector3(fw, foot, front), wood, wood, wood, wood);
+                Quad(new Vector3(-fw, fh - thick, front), new Vector3(-fw, fh, front), new Vector3(fw, fh, front), new Vector3(fw, fh - thick, front), wood, wood, wood, wood);
+            }
+            // The rails run into the dark
+            Color rail = new Color(0.06f, 0.06f, 0.065f);
+            foreach (float s in new[] { -1f, 1f })
+                Quad(new Vector3(s * 0.34f, 0f, front), new Vector3(s * 0.09f, h * 0.2f, front), new Vector3(s * 0.08f, h * 0.2f, front), new Vector3(s * 0.28f, 0f, front), rail, black, black, rail);
+
+            var mesh = new Mesh { name = "AditDark" };
+            mesh.SetVertices(v);
+            mesh.SetColors(c);
+            mesh.SetTriangles(t, 0);
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         // ------------------------------------------------------------------ the adit

@@ -50,6 +50,29 @@ namespace BattleOfAges.Combat
             a.transform.rotation = Quaternion.LookRotation(a.aim - a.from);
         }
 
+        /// <summary>A shot at no one (the hero's, at nothing in reach): it flies to that point and sticks there, hitting nothing.</summary>
+        public static void FireLoose(CombatUnit shooter, Vector3 from, Vector3 to)
+        {
+            if (!Application.isPlaying) return;
+            ArrowShot a = null;
+            while (a == null && pool.Count > 0) a = pool.Pop();
+            if (a == null) a = Create();
+            if (a == null) return;
+            a.gameObject.SetActive(true);
+            UI.GameSound.At(UI.GameSound.Kind.BowShot, from);
+            a.shooter = shooter;
+            a.target = null;
+            a.damage = 0;
+            a.piercing = false;
+            a.from = from;
+            a.aim = to;
+            a.flight = Mathf.Max(0.05f, Vector3.Distance(from, to) / Speed);
+            a.t = 0f;
+            a.stuck = false;
+            a.transform.position = from;
+            a.transform.rotation = Quaternion.LookRotation(to - from);
+        }
+
         private static Vector3 Chest(HealthComponent h) => h.transform.position + Vector3.up * 1.2f;
 
         private static void Hit(CombatUnit shooter, HealthComponent target, int damage, bool piercing)

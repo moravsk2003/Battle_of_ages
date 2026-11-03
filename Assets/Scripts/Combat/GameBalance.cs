@@ -17,6 +17,13 @@ namespace BattleOfAges.Combat
         public static int[] RankHealth = { 20, 40, 100, 250 };
         /// <summary>Base strength (damage without a weapon) of person, warrior, knight, general.</summary>
         public static int[] RankStrength = { 2, 4, 10, 25 };
+        /// <summary>Seconds between a unit's blows before the weapon's speed.</summary>
+        public static float UnitBaseCooldown = 2f;
+        /// <summary>
+        /// The abstract battle (§6.2), fitted to real ones (AbstractBattleCalibration, AbstractBattleTests): how many can strike
+        /// at once (Base + PerRoot x root of the larger side) and the share of their damage per second that lands.
+        /// </summary>
+        public static float AbstractFrontBase = 1f, AbstractFrontPerRoot = 6f, AbstractDamageShare = 0.7f;
         /// <summary>Hero XP for killing a person, warrior, knight, general (§8).</summary>
         public static int[] RankKillXp = { 2, 4, 10, 50 };
         /// <summary>A hero has this many times the HP and strength of its rank (§7.1).</summary>
@@ -158,7 +165,7 @@ namespace BattleOfAges.Combat
         /// </summary>
         public static int SmeltRatio = 10;
         public static float SmeltSecondsPerPiece = 1f;
-        public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f, AlarmChaseRadius = 90f;
+        public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f, AlarmChaseRadius = 90f, AlarmGatherNear = 9f, AlarmGatherFar = 16f;
         public static bool AutoAlarm = true;
 
         // ------------------------------------------------------------------ promotions (§11.1)
@@ -215,7 +222,7 @@ namespace BattleOfAges.Combat
         /// <summary>Walls may stand on ground rising this much across them (their foundation goes deeper than a house's).</summary>
         public static float WallMaxGroundRise = 1.6f;
         /// <summary>A new segment snaps to a free end of a wall within this of the cursor; turns go in these steps.</summary>
-        public static float WallSnapRadius = 3f, WallTurnStep = 15f;
+        public static float WallSnapRadius = 4.2f, WallTurnStep = 15f;
         /// <summary>Wood and ore pieces to raise the settlement's walls to levels II..V; the minimum ore tier is level - 1.</summary>
         public static int[] WallLevelWood = { 0, 0, 20, 45, 80, 130 };
         public static int[] WallLevelOre = { 0, 0, 8, 12, 16, 24 };
@@ -248,6 +255,8 @@ namespace BattleOfAges.Combat
         public static float CampaignCampClearance = 300f;
         /// <summary>Food (§10.3, a campaign): eaten per person per game day; the stock of a new campaign; "running low" under this many days.</summary>
         public static float FoodPerPersonPerDay = 1f, FoodStart = 40f, FoodLowDays = 1f;
+        /// <summary>Food an animal killed by the player's side brings in (to the nearest settlement's stock).</summary>
+        public static float FoodPerAnimal = 1f;
         /// <summary>Building by workers (ConstructionSite): one worker's seconds for a building, and more per wood or ore it costs; how far Auto workers come from.</summary>
         public static float BuildBaseSeconds = 8f, BuildSecondsPerResource = 2f, BuildersComeFrom = 400f;
         /// <summary>How far from its hall a settlement marks zones at hall I (§5.3; +60% each hall level).</summary>

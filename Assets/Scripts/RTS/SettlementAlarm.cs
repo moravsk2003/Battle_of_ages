@@ -186,7 +186,7 @@ namespace BattleOfAges.RTS
                 }
                 else if (!gathered && (u.transform.position - home).sqrMagnitude > GameBalance.AlarmGatherRadius * GameBalance.AlarmGatherRadius)
                 {
-                    Vector2 r = Random.insideUnitCircle * 8f;
+                    Vector2 r = Random.insideUnitCircle.normalized * Random.Range(GameBalance.AlarmGatherNear, GameBalance.AlarmGatherFar); // round the hall, not into it
                     u.IssueMoveCommand(home + new Vector3(r.x, 0f, r.y)); // everyone home
                 }
             }

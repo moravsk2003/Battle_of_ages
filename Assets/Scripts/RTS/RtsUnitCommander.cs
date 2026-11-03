@@ -216,9 +216,21 @@ namespace BattleOfAges.RTS
             // A snapshot: a worker that enters a building leaves the selection while we loop
             tempUnitsBuffer.Clear();
             foreach (RtsUnit u in selectedUnits) if (u != null) tempUnitsBuffer.Add(u);
-            OrderUnits(hit, tempUnitsBuffer);
+            // On open ground under a tree's leaves: the tree (a trunk is hard to hit from above)
+            ResourceNodeTree crown = IsOpenGround(hit.collider) ? ResourceGrid.CrownUnderRay(ray, hit.point) : null;
+            if (crown != null)
+            {
+                foreach (RtsUnit u in tempUnitsBuffer) { NpcResourceGatherer g = u.GetComponent<NpcResourceGatherer>(); if (g != null) g.CommandHarvestTree(crown); }
+                GameSound.Play2D(GameSound.Kind.OrderWork);
+            }
+            else OrderUnits(hit, tempUnitsBuffer);
             tempUnitsBuffer.Clear();
         }
+
+        /// <summary>Nothing to give an order about here: no unit, building or resource.</summary>
+        public static bool IsOpenGround(Collider c) =>
+            c != null && c.GetComponentInParent<HealthComponent>() == null && c.GetComponentInParent<BuildingNode>() == null && c.GetComponentInParent<ResourceNodeTree>() == null
+            && c.GetComponentInParent<OrePebbleNode>() == null && c.GetComponentInParent<StorageChestNode>() == null;
 
         /// <summary>Right-click order on what was hit: attack, work in a mine or at a workbench, gather, deliver, or move.</summary>
         private static void OrderUnits(RaycastHit hit, List<RtsUnit> units)
@@ -314,6 +326,9 @@ namespace BattleOfAges.RTS
                     : Vector3.zero;
                 Vector3 target = point + offset;
                 target.y = RtsUnit.GetTerrainHeight(target);
+                // Sent to a place it stays there, ready to fight, until sent to work (an army would walk back to the trees)
+                NpcResourceGatherer job = units[i].GetComponent<NpcResourceGatherer>();
+                if (job != null) job.SetGatherDirective(GatherDirective.Idle);
                 units[i].IssueMoveCommand(target);
             }
         }

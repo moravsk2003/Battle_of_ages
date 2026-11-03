@@ -75,6 +75,33 @@ namespace BattleOfAges.Resources
         }
 
         /// <summary>How many rings reach out to radius metres.</summary>
+        /// <summary>
+        /// The tree whose crown this ray goes through first, near where it reaches the ground (the map: a click on the leaves
+        /// is a click on the tree, the trunk is hard to hit from above). Null with none.
+        /// </summary>
+        public static ResourceNodeTree CrownUnderRay(Ray ray, Vector3 groundPoint, float crownHeight = 4.6f, float crownRadius = 2.8f)
+        {
+            ResourceNodeTree best = null;
+            float bestAlong = float.MaxValue;
+            Vector2Int mid = CellOf(groundPoint);
+            int reach = Mathf.CeilToInt(14f / CellSize);
+            for (int dz = -reach; dz <= reach; dz++)
+                for (int dx = -reach; dx <= reach; dx++)
+                {
+                    List<ResourceNodeTree> trees = TreesIn(new Vector2Int(mid.x + dx, mid.y + dz));
+                    if (trees == null) continue;
+                    foreach (ResourceNodeTree t in trees)
+                    {
+                        if (t == null || t.CurrentState == TreeState.Depleted) continue;
+                        Vector3 crown = t.transform.position + Vector3.up * crownHeight;
+                        float along = Vector3.Dot(crown - ray.origin, ray.direction);
+                        if (along <= 0f || along >= bestAlong) continue;
+                        if ((ray.GetPoint(along) - crown).sqrMagnitude <= crownRadius * crownRadius) { best = t; bestAlong = along; }
+                    }
+                }
+            return best;
+        }
+
         public static int RingsFor(float radius) => Mathf.CeilToInt(radius / CellSize) + 1;
     }
 }

@@ -97,6 +97,86 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsFalse(SettlementAlarm.Active, "the alarm stands down when the enemy is gone");
         }
 
+        [UnityTest, Timeout(120000)]
+        public IEnumerator ACrowd_DoesNotShoveOneOfItsOwnThroughAHouse_AndOneInsideComesOut()
+        {
+            GameObject house = BuildingPlacementSystem.CreateBuilding(BuildingType.WorkerHouse);
+            house.transform.position = Far;
+            house.GetComponent<BuildingNode>().SetType(BuildingType.WorkerHouse);
+            spawned.Add(house);
+            float half = Mathf.Max(BuildingData.GetDefinition(BuildingType.WorkerHouse).Size.x, BuildingData.GetDefinition(BuildingType.WorkerHouse).Size.z) * 0.5f;
+            yield return null;
+            Footprints.Refresh();
+            // Packed against the wall, and one started inside
+            var crowd = new List<RtsUnit>();
+            for (int i = 0; i < 12; i++)
+            {
+                GameObject w = BuildingNode.CreateWorkerNpc(Far + new Vector3(half + 0.7f + (i % 3) * 0.3f, 0f, (i - 6) * 0.25f), "NPC_Packed_" + i);
+                spawned.Add(w);
+                w.GetComponent<NpcResourceGatherer>().SetGatherDirective(GatherDirective.Idle);
+                crowd.Add(w.GetComponent<RtsUnit>());
+            }
+            GameObject inside = BuildingNode.CreateWorkerNpc(Far + new Vector3(0.3f, 0f, 0.2f), "NPC_Inside");
+            spawned.Add(inside);
+            inside.GetComponent<NpcResourceGatherer>().SetGatherDirective(GatherDirective.Idle);
+            crowd.Add(inside.GetComponent<RtsUnit>());
+            yield return new WaitForSeconds(3f);
+            foreach (RtsUnit u in crowd)
+            {
+                Vector3 off = u.transform.position - Far;
+                Assert.Greater(Mathf.Max(Mathf.Abs(off.x), Mathf.Abs(off.z)), half - 0.05f, u.name + " is not inside the house");
+            }
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator ANewUnit_WorksAndFights_AndOneToldToStandStays()
+        {
+            var go = new GameObject("NewSoldier");
+            go.transform.position = Far + new Vector3(4f, 0f, 4f);
+            go.AddComponent<HealthComponent>();
+            go.AddComponent<CombatUnit>();
+            RtsUnit soldier = go.AddComponent<RtsUnit>();
+            spawned.Add(go);
+            yield return null;
+            NpcResourceGatherer job = go.GetComponent<NpcResourceGatherer>();
+            Assert.IsNotNull(job);
+            Assert.AreEqual(GatherDirective.Auto, job.CurrentDirective, "no one stands about by being a soldier: it works");
+            Assert.IsTrue(job.IsWorking);
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator TheAlarm_GathersPeopleRoundTheHall_NotIntoIt()
+        {
+            GameObject hall = TownHall.CreatePrefab("TestHall");
+            hall.transform.position = Far;
+            hall.GetComponent<BuildingNode>().SetType(BuildingType.TownHall);
+            spawned.Add(hall);
+            yield return null;
+            Footprints.Refresh();
+            var people = new List<RtsUnit>();
+            for (int i = 0; i < 6; i++)
+            {
+                GameObject w = BuildingNode.CreateWorkerNpc(Far + new Vector3(35f + i, 0f, 3f), "NPC_Called_" + i);
+                spawned.Add(w);
+                people.Add(w.GetComponent<RtsUnit>());
+            }
+            yield return null;
+            GameBalance.AlarmStandDownSeconds = 60f;
+            SettlementAlarm.Raise();
+            Time.timeScale = 3f;
+            yield return new WaitForSeconds(15f);
+            Time.timeScale = 1f;
+            GameBalance.AlarmStandDownSeconds = 10f;
+            float half = Mathf.Max(BuildingData.GetDefinition(BuildingType.TownHall).Size.x, BuildingData.GetDefinition(BuildingType.TownHall).Size.z) * 0.5f;
+            foreach (RtsUnit u in people)
+            {
+                Vector3 off = u.transform.position - Far;
+                off.y = 0f;
+                Assert.Greater(Mathf.Max(Mathf.Abs(off.x), Mathf.Abs(off.z)), half - 0.05f, u.name + " stands outside");
+                Assert.Less(off.magnitude, GameBalance.AlarmGatherRadius + 3f, u.name + " has come home");
+            }
+        }
+
         [UnityTest, Timeout(300000)]
         public IEnumerator ARaidThatRuns_IsLetGo_AndThePeopleGoBack()
         {

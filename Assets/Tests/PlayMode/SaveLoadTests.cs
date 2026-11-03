@@ -52,6 +52,8 @@ namespace BattleOfAges.PlayModeTests
             cc.enabled = false; hero.transform.position = heroPos; cc.enabled = true;
             GameObject mine = BuildingPlacementSystem.CreateBuilding(BuildingType.Mine);
             mine.transform.position = heroPos + new Vector3(8f, 0f, 8f);
+            foreach (BattleOfAges.RTS.NpcResourceGatherer w in BattleOfAges.RTS.WorkerRegistry.ActiveWorkers)
+                if (w != null) w.SetGatherDirective(BattleOfAges.RTS.GatherDirective.Idle); // (no one carries the ore off before the save)
             mine.GetComponent<MineNode>().Produce(20);
             int buildings = 0;
             foreach (BuildingNode b in BuildingNode.Active) if (b != null && !b.name.StartsWith("BuildGhost")) buildings++;

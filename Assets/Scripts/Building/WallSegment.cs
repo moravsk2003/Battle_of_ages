@@ -15,6 +15,11 @@ namespace BattleOfAges.Building
     {
         private static readonly List<WallSegment> active = new List<WallSegment>();
         public static IReadOnlyList<WallSegment> Active => active;
+        /// <summary>The standing ones and those still being built: a new segment may join either.</summary>
+        private static readonly List<WallSegment> joinable = new List<WallSegment>();
+
+        /// <summary>A site of a wall stays open to joining while it is switched off (ConstructionSite).</summary>
+        public bool UnderConstruction { get; set; }
 
         /// <summary>Ends closer than this are joined.</summary>
         public const float JoinDistance = 0.3f;
@@ -28,8 +33,20 @@ namespace BattleOfAges.Building
         public Vector3 EndA => transform.TransformPoint(new Vector3(-Length * 0.5f, 0f, 0f));
         public Vector3 EndB => transform.TransformPoint(new Vector3(Length * 0.5f, 0f, 0f));
 
-        private void OnEnable() { if (!active.Contains(this)) active.Add(this); }
-        private void OnDisable() => active.Remove(this);
+        private void OnEnable()
+        {
+            if (!active.Contains(this)) active.Add(this);
+            if (!joinable.Contains(this)) joinable.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            active.Remove(this);
+            if (!UnderConstruction) joinable.Remove(this);
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() { active.Clear(); joinable.Clear(); }
 
         private void Start()
         {
@@ -39,6 +56,7 @@ namespace BattleOfAges.Building
 
         private void OnDestroy()
         {
+            joinable.Remove(this);
             if (!gameObject.scene.isLoaded) return; // the scene is going: so are the piers
             WallPier.Prune(EndA);
             WallPier.Prune(EndB);
@@ -56,7 +74,7 @@ namespace BattleOfAges.Building
         /// <summary>Whether some segment has an end within JoinDistance of p (on the ground plane), other than skip.</summary>
         public static bool HasEndNear(Vector3 p, WallSegment skip = null)
         {
-            foreach (WallSegment s in active)
+            foreach (WallSegment s in joinable)
             {
                 if (s == null || s == skip) continue;
                 if (Flat(s.EndA - p) < JoinDistance || Flat(s.EndB - p) < JoinDistance) return true;
@@ -75,7 +93,7 @@ namespace BattleOfAges.Building
             end = away = outside = Vector3.zero;
             float best = radius;
             bool found = false;
-            foreach (WallSegment s in active)
+            foreach (WallSegment s in joinable)
             {
                 if (s == null) continue;
                 for (int e = 0; e < 2; e++)
@@ -95,18 +113,23 @@ namespace BattleOfAges.Building
 
         /// <summary>
         /// Where a new segment of the length goes when the cursor is near a free end: on from that end, turned toward the
-        /// cursor in GameBalance.WallTurnStep steps (at most a right angle), its outside on the same side as the
-        /// neighbour's. endY is the height of the end (the new segment keeps it where the ground lets it).
+        /// cursor in GameBalance.WallTurnStep steps (at most a right angle), or by the turn given (Z / X while placing), its
+        /// outside on the same side as the neighbour's. endY is the height of the end (the new segment keeps it where the
+        /// ground lets it).
         /// </summary>
-        public static bool Snap(Vector3 cursor, float length, out Vector3 center, out float yaw, out float endY)
+        public static bool Snap(Vector3 cursor, float length, out Vector3 center, out float yaw, out float endY) =>
+            Snap(cursor, length, null, out center, out yaw, out endY, out _);
+
+        public static bool Snap(Vector3 cursor, float length, float? givenTurn, out Vector3 center, out float yaw, out float endY, out float usedTurn)
         {
-            center = cursor; yaw = 0f; endY = 0f;
+            center = cursor; yaw = 0f; endY = 0f; usedTurn = 0f;
             if (!NearestFreeEnd(cursor, GameBalance.WallSnapRadius, out Vector3 end, out Vector3 away, out Vector3 outside)) return false;
             Vector3 toCursor = cursor - end;
             toCursor.y = 0f;
             float turn = toCursor.sqrMagnitude > 0.25f ? Vector3.SignedAngle(away, toCursor, Vector3.up) : 0f;
             float step = Mathf.Max(1f, GameBalance.WallTurnStep);
-            turn = Mathf.Clamp(Mathf.Round(turn / step) * step, -90f, 90f);
+            turn = Mathf.Clamp(Mathf.Round((givenTurn ?? turn) / step) * step, -90f, 90f);
+            usedTurn = turn;
             Quaternion turned = Quaternion.Euler(0f, turn, 0f);
             Vector3 dir = turned * away;
             dir.y = 0f;

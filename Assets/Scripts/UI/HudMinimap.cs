@@ -144,7 +144,7 @@ namespace BattleOfAges.UI
             var selected = commander != null ? commander.SelectedUnits : null;
             foreach (RtsUnit u in UnitRegistry.ActiveUnits)
             {
-                if (u == null || used >= 400) continue;
+                if (u == null || !u.IsAlive || used >= 400) continue;
                 Vector3 d = u.transform.position - centre;
                 if (Mathf.Abs(d.x) > HalfSize || Mathf.Abs(d.z) > HalfSize) continue;
                 bool sel = selected != null && Contains(selected, u);
@@ -155,7 +155,7 @@ namespace BattleOfAges.UI
             foreach (HostileMobAI m in hostiles)
             {
                 if (used >= 500) break;
-                if (m == null) continue;
+                if (m == null || m.Health == null || !m.Health.IsAlive) continue; // a body lies a while: no longer an enemy on the map
                 Vector3 d = m.transform.position - centre;
                 if (Mathf.Abs(d.x) > HalfSize || Mathf.Abs(d.z) > HalfSize) continue;
                 Dot(used++, new Vector2(d.x, d.z) * Scale, new Color(0.95f, 0.25f, 0.2f), 5f);

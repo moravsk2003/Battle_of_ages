@@ -35,7 +35,7 @@ namespace BattleOfAges.Building
 
         private void OnEnable() { if (!all.Contains(this)) all.Add(this); }
 
-        private void OnDisable()
+        protected void OnDisable()
         {
             all.Remove(this);
             foreach (NpcResourceGatherer w in new List<NpcResourceGatherer>(workers)) if (w != null) w.LeavePlace(this);
@@ -99,6 +99,44 @@ namespace BattleOfAges.Building
     {
         public override int Slots => GameBalance.FieldFarmers;
         public override string JobName => "працює в полі";
+
+        /// <summary>It lies on the land as the land lies, so that no one has to climb it and no corner hangs in the air.</summary>
+        private void Start()
+        {
+            MeshFilter model = GetComponentInChildren<MeshFilter>();
+            if (model != null && model.sharedMesh != null) model.sharedMesh = Utils.ZoneBuildingBuilder.Draped(model.sharedMesh, transform);
+            World.GrassFieldRenderer.ForgetTiles();
+            ClearStones();
+        }
+
+        /// <summary>A field is cleared of the boulders it lies on.</summary>
+        private void ClearStones()
+        {
+            GameObject stones = GameObject.Find("StylizedBoulders");
+            if (stones == null) return;
+            foreach (Transform t in stones.transform)
+                if (Covers(transform.position, t.position.x, t.position.z)) t.gameObject.SetActive(false);
+        }
+
+        private static bool Covers(Vector3 middle, float x, float z)
+        {
+            const float half = 7.5f;
+            return Mathf.Abs(x - middle.x) < half && Mathf.Abs(z - middle.z) < half;
+        }
+
+        /// <summary>A field (or a field's site) lies here: no grass.</summary>
+        public static bool IsFieldAt(float x, float z)
+        {
+            foreach (BuildingNode b in BuildingNode.Active)
+                if (b != null && b.Type == BuildingType.Field && Covers(b.transform.position, x, z)) return true;
+            return false;
+        }
+
+        private new void OnDisable()
+        {
+            base.OnDisable();
+            World.GrassFieldRenderer.ForgetTiles();
+        }
         protected override float SpotRadius => 5f;
 
         private float FoodDays()

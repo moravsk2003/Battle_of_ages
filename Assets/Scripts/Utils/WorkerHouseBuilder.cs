@@ -452,6 +452,9 @@ namespace BattleOfAges.Utils
 
         // ------------------------------------------------------------------ chimney and props
 
+        /// <summary>Where smoke comes out, in the model's frame.</summary>
+        public static Vector3 ChimneyTop => new Vector3(0.78f, Ridge + 0.75f, -(D + 0.27f));
+
         private static void Chimney()
         {
             float x = 0.78f, z = -(D + 0.27f), w = 0.62f, d = 0.48f, top = Ridge + 0.62f;

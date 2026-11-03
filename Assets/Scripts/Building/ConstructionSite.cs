@@ -16,7 +16,8 @@ namespace BattleOfAges.Building
     public sealed class ConstructionSite : MonoBehaviour
     {
         public const int MaxBuilders = 4;
-        private const float BuilderReach = 2.2f, HammerEvery = 0.8f;
+        private const float FootingDepth = 4f;
+        private const float BuilderReach = 2.2f, SpotClearance = 1f, HammerEvery = 0.8f, HandsEvery = 2f;
 
         private static readonly List<ConstructionSite> all = new List<ConstructionSite>();
         public static IReadOnlyList<ConstructionSite> All => all;
@@ -35,7 +36,7 @@ namespace BattleOfAges.Building
         private readonly List<Renderer> hidden = new List<Renderer>();
         private GameObject stageModel;
         private int stage = -1;
-        private float radius, hammerClock;
+        private float half, hammerClock, handsClock;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => all.Clear();
@@ -64,11 +65,14 @@ namespace BattleOfAges.Building
         {
             ConstructionSite best = null;
             float bestSqr = reach * reach;
+            int bestCount = int.MaxValue;
             foreach (ConstructionSite s in all)
             {
                 if (s == null || !s.NeedsHands) continue;
                 float d = (s.transform.position - from).sqrMagnitude;
-                if (d < bestSqr) { bestSqr = d; best = s; }
+                if (d > reach * reach) continue;
+                // One on each first: the emptiest, then the nearest
+                if (s.builders.Count < bestCount || (s.builders.Count == bestCount && d < bestSqr)) { bestCount = s.builders.Count; bestSqr = d; best = s; }
             }
             return best;
         }
@@ -80,6 +84,8 @@ namespace BattleOfAges.Building
         {
             Type = type;
             Progress = Mathf.Clamp01(progress);
+            WallSegment wall = GetComponent<WallSegment>();
+            if (wall != null) wall.UnderConstruction = true; // the next segment can join it already
             foreach (Behaviour b in GetComponentsInChildren<Behaviour>())
             {
                 if (b == this || b is BuildingNode || !b.enabled) continue;
@@ -88,7 +94,8 @@ namespace BattleOfAges.Building
             }
             BuildingDefinition def = BuildingData.GetDefinition(type); // (after: a hall that stands no more does not count itself as the first)
             WorkSeconds = SecondsFor(def);
-            radius = Mathf.Max(def.Size.x, def.Size.z) * 0.5f + 1.2f;
+            half = Mathf.Max(def.Size.x, def.Size.z) * 0.5f;
+            if (type == BuildingType.Field) World.GrassFieldRenderer.ForgetTiles(); // the plough takes the grass from the start
             foreach (Renderer r in GetComponentsInChildren<Renderer>())
             {
                 if (!r.enabled) continue;
@@ -115,8 +122,11 @@ namespace BattleOfAges.Building
         public Vector3 SpotFor(NpcResourceGatherer worker)
         {
             int i = Mathf.Max(0, builders.IndexOf(worker));
-            float a = i * Mathf.PI * 0.5f + 0.6f;
-            Vector3 p = transform.position + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * radius;
+            float a = i * Mathf.PI * 0.5f + 0.6f, c = Mathf.Cos(a), s = Mathf.Sin(a);
+            // On the square round the footprint: on a circle of a wide building's half side the place lay inside it, the
+            // worker stopped at its edge and never counted as there
+            float reach = (half + SpotClearance) / Mathf.Max(Mathf.Abs(c), Mathf.Abs(s));
+            Vector3 p = transform.position + transform.rotation * new Vector3(c * reach, 0f, s * reach);
             p.y = RtsUnit.GetTerrainHeight(p);
             return p;
         }
@@ -127,11 +137,17 @@ namespace BattleOfAges.Building
             int present = 0;
             foreach (NpcResourceGatherer b in builders)
             {
-                Vector3 off = b.transform.position - SpotFor(b);
-                off.y = 0f;
-                if (off.sqrMagnitude <= BuilderReach * BuilderReach) present++;
+                // At the building, wherever along it: its own footprint can keep one off the very place
+                Vector3 off = Quaternion.Inverse(transform.rotation) * (b.transform.position - transform.position);
+                if (Mathf.Max(Mathf.Abs(off.x), Mathf.Abs(off.z)) <= half + BuilderReach) present++;
             }
             PresentBuilders = present;
+            handsClock -= Time.deltaTime;
+            if (handsClock <= 0f)
+            {
+                handsClock = HandsEvery;
+                if (builders.Count == 0) CallSomeone();
+            }
             if (present == 0) return;
             hammerClock -= Time.deltaTime;
             if (hammerClock <= 0f)
@@ -141,6 +157,28 @@ namespace BattleOfAges.Building
                 foreach (NpcResourceGatherer b in builders) b.GetComponent<CombatUnit>()?.TriggerAttackAnimation(); // the swing of a hammer
             }
             Work(present * Time.deltaTime);
+        }
+
+        /// <summary>
+        /// No site stands with no one at it: with no hands it borrows the nearest worker, a free one before one on a job
+        /// before a soldier (it goes back to what it did). Not one down a mine, at a bench or in a fight, nor one the player holds.
+        /// </summary>
+        private void CallSomeone()
+        {
+            NpcResourceGatherer best = null;
+            int bestKind = int.MaxValue;
+            float bestSqr = GameBalance.BuildersComeFrom * GameBalance.BuildersComeFrom;
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+            {
+                if (w == null || w.AtSite || w.IsMiner || w.AtBench || SettlementAlarm.ActiveAt(w.transform.position)) continue;
+                RtsUnit u = w.GetComponent<RtsUnit>();
+                if (u == null || !u.IsAlive || u.IsSelected || u.HasAttackTarget || u.WallBound) continue;
+                int kind = w.CurrentDirective == GatherDirective.Idle ? 2 : w.CurrentDirective == GatherDirective.Auto && !w.AtPlace ? 0 : 1;
+                float d = (w.transform.position - transform.position).sqrMagnitude;
+                if (d > GameBalance.BuildersComeFrom * GameBalance.BuildersComeFrom) continue;
+                if (kind < bestKind || (kind == bestKind && d < bestSqr)) { best = w; bestKind = kind; bestSqr = d; }
+            }
+            if (best != null) best.AssignToSite(this, lent: bestKind > 0);
         }
 
         /// <summary>This many worker-seconds of work (the tests call it directly).</summary>
@@ -157,6 +195,8 @@ namespace BattleOfAges.Building
             if (stageModel != null) Destroy(stageModel);
             foreach (Renderer r in hidden) if (r != null) r.enabled = true;
             foreach (Behaviour b in switchedOff) if (b != null) b.enabled = true;
+            WallSegment wall = GetComponent<WallSegment>();
+            if (wall != null) wall.UnderConstruction = false;
             all.Remove(this);
             GetComponent<BuildingNode>()?.OnBuilt();
             GetComponent<TownHall>()?.Founded();
@@ -177,7 +217,7 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(Type);
             stageModel = new GameObject("ConstructionStage");
             stageModel.transform.SetParent(transform, false);
-            stageModel.AddComponent<MeshFilter>().sharedMesh = StageMesh(def.Size, now);
+            stageModel.AddComponent<MeshFilter>().sharedMesh = Type == BuildingType.Field ? Utils.ZoneBuildingBuilder.Draped(Utils.ZoneBuildingBuilder.FieldSite, transform) : StageMesh(def.Size, now);
             MeshRenderer r = stageModel.AddComponent<MeshRenderer>();
             r.sharedMaterial = look;
         }
@@ -188,7 +228,8 @@ namespace BattleOfAges.Building
             var kit = new MeshKit();
             Color stone = new Color(0.45f, 0.43f, 0.4f), plank = new Color(0.62f, 0.46f, 0.28f), post = new Color(0.5f, 0.36f, 0.2f);
             float w = Mathf.Max(1.5f, size.x), d = Mathf.Max(1.5f, size.z), h = Mathf.Max(1.5f, size.y);
-            kit.Box(Matrix4x4.Translate(new Vector3(0f, 0.1f, 0f)), new Vector3(w + 0.3f, 0.2f, d + 0.3f), 0.03f, Vector3.zero, _ => stone);
+            // Deep: on a slope a site sits on its highest corner, and its footing goes down into the ground instead of hanging over it
+            kit.Box(Matrix4x4.Translate(new Vector3(0f, 0.2f - FootingDepth * 0.5f, 0f)), new Vector3(w + 0.3f, FootingDepth, d + 0.3f), 0.03f, Vector3.zero, _ => stone);
             kit.Box(Matrix4x4.Translate(new Vector3(0f, 0.27f, 0f)), new Vector3(w, 0.1f, d), 0.02f, Vector3.zero, _ => plank);
             if (stage >= 1)
             {

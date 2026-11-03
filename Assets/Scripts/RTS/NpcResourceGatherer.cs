@@ -226,11 +226,12 @@ namespace BattleOfAges.RTS
         }
 
         /// <summary>Goes to build this site (false when it is full).</summary>
-        public bool AssignToSite(ConstructionSite site)
+        public bool AssignToSite(ConstructionSite site, bool lent = false)
         {
-            if (site == null || CentralEmpire.Active) return false;
+            if (site == null) return false; // (the Central Empire's people do no other work, but its buildings need their hands: it had sites no one would ever raise)
             if (assignedSite == site) return true;
             if (!site.NeedsHands) return false;
+            lentFrom = lent || CentralEmpire.Active ? currentDirective : (GatherDirective?)null;
             StartWorking();
             ClearCurrentTargets();
             site.Join(this);
@@ -247,7 +248,16 @@ namespace BattleOfAges.RTS
             assignedSite.Leave(this);
             assignedSite = null;
             if (currentState == GathererState.Building) currentState = GathererState.FindingResource;
+            if (lentFrom.HasValue)
+            {
+                GatherDirective back = lentFrom.Value;
+                lentFrom = null;
+                if (back != currentDirective) SetGatherDirective(back);
+            }
         }
+
+        /// <summary>Borrowed by a site with no hands: what it goes back to.</summary>
+        private GatherDirective? lentFrom;
 
         /// <summary>Walks to its place round the site and works there (the site counts it once it is there).</summary>
         private void HandleBuildingState()
