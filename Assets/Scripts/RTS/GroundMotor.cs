@@ -12,7 +12,6 @@ namespace BattleOfAges.RTS
     {
         /// <summary>Max rise per horizontal metre (~55 degrees), like the units' CharacterController slope limit.</summary>
         private const float MaxClimb = 1.43f;
-        private const float SeparationStrength = 6f;
 
         /// <summary>
         /// Moves the unit; returns the horizontal velocity actually applied. Walls stop it (it slides along them); own:
@@ -23,7 +22,7 @@ namespace BattleOfAges.RTS
             Vector3 p = t.position;
             Vector3 v = desiredVelocity;
             v.y = 0f;
-            if (gridId >= 0) v += UnitSpatialGrid.Separation(gridId, p, radius, SeparationStrength);
+            if (gridId >= 0) v += UnitSpatialGrid.Separation(gridId, p, radius, v.sqrMagnitude > 0.01f ? Combat.GameBalance.WalkerSeparation : Combat.GameBalance.StandingSeparation);
             if (v.sqrMagnitude < 1e-6f || dt <= 0f) return Vector3.zero;
 
             float maxSpeed = Mathf.Max(desiredVelocity.magnitude * 1.25f, 2f);

@@ -127,11 +127,14 @@ namespace BattleOfAges.UI
                 RenderSettings.fog = fog;
             }
 
-            // Where the player looks (first person), every frame
-            Vector3 me = main.transform.position - centre;
+            // Where the hero looks, every frame (first person: the camera; on the map: the hero, while in the frame)
+            GameObject hero = GameContext.Player;
+            Transform looks = map && hero != null ? hero.transform : main.transform;
+            Vector3 me = looks.position - centre;
             heading.anchoredPosition = new Vector2(me.x, me.z) * Scale;
-            heading.localEulerAngles = new Vector3(0f, 0f, -main.transform.eulerAngles.y);
-            if (heading.gameObject.activeSelf != !map) heading.gameObject.SetActive(!map);
+            heading.localEulerAngles = new Vector3(0f, 0f, -looks.eulerAngles.y);
+            bool showHeading = !map || (hero != null && Mathf.Abs(me.x) < HalfSize && Mathf.Abs(me.z) < HalfSize);
+            if (heading.gameObject.activeSelf != showHeading) heading.gameObject.SetActive(showHeading);
 
             dotTimer -= Time.unscaledDeltaTime;
             if (dotTimer > 0f) return;

@@ -570,13 +570,16 @@ namespace BattleOfAges.RTS
             if (movedDist < 0.20f * elapsed * MoveSpeed)
             {
                 stuckTimer += elapsed;
-                if (stuckTimer > 0.25f)
+                // Held up by a prop straight ahead: round it at once. By nothing solid there, so by other units: press on
+                // and shove a while first, and only then go round
+                float bypassAfter = centerBlocked ? 0.25f : GameBalance.PressBeforeBypass;
+                if (stuckTimer > bypassAfter)
                 {
-                    if (stuckTimer > 0.8f && Random.value < 0.1f * Mathf.Max(1f, elapsed / 0.016f)) avoidSideSign = -avoidSideSign;
+                    if (stuckTimer > bypassAfter + 0.55f && Random.value < 0.1f * Mathf.Max(1f, elapsed / 0.016f)) avoidSideSign = -avoidSideSign;
                     Vector3 wallBypassDir = (Vector3.Cross(Vector3.up, desiredDir).normalized * avoidSideSign + desiredDir * 0.4f).normalized;
                     finalDir = wallBypassDir;
 
-                    if (stuckTimer > 1.0f)
+                    if (stuckTimer > bypassAfter + 0.75f)
                     {
                         Vector3 lateralNudge = Vector3.Cross(Vector3.up, desiredDir).normalized * (avoidSideSign * 2.0f * elapsed);
                         if (isPlayerControlled && characterController != null) characterController.Move(lateralNudge);
@@ -592,6 +595,9 @@ namespace BattleOfAges.RTS
             lastPos = currentPos;
             return finalDir;
         }
+
+        /// <summary>Still on its way somewhere.</summary>
+        public bool HasMoveTarget => hasTarget;
 
         private bool IsValidObstacle(RaycastHit hit)
         {

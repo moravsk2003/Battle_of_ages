@@ -83,6 +83,11 @@ namespace BattleOfAges.UI
         {
             bool map = GameContext.MapOpen;
             if (!map) Stop();
+            else if (!GameWindows.BlockGameplay && UniversalInput.IsKeyDown(KeyCode.Delete))
+            {
+                if (Erasing) Stop();
+                else BeginEraser();
+            }
             bool overUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
             bool free = Painting && !overUi && !GameWindows.BlockGameplay && GroundUnderCursor(out cursor);
             if (free) PaintUnderCursor();

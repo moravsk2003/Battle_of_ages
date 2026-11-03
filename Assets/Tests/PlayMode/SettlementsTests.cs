@@ -11,6 +11,7 @@ using BattleOfAges.Player;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
 using BattleOfAges.SaveLoad;
+using BattleOfAges.UI;
 using BattleOfAges.Utils;
 using BattleOfAges.World;
 
@@ -186,6 +187,34 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(1, Caravan.All.Count, "the cart still on the road");
             Assert.AreEqual(CaravanGood.Food, Caravan.All[0].Good);
             Assert.AreSame(other, Caravan.All[0].To);
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator OnTheMap_AnArrowShowsWhereTheHeroLooks()
+        {
+            SaveSystem.NewGame(new CampaignSetup { Seed = 555, Class = HeroClass.Tank, HasArtifact = true, Artifact = ArtifactType.Vampiric });
+            yield return new WaitForSeconds(2f);
+            Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap);
+            yield return new WaitForSeconds(0.5f);
+            HeroMapArrow holder = Object.FindFirstObjectByType<HeroMapArrow>();
+            Assert.IsNotNull(holder, "it is there");
+            Transform arrow = holder.transform.Find("Arrow");
+            Camera cam = ViewCamera.Current;
+            GameObject hero = Managers.GameContext.Player;
+            Assert.IsNotNull(arrow, $"it was made: map {Managers.GameContext.MapOpen}, hero {hero != null}, camera {cam != null}");
+            MeshRenderer r = arrow.GetComponent<MeshRenderer>();
+            Mesh mesh = arrow.GetComponent<MeshFilter>().sharedMesh;
+            Vector3 onScreen = cam.WorldToViewportPoint(arrow.position);
+            string state = $"active {arrow.gameObject.activeInHierarchy}, enabled {r.enabled}, shader {r.sharedMaterial.shader.name}, at {arrow.position}, scale {arrow.lossyScale}, hero {hero.transform.position}, viewport {onScreen}, verts {mesh.vertexCount}, tris {mesh.triangles.Length}, bounds {r.bounds}, layer {arrow.gameObject.layer}, cull {cam.cullingMask}, near {cam.nearClipPlane} far {cam.farClipPlane}, ortho {cam.orthographicSize}, colour {mesh.colors[4]}";
+            Assert.IsTrue(arrow.gameObject.activeInHierarchy, state);
+            Assert.Greater(arrow.lossyScale.x, 0.3f, state);
+            Vector3 off = arrow.position - hero.transform.position;
+            off.y = 0f;
+            Assert.Less(off.magnitude, 0.1f, state);
+            hero.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
+            yield return null;
+            Assert.AreEqual(90f, arrow.eulerAngles.y, 1f, "it turns with the hero; " + state);
+            UnityEngine.Debug.Log("[ArrowState] " + state);
         }
 
         [UnityTest, Timeout(180000)]

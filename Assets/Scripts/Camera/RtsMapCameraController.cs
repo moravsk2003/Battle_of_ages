@@ -53,6 +53,7 @@ namespace BattleOfAges.CameraSystem
         private Vector3 smoothPosition; // where the camera flies; the transform backs off from it by lift over hills
         private float lift, liftTimer;
 
+        private float usualPitch, usualYaw, usualZoom;
         private float currentYaw = 0.0f;      // Y-axis rotation (left/right)
         private float currentPitch = 60.0f;   // X-axis tilt (30° isometric to 90° top-down)
 
@@ -61,6 +62,9 @@ namespace BattleOfAges.CameraSystem
             Managers.GameContext.Register(this);
             mapCamera = GetComponent<Camera>();
             mapCamera.orthographic = true;
+            usualPitch = currentPitch;
+            usualYaw = currentYaw;
+            usualZoom = mapCamera.orthographicSize;
             targetPosition = transform.position;
             transform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
             smoothPosition = targetPosition;
@@ -250,6 +254,18 @@ namespace BattleOfAges.CameraSystem
             float pitch = Mathf.Clamp(currentPitch, 10f, 90f);
             float back = pitch >= 89.5f ? 0f : (cameraHeight - point.y) / Mathf.Tan(pitch * Mathf.Deg2Rad);
             FocusOnPosition(point - Quaternion.Euler(0f, currentYaw, 0f) * Vector3.forward * back);
+        }
+
+        /// <summary>Back to the usual angle, turn and zoom, over the same place.</summary>
+        public void ResetView()
+        {
+            Vector3 f = transform.forward;
+            Vector3 middle = f.y < -0.01f ? transform.position + f * (transform.position.y / -f.y) : transform.position;
+            middle.y = 0f;
+            currentPitch = usualPitch;
+            currentYaw = usualYaw;
+            mapCamera.orthographicSize = usualZoom;
+            LookAtGround(middle);
         }
 
         public void EnableControl(bool enable)

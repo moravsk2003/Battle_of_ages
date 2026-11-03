@@ -132,6 +132,11 @@ namespace BattleOfAges.Combat
         /// <summary>Workers at one tree at most: the rest take the next tree instead of crowding round one.</summary>
         public static int WorkersPerTree = 2;
         /// <summary>
+        /// Units in each other's way: one walking gives little ground, one standing gives much, so the walker shoulders through;
+        /// and held up with nothing solid straight ahead it presses on this many seconds before it tries going round.
+        /// </summary>
+        public static float WalkerSeparation = 3f, StandingSeparation = 8f, PressBeforeBypass = 1.5f;
+        /// <summary>
         /// Workers on their own (Auto) split by need: while the wood in stock is short of the next town hall step (at least
         /// AutoWoodReserve) this share of them hauls mine ore and the rest fetch wood; with wood enough, AutoHaulShare
         /// haul (the rest wood and pebbles). Before this they all hauled while a mine had ore, and a mine always had.

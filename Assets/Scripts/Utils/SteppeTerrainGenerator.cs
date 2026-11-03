@@ -95,7 +95,6 @@ namespace BattleOfAges.Utils
             ScatterSteppeTrees(terrainObj.transform, size);
             ScatterOrePebbles(terrainObj.transform, size);
             ScatterFacetedBoulders(terrainObj.transform, size);
-            ScatterCampDecorations(terrainObj.transform);
 
             return terrainObj;
         }
@@ -246,37 +245,5 @@ namespace BattleOfAges.Utils
             }
         }
 
-        private static void ScatterCampDecorations(Transform terrainParent)
-        {
-            GameObject decoGroup = new GameObject("Camp_Props");
-            decoGroup.transform.SetParent(terrainParent, false);
-
-            Material woodMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Wood, new Color(0.32f, 0.20f, 0.10f), 0f, 0.22f);
-            Material metalMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Metal, new Color(0.25f, 0.26f, 0.28f), 0.7f, 0.5f);
-
-            Vector3[] barrelPos = { new Vector3(2.2f, 0f, 5.0f), new Vector3(2.8f, 0f, 5.5f) };
-            for (int b = 0; b < barrelPos.Length; b++)
-            {
-                Vector3 pos = barrelPos[b];
-                pos.y = RtsUnit.GetTerrainHeight(pos) + 0.45f;
-
-                GameObject barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                barrel.name = $"SupplyBarrel_{b + 1}";
-                barrel.transform.SetParent(decoGroup.transform, false);
-                barrel.transform.position = pos;
-                barrel.transform.localScale = new Vector3(0.55f, 0.45f, 0.55f);
-                barrel.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-            }
-
-            Vector3 cratePos = new Vector3(1.4f, 0f, 5.2f);
-            cratePos.y = RtsUnit.GetTerrainHeight(cratePos) + 0.35f;
-            GameObject crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            crate.name = "SupplyCrate_1";
-            crate.transform.SetParent(decoGroup.transform, false);
-            crate.transform.position = cratePos;
-            crate.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
-            crate.transform.rotation = Quaternion.Euler(0f, 25f, 0f);
-            crate.GetComponent<MeshRenderer>().sharedMaterial = woodMat;
-        }
     }
 }

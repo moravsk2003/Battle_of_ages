@@ -53,6 +53,14 @@ namespace BattleOfAges.Utils
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
             if (zones && map) { UI.ZonePainter.Begin(World.ZoneType.Fields); yield return new WaitForSecondsRealtime(1f); } // the toolbar's line, the brush and the ring
+            if (zones && map && Managers.GameContext.Player != null)
+            {
+                Managers.GameContext.MapCamera?.LookAtGround(Managers.GameContext.Player.transform.position); // the hero's arrow in the middle
+                yield return new WaitForSecondsRealtime(0.5f);
+                UI.HeroMapArrow holder = FindFirstObjectByType<UI.HeroMapArrow>();
+                Transform arrow = holder != null ? holder.transform.Find("Arrow") : null;
+                Debug.Log($"[Smoke] arrow holder {holder != null}, arrow {arrow != null}, active {arrow != null && arrow.gameObject.activeInHierarchy}, at {(arrow != null ? arrow.position : Vector3.zero)}, scale {(arrow != null ? arrow.lossyScale.x : 0f)}, viewport {(arrow != null ? ViewCamera.Current.WorldToViewportPoint(arrow.position) : Vector3.zero)}");
+            }
             ScreenCapture.CaptureScreenshot(path);
             yield return new WaitForSecondsRealtime(1.5f);
             if (zones)

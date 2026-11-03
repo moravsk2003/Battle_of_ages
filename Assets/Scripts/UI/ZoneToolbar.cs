@@ -1,29 +1,33 @@
 using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.Building;
+using BattleOfAges.CameraSystem;
+using BattleOfAges.Managers;
 using BattleOfAges.Resources;
 using BattleOfAges.World;
 
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// The zones on the map, always at hand (a campaign's): one click takes up a zone's brush, another puts it down; the
-    /// eraser and the brush's size beside them; while a brush is up, a line says what the zone gives, what is marked and
-    /// what comes next.
+    /// The buttons over the map (a campaign's): "Будівництво" opens the zones and the buildings, "Стерти" takes up the
+    /// eraser, the view goes back to its usual angle or to the hero or the base. While a brush is up, a line says what the
+    /// zone gives, what is marked and what comes next.
     /// </summary>
     public sealed class ZoneToolbar : MonoBehaviour
     {
-        private const float Y = -72f, Step = 118f, ButtonW = 112f, ButtonH = 46f, SizeStep = 50f;
+        private const float TopY = -72f, RowH = 46f, RowGap = 6f, Step = 118f, ButtonW = 112f, SizeStep = 50f, MainStep = 166f, MainW = 160f;
         private static readonly string[] SizeNames = { "М", "С", "В" };
         private static readonly string[] SizeTips = { "малий", "середній", "великий" };
 
+        private Button build, eraser;
         private Button[] zoneButtons;
-        private Button eraser;
         private Button[] sizes;
+        private GameObject row, zonesRow;
         private RectTransform statusPanel;
         private Text status;
-        private GameObject row;
+        private bool open;
         private float nextStatus;
+        private int baseIndex;
 
         public static ZoneToolbar Create(Transform parent)
         {
@@ -40,16 +44,36 @@ namespace BattleOfAges.UI
 
         private void Build(RectTransform root)
         {
-            var rowRect = UiTheme.Child(root, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            RectTransform rowRect = UiTheme.Child(root, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             row = rowRect.gameObject;
+
+            // The first row: always there
+            float x = -2f * MainStep;
+            Button Main(string name, string text, UnityEngine.Events.UnityAction click, string tip)
+            {
+                Button b = UiTheme.TextButton(rowRect, name, text, new Vector2(0.5f, 1f), new Vector2(x, TopY), new Vector2(MainW, RowH), click, 16);
+                Tooltip.Set(b.gameObject, () => tip);
+                x += MainStep;
+                return b;
+            }
+            build = Main("Build", "Будівництво", ToggleBuild, TipText.Title("Будівництво", UiTheme.Gold) + "\nЗони, які робітники забудовують самі, і споруди: ратуша, стіни, скриня.");
+            eraser = Main("Eraser", "Стерти", ToggleEraser, TipText.Title("Стерти розмітку", UiTheme.Gold) + "\nТягніть ЛКМ по розмітці. Споруди, що вже стоять, лишаються.\n" + TipText.Dim("Також клавіша Delete."));
+            Main("ResetView", "Скинути вигляд", ResetView, TipText.Title("Скинути вигляд", UiTheme.Gold) + "\nЗвичайний нахил, поворот і масштаб мапи.");
+            Main("ToHero", "До героя", ToHero, TipText.Title("До героя", UiTheme.Gold) + "\nНавести мапу на свого героя.");
+            Main("ToBase", "До бази", ToBase, TipText.Title("До бази", UiTheme.Gold) + "\nНавести мапу на ратушу. Натискайте ще раз, щоб перейти до наступного поселення.");
+
+            // The second row: opened by "Будівництво"
+            RectTransform zonesRect = UiTheme.Child(rowRect, "Zones", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            zonesRow = zonesRect.gameObject;
+            float zonesY = TopY - RowH - RowGap;
             ZoneType[] types = ZoneMap.Types;
             float width = (types.Length + 1) * Step + SizeNames.Length * SizeStep + 14f;
-            float x = -width * 0.5f + ButtonW * 0.5f;
+            x = -width * 0.5f + ButtonW * 0.5f;
             zoneButtons = new Button[types.Length];
             for (int i = 0; i < types.Length; i++)
             {
                 ZoneType type = types[i];
-                zoneButtons[i] = UiTheme.TextButton(rowRect, "Zone_" + type, ZoneMap.Name(type), new Vector2(0.5f, 1f), new Vector2(x, Y), new Vector2(ButtonW, ButtonH), () => Toggle(type), 16);
+                zoneButtons[i] = UiTheme.TextButton(zonesRect, "Zone_" + type, ZoneMap.Name(type), new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(ButtonW, RowH), () => Toggle(type), 16);
                 RectTransform stripe = UiTheme.Child(zoneButtons[i].transform, "Stripe", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(7f, 5f), new Vector2(-7f, 11f));
                 Image img = stripe.gameObject.AddComponent<Image>();
                 Color c = ZoneMap.Colour(type);
@@ -59,19 +83,19 @@ namespace BattleOfAges.UI
                 Tooltip.Set(zoneButtons[i].gameObject, () => TipText.Title(ZoneMap.Name(type), UiTheme.Gold) + "\n" + ZoneMap.Description(type));
                 x += Step;
             }
-            eraser = UiTheme.TextButton(rowRect, "Eraser", "Стерти", new Vector2(0.5f, 1f), new Vector2(x, Y), new Vector2(ButtonW, ButtonH), () => { if (ZonePainter.Erasing) ZonePainter.Stop(); else ZonePainter.BeginEraser(); }, 16);
-            Tooltip.Set(eraser.gameObject, () => TipText.Title("Стерти розмітку", UiTheme.Gold) + "\nСпоруди, що вже стоять, лишаються.");
+            Button buildings = UiTheme.TextButton(zonesRect, "Buildings", "Споруди", new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(ButtonW, RowH), OpenBuildings, 16);
+            Tooltip.Set(buildings.gameObject, () => TipText.Title("Споруди", UiTheme.Gold) + "\nРатуша, стіни, ворота, скриня: їх ставите самі, зводять робітники.");
             x += ButtonW * 0.5f + 14f + 22f;
             sizes = new Button[SizeNames.Length];
             for (int i = 0; i < SizeNames.Length; i++)
             {
                 int index = i;
-                sizes[i] = UiTheme.TextButton(rowRect, "Size" + i, SizeNames[i], new Vector2(0.5f, 1f), new Vector2(x, Y), new Vector2(44f, ButtonH), () => ZonePainter.BrushIndex = index, 17);
+                sizes[i] = UiTheme.TextButton(zonesRect, "Size" + i, SizeNames[i], new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(44f, RowH), () => ZonePainter.BrushIndex = index, 17);
                 Tooltip.Set(sizes[i].gameObject, () => TipText.Title($"Пензель {SizeTips[index]}", UiTheme.Gold) + $"\nРадіус {ZonePainter.Brushes[index]:0} м.");
                 x += SizeStep;
             }
 
-            statusPanel = UiTheme.Rect(rowRect, "Status", new Vector2(0.5f, 1f), new Vector2(0f, Y - ButtonH - 6f), new Vector2(width - 6f, 84f));
+            statusPanel = UiTheme.Rect(rowRect, "Status", new Vector2(0.5f, 1f), new Vector2(0f, zonesY - RowH - RowGap), new Vector2(width - 6f, 84f));
             UiTheme.PanelImage(statusPanel);
             RectTransform text = UiTheme.Child(statusPanel, "Text", Vector2.zero, Vector2.one, new Vector2(16f, 6f), new Vector2(-148f, -6f));
             status = UiTheme.Label(text, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
@@ -80,7 +104,21 @@ namespace BattleOfAges.UI
             UiTheme.TextButton(statusPanel, "Done", "Готово\n<size=12>Esc</size>", new Vector2(1f, 0.5f), new Vector2(-10f, 0f), new Vector2(120f, 56f), ZonePainter.Stop, 16)
                 .GetComponentInChildren<Text>().supportRichText = true;
             statusPanel.gameObject.SetActive(false);
+            zonesRow.SetActive(false);
             Apply();
+        }
+
+        private void ToggleBuild()
+        {
+            open = !open;
+            if (!open) ZonePainter.Stop();
+            zonesRow.SetActive(open);
+        }
+
+        private static void ToggleEraser()
+        {
+            if (ZonePainter.Erasing) ZonePainter.Stop();
+            else ZonePainter.BeginEraser();
         }
 
         private static void Toggle(ZoneType type)
@@ -89,11 +127,42 @@ namespace BattleOfAges.UI
             else ZonePainter.Begin(type);
         }
 
+        private static void OpenBuildings()
+        {
+            ZonePainter.Stop();
+            BuildMenuUI.Instance?.ToggleMenu();
+        }
+
+        private static void ResetView() => GameContext.MapCamera?.ResetView();
+
+        private static void ToHero()
+        {
+            GameObject hero = GameContext.Player;
+            if (hero != null) GameContext.MapCamera?.LookAtGround(hero.transform.position);
+        }
+
+        /// <summary>The hall nearest the hero first, then each settlement in turn.</summary>
+        private void ToBase()
+        {
+            RtsMapCameraController map = GameContext.MapCamera;
+            if (map == null) return;
+            var halls = TownHall.All;
+            GameObject hero = GameContext.Player;
+            if (halls.Count == 0)
+            {
+                if (hero != null) map.LookAtGround(StorageChestNode.GetNearestChestDepositPosition(hero.transform.position));
+                return;
+            }
+            baseIndex = (baseIndex + 1) % halls.Count;
+            map.LookAtGround(halls[baseIndex].transform.position);
+        }
+
         private void Update()
         {
             bool campaign = WorldSettings.Bounded;
             if (row.activeSelf != campaign) row.SetActive(campaign);
             if (!campaign) return;
+            if (ZonePainter.Painting && !open) { open = true; zonesRow.SetActive(true); } // the eraser, Delete: the sizes in reach
             Apply();
             bool painting = ZonePainter.Painting;
             if (statusPanel.gameObject.activeSelf != painting) { statusPanel.gameObject.SetActive(painting); nextStatus = 0f; }
@@ -102,7 +171,7 @@ namespace BattleOfAges.UI
             status.text = StatusText();
         }
 
-        /// <summary>The brush in hand and the size lit up; trade waits for a hall II.</summary>
+        /// <summary>What is in hand lit up; trade waits for a hall II.</summary>
         private void Apply()
         {
             ZoneType[] types = ZoneMap.Types;
@@ -112,11 +181,12 @@ namespace BattleOfAges.UI
                 if (types[i] == ZoneType.Trade)
                 {
                     TownHall hall = TownHall.Viewed;
-                    bool open = hall != null && hall.Level >= 2;
-                    if (zoneButtons[i].interactable != open) zoneButtons[i].interactable = open;
-                    if (!open && ZonePainter.Tool == ZoneType.Trade) ZonePainter.Stop();
+                    bool canTrade = hall != null && hall.Level >= 2;
+                    if (zoneButtons[i].interactable != canTrade) zoneButtons[i].interactable = canTrade;
+                    if (!canTrade && ZonePainter.Tool == ZoneType.Trade) ZonePainter.Stop();
                 }
             }
+            Light(build, open);
             Light(eraser, ZonePainter.Erasing);
             for (int i = 0; i < sizes.Length; i++) Light(sizes[i], ZonePainter.BrushIndex == i);
         }

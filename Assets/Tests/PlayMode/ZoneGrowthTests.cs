@@ -115,7 +115,10 @@ namespace BattleOfAges.PlayModeTests
             spawned.Add(parent);
             ZoneToolbar bar = ZoneToolbar.Create(parent.transform);
             yield return null;
-            Button fields = bar.transform.Find("Row/Zone_Fields").GetComponent<Button>();
+            Assert.IsFalse(bar.transform.Find("Row/Zones").gameObject.activeSelf, "the zones wait behind one button");
+            bar.transform.Find("Row/Build").GetComponent<Button>().onClick.Invoke();
+            Assert.IsTrue(bar.transform.Find("Row/Zones").gameObject.activeSelf);
+            Button fields = bar.transform.Find("Row/Zones/Zone_Fields").GetComponent<Button>();
             fields.onClick.Invoke();
             Assert.AreEqual(ZoneType.Fields, ZonePainter.Tool, "one click takes it up");
             StringAssert.Contains("золотого кола", ZoneToolbar.StatusText(), "nothing marked: what to do");
@@ -126,14 +129,62 @@ namespace BattleOfAges.PlayModeTests
             bar.transform.Find("Row/Eraser").GetComponent<Button>().onClick.Invoke();
             Assert.IsTrue(ZonePainter.Erasing);
             Assert.AreEqual(ZoneType.None, ZonePainter.Tool, "the eraser in its place");
-            bar.transform.Find("Row/Zone_Housing").GetComponent<Button>().onClick.Invoke();
+            bar.transform.Find("Row/Zones/Zone_Housing").GetComponent<Button>().onClick.Invoke();
             Assert.IsFalse(ZonePainter.Erasing);
-            bar.transform.Find("Row/Zone_Housing").GetComponent<Button>().onClick.Invoke();
+            bar.transform.Find("Row/Zones/Zone_Housing").GetComponent<Button>().onClick.Invoke();
             Assert.IsFalse(ZonePainter.Painting, "a second click puts it down");
-            bar.transform.Find("Row/Size2").GetComponent<Button>().onClick.Invoke();
+            bar.transform.Find("Row/Zones/Size2").GetComponent<Button>().onClick.Invoke();
             Assert.AreEqual(ZonePainter.Brushes[2], ZonePainter.Brush);
             ZonePainter.BrushIndex = 1;
             ZonePainter.Stop();
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator TheMapView_GoesBackToItsUsualLook_OverTheSamePlace()
+        {
+            var go = new GameObject("TestMapCamera", typeof(Camera));
+            spawned.Add(go);
+            BattleOfAges.CameraSystem.RtsMapCameraController map = go.AddComponent<BattleOfAges.CameraSystem.RtsMapCameraController>();
+            Camera cam = go.GetComponent<Camera>();
+            float usualZoom = cam.orthographicSize;
+            yield return null;
+            Vector3 place = new Vector3(120f, 0f, -70f);
+            map.LookAtGround(place);
+            cam.orthographicSize = usualZoom * 3f;
+            map.ResetView();
+            Assert.AreEqual(usualZoom, cam.orthographicSize, 1e-3f, "the zoom");
+            Vector3 f = go.transform.forward;
+            Vector3 middle = go.transform.position + f * (go.transform.position.y / -f.y);
+            Assert.Less(Vector2.Distance(new Vector2(middle.x, middle.z), new Vector2(place.x, place.z)), 1f, "the same place in the middle");
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator AWalker_ShouldersThroughARowOfUnits_InsteadOfGoingRound()
+        {
+            Vector3 from = new Vector3(70f, 0f, -120f);
+            from.y = RtsUnit.GetTerrainHeight(from);
+            var row = new List<NpcResourceGatherer>();
+            for (int i = -6; i <= 6; i++)
+            {
+                NpcResourceGatherer standing = Worker(from + new Vector3(7f, 0f, i * 0.85f), "NPC_Standing_" + i);
+                standing.SetGatherDirective(GatherDirective.Idle);
+                row.Add(standing);
+            }
+            NpcResourceGatherer walker = Worker(from, "NPC_Walker");
+            walker.SetGatherDirective(GatherDirective.Idle);
+            RtsUnit unit = walker.GetComponent<RtsUnit>();
+            yield return null;
+            yield return null;
+            Vector3 to = from + new Vector3(14f, 0f, 0f);
+            unit.IssueMoveCommand(to);
+            float side = 0f, end = Time.time + 15f;
+            while (Time.time < end && Mathf.Abs(walker.transform.position.x - to.x) > 1f)
+            {
+                side = Mathf.Max(side, Mathf.Abs(walker.transform.position.z - from.z));
+                yield return null;
+            }
+            Assert.Less(Mathf.Abs(walker.transform.position.x - to.x), 1f, $"it got there (went {side:0.0} m aside)");
+            Assert.Less(side, 2f, "straight through the row: going round it is 5.5 m aside");
         }
 
         [Test]
