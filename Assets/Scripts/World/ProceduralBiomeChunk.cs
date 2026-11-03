@@ -30,7 +30,7 @@ namespace BattleOfAges.World
         public static bool ZoneClearsTrees(Vector3 p)
         {
             ZoneType z = ZoneMap.At(p);
-            return z != ZoneType.None && z != ZoneType.Forest;
+            return (z != ZoneType.None && z != ZoneType.Forest) || AI.KingdomTown.Holds(p.x, p.z);
         }
 
         /// <summary>Does this chunk get a raider camp? One in five by the M0 rule; a campaign's world is wide: rarer, none by the base.</summary>

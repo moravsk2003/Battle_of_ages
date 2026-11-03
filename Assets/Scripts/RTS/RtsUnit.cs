@@ -458,6 +458,7 @@ namespace BattleOfAges.RTS
                     if (routeTimer <= 0f || routeFor != targetPosition || (routeVia - currentPos).sqrMagnitude < 0.36f)
                     {
                         routeVia = Building.WallBarriers.Route(currentPos, targetPosition, out routeInGateway);
+                        if (routeVia.x == targetPosition.x && routeVia.z == targetPosition.z) routeVia = AI.KingdomTown.Route(currentPos, targetPosition);
                         routeFor = targetPosition;
                         routeTimer = 0.25f;
                     }
@@ -542,8 +543,10 @@ namespace BattleOfAges.RTS
             // Walked right up to a solid prop next to the destination (tree being chopped, chest, building): arrived.
             // The CharacterController used to stop the unit here; kinematic movement must do it explicitly.
             // (the window covers the distance walked until the next probe, so faster units cannot step past it)
+            // Only when the destination is at that prop: one round the corner of a house is still to be walked to (it used to
+            // stop there, against the wall, for good)
             touchingSolidNearTarget = !isPlayerControlled && centerHit && hitCenter.distance < 0.35f + MoveSpeed * SteerInterval && IsSolid(hitCenter)
-                                      && Vector3.Distance(currentPos, targetPosition) < 4f;
+                                      && Vector3.Distance(currentPos, targetPosition) < 4f && TargetIsAt(hitCenter.collider);
             bool leftBlocked = leftHit && IsValidObstacle(hitLeft);
             bool rightBlocked = rightHit && IsValidObstacle(hitRight);
 
@@ -606,8 +609,17 @@ namespace BattleOfAges.RTS
 
             // If hit object is our attack target or within 2.5m of target destination, do not steer away!
             if (attackTarget != null && (hit.transform.root == attackTarget.transform || hit.transform == attackTarget.transform)) return false;
-            if (hasTarget && Vector3.Distance(hit.point, targetPosition) < 2.5f) return false;
+            if (hasTarget && TargetIsAt(hit.collider)) return false;
             return true;
+        }
+
+        /// <summary>The destination is in this prop or right by it (flat: a slope does not count).</summary>
+        private bool TargetIsAt(Collider prop)
+        {
+            Bounds b = prop.bounds;
+            Vector3 p = targetPosition;
+            p.y = b.center.y;
+            return b.SqrDistance(p) < 1f;
         }
 
         /// <summary>A prop the unit cannot walk through (not ground, not a unit, not itself).</summary>

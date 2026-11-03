@@ -94,6 +94,7 @@ namespace BattleOfAges.AI
             k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * Random.Range(1f, 2f);
             k.Economy.Wood = wood >= 0 ? wood : GameBalance.KingdomStartWood;
             k.BuildHall();
+            if (Application.isPlaying && !free) k.Town = KingdomTown.Attach(k);
             k.Crown(k.AddSubject(UnitRank.General, k.Spot()), kingClass == HeroClass.None ? RandomClass() : kingClass);
             for (int i = 0, n = people >= 0 ? people : GameBalance.KingdomStartPeople; i < n; i++) k.AddSubject(UnitRank.Person, k.Spot());
             return k;
@@ -116,13 +117,16 @@ namespace BattleOfAges.AI
         /// <summary>The Central Empire of this world (§9.1.1): everyone armed by rank, no one works, the hall rises for nothing; its emperor's death ends it and opens an epoch.</summary>
         public bool IsEmpire { get; private set; }
 
+        /// <summary>The buildings round its hall (not a free hero's band).</summary>
+        public KingdomTown Town { get; private set; }
+
         /// <summary>Its side, set directly (the calibration's two armies).</summary>
         public int TeamForTests { set => Team = value; }
 
         private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
         {
             UnitRank.Person => HumanoidModelBuilder.HumanType.Villager,
-            UnitRank.Warrior => HumanoidModelBuilder.HumanType.Bandit,
+            UnitRank.Warrior => HumanoidModelBuilder.HumanType.Villager, // a kingdom's man in its armour, not one of the bandits
             UnitRank.Knight => HumanoidModelBuilder.HumanType.KnightGuard,
             _ => HumanoidModelBuilder.HumanType.Warlord
         };
@@ -274,7 +278,7 @@ namespace BattleOfAges.AI
             while (promotionClock >= 1f)
             {
                 promotionClock -= 1f;
-                if (!IsEmpire) PromoteWorkers();
+                PromoteWorkers();
             }
 
             secondClock += seconds;
@@ -319,7 +323,9 @@ namespace BattleOfAges.AI
             {
                 if (m.CurrentCombatTarget != null || raiders.Contains(m) || !AtHome(m)) continue;
                 UnitProgress p = m.GetComponent<UnitProgress>();
-                if (p != null && p.Rank == UnitRank.Person && Random.value < GameBalance.WorkPromotionPerHour) p.Promote();
+                if (p != null && p.Rank == UnitRank.Person && !IsEmpire && Random.value < GameBalance.WorkPromotionPerHour) p.Promote();
+                else if (p != null && p.Rank == UnitRank.Warrior && Random.value < GameBalance.KingdomKnightTraining[Economy.HallLevel]) p.Promote();
+                else if (p != null && p.Rank == UnitRank.Knight && Random.value < GameBalance.KingdomGeneralTraining[Economy.HallLevel]) p.Promote();
             }
         }
 
@@ -446,7 +452,21 @@ namespace BattleOfAges.AI
             raidTarget = target;
             foreach (HostileMobAI m in raiders) m.OrderAttack(target);
             RaidStarted?.Invoke(this, target);
-            StrategyHud.Notify($"{KingdomName} іде в набіг: {raidSize} бійців!");
+            StrategyHud.Notify($"{KingdomName} іде в набіг{Whom(target)}: {raidSize} бійців!");
+        }
+
+        /// <summary>Who a raid goes at, for the message: the same words looked as if every raid were coming for the player.</summary>
+        private static string Whom(HealthComponent target)
+        {
+            if (target == null) return "";
+            if (target.GetComponent<TownHall>() != null || target.gameObject == Managers.GameContext.Player) return " на вас";
+            foreach (NpcKingdom k in all)
+            {
+                if (k == null) continue;
+                if (k.Hall == target || (k.King != null && k.King.Health == target)) return $" на «{k.KingdomName}»";
+                foreach (HostileMobAI m in k.subjects) if (m != null && m.Health == target) return $" на «{k.KingdomName}»";
+            }
+            return "";
         }
 
         /// <summary>Once a second on a raid: turn back after heavy losses, else keep every raider fighting something.</summary>
@@ -645,8 +665,11 @@ namespace BattleOfAges.AI
             if (k.Team >= nextTeam) nextTeam = k.Team + 1;
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
             k.Age = s.Age;
+            // Kings do not all set off at once, as a new one (a state does not keep it: the same hour for the same name)
+            k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * (1f + Mathf.Repeat(KingdomTown.Seed(s.Name) * 0.618034f, 1f));
             k.BuildHall();
             if (s.Hall > 0 && s.HallHealth > 0) k.Hall.SetCurrentHealth(s.HallHealth);
+            if (Application.isPlaying && !s.Free) k.Town = KingdomTown.Attach(k);
             if (s.Defeated) { k.IsDefeated = true; return k; }
             if (gradual) k.arriving.AddRange(s.Subjects); // a few a frame (ArriveMore): a grown kingdom was a hitch of hundreds of ms
             else foreach (SaveLoad.SubjectSave u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);

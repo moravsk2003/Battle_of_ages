@@ -130,6 +130,37 @@ namespace BattleOfAges.UI
                 text.text = $"{s.DisplayName} {Mathf.FloorToInt(s.Progress * 100f)}%  ·  {hands}";
             }
             for (int i = used; i < sitePlates.Count; i++) if (sitePlates[i].plate.gameObject.activeSelf) sitePlates[i].plate.gameObject.SetActive(false);
+            UpdatePlaces(cam, map);
+        }
+
+        private readonly List<(RectTransform plate, Text text)> placePlates = new List<(RectTransform, Text)>();
+
+        /// <summary>On the map, with units selected: over each field or sawmill with room, that a right-click sends them there.</summary>
+        private void UpdatePlaces(Camera cam, bool map)
+        {
+            int used = 0;
+            RtsUnitCommander commander = GameContext.Commander;
+            if (map && cam != null && commander != null && commander.SelectedUnits.Count > 0)
+                foreach (WorkPlace p in WorkPlace.All)
+                {
+                    if (p == null || p.WorkerCount >= p.Slots || BuildGhost.Is(p) || !OnScreen(cam, p.transform.position + Vector3.up * 2.5f, out Vector2 local, out _)) continue;
+                    while (placePlates.Count <= used)
+                    {
+                        RectTransform rt = UiTheme.Rect(layer, "PlaceLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 28f));
+                        rt.pivot = new Vector2(0.5f, 0f);
+                        UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
+                        RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(290f, 24f));
+                        Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
+                        t.raycastTarget = false;
+                        rt.GetComponent<Image>().raycastTarget = false;
+                        placePlates.Add((rt, t));
+                    }
+                    var (plate, text) = placePlates[used++];
+                    if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
+                    plate.anchoredPosition = local;
+                    text.text = $"{(p is FieldNode ? "Поле" : "Лісопилка")} {p.WorkerCount}/{p.Slots}  ·  ПКМ — послати сюди";
+                }
+            for (int i = used; i < placePlates.Count; i++) if (placePlates[i].plate.gameObject.activeSelf) placePlates[i].plate.gameObject.SetActive(false);
         }
 
         // ------------------------------------------------------------------ mines

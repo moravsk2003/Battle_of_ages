@@ -95,6 +95,10 @@ namespace BattleOfAges.Utils
             }, Vector3.up);
         }
 
+        /// <summary>The bare models, for a kingdom's town (no building of the player's).</summary>
+        public static Mesh FieldModel => field != null ? field : (field = FieldMesh());
+        public static Mesh SawmillModel => sawmill != null ? sawmill : (sawmill = SawmillMesh());
+
         /// <summary>A field's site: the land ploughed, nothing yet growing.</summary>
         public static Mesh FieldSite { get { if (fieldSite == null) { var kit = new MeshKit(); Tilth(kit); fieldSite = kit.ToMesh("FieldSite"); } return fieldSite; } }
         private static Mesh fieldSite;

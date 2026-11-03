@@ -39,6 +39,7 @@ namespace BattleOfAges.RTS
             if (v.sqrMagnitude > maxSpeed * maxSpeed) v = v.normalized * maxSpeed;
 
             Vector3 step = Building.WallBarriers.Constrain(p, v * dt, radius, own);
+            step = AI.KingdomTown.Constrain(p, step, radius);
             step = World.Lakes.Constrain(p, step, radius); // nobody swims: along the shore instead
             if (step.sqrMagnitude < 1e-10f) return Vector3.zero;
             v = step / dt;

@@ -175,6 +175,14 @@ namespace BattleOfAges.Combat
         public static int XpPerHit = 1, XpPerKill = 10, XpPerSurvival = 5;
         /// <summary>Survival XP is given at most once per this many seconds (one fight, not every target).</summary>
         public static float SurvivalAwardWindow = 30f;
+        /// <summary>An NPC kingdom's town: one house to so many people, one field to so many, walls from this hall.</summary>
+        public static int TownPeoplePerHouse = 3, TownPeoplePerField = 10, TownWallHall = 3;
+        /// <summary>
+        /// Chance per game hour, by hall level, that an NPC kingdom's warrior trains into a knight, and from hall IV a knight
+        /// into a general (they would otherwise rise only in battle, and a far kingdom fights none).
+        /// </summary>
+        public static float[] KingdomKnightTraining = { 0f, 0.002f, 0.004f, 0.006f, 0.008f, 0.01f };
+        public static float[] KingdomGeneralTraining = { 0f, 0f, 0f, 0f, 0.001f, 0.002f };
         /// <summary>Chance per worked game hour that a working person becomes a warrior.</summary>
         public static float WorkPromotionPerHour = 0.005f;
 

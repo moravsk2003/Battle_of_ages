@@ -45,6 +45,28 @@ namespace BattleOfAges.AI
             return false;
         }
 
+        /// <summary>
+        /// The nearest kingdom against the player still standing, near or far (no free band): false when there is none.
+        /// It is what the minimap points at until the world map of §5.4 is there: the world is kilometres wide and
+        /// nothing else tells the player which way to go.
+        /// </summary>
+        public static bool NearestEnemy(Vector3 from, out string name, out Vector3 at)
+        {
+            string bestName = null;
+            Vector3 bestAt = from;
+            float best = float.MaxValue;
+            void Consider(string n, Vector3 p)
+            {
+                float d = Flat(from, p);
+                if (d < best) { best = d; bestName = n; bestAt = p; }
+            }
+            foreach (KingdomSave s in far) if (!s.Defeated && !s.Free) Consider(s.Name, s.Home);
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated && !k.Free && k.AgainstPlayer) Consider(k.KingdomName, k.Home);
+            name = bestName;
+            at = bestAt;
+            return name != null;
+        }
+
         // ------------------------------------------------------------------ a new campaign
 
         /// <summary>The campaign's heroes on their sites: heroes - 1 of them (the player is one), a share kings, the rest free.</summary>
@@ -202,10 +224,18 @@ namespace BattleOfAges.AI
             }
             var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births, Free = s.Empire };
             int born = economy.Tick(hours, s.Empire ? 0 : s.Subjects.Count, s.Subjects.Count);
-            var rng = new System.Random(s.Name.GetHashCode() ^ Mathf.FloorToInt(s.Age * 7f));
+            var rng = new System.Random(s.Name.GetHashCode() ^ Mathf.FloorToInt(s.Age * 7f)); // (the same hour's draws: births, work, training)
             for (int i = 0; i < born; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Person, Position = Around(s.Home, rng) });
             double chance = 1.0 - System.Math.Pow(1.0 - GameBalance.WorkPromotionPerHour, hours);
             if (!s.Empire) foreach (SubjectSave u in s.Subjects) if (u.Rank == (int)UnitRank.Person && rng.NextDouble() < chance) u.Rank = (int)UnitRank.Warrior;
+            // Training, as a real one's (NpcKingdom.PromoteWorkers)
+            int hall = Mathf.Clamp(s.Hall, 0, GameBalance.KingdomKnightTraining.Length - 1);
+            double knight = 1.0 - System.Math.Pow(1.0 - GameBalance.KingdomKnightTraining[hall], hours), general = 1.0 - System.Math.Pow(1.0 - GameBalance.KingdomGeneralTraining[hall], hours);
+            foreach (SubjectSave u in s.Subjects)
+            {
+                if (u.Rank == (int)UnitRank.Warrior && rng.NextDouble() < knight) u.Rank = (int)UnitRank.Knight;
+                else if (u.Rank == (int)UnitRank.Knight && rng.NextDouble() < general) u.Rank = (int)UnitRank.General;
+            }
             if (!s.Free && (economy.HallLevel == 0 || s.Subjects.Count >= economy.Cap - GameBalance.KingdomHallRoom) && economy.TryUpgrade())
                 s.HallHealth = GameBalance.TownHallHealth[economy.HallLevel];
             s.Wood = economy.Wood; s.Ore = economy.Ore; s.Hall = economy.HallLevel; s.Births = economy.BirthCarry;

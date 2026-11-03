@@ -79,6 +79,9 @@ namespace BattleOfAges.Utils
             ps.Play(true);
         }
 
+        /// <summary>The soft round puff, for other soft particles (a campfire's flames); null where the shader is missing.</summary>
+        public static Material SoftMaterial => Look();
+
         private static Material Look()
         {
             if (material != null) return material;

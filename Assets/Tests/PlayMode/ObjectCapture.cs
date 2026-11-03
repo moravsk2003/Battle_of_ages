@@ -150,6 +150,7 @@ namespace BattleOfAges.PlayModeTests
                 ("wall_line_inside", () => (wallAt - fwd * 13f + right * 1f + Vector3.up * 7f, wallAt + right * 2f + Vector3.up * 1.5f)),
                 ("wall_gate_close", () => (gate.transform.position + fwd * 6.5f - right * 1.5f + Vector3.up * 2.2f, gate.transform.position + Vector3.up * 2.2f)),
                 ("wall_ladder", () => (wallAt + fwd * 6f + right * 4f + Vector3.up * 3f, wallAt + right * 0.6f + fwd * 0.8f + Vector3.up * 2.2f)),
+                ("wall_foot_low", () => (wallAt + fwd * 3.2f + Vector3.up * 0.15f, wallAt - fwd * 3f + Vector3.up * 0.05f)),
                 ("wall_walkway", () => (wallStairs.transform.position - fwd * 1.6f - right * 1.5f + Vector3.up * 5.4f, gate.transform.position + Vector3.up * 3.8f)),
             };
 

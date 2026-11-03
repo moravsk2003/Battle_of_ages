@@ -127,7 +127,8 @@ namespace BattleOfAges.Utils
             Plinth(FaceZ + 0.18f, 1f, x0, x1);
             Plinth(-FaceZ - 0.18f, -1f, x0, x1);
             // Core (the mortar between the blocks)
-            B(new Vector3(mid, (WalkY - 0.08f) * 0.5f, 0f), new Vector3(len, WalkY - 0.08f, CoreZ * 2f), Core, StoneS, 0f);
+            // (from the foundation up: between its top and the blocks one could see right through the wall)
+            B(new Vector3(mid, (WalkY - 0.08f + FootY) * 0.5f, 0f), new Vector3(len, WalkY - 0.08f - FootY, CoreZ * 2f), Core, StoneS, 0f);
             Ashlar(CoreZ, 1f, x0, x1, 0.35f, WalkY + BreastH);
             Ashlar(-CoreZ, -1f, x0, x1, 0.35f, WalkY - 0.15f);
         }

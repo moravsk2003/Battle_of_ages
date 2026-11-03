@@ -233,7 +233,7 @@ namespace BattleOfAges.AI
             }
 
             Vector3 currentPos = transform.position;
-            Vector3 targetPos = destination;
+            Vector3 targetPos = KingdomTown.Route(currentPos, destination);
             targetPos.y = currentPos.y;
 
             Vector3 moveDir = targetPos - currentPos;

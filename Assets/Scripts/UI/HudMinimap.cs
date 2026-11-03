@@ -19,7 +19,9 @@ namespace BattleOfAges.UI
         public const float HalfSize = 90f, Px = 280f, FramePx = Px + 24f;
         private const float Scale = Px / (2f * HalfSize);
 
-        private RectTransform frame, dots, heading;
+        private RectTransform frame, dots, heading, kingdomMark;
+        private Text kingdomLabel;
+        private float kingdomTimer;
         private Camera cam;
         private RenderTexture texture;
         private Vector3 centre = new Vector3(1e9f, 0f, 0f);
@@ -48,13 +50,22 @@ namespace BattleOfAges.UI
             image.raycastTarget = true; // clicks: MinimapInput
             view.gameObject.AddComponent<MinimapInput>().Pressed = OnPressed;
             Tooltip.Set(view.gameObject, () => GameContext.MapOpen
-                ? TipText.Title("Мапа", UiTheme.Gold) + "\nЛКМ — камера туди (можна вести), ПКМ — обрані йдуть туди." + "\n" + TipText.Dim("Сині — свої, червоні — вороги, жовті — обрані, кільця — напад.")
+                ? TipText.Title("Мапа", UiTheme.Gold) + "\nЛКМ — камера туди (можна вести), ПКМ — обрані йдуть туди." + "\n" + TipText.Dim("Сині — свої, червоні — вороги, жовті — обрані, кільця — напад. Червоне кільце з краю — бік найближчого ворожого королівства.")
                 : null);
             dots = UiTheme.Rect(view, "Dots", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(Px, Px));
             heading = UiTheme.Rect(dots, "Heading", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(3f, 16f));
             heading.pivot = new Vector2(0.5f, 0f);
             var headingImg = heading.gameObject.AddComponent<Image>();
             headingImg.sprite = UiTheme.BarSprite; headingImg.color = Color.white; headingImg.raycastTarget = false;
+            // The way to the nearest enemy kingdom: a mark on the edge, its name and distance under the map
+            kingdomMark = UiTheme.Rect(dots, "KingdomMark", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(16f, 16f));
+            var markImg = kingdomMark.gameObject.AddComponent<Image>();
+            markImg.sprite = UiTheme.RingSprite; markImg.color = new Color(0.95f, 0.3f, 0.2f); markImg.raycastTarget = false;
+            RectTransform under = UiTheme.Rect(frame, "KingdomWay", new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(Px, 26f));
+            UiTheme.PanelImage(under, UiTheme.ButtonSprite);
+            kingdomLabel = UiTheme.Label(under, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Normal);
+            kingdomMark.gameObject.SetActive(false);
+            under.gameObject.SetActive(false);
             RectTransform title = UiTheme.Rect(frame, "Title", new Vector2(0.5f, 1f), new Vector2(0f, 16f), new Vector2(120f, 30f));
             UiTheme.PanelImage(title, UiTheme.ButtonSprite);
             UiTheme.Label(title, "Text", "Мапа", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
@@ -161,8 +172,32 @@ namespace BattleOfAges.UI
                 Dot(used++, new Vector2(d.x, d.z) * Scale, new Color(0.95f, 0.25f, 0.2f), 5f);
             }
             Dot(used++, new Vector2(me.x, me.z) * Scale, Color.white, 9f);
+            PointToKingdom(looks.position);
             for (int i = used; i < dotImages.Count; i++) if (dotImages[i].enabled) dotImages[i].enabled = false;
         }
+
+        /// <summary>Shown in a campaign, while an enemy kingdom stands: the world is kilometres wide, this minimap 180 m.</summary>
+        private void PointToKingdom(Vector3 from)
+        {
+            bool found = KingdomRealm.Active && KingdomRealm.NearestEnemy(from, out rememberedName, out rememberedAt);
+            if (kingdomMark.gameObject.activeSelf != found) { kingdomMark.gameObject.SetActive(found); kingdomLabel.transform.parent.gameObject.SetActive(found); }
+            if (!found) return;
+            Vector3 d = rememberedAt - centre;
+            Vector2 p = new Vector2(d.x, d.z) * Scale;
+            float edge = Px * 0.5f - 9f, m = Mathf.Max(Mathf.Abs(p.x), Mathf.Abs(p.y));
+            if (m > edge) p *= edge / m;
+            kingdomMark.anchoredPosition = p;
+            kingdomMark.SetAsLastSibling();
+            kingdomTimer -= 0.15f;
+            if (kingdomTimer > 0f) return;
+            kingdomTimer = 0.6f;
+            Vector3 way = rememberedAt - from;
+            way.y = 0f;
+            kingdomLabel.text = $"{rememberedName}: {Mathf.RoundToInt(way.magnitude / 10f) * 10} м";
+        }
+
+        private string rememberedName;
+        private Vector3 rememberedAt;
 
         private static bool Contains(IReadOnlyList<RtsUnit> list, RtsUnit u)
         {
