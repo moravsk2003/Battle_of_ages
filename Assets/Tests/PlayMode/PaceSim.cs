@@ -19,7 +19,9 @@ namespace BattleOfAges.PlayModeTests
     /// <summary>
     /// How fast a campaign goes from its real start (nothing given): a simple player marks the zones at once, sets a hall
     /// as soon as it can, raises it, then founds a settlement with SIM_BUILDERS workers. One game hour is a real minute.
-    /// Writes pace_report.md to CAPTURE_DIR (SIM_SPEED default 12, SIM_HOURS default 90, SIM_SEED default 777, SIM_RAIDS 1: bandits on).
+    /// Writes pace_report.md to CAPTURE_DIR (SIM_SPEED default 12, SIM_HOURS default 90, SIM_SEED default 777, SIM_RAIDS 1: bandits on),
+    /// and adds a row to zone_ab.md there: SIM_ZONES names the zones to mark (default all), SIM_FOUND 0 leaves out the second settlement,
+    /// to compare what each zone gives.
     /// </summary>
     [Explicit("Balance simulation, run on demand")]
     public class PaceSim
@@ -48,7 +50,12 @@ namespace BattleOfAges.PlayModeTests
             var seen = new HashSet<BuildingType>();
 
             Vector3 hallAt = new Vector3(0f, 0f, -44f);
-            void Zones(ZoneType t, Vector3 at, int strokes) { for (int i = 0; i < strokes; i++) ZoneMap.Paint(at + new Vector3(i * 16f, 0f, 0f), 14f, t, out _); }
+            string zoneList = Env("SIM_ZONES", "Fields,Housing,Mining,Crafts,Forest,Trade");
+            void Zones(ZoneType t, Vector3 at, int strokes)
+            {
+                if (!zoneList.Contains(t.ToString())) return;
+                for (int i = 0; i < strokes; i++) ZoneMap.Paint(at + new Vector3(i * 16f, 0f, 0f), 14f, t, out _);
+            }
             Zones(ZoneType.Fields, new Vector3(30f, 0f, -90f), 3);
             Zones(ZoneType.Housing, new Vector3(-90f, 0f, -80f), 3);
             Zones(ZoneType.Mining, new Vector3(60f, 0f, 70f), 2);
@@ -62,12 +69,31 @@ namespace BattleOfAges.PlayModeTests
             float foundingAt = -1f, hungryHours = 0f, minDays = float.MaxValue, nextRow = 0f, lastHour = 0f;
             bool hallPlaced = false, foundWood = false, tradeMarked = false;
             int level = 0;
+            bool found = Env("SIM_FOUND", "1") != "0";
+            float woodGained = 0f, oreGained = 0f, foodGained = 0f, farmerHours = 0f, sawyerHours = 0f, minerHours = 0f, peopleHours = 0f, hallOne = -1f, hallTwo = -1f, at15 = -1f, at25 = -1f;
+            int lastWood = rm.Main.WoodCount, lastOre = rm.Main.OreCount;
+            float lastFood = rm.Main.Food;
             while (WorldClock.GameHours < hours)
             {
                 float now = (float)WorldClock.GameHours;
                 float dt = now - lastHour;
                 lastHour = now;
                 SettlementStock stock = rm.Main;
+                woodGained += Mathf.Max(0, stock.WoodCount - lastWood);
+                oreGained += Mathf.Max(0, stock.OreCount - lastOre);
+                foodGained += Mathf.Max(0f, stock.Food - lastFood);
+                lastWood = stock.WoodCount; lastOre = stock.OreCount; lastFood = stock.Food;
+                foreach (WorkPlace place in WorkPlace.All)
+                {
+                    if (place is FieldNode) farmerHours += place.Present * dt;
+                    else if (place is SawmillNode) sawyerHours += place.Present * dt;
+                }
+                foreach (MineNode mine in MineNode.ActiveMines) if (mine != null) minerHours += mine.AssignedWorkerCount * dt;
+                peopleHours += WorkerRegistry.WorkerCount * dt;
+                if (at15 < 0f && WorkerRegistry.WorkerCount >= 15) at15 = now;
+                if (at25 < 0f && WorkerRegistry.WorkerCount >= 25) at25 = now;
+                if (hallOne < 0f && TownHall.Current != null) hallOne = now;
+                if (hallTwo < 0f && TownHall.Current != null && TownHall.Current.Level >= 2) hallTwo = now;
                 if (stock.Hungry) hungryHours += dt;
                 float perDay = Mathf.Max(1, TownHall.Population) * GameBalance.FoodPerPersonPerDay;
                 minDays = Mathf.Min(minDays, stock.Food / perDay);
@@ -99,7 +125,7 @@ namespace BattleOfAges.PlayModeTests
                 if (hall != null && hall.Level >= 2 && !tradeMarked) { tradeMarked = true; Zones(ZoneType.Trade, new Vector3(-60f, 0f, 80f), 2); }
 
                 // A new settlement as soon as it can be paid for
-                if (second == null && hall != null && hall.Level >= GameBalance.FoundingHallLevel && stock.WoodCount >= GameBalance.FoundingWood && stock.OreCount >= GameBalance.FoundingOre)
+                if (found && second == null && hall != null && hall.Level >= GameBalance.FoundingHallLevel && stock.WoodCount >= GameBalance.FoundingWood && stock.OreCount >= GameBalance.FoundingOre)
                 {
                     Vector3 place = Vector3.zero;
                     for (float r = 650f; r < 2000f && place == Vector3.zero; r += 100f)
@@ -148,6 +174,15 @@ namespace BattleOfAges.PlayModeTests
             report.AppendLine("## Over time\n");
             report.Append(table);
             File.WriteAllText(Path.Combine(dir, "pace_report.md"), report.ToString());
+
+            var built = new Dictionary<BuildingType, int>();
+            foreach (BuildingNode b in BuildingNode.Active)
+                if (b != null && b.GetComponent<ConstructionSite>() == null) { built.TryGetValue(b.Type, out int n); built[b.Type] = n + 1; }
+            var builtText = new List<string>();
+            foreach (var pair in built) builtText.Add(pair.Key + " " + pair.Value);
+            string ab = Path.Combine(dir, "zone_ab.md");
+            if (!File.Exists(ab)) File.WriteAllText(ab, "| zones | seed | hall I h | hall II h | 15 ppl h | 25 ppl h | people | wood gained | ore gained | food gained | wood | ore | food | low food days | hungry h | farmer-h | sawyer-h | miner-h | people-h | built |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+            File.AppendAllText(ab, $"| {zoneList} | {seed} | {hallOne:0.0} | {hallTwo:0.0} | {at15:0.0} | {at25:0.0} | {WorkerRegistry.WorkerCount} | {woodGained:0} | {oreGained:0} | {foodGained:0} | {rm.Main.WoodCount} | {rm.Main.OreCount} | {rm.Main.FoodCount} | {minDays:0.0} | {hungryHours:0.0} | {farmerHours:0} | {sawyerHours:0} | {minerHours:0} | {peopleHours:0} | {string.Join(", ", builtText)} |\n");
 
             GameBalance.BanditFirstRaidHours = firstRaid;
             SaveSystem.FolderOverride = null;
