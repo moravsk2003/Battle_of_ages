@@ -59,6 +59,16 @@ namespace BattleOfAges.PlayModeTests
             yield return new WaitForSeconds(3f);
             var report = new StringBuilder();
             PlayerCombatController hero = Object.FindFirstObjectByType<PlayerCombatController>();
+            // A settlement to raid and a hero that stays alive: standing idle it fell to the first bandits, and the raid at it ended there
+            hero.GetComponent<HealthComponent>().InvulnerableUntil = float.PositiveInfinity;
+            if (TownHall.Current == null)
+            {
+                GameObject built = TownHall.CreatePrefab("Probe_Hall");
+                Vector3 place = hero.transform.position + new Vector3(30f, 0f, 30f);
+                place.y = RtsUnit.GetTerrainHeight(place);
+                built.transform.position = place;
+                yield return null;
+            }
             Vector3 home = TownHall.Current != null ? TownHall.Current.transform.position : hero.transform.position;
             report.AppendLine($"seed {WorldSettings.Seed}, size {WorldSettings.Size}, hero speed {hero.GetComponent<CombatUnit>().MoveSpeed:0.0} m/s, hall at home {TownHall.Current != null}");
             var rows = new List<(float d, string line)>();
@@ -77,7 +87,7 @@ namespace BattleOfAges.PlayModeTests
             Time.timeScale = 10f;
             float end = Time.realtimeSinceStartup + 1300f;
             float nextRow = 0f;
-            while (Minute() < 45f && Time.realtimeSinceStartup < end)
+            while (Minute() < 60f && Time.realtimeSinceStartup < end)
             {
                 float nearest = float.MaxValue;
                 foreach (NpcKingdom k in NpcKingdom.All)
@@ -95,9 +105,10 @@ namespace BattleOfAges.PlayModeTests
                     {
                         var party = k.RaidParty();
                         float ours = NpcKingdom.PowerOf(party.ConvertAll(m => m.Health)), guards = NpcKingdom.PowerOf(k.GuardsOf(TownHall.Current != null ? home : hero.transform.position));
-                        return $"{k.KingdomName}: {k.Population} people, hall {k.Economy.HallLevel}, power {ours:0} vs base {guards:0} x{GameBalance.KingdomRaidPowerRatio}, {(k.Raiding ? "raiding" : "home")}";
+                        return $"{k.KingdomName}{(k.IsDefeated ? " (FALLEN)" : "")}: {k.Population} people, hall {k.Economy.HallLevel}, power {ours:0} vs base {guards:0} x{GameBalance.KingdomRaidPowerRatio}, {(k.Raiding ? "raiding" : "home")}";
                     }));
-                    report.AppendLine($"minute {Minute():0}: {state}; nearest raider {(nearest < float.MaxValue ? nearest.ToString("0") + " m" : "none")}");
+                    int armies = KingdomRealm.Far.Sum(f => f.Armies.Count), fallen = KingdomRealm.Far.Count(f => f.Defeated);
+                    report.AppendLine($"minute {Minute():0}: {state}; nearest raider {(nearest < float.MaxValue ? nearest.ToString("0") + " m" : "none")}; far world: {armies} armies out, {fallen} fallen");
                 }
                 yield return null;
             }
