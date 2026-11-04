@@ -54,7 +54,11 @@ namespace BattleOfAges.AI
             HealthComponent attackerHp = attacker != null ? attacker.GetComponent<HealthComponent>() : null;
             if (attackerHp == null || !attackerHp.IsAlive || !Health.IsAlive) return;
             provokedUntil = Time.time + GameBalance.ProvokedSeconds;
-            if (CurrentStateType == AIStateType.Retreat || currentCombatTarget != null) return;
+            if (CurrentStateType == AIStateType.Retreat) return;
+            // On its way to something else (a raid's hall, far off) it turns on whoever hit it; in a fight at hand it stays in it
+            bool busy = currentCombatTarget != null && currentCombatTarget.IsAlive && currentCombatTarget.BodyRadius <= 0f
+                        && currentCombatTarget.DistanceFrom(transform.position) <= aggroRadius;
+            if (busy) return;
             SetTarget(attackerHp); // also calls the allies nearby
             ChangeState(AIStateType.Chase);
         }
@@ -175,6 +179,32 @@ namespace BattleOfAges.AI
             currentCombatTarget = target;
             isOnAssaultOrder = true;
             ChangeState(AIStateType.Chase);
+        }
+
+        /// <summary>
+        /// A raider on its way: any enemy within this radius comes first, the unit or the hero, unless it already fights one at
+        /// hand (they marched past the player's hero, and it could cut them all down on the road). True when it turned.
+        /// </summary>
+        public bool EngageNear(float radius)
+        {
+            HealthComponent now = currentCombatTarget;
+            if (now != null && now.IsAlive && now.BodyRadius <= 0f && now.DistanceFrom(transform.position) <= radius) return false;
+            HealthComponent best = null;
+            float bestDistance = radius;
+            int unit = UnitSpatialGrid.FindNearestEnemy(transform.position, radius, team);
+            if (unit >= 0)
+            {
+                HealthComponent h = UnitSpatialGrid.Health(unit);
+                if (h != null && h.IsAlive) { best = h; bestDistance = Vector3.Distance(transform.position, h.transform.position); }
+            }
+            if (AgainstPlayer)
+            {
+                HealthComponent hero = GetPlayerHealth();
+                if (hero != null && hero.IsAlive && Vector3.Distance(transform.position, hero.transform.position) <= bestDistance) best = hero;
+            }
+            if (best == null || best == now) return false;
+            OrderAttack(best);
+            return true;
         }
 
         public void AlertNearbyAllies(HealthComponent target)

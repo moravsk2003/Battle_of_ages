@@ -71,7 +71,7 @@ namespace BattleOfAges.PlayModeTests
             KingdomRealm.Load(KingdomRealm.AllStates());
             NpcKingdom real = NpcKingdom.FromSave(JsonUtility.FromJson<KingdomSave>(JsonUtility.ToJson(far)));
             Assert.IsTrue(real.IsEmpire, "a save keeps it");
-            Assert.AreEqual(GameBalance.EmpireHeroGear, real.King.GetComponent<BattleOfAges.Crafting.Equipment>().LevelOf(BattleOfAges.Crafting.ItemType.Sword), "the emperor's sword");
+            Assert.AreEqual(GameBalance.EmpireHeroGear, real.King.GetComponent<BattleOfAges.Crafting.Equipment>()[BattleOfAges.Crafting.EquipSlot.Weapon].Level, "the emperor's weapon (a sword, a bow or a staff by its class)");
             HostileMobAI person = real.Subjects[0];
             Assert.AreEqual(GameBalance.EmpirePersonGear, person.GetComponent<BattleOfAges.Crafting.Equipment>().LevelOf(BattleOfAges.Crafting.ItemType.Sword), "a person's sword");
             real.King.Health.TakeDamage(100000000, ignoreArmor: true);

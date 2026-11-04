@@ -60,7 +60,7 @@ namespace BattleOfAges.UI
             Heading(-92f, 290f, "Ваш герой");
             Cycler(-150f, 290f, "Клас", () => HeroClassRules.Name(Classes[classIndex]), d => classIndex = Wrap(classIndex + d, Classes.Length), out classText);
             classDescription = Description(-195f, 290f);
-            Cycler(-330f, 290f, "Стартовий артефакт", () => Artifacts.Name(Artifacts.All[artifactIndex]), d => artifactIndex = Wrap(artifactIndex + d, Artifacts.All.Length), out artifactText);
+            Cycler(-330f, 290f, "Стартовий артефакт", () => Artifacts.Name(Artifacts.All[artifactIndex], Classes[classIndex]), d => artifactIndex = Wrap(artifactIndex + d, Artifacts.All.Length), out artifactText);
             artifactDescription = Description(-375f, 290f);
 
             UiTheme.TextButton(Panel, "Start", "Почати", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), Start, 22)

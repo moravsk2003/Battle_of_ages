@@ -181,12 +181,12 @@ namespace BattleOfAges.UI
             if (picking)
             {
                 ArtifactType a = Artifacts.All[pickIndex];
-                artifactText.text = $"Стартовий артефакт: <b>{Artifacts.Name(a)}</b>\n{Artifacts.Description(a)}";
+                artifactText.text = $"Стартовий артефакт: <b>{Artifacts.Name(a, hero != null ? hero.Class : HeroClass.None)}</b>\n{Artifacts.Description(a)}";
             }
             else
             {
                 var names = new System.Text.StringBuilder();
-                foreach (ArtifactType a in bag.Held) names.Append(names.Length > 0 ? ", " : "").Append(Artifacts.Name(a));
+                foreach (ArtifactType a in bag.Held) names.Append(names.Length > 0 ? ", " : "").Append(Artifacts.Name(a, hero != null ? hero.Class : HeroClass.None));
                 artifactText.text = $"Артефакти: {(names.Length > 0 ? names.ToString() : "немає")}\nОсколки: {bag.Shards.Count}";
             }
             useHeal.gameObject.SetActive(!picking && bag.Has(ArtifactType.FullHeal));
@@ -276,7 +276,11 @@ namespace BattleOfAges.UI
             {
                 HeroClass c = classes[i];
                 Button cb = UiTheme.TextButton(pick, "Class" + c, HeroClassRules.Name(c), new Vector2(0f, 0.5f), new Vector2(10f + i * 128f, 0f), new Vector2(120f, 46f),
-                    () => { if (hero != null) hero.ChooseClass(c); }, 19);
+                    () =>
+                    {
+                        if (hero == null || !hero.ChooseClass(c)) return;
+                        Crafting.StartingKits.GiveClassWeapon(hero.GetComponent<Crafting.Equipment>(), c);
+                    }, 19);
                 Tooltip.Set(cb.gameObject, () => TipText.Title(HeroClassRules.Name(c), UiTheme.Gold) + "\n" + HeroClassRules.Description(c) + "\n" + TipText.Dim("Клас обирається один раз."));
             }
 

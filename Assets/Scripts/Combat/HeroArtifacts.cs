@@ -59,6 +59,9 @@ namespace BattleOfAges.Combat
         /// <summary>Takes an artifact; a second world-changing one blows the bearer up (§9.2).</summary>
         public void Add(ArtifactType a)
         {
+            // The ×5 weapon takes the slot and stays: an archer's is a bow, a mage's a staff, whatever it holds now
+            if (a == ArtifactType.SwordX5 && !held.Contains(a) && TryGetComponent(out HeroProgress bearer))
+                Crafting.StartingKits.GiveClassWeapon(GetComponent<Crafting.Equipment>(), bearer.Class);
             bool secondWorld = Artifacts.Tier(a) == ArtifactTier.WorldChanging && held.Exists(h => Artifacts.Tier(h) == ArtifactTier.WorldChanging);
             held.Add(a);
             ApplyEffects();

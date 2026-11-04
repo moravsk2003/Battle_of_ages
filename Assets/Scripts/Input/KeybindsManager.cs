@@ -20,7 +20,8 @@ namespace BattleOfAges.InputSystem
         IdleWorker,
         AlertJump,
         UseFullHeal,
-        UseLightning
+        UseLightning,
+        AutoWalk
     }
 
     /// <summary>
@@ -46,7 +47,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.IdleWorker,      KeyCode.Period },
             { KeyAction.AlertJump,       KeyCode.Space },
             { KeyAction.UseFullHeal,     KeyCode.Alpha1 },
-            { KeyAction.UseLightning,    KeyCode.Alpha2 }
+            { KeyAction.UseLightning,    KeyCode.Alpha2 },
+            { KeyAction.AutoWalk,        KeyCode.V }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -65,7 +67,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.IdleWorker,      "Наступний робітник без діла" },
             { KeyAction.AlertJump,       "До місця нападу (мапа)" },
             { KeyAction.UseFullHeal,     "Артефакт: повне зцілення" },
-            { KeyAction.UseLightning,    "Артефакт: блискавка" }
+            { KeyAction.UseLightning,    "Артефакт: блискавка" },
+            { KeyAction.AutoWalk,        "Автоходьба" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

@@ -11,7 +11,7 @@ namespace BattleOfAges.World
     public static class WorldSettings
     {
         /// <summary>A new campaign's side in metres (the setup screen and tests choose; §5.1).</summary>
-        public const float DefaultSize = 16000f;
+        public const float DefaultSize = 8000f; // (16 km left the nearest king 3.4 km off, a raid 12 minutes on the march)
         /// <summary>The mountain wall: it rises over this band inside the edge, to EdgeRise metres.</summary>
         public const float EdgeBand = 400f, EdgeRise = 150f;
 

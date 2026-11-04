@@ -157,7 +157,7 @@ namespace BattleOfAges.Crafting
         }
 
         /// <summary>Calls the nearest villager who is not at the bench yet (falls back to any own unit).</summary>
-        public RtsUnit AssignNearestFreeWorker()
+        public RtsUnit AssignNearestFreeWorker(bool onlyWorking = false)
         {
             assignedWorkers.RemoveAll(w => w == null);
             RtsUnit best = null;
@@ -167,6 +167,7 @@ namespace BattleOfAges.Crafting
                 if (u == null || assignedWorkers.Contains(u) || u.GetComponent<FirstPersonController>() != null) continue;
                 NpcResourceGatherer g = u.GetComponent<NpcResourceGatherer>();
                 if (g != null && g.IsStationed) continue; // in a mine or at another bench
+                if (onlyWorking && (g == null || !g.IsWorking)) continue; // (a soldier told to stand stays)
                 float score = Vector3.Distance(transform.position, u.transform.position) + (g != null ? 0f : 1000f);
                 if (score < bestScore) { bestScore = score; best = u; }
             }

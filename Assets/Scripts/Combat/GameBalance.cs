@@ -322,6 +322,13 @@ namespace BattleOfAges.Combat
         /// <summary>Raiders look for something to fight this far from where they are; the guards of a target count within GuardRadius.</summary>
         public static float KingdomRaidSearchRadius = 40f, KingdomGuardRadius = 40f;
         public static int KingdomHallRoom = 2;
+        /// <summary>A raider on the march turns on any enemy this near. Choosing a raid's target, the player counts as this share of its distance.</summary>
+        public static float RaidEngageRadius = 15f, KingdomPlayerTargetFactor = 0.5f;
+        /// <summary>A felled tree in a Forest zone stands again after so many game hours; a master in a Crafts zone leaves the stock this much.</summary>
+        public static float ForestRegrowHours = 12f;
+        public static int CraftsKeepWood = 100, CraftsKeepOre = 30;
+        /// <summary>With an empty larder one person of the settlement dies every so many game hours.</summary>
+        public static float StarveEveryHours = 3f;
         /// <summary>
         /// Where the world puts settlements (BuildSite): a kingdom looks this far round its spot for ground rising at most
         /// SiteMaxRise across its 7 m hall; a raider camp looks within its chunk across 14 m, and is not made if none is level.

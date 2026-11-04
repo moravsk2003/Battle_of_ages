@@ -118,6 +118,8 @@ namespace BattleOfAges.AI
             HealthComponent main = MainTarget();
             foreach (HostileMobAI m in band)
             {
+                if (m == null) continue;
+                m.EngageNear(GameBalance.RaidEngageRadius);
                 HealthComponent t = m.CurrentCombatTarget;
                 if (t != null && t.IsAlive) continue;
                 int near = UnitSpatialGrid.FindNearestEnemy(m.transform.position, GameBalance.KingdomRaidSearchRadius, UnitSpatialGrid.TeamHostile);

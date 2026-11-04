@@ -26,6 +26,14 @@ namespace BattleOfAges.Combat
         /// <summary>Used once, then gone (and never dropped).</summary>
         public static bool IsConsumable(ArtifactType a) => a == ArtifactType.FullHeal || a == ArtifactType.Lightning;
 
+        /// <summary>The name for a bearer of this class: the ×5 weapon is its class's own.</summary>
+        public static string Name(ArtifactType a, HeroClass cls)
+        {
+            if (a == ArtifactType.SwordX5 && cls == HeroClass.Archer) return "Лук ×5";
+            if (a == ArtifactType.SwordX5 && cls == HeroClass.Mage) return "Посох ×5";
+            return Name(a);
+        }
+
         public static string Name(ArtifactType a)
         {
             switch (a)

@@ -284,6 +284,14 @@ namespace BattleOfAges.Crafting
     {
         private static Item I(ItemType t, int l) => new Item(t, l);
 
+        /// <summary>The weapon a hero of this class cannot work without: the archer's bow, the mage's staff, as good as what it holds.</summary>
+        public static void GiveClassWeapon(Equipment gear, Combat.HeroClass cls)
+        {
+            if (gear == null) return;
+            if (cls == Combat.HeroClass.Archer && !gear.HasBow) gear.Equip(I(ItemType.Bow, Mathf.Max(1, gear.LevelOf(ItemType.Sword))));
+            else if (cls == Combat.HeroClass.Mage && !gear.HasStaff) gear.Equip(I(ItemType.Staff, Mathf.Max(1, gear.LevelOf(ItemType.Sword))));
+        }
+
         public static Item[] For(HumanoidModelBuilder.HumanType type)
         {
             switch (type)

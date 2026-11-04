@@ -27,7 +27,7 @@ namespace BattleOfAges.UI
             float days = res != null && perDay > 0f ? res.Food / perDay : 0f;
             return TipText.Title($"Їжа: {(res != null ? res.FoodCount : 0)}", res != null && res.Hungry ? UiTheme.Bad : UiTheme.Gold) +
                    $"\nЛюдина їсть {Combat.GameBalance.FoodPerPersonPerDay:0.#} на ігровий день: зараз {perDay:0.#} на день, запасу на {days:0.#} дн." +
-                   (res != null && res.Hungry ? "\n" + TipText.Bad("Без їжі приріст населення стоїть.") : "") +
+                   (res != null && res.Hungry ? "\n" + TipText.Bad($"Без їжі приріст стоїть, а кожні {Combat.GameBalance.StarveEveryHours:0} год гри гине людина.") : "") +
                    "\n" + TipText.Dim("Їжу дають поля.");
         }
 

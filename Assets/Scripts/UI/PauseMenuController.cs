@@ -333,16 +333,34 @@ namespace BattleOfAges.UI
             UiTheme.Divider(win, -64f, 520f);
             PopIn.On(win);
 
-            RectTransform left = Section(win, "Sliders", "Миша й звук", new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Vector2(28f, 96f), new Vector2(-12f, -76f));
+            // One tab a category (a tester asked: all of it lay in two boxes)
+            RectTransform control = SettingsTab(win, "Керування", 0);
             int row = 0;
-            SliderRow(left, row++, "Миша від першої особи", fpsSensSlider, v => v.ToString("0.0"));
-            SliderRow(left, row++, "Перетяг мапи", mapSensSlider, v => v.ToString("0.0"));
-            SliderRow(left, row++, "Зум колесом на мапі", zoomSlider, v => v.ToString("0.0"));
-            SliderRow(left, row, "Гучність", volumeSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+            SliderRow(control, row++, "Миша від першої особи", fpsSensSlider, v => v.ToString("0.0"));
+            SliderRow(control, row++, "Перетяг мапи", mapSensSlider, v => v.ToString("0.0"));
+            SliderRow(control, row, "Зум колесом на мапі", zoomSlider, v => v.ToString("0.0"));
 
-            RectTransform right = Section(win, "KeybindsPanel", "Графіка й клавіші", new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Vector2(12f, 96f), new Vector2(-28f, -76f));
-            keybindsContainerObj = right.gameObject;
-            BuildKeyList(right);
+            SliderRow(SettingsTab(win, "Звук", 1), 0, "Гучність", volumeSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+
+            Transform screen = ScrollList(SettingsTab(win, "Графіка", 2));
+            CreateGraphicsRow(screen);
+            CycleRow(screen, "Row_UiScale", "Масштаб інтерфейсу", () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
+            CycleRow(screen, "Row_FullScreen", "Повний екран", () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);
+            CycleRow(screen, "Row_Resolution", "Роздільність", () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
+            CycleRow(screen, "Row_VSync", "VSync", () => DisplaySettings.VSync ? "увімк." : "вимк.", DisplaySettings.ToggleVSync);
+            CycleRow(screen, "Row_FrameCap", "Ліміт кадрів", () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
+
+            RectTransform keys = SettingsTab(win, "Клавіші", 3);
+            keybindsContainerObj = keys.gameObject;
+            Transform keyRows = ScrollList(keys);
+            foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
+            {
+                KeyAction captured = action;
+                keybindButtonTexts[action] = CreateRow(keyRows, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(captured));
+            }
+
+            Transform game = ScrollList(SettingsTab(win, "Гра", 4));
+            CycleRow(game, "Row_Advisor", "Поради «Перші кроки»", () => Advisor.Hidden ? "сховано" : "показано", () => Advisor.Hidden = !Advisor.Hidden);
 
             if (closeSettingsButton != null)
             {
@@ -352,12 +370,40 @@ namespace BattleOfAges.UI
                 back.sizeDelta = new Vector2(260f, 52f);
                 back.anchoredPosition = new Vector2(-145f, 24f);
             }
-            UiTheme.TextButton(win, "ResetDefaultsBtn", "Скинути клавіші", new Vector2(0.5f, 0f), new Vector2(145f, 24f), new Vector2(260f, 52f), () =>
+            resetKeysButton = UiTheme.TextButton(win, "ResetDefaultsBtn", "Скинути клавіші", new Vector2(0.5f, 0f), new Vector2(145f, 24f), new Vector2(260f, 52f), () =>
             {
                 activeRebindAction = null;
                 KeybindsManager.ResetToDefaults();
-            });
+            }).gameObject;
+            ShowSettingsTab(0);
             RefreshKeybindButtonTexts();
+        }
+
+        private readonly System.Collections.Generic.List<(GameObject page, Image tab)> settingsTabs = new System.Collections.Generic.List<(GameObject, Image)>();
+        private GameObject resetKeysButton;
+        private const int SettingsTabCount = 5;
+
+        /// <summary>A category: its button along the top and its page under them.</summary>
+        private RectTransform SettingsTab(RectTransform win, string title, int index)
+        {
+            const float w = 184f, gap = 8f;
+            float x = (index - (SettingsTabCount - 1) * 0.5f) * (w + gap);
+            Image tab = UiTheme.TextButton(win, "Tab_" + title, title, new Vector2(0.5f, 1f), new Vector2(x, -94f), new Vector2(w, 46f), () => ShowSettingsTab(index), 20).GetComponent<Image>();
+            RectTransform page = Section(win, "Page_" + title, title, Vector2.zero, Vector2.one, new Vector2(28f, 96f), new Vector2(-28f, -124f));
+            settingsTabs.Add((page.gameObject, tab));
+            return page;
+        }
+
+        /// <summary>Opens a category's page (its key-reset button only with the keys).</summary>
+        public void ShowSettingsTab(int index)
+        {
+            activeRebindAction = null;
+            for (int i = 0; i < settingsTabs.Count; i++)
+            {
+                settingsTabs[i].page.SetActive(i == index);
+                settingsTabs[i].tab.color = i == index ? Color.white : new Color(0.72f, 0.72f, 0.72f);
+            }
+            if (resetKeysButton != null) resetKeysButton.SetActive(index == 3);
         }
 
         private static RectTransform Section(RectTransform win, string name, string title, Vector2 min, Vector2 max, Vector2 offMin, Vector2 offMax)
@@ -398,8 +444,8 @@ namespace BattleOfAges.UI
             }
         }
 
-        /// <summary>Graphics preset and one row per key, scrolling under the heading.</summary>
-        private void BuildKeyList(RectTransform section)
+        /// <summary>A list of rows scrolling under the heading; returns where the rows go.</summary>
+        private static Transform ScrollList(RectTransform section)
         {
             RectTransform scrollRect = UiTheme.Child(section, "ScrollView", Vector2.zero, Vector2.one, new Vector2(14f, 14f), new Vector2(-14f, -48f));
             ScrollRect scroll = scrollRect.gameObject.AddComponent<ScrollRect>();
@@ -422,19 +468,7 @@ namespace BattleOfAges.UI
             layout.padding = new RectOffset(4, 4, 4, 4);
             contentRect.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             scroll.content = contentRect;
-
-            CreateGraphicsRow(contentRect);
-            CycleRow(contentRect, "Row_UiScale", "Масштаб інтерфейсу", () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
-            CycleRow(contentRect, "Row_FullScreen", "Повний екран", () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);
-            CycleRow(contentRect, "Row_Resolution", "Роздільність", () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
-            CycleRow(contentRect, "Row_VSync", "VSync", () => DisplaySettings.VSync ? "увімк." : "вимк.", DisplaySettings.ToggleVSync);
-            CycleRow(contentRect, "Row_FrameCap", "Ліміт кадрів", () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
-            CycleRow(contentRect, "Row_Advisor", "Поради «Перші кроки»", () => Advisor.Hidden ? "сховано" : "показано", () => Advisor.Hidden = !Advisor.Hidden);
-            foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
-            {
-                KeyAction captured = action;
-                keybindButtonTexts[action] = CreateRow(contentRect, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(captured));
-            }
+            return contentRect;
         }
 
         /// <summary>A row whose button steps through values (each click: the next one); the text follows the value.</summary>

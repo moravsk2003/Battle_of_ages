@@ -328,6 +328,29 @@ namespace BattleOfAges.Building
             return promoted;
         }
 
+        private float starveClock;
+
+        /// <summary>Hunger takes one of this settlement's people, the lowest in rank (the hero is not among them). False when none is left.</summary>
+        public bool StarveOne()
+        {
+            NpcResourceGatherer victim = null;
+            UnitRank lowest = UnitRank.General;
+            bool found = false;
+            foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers)
+            {
+                if (w == null || Nearest(w.transform.position) != this) continue;
+                UnitProgress p = w.GetComponent<UnitProgress>();
+                UnitRank rank = p != null ? p.Rank : UnitRank.Person;
+                if (found && rank >= lowest) continue;
+                found = true;
+                lowest = rank;
+                victim = w;
+            }
+            if (victim == null || !victim.TryGetComponent(out HealthComponent hp) || !hp.IsAlive) return false;
+            hp.TakeDamage(int.MaxValue / 2, ignoreArmor: true);
+            return true;
+        }
+
         private void Update()
         {
             float hours = WorldClock.HoursOf(Time.deltaTime);
@@ -336,10 +359,21 @@ namespace BattleOfAges.Building
             if (promotionClock >= 1f)
             {
                 promotionClock -= 1f;
+                ZoneWork.Hour();
                 if (PromoteWorkers(GameBalance.WorkPromotionPerHour) > 0) StrategyHud.Notify("Робота загартувала: новий воїн");
             }
 
             SettlementStock food = Stock;
+            if (food != null && food.Hungry && !CentralEmpire.Active)
+            {
+                starveClock += hours;
+                if (starveClock >= GameBalance.StarveEveryHours)
+                {
+                    starveClock = 0f;
+                    if (StarveOne()) StrategyHud.Notify("Голод: померла людина");
+                }
+            }
+            else starveClock = 0f;
             int born = food != null && food.Hungry ? 0 : Births(ref birthCarry, hours, People, Cap, this); // no births on an empty larder (§10.3)
             for (int i = 0; i < born; i++)
             {

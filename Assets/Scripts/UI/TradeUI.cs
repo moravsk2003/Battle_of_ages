@@ -10,7 +10,19 @@ namespace BattleOfAges.UI
     /// <summary>The market's window (M5 step 4, a click on a market): fixed exchanges of the settlement's wood, food and common ore, at a loss, for when one runs short and another piles up.</summary>
     public sealed class TradeUI : MonoBehaviour
     {
-        private enum Good { Wood, Food, Ore }
+        public enum Good { Wood, Food, Ore }
+
+        /// <summary>
+        /// The fixed exchanges. No offer gives more of a good for an hour of a worker's other job than a worker of that good
+        /// makes itself (MarketTests): 10 wood for 5 food was 25 times a farmer's yield, and with the plenty of wood it replaced
+        /// fields and mines.
+        /// </summary>
+        public static readonly (Good give, int giveAmount, Good take, int takeAmount)[] Offers =
+        {
+            (Good.Wood, 100, Good.Food, 1), (Good.Food, 10, Good.Wood, 5),
+            (Good.Wood, 10, Good.Ore, 4), (Good.Ore, 5, Good.Wood, 1),
+            (Good.Food, 10, Good.Ore, 4), (Good.Ore, 240, Good.Food, 1)
+        };
 
         private struct Offer { public Good Give, Take; public int GiveAmount, TakeAmount; public Button Button; }
 
@@ -103,12 +115,7 @@ namespace BattleOfAges.UI
             stock = UiTheme.Label(st, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Ink);
             stock.supportRichText = true;
 
-            var list = new[]
-            {
-                (Good.Wood, 10, Good.Food, 5), (Good.Food, 10, Good.Wood, 5),
-                (Good.Wood, 10, Good.Ore, 4), (Good.Ore, 5, Good.Wood, 8),
-                (Good.Food, 10, Good.Ore, 4), (Good.Ore, 5, Good.Food, 8)
-            };
+            var list = Offers;
             offers = new Offer[list.Length];
             for (int i = 0; i < list.Length; i++)
             {

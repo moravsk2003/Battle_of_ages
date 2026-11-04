@@ -102,6 +102,9 @@ namespace BattleOfAges.Player
             if (input) HandleMouseLook();
         }
 
+        /// <summary>Walks forward by itself where the hero looks: on with its key, off with it, with walking back, or on the map.</summary>
+        public bool AutoWalking { get; set; }
+
         private void HandleMovement(bool input)
         {
             isGrounded = characterController.isGrounded;
@@ -111,6 +114,9 @@ namespace BattleOfAges.Player
             }
 
             Vector2 inputMove = input ? UniversalInput.GetMoveInput() : Vector2.zero;
+            if (input && InputSystem.KeybindsManager.GetKeyDown(InputSystem.KeyAction.AutoWalk)) AutoWalking = !AutoWalking;
+            if (!isControlEnabled || inputMove.y < 0f) AutoWalking = false; // the map, or walking back, ends it
+            if (input && AutoWalking && inputMove.y <= 0f) inputMove.y = 1f;
             Vector3 move = transform.right * inputMove.x + transform.forward * inputMove.y;
             
             if (move.sqrMagnitude > 1.0f)

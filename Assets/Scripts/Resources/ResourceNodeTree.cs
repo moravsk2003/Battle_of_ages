@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Utils;
 
@@ -55,7 +56,14 @@ namespace BattleOfAges.Resources
         private bool inGrid;
 
         private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; }
-        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; }
+        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; felled.Remove(this); }
+
+        private static readonly HashSet<ResourceNodeTree> felled = new HashSet<ResourceNodeTree>();
+        /// <summary>The stumps in the loaded land (in a Forest zone they grow back: ZoneWork).</summary>
+        public static IReadOnlyCollection<ResourceNodeTree> Felled => felled;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => felled.Clear();
 
         /// <summary>Moved after it was enabled (a builder makes it at the origin, then places it): into its new cell.</summary>
         private void KeepGridCell()
@@ -147,6 +155,7 @@ namespace BattleOfAges.Resources
                         if (currentWoodRemaining <= 0)
                         {
                             currentState = TreeState.Depleted;
+                            felled.Add(this);
                             OnTreeDepleted?.Invoke();
                             
                             if (woodPileObj != null)
@@ -250,6 +259,7 @@ namespace BattleOfAges.Resources
             ConvertToWoodPile();
             if (state != TreeState.Depleted) return;
             currentState = TreeState.Depleted;
+            felled.Add(this);
             currentWoodRemaining = 0;
             if (woodPileObj != null) { Destroy(woodPileObj); woodPileObj = null; }
             Collider col = GetComponent<Collider>();
@@ -258,6 +268,7 @@ namespace BattleOfAges.Resources
 
         public void ResetTreeState()
         {
+            felled.Remove(this);
             currentState = TreeState.WholeTree;
             currentWoodRemaining = maxWoodCapacity;
             branchTimer = 0f;

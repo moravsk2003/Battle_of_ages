@@ -10,6 +10,8 @@ namespace BattleOfAges.SaveLoad
     public class SaveData
     {
         public int Version = 1;
+        /// <summary>The player's name for this save (empty: none).</summary>
+        public string Title = "";
         public long SavedAtTicks;
         public float PlaySeconds;
         public double GameHours;          // WorldClock
@@ -192,6 +194,7 @@ namespace BattleOfAges.SaveLoad
         public int Slot;
         public bool Exists;
         public DateTime SavedAt;
+        public string Title = "";
         public float PlaySeconds;
         public int Wood, Ore, Units, Buildings;
     }

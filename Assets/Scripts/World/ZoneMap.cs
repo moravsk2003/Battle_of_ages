@@ -168,8 +168,8 @@ namespace BattleOfAges.World
             {
                 case ZoneType.Housing: return "Хати: кожна прискорює приріст населення";
                 case ZoneType.Fields: return "Поля й селяни на них: їжа";
-                case ZoneType.Forest: return "Лісопилки: дерево, більше в густому лісі";
-                case ZoneType.Crafts: return "Верстаки: зброя, броня, переплавка";
+                case ZoneType.Forest: return "Лісопилки: дерево, більше в густому лісі. Зрубані дерева тут відростають";
+                case ZoneType.Crafts: return "Верстаки: зброя, броня, переплавка. Майстри самі роблять речі, коли на складі є запас";
                 case ZoneType.Mining: return "Шахти: руда, багатша на жилах";
                 case ZoneType.Trade: return "Ринок: обмін ресурсів (від ратуші II)";
                 default: return "";

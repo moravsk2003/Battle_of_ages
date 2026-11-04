@@ -54,6 +54,7 @@ namespace BattleOfAges.SaveLoad
             if (d == null) return meta;
             meta.Exists = true;
             meta.SavedAt = new DateTime(d.SavedAtTicks, DateTimeKind.Utc).ToLocalTime();
+            meta.Title = d.Title ?? "";
             meta.PlaySeconds = d.PlaySeconds;
             meta.Wood = d.Wood;
             meta.Ore = d.OreTotal;
@@ -99,12 +100,14 @@ namespace BattleOfAges.SaveLoad
 
         // ------------------------------------------------------------------ save
 
-        public static bool Save(int slot)
+        /// <summary>Saves to the slot. title: the player's name for it; null keeps the one the slot has.</summary>
+        public static bool Save(int slot, string title = null)
         {
             if (!InGame) return false;
             try
             {
                 SaveData d = Capture();
+                d.Title = slot == AutoSlot ? "" : title != null ? title.Trim() : Meta(slot).Title;
                 Directory.CreateDirectory(Folder);
                 string tmp = PathOf(slot) + ".tmp";
                 File.WriteAllText(tmp, JsonUtility.ToJson(d));
@@ -351,7 +354,11 @@ namespace BattleOfAges.SaveLoad
             yield return null;
             GameObject player = Managers.GameContext.Player;
             if (player == null) yield break;
-            if (setup.Class != HeroClass.None) player.GetComponent<HeroProgress>()?.ChooseClass(setup.Class);
+            if (setup.Class != HeroClass.None)
+            {
+                player.GetComponent<HeroProgress>()?.ChooseClass(setup.Class);
+                Crafting.StartingKits.GiveClassWeapon(player.GetComponent<Crafting.Equipment>(), setup.Class);
+            }
             if (setup.HasArtifact) player.GetComponent<HeroArtifacts>()?.ChooseStart(setup.Artifact);
         }
 

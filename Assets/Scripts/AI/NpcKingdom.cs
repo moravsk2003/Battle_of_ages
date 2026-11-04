@@ -178,6 +178,7 @@ namespace BattleOfAges.AI
             if (unit.GetComponent<HeroSkills>() == null) unit.gameObject.AddComponent<HeroSkills>();
             hero.ChooseClass(cls);
             Equipment kingGear = unit.GetComponent<Equipment>();
+            if (cls == HeroClass.Archer && kingGear != null) kingGear.Equip(new Item(ItemType.Bow, Mathf.Max(1, kingGear.LevelOf(ItemType.Sword))));
             if (cls == HeroClass.Mage && kingGear != null) // the mage strikes only with a staff: the kingdom's smiths make one
                 kingGear.Equip(new Item(ItemType.Staff, Mathf.Max(1, kingGear.LevelOf(ItemType.Sword))));
             hero.Changed -= OnHeroChanged;
@@ -396,7 +397,13 @@ namespace BattleOfAges.AI
             // Not one that another king is already raiding: the player sits in the middle, the nearest for every king, and
             // the kings took turns on it (the session sim: 1 against 3 again)
             targets.RemoveAll(TakenByAnotherRaid);
-            targets.Sort((a, b) => (a.transform.position - Home).sqrMagnitude.CompareTo((b.transform.position - Home).sqrMagnitude));
+            // Nearest first, the player as if half as far: kings went on fighting each other and never came (FieldReportProbe)
+            float Way(HealthComponent t)
+            {
+                float d = (t.transform.position - Home).magnitude;
+                return t.GetComponent<TownHall>() != null || t.gameObject == Managers.GameContext.Player ? d * GameBalance.KingdomPlayerTargetFactor : d;
+            }
+            targets.Sort((a, b) => Way(a).CompareTo(Way(b)));
             return targets;
         }
 
@@ -490,6 +497,7 @@ namespace BattleOfAges.AI
             bool anyFighting = false;
             foreach (HostileMobAI m in raiders)
             {
+                m.EngageNear(GameBalance.RaidEngageRadius);
                 HealthComponent t = m.CurrentCombatTarget;
                 if (t != null && t.IsAlive) { anyFighting = true; continue; }
                 HealthComponent next = NearestEnemy(m.transform.position, GameBalance.KingdomRaidSearchRadius);

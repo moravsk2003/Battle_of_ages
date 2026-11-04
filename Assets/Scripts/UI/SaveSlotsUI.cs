@@ -73,7 +73,7 @@ namespace BattleOfAges.UI
             armedSlot = -1;
             switch (action)
             {
-                case "save": SaveSystem.Save(slot); Refresh(); break;
+                case "save": SaveSystem.Save(slot, titles.TryGetValue(slot, out string title) ? title : null); Refresh(); break;
                 case "delete": SaveSystem.Delete(slot); Refresh(); break;
                 case "load":
                     window.SetActive(false);
@@ -98,7 +98,10 @@ namespace BattleOfAges.UI
             RectTransform row = UiTheme.Rect(list, "Slot" + slot, new Vector2(0.5f, 1f), new Vector2(x0, -y), new Vector2(760f, 102f));
             UiTheme.PanelImage(row, UiTheme.SlotSprite, slot == SaveSystem.AutoSlot ? new Color(0.85f, 0.85f, 0.95f) : Color.white);
             RectTransform nm = UiTheme.Rect(row, "Name", new Vector2(0f, 1f), new Vector2(18f, -10f), new Vector2(420f, 32f));
-            UiTheme.Label(nm, "Text", SaveSystem.SlotName(slot), 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            bool named = saving && slot != SaveSystem.AutoSlot;
+            string heading = !named && !string.IsNullOrEmpty(m.Title) ? $"{SaveSystem.SlotName(slot)}: {m.Title}" : SaveSystem.SlotName(slot);
+            UiTheme.Label(nm, "Text", heading, 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold).horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (named) TitleField(row, slot, m);
             RectTransform info = UiTheme.Rect(row, "Info", new Vector2(0f, 0f), new Vector2(18f, 10f), new Vector2(470f, 52f));
             Text t = UiTheme.Label(info, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -124,6 +127,26 @@ namespace BattleOfAges.UI
                 Button b = UiTheme.TextButton(row, "Load", "Завантажити", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "load"), 17);
                 b.interactable = m.Exists;
             }
+        }
+
+        private readonly Dictionary<int, string> titles = new Dictionary<int, string>();
+
+        /// <summary>The name of a save, typed before pressing Save; stays while the window is redrawn.</summary>
+        private void TitleField(RectTransform row, int slot, SaveMeta m)
+        {
+            RectTransform f = UiTheme.Rect(row, "Title", new Vector2(0f, 1f), new Vector2(118f, -8f), new Vector2(300f, 36f));
+            UiTheme.PanelImage(f, UiTheme.SlotSprite);
+            RectTransform tr = UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 30f));
+            Text text = UiTheme.Label(tr, "Text", "", 18, TextAnchor.MiddleLeft, UiTheme.Ink);
+            text.supportRichText = false;
+            RectTransform pr = UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 30f));
+            Text placeholder = UiTheme.Label(pr, "Text", "назва збереження", 16, TextAnchor.MiddleLeft, UiTheme.InkDim, FontStyle.Italic);
+            InputField input = f.gameObject.AddComponent<InputField>();
+            input.textComponent = text;
+            input.placeholder = placeholder;
+            input.characterLimit = 32;
+            input.text = titles.TryGetValue(slot, out string typed) ? typed : m.Title ?? "";
+            input.onValueChanged.AddListener(v => titles[slot] = v);
         }
 
         private static string PlayTime(float seconds)
