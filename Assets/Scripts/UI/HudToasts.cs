@@ -15,7 +15,7 @@ namespace BattleOfAges.UI
     {
         public static HudToasts Active { get; private set; }
 
-        private const float Life = 4f, MergeWithin = 2.5f, Spacing = 48f;
+        private const float Life = 4f, MergeWithin = 2.5f, Gap = 6f, PlateWidth = 340f, PlateHeight = 42f, TextMargin = 14f, TextMarginY = 8f;
         private const int MaxShown = 5;
 
         private RectTransform column;
@@ -58,14 +58,20 @@ namespace BattleOfAges.UI
                     var t = toasts[i];
                     t.amount += amount; t.born = Time.unscaledTime;
                     t.text.text = text(t.amount);
+                    FitPlate(t.rt, t.text);
                     toasts[i] = t;
                     return;
                 }
-            RectTransform rt = UiTheme.Rect(column, "Toast", new Vector2(1f, 0f), Vector2.zero, new Vector2(340f, 42f));
+            RectTransform rt = UiTheme.Rect(column, "Toast", new Vector2(1f, 0f), Vector2.zero, new Vector2(PlateWidth, PlateHeight));
             UiTheme.PanelImage(rt);
             var group = rt.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
             Text label = UiTheme.Label(rt, "Text", text(amount), 19, TextAnchor.MiddleCenter, color ?? UiTheme.Gold);
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.rectTransform.offsetMin = new Vector2(TextMargin, 0f);
+            label.rectTransform.offsetMax = new Vector2(-TextMargin, 0f);
+            FitPlate(rt, label);
             if (color.HasValue) rt.GetComponent<Image>().color = new Color(1f, 0.75f, 0.7f);
             toasts.Add((rt, label, group, Time.unscaledTime, key, amount));
             if (toasts.Count > MaxShown) { Destroy(toasts[0].rt.gameObject); toasts.RemoveAt(0); }
@@ -80,8 +86,19 @@ namespace BattleOfAges.UI
                 if (age > Life) { Destroy(toasts[i].rt.gameObject); toasts.RemoveAt(i); continue; }
                 toasts[i].group.alpha = Mathf.Clamp01((Life - age) / 0.6f) * Mathf.Clamp01(age / 0.15f + 0.3f);
             }
-            for (int i = 0; i < toasts.Count; i++)
-                toasts[i].rt.anchoredPosition = Vector2.Lerp(toasts[i].rt.anchoredPosition, new Vector2(0f, (toasts.Count - 1 - i) * Spacing), 0.25f);
+            float y = 0f;
+            for (int i = toasts.Count - 1; i >= 0; i--)
+            {
+                toasts[i].rt.anchoredPosition = Vector2.Lerp(toasts[i].rt.anchoredPosition, new Vector2(0f, y), 0.25f);
+                y += toasts[i].rt.sizeDelta.y + Gap;
+            }
+        }
+
+        /// <summary>A long message takes more lines, and its plate grows to hold them.</summary>
+        private static void FitPlate(RectTransform plate, Text label)
+        {
+            float height = Mathf.Max(PlateHeight, Mathf.Ceil(label.preferredHeight) + TextMarginY * 2f);
+            plate.sizeDelta = new Vector2(plate.sizeDelta.x, height);
         }
 
         /// <summary>A few times a second: what grew since last time (wood, ore, workers, buildings) becomes a toast.</summary>
