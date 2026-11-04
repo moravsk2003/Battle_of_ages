@@ -638,7 +638,7 @@ namespace BattleOfAges.AI
             {
                 Id = stateIds.Id, Name = KingdomName, Home = Home, Hall = Economy.HallLevel, HallHealth = Hall != null ? Hall.CurrentHealth : 0,
                 Wood = Economy.Wood, Ore = Economy.Ore, Births = Economy.BirthCarry, Age = Age, Interregnum = InterregnumLeft, Defeated = IsDefeated,
-                Free = Free, Team = Team, Empire = IsEmpire
+                Free = Free, Team = Team, Empire = IsEmpire, LastRaidEnd = float.IsInfinity(LastRaidEnd) ? -1000f : LastRaidEnd
             };
             s.Hero.Id = stateIds.Hero;
             s.Capital.Id = stateIds.Settlement;
@@ -680,6 +680,10 @@ namespace BattleOfAges.AI
             if (k.Team >= nextTeam) nextTeam = k.Team + 1;
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
             k.Age = s.Age;
+            k.LastRaidEnd = s.LastRaidEnd;
+            // Its armies on the far roads come home with it, for now (M6 step 4: they will turn real where they are)
+            foreach (SaveLoad.ArmyState army in s.Armies) s.Subjects.AddRange(army.Units);
+            s.Armies.Clear();
             // Kings do not all set off at once, as a new one (a state does not keep it: the same hour for the same name)
             k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * (1f + Mathf.Repeat(KingdomTown.Seed(s.Name) * 0.618034f, 1f));
             k.BuildHall();
@@ -703,7 +707,7 @@ namespace BattleOfAges.AI
 
         private readonly List<SaveLoad.UnitState> arriving = new List<SaveLoad.UnitState>();
         /// <summary>The numbers of its state (SaveLoad.KingdomState): they stay through turning far and real.</summary>
-        private (SaveLoad.EntityId Id, SaveLoad.EntityId Hero, SaveLoad.EntityId Settlement, SaveLoad.EntityId Garrison) stateIds;
+        private (SaveLoad.WorldId Id, SaveLoad.WorldId Hero, SaveLoad.WorldId Settlement, SaveLoad.WorldId Garrison) stateIds;
 
         /// <summary>People of a kingdom made real gradually, still to come into the scene.</summary>
         public int Arriving => arriving.Count;

@@ -184,7 +184,7 @@ namespace BattleOfAges.SaveLoad
                 d.KingdomsFounded = true;
                 if (AI.KingdomRealm.Active) d.KingdomStates.AddRange(AI.KingdomRealm.AllStates()); // a campaign: the far ones too
                 else foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.KingdomStates.Add(k.ToState());
-                d.NextEntityId = EntityIds.Next;
+                d.NextEntityId = WorldIds.Next;
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null)
                 {
@@ -299,7 +299,7 @@ namespace BattleOfAges.SaveLoad
         /// <summary>A new campaign with these choices (the setup screen; null: a random world with the defaults).</summary>
         public static void NewGame(CampaignSetup setup)
         {
-            EntityIds.Reset(1);
+            WorldIds.Reset(1);
             setup = setup ?? new CampaignSetup();
             startingSetup = setup;
             pending = null;
@@ -538,7 +538,7 @@ namespace BattleOfAges.SaveLoad
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }
             AI.NpcKingdom.RemoveAll();
-            EntityIds.Reset(d.NextEntityId);
+            WorldIds.Reset(d.NextEntityId);
             Migrate(d);
             if (d.KingdomsFounded && AI.KingdomRealm.Active) AI.KingdomRealm.Load(d.KingdomStates); // near ones real, the rest as data
             else if (d.KingdomsFounded) foreach (KingdomState k in d.KingdomStates) AI.NpcKingdom.FromState(k);

@@ -324,6 +324,9 @@ namespace BattleOfAges.Combat
         public static int KingdomHallRoom = 2;
         /// <summary>A raider on the march turns on any enemy this near. Choosing a raid's target, the player counts as this share of its distance.</summary>
         public static float RaidEngageRadius = 15f, KingdomPlayerTargetFactor = 0.5f;
+        /// <summary>The far world's share of a frame, ms (KingdomRealm). A free hero's walk: metres to the next camp, hours at each, how far it stays from the player's base.</summary>
+        public static float FarTickBudgetMs = 2f;
+        public static float FreeHeroWalkMin = 300f, FreeHeroWalkMax = 1200f, FreeHeroCampHoursMin = 6f, FreeHeroCampHoursMax = 18f, FreeHeroKeepOut = 500f;
         /// <summary>A felled tree in a Forest zone stands again after so many game hours; a master in a Crafts zone leaves the stock this much.</summary>
         public static float ForestRegrowHours = 12f;
         public static int CraftsKeepWood = 100, CraftsKeepOre = 30;

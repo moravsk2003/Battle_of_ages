@@ -6,21 +6,21 @@ namespace BattleOfAges.SaveLoad
 {
     /// <summary>A stable number for an entity of the world's state, kept through saves and the turns between far and real (docs/GAME_DESIGN.md §14.3). 0: none.</summary>
     [Serializable]
-    public struct EntityId : IEquatable<EntityId>
+    public struct WorldId : IEquatable<WorldId>
     {
         public int Value;
 
         public bool IsNone => Value == 0;
-        public bool Equals(EntityId other) => Value == other.Value;
-        public override bool Equals(object obj) => obj is EntityId other && Equals(other);
+        public bool Equals(WorldId other) => Value == other.Value;
+        public override bool Equals(object obj) => obj is WorldId other && Equals(other);
         public override int GetHashCode() => Value;
         public override string ToString() => "#" + Value;
-        public static bool operator ==(EntityId a, EntityId b) => a.Value == b.Value;
-        public static bool operator !=(EntityId a, EntityId b) => a.Value != b.Value;
+        public static bool operator ==(WorldId a, WorldId b) => a.Value == b.Value;
+        public static bool operator !=(WorldId a, WorldId b) => a.Value != b.Value;
     }
 
     /// <summary>Hands out entity ids; the next one is kept in the save, so a loaded world goes on without reusing any.</summary>
-    public static class EntityIds
+    public static class WorldIds
     {
         /// <summary>The number the next id will have.</summary>
         public static int Next { get; private set; } = 1;
@@ -28,16 +28,16 @@ namespace BattleOfAges.SaveLoad
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() => Next = 1;
 
-        public static EntityId New() => new EntityId { Value = Next++ };
+        public static WorldId New() => new WorldId { Value = Next++ };
 
         /// <summary>A new world, or a loaded one: ids go on from here.</summary>
         public static void Reset(int next) => Next = Mathf.Max(1, next);
 
         /// <summary>Never gives out this one again (a state from elsewhere that already has it).</summary>
-        public static void Saw(EntityId id) { if (id.Value >= Next) Next = id.Value + 1; }
+        public static void Saw(WorldId id) { if (id.Value >= Next) Next = id.Value + 1; }
 
         /// <summary>Gives the id a number if it has none.</summary>
-        public static void Ensure(ref EntityId id)
+        public static void Ensure(ref WorldId id)
         {
             if (id.IsNone) id = New();
             else Saw(id);
@@ -56,7 +56,7 @@ namespace BattleOfAges.SaveLoad
     [Serializable]
     public class HeroState
     {
-        public EntityId Id, KingdomId;
+        public WorldId Id, KingdomId;
         public bool Alive;
         public int Class, TotalXp;
         public UnitState Unit = new UnitState();
@@ -66,16 +66,20 @@ namespace BattleOfAges.SaveLoad
     [Serializable]
     public class ArmyState
     {
-        public EntityId Id, KingdomId, OwnerHeroId;
+        public WorldId Id, KingdomId, OwnerHeroId;
         public Vector3 Position;
         public List<UnitState> Units = new List<UnitState>();
+        /// <summary>On a raid: at whom, how many set off, whether the hero leads it, whether it is on its way home or already at the target.</summary>
+        public WorldId TargetKingdomId;
+        public int StartCount;
+        public bool WithHero, Returning, AtTarget;
     }
 
     /// <summary>A settlement as data (§6.2): its hall, its stock, who stands in it. A free hero's camp is one with no hall.</summary>
     [Serializable]
     public class SettlementState
     {
-        public EntityId Id, KingdomId;
+        public WorldId Id, KingdomId;
         public Vector3 Position;
         public int Hall, HallHealth;
         public float Wood, Ore, Births;
@@ -90,7 +94,7 @@ namespace BattleOfAges.SaveLoad
     [Serializable]
     public class KingdomState
     {
-        public EntityId Id;
+        public WorldId Id;
         public string Name;
         public bool Defeated;
         /// <summary>A free hero's band (§7.4): no hall, no raids. Team: its side (the same ring colour whenever it comes back).</summary>
@@ -99,6 +103,14 @@ namespace BattleOfAges.SaveLoad
         public bool Empire;
         public int Team;
         public float Age, Interregnum;
+        /// <summary>Its age when its last raid ended (the next waits for the cooldown).</summary>
+        public float LastRaidEnd = -1000f;
+        /// <summary>A free hero's walk (FarWorld.Wander): hours left at this camp, or on its way to another.</summary>
+        public float WaitHours;
+        public bool Walking;
+        public Vector3 WalkingTo;
+        /// <summary>Hours it has yet to live through (KingdomRealm spreads the hour over the frames); not saved: less than an hour.</summary>
+        [NonSerialized] public float PendingHours;
         public HeroState Hero = new HeroState();
         public List<SettlementState> Settlements = new List<SettlementState>();
         /// <summary>Its armies away from any settlement (M6 step 3).</summary>
@@ -128,12 +140,12 @@ namespace BattleOfAges.SaveLoad
         /// <summary>Everyone of it with a number, and who belongs to whom said in the numbers.</summary>
         public KingdomState EnsureIds()
         {
-            EntityIds.Ensure(ref Id);
-            EntityIds.Ensure(ref Hero.Id);
+            WorldIds.Ensure(ref Id);
+            WorldIds.Ensure(ref Hero.Id);
             Hero.KingdomId = Id;
             foreach (SettlementState s in Settlements)
             {
-                EntityIds.Ensure(ref s.Id);
+                WorldIds.Ensure(ref s.Id);
                 s.KingdomId = Id;
                 Link(s.Garrison);
             }
@@ -143,7 +155,7 @@ namespace BattleOfAges.SaveLoad
 
         private void Link(ArmyState army)
         {
-            EntityIds.Ensure(ref army.Id);
+            WorldIds.Ensure(ref army.Id);
             army.KingdomId = Id;
             army.OwnerHeroId = Hero.Id;
         }

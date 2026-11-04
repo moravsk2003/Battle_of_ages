@@ -164,12 +164,34 @@ namespace BattleOfAges.AI
             hourClock += hours;
             if (hourClock >= 1f)
             {
-                foreach (KingdomState s in far) Advance(s, hourClock);
+                foreach (KingdomState s in far) s.PendingHours += hourClock;
                 hourClock = 0f;
+                tickCursor = 0;
             }
+            TickFar();
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && k.Arriving > 0) k.ArriveMore(ArrivalsPerFrame);
             syncClock -= Time.deltaTime;
             if (syncClock <= 0f) { syncClock = 1f; Sync(); }
+        }
+
+        private int tickCursor;
+        private readonly System.Diagnostics.Stopwatch tickWatch = new System.Diagnostics.Stopwatch();
+
+        /// <summary>Lives the far kingdoms' hour a few at a time, within the frame's budget (§17: at most 2 ms); the rest next frame.</summary>
+        private void TickFar()
+        {
+            if (tickCursor >= far.Count) return;
+            tickWatch.Restart();
+            Vector3 home = HomeOfPlayer();
+            while (tickCursor < far.Count && tickWatch.Elapsed.TotalMilliseconds < GameBalance.FarTickBudgetMs)
+            {
+                KingdomState s = far[tickCursor++];
+                if (s.PendingHours <= 0f) continue;
+                float hours = s.PendingHours;
+                s.PendingHours = 0f;
+                Advance(s, hours);
+                FarWorld.Hour(s, far, hours, new System.Random(KingdomTown.Seed(s.Name) ^ Mathf.FloorToInt(s.Age * 7f)), home);
+            }
         }
 
         private static Vector3 HomeOfPlayer() => TownHall.Current != null ? TownHall.Current.transform.position : Vector3.zero;

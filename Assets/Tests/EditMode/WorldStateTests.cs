@@ -4,7 +4,6 @@ using UnityEngine;
 using BattleOfAges.AI;
 using BattleOfAges.SaveLoad;
 using BattleOfAges.World;
-using EntityId = BattleOfAges.SaveLoad.EntityId; // (Unity has one of its own)
 
 namespace BattleOfAges.Tests
 {
@@ -116,7 +115,7 @@ namespace BattleOfAges.Tests
         public void ANewKing_IsANewHero_OfTheSameKingdom()
         {
             KingdomState s = NewKingdom("Спадок");
-            EntityId first = s.Hero.Id, kingdom = s.Id;
+            WorldId first = s.Hero.Id, kingdom = s.Id;
             s.HasKing = false;
             s.Interregnum = 0.001f;
             KingdomRealm.Advance(s, 1f);
@@ -129,11 +128,11 @@ namespace BattleOfAges.Tests
         [Test]
         public void Ids_GoOnAfterALoad_NoneGivenTwice()
         {
-            EntityIds.Reset(500);
-            Assert.AreEqual(500, EntityIds.New().Value);
-            var seen = new KingdomState { Id = new EntityId { Value = 900 } };
+            WorldIds.Reset(500);
+            Assert.AreEqual(500, WorldIds.New().Value);
+            var seen = new KingdomState { Id = new WorldId { Value = 900 } };
             seen.EnsureIds();
-            Assert.Greater(EntityIds.Next, 900, "a number already in use is not given out");
+            Assert.Greater(WorldIds.Next, 900, "a number already in use is not given out");
             Assert.AreEqual(900, seen.Id.Value, "and it keeps its own");
         }
     }
