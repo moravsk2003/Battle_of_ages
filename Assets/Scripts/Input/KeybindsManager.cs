@@ -23,7 +23,10 @@ namespace BattleOfAges.InputSystem
         UseLightning,
         AutoWalk,
         PlayerList,
-        WorldMap
+        WorldMap,
+        StopUnits,
+        SelectFighters,
+        CenterSelection
     }
 
     /// <summary>
@@ -52,7 +55,10 @@ namespace BattleOfAges.InputSystem
             { KeyAction.UseLightning,    KeyCode.Alpha2 },
             { KeyAction.AutoWalk,        KeyCode.V },
             { KeyAction.PlayerList,      KeyCode.Tab },
-            { KeyAction.WorldMap,        KeyCode.N }
+            { KeyAction.WorldMap,        KeyCode.N },
+            { KeyAction.StopUnits,       KeyCode.X },
+            { KeyAction.SelectFighters,  KeyCode.G },
+            { KeyAction.CenterSelection, KeyCode.L }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -74,7 +80,10 @@ namespace BattleOfAges.InputSystem
             { KeyAction.UseLightning,    "Артефакт: блискавка" },
             { KeyAction.AutoWalk,        "Автоходьба" },
             { KeyAction.PlayerList,      "Хто в грі (утримувати)" },
-            { KeyAction.WorldMap,        "Мапа світу" }
+            { KeyAction.WorldMap,        "Мапа світу" },
+            { KeyAction.StopUnits,       "Обраним: стій (мапа)" },
+            { KeyAction.SelectFighters,  "Обрати всіх бійців (мапа)" },
+            { KeyAction.CenterSelection, "Камера до обраних (мапа)" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

@@ -52,7 +52,10 @@ namespace BattleOfAges.RTS
                 // Convert screen Y (bottom-left 0,0) to GUI Y (top-left 0,0)
                 screenPoint.y = Screen.height - screenPoint.y;
 
-                if (selectionRect.Contains(screenPoint))
+                // Feet or chest: a rectangle over the upper body of a unit takes it too
+                Vector3 chest = camera.WorldToScreenPoint(unit.transform.position + Vector3.up * ChestHeight);
+                chest.y = Screen.height - chest.y;
+                if (selectionRect.Contains(screenPoint) || selectionRect.Contains(chest))
                 {
                     resultsBuffer.Add(unit);
                 }
@@ -63,6 +66,33 @@ namespace BattleOfAges.RTS
         /// Finds the nearest unit within maxDistance from a world point.
         /// Uses squared distance calculations to avoid square root CPU costs.
         /// </summary>
+        private const float ChestHeight = 1.1f;
+
+        /// <summary>
+        /// The unit nearest this screen point, not further than these pixels from its body: what a click means by "that one" at any zoom
+        /// (metres meant a click on empty ground took a unit close up, and missed one far off).
+        /// </summary>
+        public static RtsUnit NearestOnScreen(Vector3 screenPoint, Camera camera, float pixels)
+        {
+            RtsUnit closest = null;
+            float best = pixels * pixels;
+            var at = new Vector2(screenPoint.x, screenPoint.y);
+            int count = activeUnits.Count;
+            for (int i = 0; i < count; i++)
+            {
+                RtsUnit unit = activeUnits[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || !unit.IsAlive || unit.InsideMine) continue;
+                Vector3 feet = camera.WorldToScreenPoint(unit.transform.position);
+                if (feet.z < 0f) continue;
+                Vector3 chest = camera.WorldToScreenPoint(unit.transform.position + Vector3.up * ChestHeight);
+                Vector2 a = feet, ab = (Vector2)chest - a;
+                float t = ab.sqrMagnitude > 1e-4f ? Mathf.Clamp01(Vector2.Dot(at - a, ab) / ab.sqrMagnitude) : 0f;
+                float d = (at - (a + ab * t)).sqrMagnitude;
+                if (d < best) { best = d; closest = unit; }
+            }
+            return closest;
+        }
+
         public static RtsUnit FindNearestUnit(Vector3 worldPoint, float maxDistance)
         {
             RtsUnit closest = null;

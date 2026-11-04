@@ -27,6 +27,23 @@ namespace BattleOfAges.RTS
         private static readonly Color HeroBadge = new Color(1f, 0.95f, 0.6f);
 
         private static Mesh ring, badge;
+        /// <summary>Colours of the ring left where an order was given.</summary>
+        public static readonly Color MoveMark = new Color(0.55f, 1f, 0.45f), AttackMark = new Color(1f, 0.25f, 0.2f), MarchMark = new Color(1f, 0.6f, 0.15f), WorkMark = new Color(1f, 0.85f, 0.35f), WayMark = new Color(0.8f, 0.95f, 1f);
+        private const float MarkSeconds = 0.7f, MarkPixels = 44f;
+        private static readonly List<(Vector3 at, Color color, float born)> marks = new List<(Vector3, Color, float)>();
+        /// <summary>Order rings still showing (tests).</summary>
+        public static int MarksShowing => marks.Count;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetMarks() => marks.Clear();
+
+        /// <summary>A ring on the ground that shrinks away: the order was heard, and this is where it goes.</summary>
+        public static void Flash(Vector3 at, Color color)
+        {
+            at.y = RtsUnit.GetTerrainHeight(at);
+            if (marks.Count > 8) marks.RemoveAt(0);
+            marks.Add((at, color, Time.unscaledTime));
+        }
         private readonly Dictionary<Color, List<Matrix4x4>> ringBatches = new Dictionary<Color, List<Matrix4x4>>();
         private readonly Dictionary<Color, List<Matrix4x4>> badgeBatches = new Dictionary<Color, List<Matrix4x4>>();
         private readonly Matrix4x4[] chunk = new Matrix4x4[1023];
@@ -103,6 +120,15 @@ namespace BattleOfAges.RTS
                 float b = p.IsHero ? badgeSize * 1.4f : badgeSize;
                 LastBadges++;
                 Add(badgeBatches, rank, Matrix4x4.TRS(at + Vector3.up * (2.1f + b), facing, Vector3.one * b));
+            }
+
+            float markSize = WorldSize(RingMetres * 1.6f, MarkPixels, cam.orthographicSize, Screen.height);
+            for (int i = marks.Count - 1; i >= 0; i--)
+            {
+                float age = (Time.unscaledTime - marks[i].born) / MarkSeconds;
+                if (age >= 1f) { marks.RemoveAt(i); continue; }
+                float s = markSize * (1f - age * age) * 0.5f;
+                Add(ringBatches, marks[i].color, Matrix4x4.TRS(marks[i].at + Vector3.up * 0.15f, Quaternion.identity, new Vector3(s, 1f, s)));
             }
 
             Draw(ring, ringBatches, target);

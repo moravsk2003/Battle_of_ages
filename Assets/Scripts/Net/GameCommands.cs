@@ -125,7 +125,7 @@ namespace BattleOfAges.Net
     [Serializable]
     public sealed class UnitOrderCommand : GameCommand
     {
-        public enum Kind { Move, Attack, Wall, Mine, Bench, Site, Place, Tree, Pebble, Chest }
+        public enum Kind { Move, Attack, Wall, Mine, Bench, Site, Place, Tree, Pebble, Chest, AttackMove, QueueMove, Stop }
 
         public Kind Order;
         public int[] Units;
@@ -214,8 +214,25 @@ namespace BattleOfAges.Net
                     Gatherers(units, g => g.CommandDeliverToChest());
                     Sound(GameSound.Kind.OrderWork);
                     return;
+                case Kind.Stop:
+                    foreach (RtsUnit unit in units)
+                    {
+                        NpcResourceGatherer job = unit.GetComponent<NpcResourceGatherer>();
+                        if (job != null) job.SetGatherDirective(GatherDirective.Idle);
+                        unit.StopHere();
+                    }
+                    Sound(GameSound.Kind.OrderMove);
+                    return;
+                case Kind.AttackMove:
+                    MoveInFormation(units, Point, (u, at) => u.IssueAttackMove(at));
+                    Sound(GameSound.Kind.OrderAttack);
+                    return;
+                case Kind.QueueMove:
+                    MoveInFormation(units, Point, (u, at) => u.QueueMove(at));
+                    Sound(GameSound.Kind.OrderMove);
+                    return;
                 default:
-                    MoveInFormation(units, Point);
+                    MoveInFormation(units, Point, (u, at) => u.IssueMoveCommand(at));
                     Sound(GameSound.Kind.OrderMove);
                     return;
             }
@@ -227,24 +244,34 @@ namespace BattleOfAges.Net
                 if (unit.TryGetComponent(out NpcResourceGatherer gatherer)) order(gatherer);
         }
 
-        /// <summary>Spreads the units over a square grid (2.2 m apart) around the point.</summary>
-        private static void MoveInFormation(List<RtsUnit> units, Vector3 point)
+        /// <summary>The group's places round the point (UnitFormation), and the walk to each.</summary>
+        private static void MoveInFormation(List<RtsUnit> units, Vector3 point, Action<RtsUnit, Vector3> walk)
         {
-            const float spacing = 2.2f;
-            int count = units.Count;
-            int cols = Mathf.CeilToInt(Mathf.Sqrt(count));
-            for (int i = 0; i < count; i++)
+            var at = new List<Vector3>(units.Count);
+            var strength = new List<int>(units.Count);
+            foreach (RtsUnit u in units)
             {
-                Vector3 offset = count > 1
-                    ? new Vector3((i % cols - cols / 2f) * spacing, 0f, (i / cols - cols / 2f) * spacing)
-                    : Vector3.zero;
-                Vector3 target = point + offset;
+                at.Add(u.transform.position);
+                strength.Add(FrontOf(u));
+            }
+            Vector3[] slots = UnitFormation.Slots(at, strength, point);
+            for (int i = 0; i < units.Count; i++)
+            {
+                Vector3 target = units.Count > 1 ? UnitFormation.Standable(slots[i], point) : slots[i];
                 target.y = RtsUnit.GetTerrainHeight(target);
                 // Sent to a place it stays there, ready to fight, until sent to work (an army would walk back to the trees)
                 NpcResourceGatherer job = units[i].GetComponent<NpcResourceGatherer>();
                 if (job != null) job.SetGatherDirective(GatherDirective.Idle);
-                units[i].IssueMoveCommand(target);
+                walk(units[i], target);
             }
+        }
+
+        /// <summary>Who goes in front: the higher the rank the further, the ones who shoot behind them all.</summary>
+        private static int FrontOf(RtsUnit u)
+        {
+            if (u.IsRanged) return -1;
+            Combat.UnitProgress progress = u.GetComponent<Combat.UnitProgress>();
+            return progress != null ? (int)progress.Rank : 0;
         }
     }
 

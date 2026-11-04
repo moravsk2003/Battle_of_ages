@@ -207,6 +207,9 @@ namespace BattleOfAges.UI
                 if (placement != null && (placement.IsPlacing || placement.CancelledFrame == Time.frameCount)) return;
                 if (!isPaused && gameModeManager != null && gameModeManager.CurrentMode == GameMode.RtsMap)
                 {
+                    // First Esc lets go of those chosen, the next leaves the map
+                    RTS.RtsUnitCommander commander = Managers.GameContext.Commander;
+                    if (commander != null && commander.SelectedUnits.Count > 0) { commander.DeselectAll(); return; }
                     gameModeManager.SetGameMode(GameMode.FirstPerson);
                     return;
                 }

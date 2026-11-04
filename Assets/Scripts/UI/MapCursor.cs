@@ -54,6 +54,7 @@ namespace BattleOfAges.UI
             Camera cam = ViewCamera.Current;
             if (cam == null || !Physics.Raycast(cam.ScreenPointToRay(InputSystem.UniversalInput.GetMousePosition()), out RaycastHit hit, 1000f)) return Look.Arrow;
             Look look = LookAt(hit.collider);
+            if (look == Look.Arrow && InputSystem.UniversalInput.IsCtrlHeld()) return Look.Attack; // a march that fights its way
             if (look == Look.Arrow && RtsUnitCommander.IsOpenGround(hit.collider) && ResourceGrid.CrownUnderRay(cam.ScreenPointToRay(InputSystem.UniversalInput.GetMousePosition()), hit.point) != null) return Look.Wood;
             return look;
         }

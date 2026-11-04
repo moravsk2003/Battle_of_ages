@@ -53,6 +53,13 @@ namespace BattleOfAges.RTS
         private bool touchingSolidNearTarget;
 
         public bool IsSelected { get; private set; }
+        private readonly System.Collections.Generic.Queue<Vector3> waypoints = new System.Collections.Generic.Queue<Vector3>();
+        private bool attackMoving;
+        private Vector3 attackMoveTo;
+        /// <summary>Points still to walk to after this one.</summary>
+        public int WaypointsLeft => waypoints.Count;
+        /// <summary>On its way, fighting whatever it meets, then going on.</summary>
+        public bool AttackMoving => attackMoving;
         /// <summary>Ordered to attack or engaged in a fight (the job waits meanwhile).</summary>
         public bool HasAttackTarget => attackTarget != null;
 
@@ -232,6 +239,14 @@ namespace BattleOfAges.RTS
             if (!leashed) return;
             leashed = false;
             defending = false;
+            if (attackMoving)
+            {
+                // On with the march, not back to where the fight began
+                targetPosition = attackMoveTo;
+                hasTarget = true;
+                stuckTimer = 0f;
+                return;
+            }
             if (!IsWorking && FlatDistance(transform.position, leashOrigin) > 2f) IssueMoveCommand(leashOrigin);
         }
 
@@ -362,7 +377,7 @@ namespace BattleOfAges.RTS
             // Soldiers (and everyone during an alarm) engage raiders that come near on their own; a worker goes for an
             // enemy close to it (one kind of unit: people fight too), even on the way to work. Not the hero, not in a mine.
             bool soldier = !IsWorking || SettlementAlarm.ActiveAt(transform.position);
-            if (!isPlayerControlled && !InsideMine && combatUnit != null && attackTarget == null && (!hasTarget || !soldier))
+            if (!isPlayerControlled && !InsideMine && combatUnit != null && attackTarget == null && (!hasTarget || !soldier || attackMoving))
             {
                 engageTimer -= Time.deltaTime;
                 if (engageTimer <= 0f)
@@ -422,6 +437,11 @@ namespace BattleOfAges.RTS
             }
 
             float radius = characterController != null ? characterController.radius : 0.4f;
+            if (!hasTarget && attackTarget == null)
+            {
+                if (waypoints.Count > 0) WalkOn(waypoints.Dequeue());
+                else attackMoving = false;
+            }
             if (!hasTarget)
             {
                 if (isPlayerControlled)
@@ -696,8 +716,52 @@ namespace BattleOfAges.RTS
             if (selectionIndicator != null) selectionIndicator.SetActive(false);
         }
 
+        /// <summary>There, fighting whatever comes near on the way, then going on.</summary>
+        public void IssueAttackMove(Vector3 destination)
+        {
+            IssueMoveCommand(destination);
+            attackMoving = true;
+            attackMoveTo = targetPosition;
+        }
+
+        /// <summary>There, after the places it is already going to.</summary>
+        public void QueueMove(Vector3 destination)
+        {
+            if (!hasTarget && attackTarget == null && !WallBound) { IssueMoveCommand(destination); return; }
+            waypoints.Enqueue(destination);
+        }
+
+        /// <summary>Stands where it is: whatever it was going to or fighting is over (down from the walls first).</summary>
+        public void StopHere()
+        {
+            waypoints.Clear();
+            attackMoving = false;
+            if (WallBound)
+            {
+                if (OnWall) { leaveToMove = false; leaveTarget = null; LeaveWall(); }
+                else { wallState = WallState.None; Building.WallWalk.Release(this); PostedByAlarm = false; }
+            }
+            attackTarget = null;
+            leashed = defending = false;
+            hasTarget = false;
+            stuckTimer = 0f;
+        }
+
+        private void WalkOn(Vector3 destination)
+        {
+            bool fighting = attackMoving;
+            System.Collections.Generic.Queue<Vector3> keep = null;
+            if (waypoints.Count > 0) { keep = new System.Collections.Generic.Queue<Vector3>(waypoints); }
+            IssueMoveCommand(destination);
+            if (keep != null) foreach (Vector3 p in keep) waypoints.Enqueue(p);
+            attackMoving = fighting;
+            attackMoveTo = targetPosition;
+        }
+
         public void IssueMoveCommand(Vector3 destination)
         {
+            waypoints.Clear();
+            attackMoving = false;
             if (OnWall)
             {
                 // Down the walls first, then there

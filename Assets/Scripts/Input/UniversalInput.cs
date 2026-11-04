@@ -74,6 +74,8 @@ namespace BattleOfAges.InputSystem
 #endif
         }
 
+        public static bool IsCtrlHeld() => IsKeyHeld(KeyCode.LeftControl) || IsKeyHeld(KeyCode.RightControl);
+
         public static bool IsKeyHeld(KeyCode key)
         {
             if (key == KeyCode.None) return false;

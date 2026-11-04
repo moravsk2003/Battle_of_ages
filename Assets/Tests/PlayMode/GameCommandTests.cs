@@ -125,6 +125,9 @@ namespace BattleOfAges.PlayModeTests
             GameCommand[] all =
             {
                 new UnitOrderCommand { Order = UnitOrderCommand.Kind.Attack, Units = new[] { 1, 2 }, Target = 7, Point = Vector3.one },
+                new UnitOrderCommand { Order = UnitOrderCommand.Kind.AttackMove, Units = new[] { 3 }, Point = Vector3.right },
+                new UnitOrderCommand { Order = UnitOrderCommand.Kind.QueueMove, Units = new[] { 3 }, Point = Vector3.left },
+                new UnitOrderCommand { Order = UnitOrderCommand.Kind.Stop, Units = new[] { 3 } },
                 new SetDirectiveCommand { Units = new[] { 4 }, Directive = GatherDirective.Idle },
                 new PaintZoneCommand { From = Vector3.one, To = Vector3.up, Radius = 4f, Zone = ZoneType.Mining },
                 new PlaceBuildingCommand { Type = BuildingType.Mine, Position = Vector3.right, Rotation = Quaternion.Euler(0f, 90f, 0f), WallTier = 2 },

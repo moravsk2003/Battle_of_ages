@@ -138,11 +138,7 @@ namespace BattleOfAges.UI
         {
             int count = selected.Count;
             singleUnit = null; // the single view starts afresh next time
-            if (groupCount.Changed(count))
-            {
-                titleText.text = $"Обрано: {count}";
-                titleText.color = UiTheme.Gold;
-            }
+            titleText.color = UiTheme.Gold;
 
             int hash = count;
             foreach (RtsUnit u in selected) hash = hash * 31 + (u != null ? u.GetInstanceID() : 0);
@@ -150,6 +146,8 @@ namespace BattleOfAges.UI
             if (hash != shownHash)
             {
                 shownHash = hash;
+                titleText.supportRichText = true;
+                titleText.text = GroupTitle(selected);
                 for (int i = 0; i < cards.Count; i++)
                 {
                     bool on = i < shown && selected[i] != null;
@@ -170,6 +168,31 @@ namespace BattleOfAges.UI
                 cards[i].fill.anchorMax = new Vector2(f, 1f);
                 cards[i].fill.GetComponent<Image>().color = HealthColor(f);
             }
+        }
+
+        /// <summary>How many, and who: the cards show only the first of a big group.</summary>
+        private static string GroupTitle(IReadOnlyList<RtsUnit> selected)
+        {
+            int people = 0, warriors = 0, knights = 0, generals = 0, heroes = 0;
+            foreach (RtsUnit u in selected)
+            {
+                if (u == null) continue;
+                if (u.IsHero) { heroes++; continue; }
+                switch (RankOf(u))
+                {
+                    case UnitRank.General: generals++; break;
+                    case UnitRank.Knight: knights++; break;
+                    case UnitRank.Warrior: warriors++; break;
+                    default: people++; break;
+                }
+            }
+            var who = new List<string>();
+            if (heroes > 0) who.Add("герой");
+            if (generals > 0) who.Add($"генерали {generals}");
+            if (knights > 0) who.Add($"лицарі {knights}");
+            if (warriors > 0) who.Add($"воїни {warriors}");
+            if (people > 0) who.Add($"люди {people}");
+            return $"Обрано: {selected.Count}  <size=14>{string.Join(" · ", who)}</size>";
         }
 
         private void OnCardClicked(int index)
@@ -368,12 +391,13 @@ namespace BattleOfAges.UI
             CreateDirectiveButton(orders, UiTheme.Icon.Worker, "Авто", GatherDirective.Auto,
                 "Самостійно", "Самі беруться за роботу, якої бракує: поки дерева менше, ніж на наступну ратушу, більшість іде по дерево, решта носить руду з шахти; потім навпаки.");
             CreateGearButton(orders);
+            CreateStopButton(orders);
 
             RectTransform close = UiTheme.Rect(rect, "DeselectBtn", new Vector2(1f, 1f), new Vector2(14f, 14f), new Vector2(38f, 38f));
             UiTheme.PanelImage(close, UiTheme.ButtonSprite, new Color(1f, 0.72f, 0.68f));
             UiTheme.AddButton(close.gameObject).onClick.AddListener(DeselectAll);
             UiTheme.Label(close, "Text", "×", 26, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
-            Tooltip.Set(close.gameObject, "Зняти виділення  " + TipText.Key("ПКМ по порожньому / Esc"));
+            Tooltip.Set(close.gameObject, "Зняти виділення  " + TipText.Key("Esc"));
         }
 
         private static string CardTip(RtsUnit u)
@@ -384,6 +408,19 @@ namespace BattleOfAges.UI
                    (hp != null ? $"\nЗдоров'я {hp.CurrentHealth} / {hp.MaxHealth}" : "") +
                    (g != null ? "\n" + (g.IsIdle ? TipText.Bad("Без діла") : GetDirectiveName(g.CurrentDirective)) : "") +
                    "\n" + TipText.Dim("Клік — лише цей, Shift+клік — прибрати з обраних");
+        }
+
+        private void CreateStopButton(Transform parent)
+        {
+            var go = new GameObject("StopBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite, new Color(1f, 0.78f, 0.72f));
+            Button btn = UiTheme.AddButton(go);
+            btn.onClick.AddListener(() => { if (commander != null) commander.OrderStop(); });
+            UiTheme.IconImage(go.transform, UiTheme.Icon.Army, new Vector2(0.5f, 1f), new Vector2(0f, -8f), 38f);
+            RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
+            UiTheme.Label(txt, "Text", "Стій", 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            Tooltip.Set(go, () => TipText.Title("Стій", UiTheme.Gold) + "\nКидають роботу й похід, стоять на місці. Ворога поруч однаково б'ють.  " + TipText.Key(HudTips.Key(KeyAction.StopUnits)));
         }
 
         private void CreateGearButton(Transform parent)
