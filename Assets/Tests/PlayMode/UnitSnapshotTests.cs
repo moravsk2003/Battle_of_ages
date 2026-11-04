@@ -78,7 +78,7 @@ namespace BattleOfAges.PlayModeTests
             yield return Run(writer, 1f);
 
             int idOne = one.GridId, idTwo = two.GridId;
-            Assert.IsTrue(remote.TryGet((ushort)idOne, out Vector3 seen, out int share), "it has come");
+            Assert.IsTrue(remote.TryGet(0, (ushort)idOne, out Vector3 seen, out int share), "it has come");
             Vector3 off = seen - one.transform.position;
             off.y = 0f;
             Assert.Less(off.magnitude, 1f, "where it is");
@@ -86,12 +86,12 @@ namespace BattleOfAges.PlayModeTests
 
             one.Health.TakeDamage(one.Health.MaxHealth / 2, ignoreArmor: true);
             yield return Run(writer, 0.6f);
-            Assert.IsTrue(remote.TryGet((ushort)idOne, out _, out share));
+            Assert.IsTrue(remote.TryGet(0, (ushort)idOne, out _, out share));
             Assert.AreEqual(100f, share, 5f, "hurt as it is hurt");
 
             two.Health.TakeDamage(int.MaxValue / 2, ignoreArmor: true);
             yield return Run(writer, 1f);
-            Assert.IsFalse(remote.TryGet((ushort)idTwo, out _, out _), "fallen, it is gone");
+            Assert.IsFalse(remote.TryGet(0, (ushort)idTwo, out _, out _), "fallen, it is gone");
         }
 
         [UnityTest, Timeout(60000)]

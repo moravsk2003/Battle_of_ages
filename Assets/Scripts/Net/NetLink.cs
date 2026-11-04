@@ -157,6 +157,12 @@ namespace BattleOfAges.Net
             return true;
         }
 
+        /// <summary>To everyone but one (a host passing on what a player sent).</summary>
+        public void SendOthers(int except, NetChannel channel, byte[] data, int length)
+        {
+            foreach (int peer in peers.Keys) if (peer != except) Send(peer, channel, data, length);
+        }
+
         public void SendAll(NetChannel channel, byte[] data, int length)
         {
             foreach (int peer in peers.Keys) Send(peer, channel, data, length);

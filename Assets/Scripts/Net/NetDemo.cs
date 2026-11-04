@@ -31,7 +31,9 @@ namespace BattleOfAges.Net
             var go = new GameObject("NetDemo");
             DontDestroyOnLoad(go);
             NetDemo demo = go.AddComponent<NetDemo>();
-            demo.StartCoroutine(demo.Run(args, args[i + 1] == "host", i + 2 < args.Length && !args[i + 2].StartsWith("-") ? args[i + 2] : "127.0.0.1"));
+            string address = i + 2 < args.Length && !args[i + 2].StartsWith("-") ? args[i + 2] : "127.0.0.1";
+            if (args[i + 1] == "sessionhost" || args[i + 1] == "sessionjoin") demo.StartCoroutine(demo.RunSession(args, args[i + 1] == "sessionhost", address));
+            else demo.StartCoroutine(demo.Run(args, args[i + 1] == "host", address));
         }
 
         private static string Arg(string[] args, string name, string fallback)
@@ -126,6 +128,47 @@ namespace BattleOfAges.Net
             Directory.CreateDirectory(Path.GetDirectoryName(log));
             File.WriteAllText(log, report.ToString());
             link.Dispose();
+            Application.Quit(0);
+        }
+
+        /// <summary>Two players in the same world, as the menu starts them: what each sees of the other goes in the log.</summary>
+        private IEnumerator RunSession(string[] args, bool host, string address)
+        {
+            string log = Arg(args, "-netdemolog", Path.Combine(Application.persistentDataPath, host ? "session_host.md" : "session_join.md"));
+            float seconds = float.Parse(Arg(args, "-netdemoseconds", "40"), System.Globalization.CultureInfo.InvariantCulture);
+            ushort port = ushort.Parse(Arg(args, "-netdemoport", NetLink.DefaultPort.ToString()));
+            Application.runInBackground = true;
+            var report = new StringBuilder();
+            if (host)
+            {
+                SaveSystem.NewGame(new CampaignSetup { Seed = 777, Size = World.WorldSettings.DefaultSize, Heroes = 16, KingShare = 0.75f, Class = HeroClass.Tank });
+                while (GameObject.Find("Player") == null) yield return null;
+                yield return new WaitForSeconds(2f);
+                report.AppendLine($"host opened: {NetSession.Host(port)}");
+            }
+            else
+            {
+                yield return new WaitForSeconds(1f);
+                NetSession.Failed += why => report.AppendLine("failed: " + why);
+                report.AppendLine($"joining {address}: {NetSession.Join(address, port)}");
+            }
+            float end = Time.realtimeSinceStartup + seconds;
+            float nextRow = Time.realtimeSinceStartup + 5f;
+            while (Time.realtimeSinceStartup < end)
+            {
+                yield return null;
+                if (Time.realtimeSinceStartup < nextRow) continue;
+                nextRow = Time.realtimeSinceStartup + 5f;
+                NetSession s = NetSession.Current;
+                GameObject me = GameObject.Find("Player");
+                string other = "not seen";
+                if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 at, out int share)) other = $"at {at.x:0},{at.z:0} health {share}";
+                report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count}, " +
+                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(log));
+            File.WriteAllText(log, report.ToString());
+            NetSession.Stop();
             Application.Quit(0);
         }
 

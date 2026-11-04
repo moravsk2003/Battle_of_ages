@@ -116,6 +116,11 @@ namespace BattleOfAges.SaveLoad
         public static bool Save(int slot, string title = null)
         {
             if (!InGame) return false;
+            if (Net.NetSession.IsGuest) // a game with others is saved on its host (§14.1)
+            {
+                if (slot != AutoSlot) StrategyHud.Notify("Цю гру зберігає хост");
+                return false;
+            }
             try
             {
                 SaveData d = Capture();
@@ -319,6 +324,7 @@ namespace BattleOfAges.SaveLoad
 
         public static void ToMainMenu()
         {
+            Net.NetSession.Stop();
             pending = null;
             AI.KingdomRealm.Clear();
             WorldPersistence.Suspended = true;
@@ -379,6 +385,7 @@ namespace BattleOfAges.SaveLoad
         private static IEnumerator FoundKingdomsLater()
         {
             yield return null; // the player is in place
+            if (Net.NetSession.IsGuest) yield break; // a guest's world has the host's kingdoms, not its own
             if (AI.NpcKingdom.All.Count == 0 && AI.KingdomRealm.Far.Count == 0) FoundKingdoms();
         }
 

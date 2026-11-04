@@ -58,6 +58,62 @@ namespace BattleOfAges.UI
             campaign.Panel.gameObject.SetActive(show);
         }
 
+        private RectTransform joinPanel;
+        private InputField joinAddress;
+        private Text joinStatus;
+
+        private void ShowJoin(bool show)
+        {
+            menu.gameObject.SetActive(!show);
+            joinPanel.gameObject.SetActive(show);
+            if (show) joinStatus.text = "";
+        }
+
+        /// <summary>To a host by its address: the world comes from it once it answers.</summary>
+        private void JoinGame()
+        {
+            string address = joinAddress.text.Trim();
+            if (string.IsNullOrEmpty(address)) { joinStatus.text = "Вкажіть адресу хоста"; return; }
+            Net.NetSession.Failed -= OnJoinFailed;
+            Net.NetSession.Failed += OnJoinFailed;
+            if (Net.NetSession.Join(address)) joinStatus.text = "З'єднання…";
+            else joinStatus.text = "Адреса не схожа на IP, наприклад 192.168.0.5";
+        }
+
+        private void OnJoinFailed(string why)
+        {
+            if (joinStatus != null) joinStatus.text = why;
+        }
+
+        private void OnDestroy() => Net.NetSession.Failed -= OnJoinFailed;
+
+        private void BuildJoinPanel(RectTransform root)
+        {
+            joinPanel = UiTheme.Rect(root, "Join", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(640f, 360f));
+            UiTheme.PanelImage(joinPanel);
+            PopIn.On(joinPanel);
+            UiTheme.Label(UiTheme.Rect(joinPanel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(560f, 44f)), "Text", "Гра в мережі", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Divider(joinPanel, -66f, 400f);
+            Text hint = UiTheme.Label(UiTheme.Rect(joinPanel, "Hint", new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(580f, 56f)), "Text",
+                "Адреса хоста. Хост відкриває свою гру в меню паузи й бачить там свою адресу. У вас буде своє королівство в його світі.", 16, TextAnchor.UpperCenter, UiTheme.InkDim);
+            hint.horizontalOverflow = HorizontalWrapMode.Wrap;
+
+            RectTransform f = UiTheme.Rect(joinPanel, "Address", new Vector2(0.5f, 1f), new Vector2(0f, -170f), new Vector2(380f, 46f));
+            UiTheme.PanelImage(f, UiTheme.SlotSprite);
+            Text text = UiTheme.Label(UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 38f)), "Text", "", 20, TextAnchor.MiddleCenter, UiTheme.Ink);
+            text.supportRichText = false;
+            Text placeholder = UiTheme.Label(UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 38f)), "Text", "192.168.0.5", 18, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
+            joinAddress = f.gameObject.AddComponent<InputField>();
+            joinAddress.textComponent = text;
+            joinAddress.placeholder = placeholder;
+            joinAddress.characterLimit = 45;
+
+            joinStatus = UiTheme.Label(UiTheme.Rect(joinPanel, "Status", new Vector2(0.5f, 1f), new Vector2(0f, -218f), new Vector2(580f, 30f)), "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Bad);
+            UiTheme.TextButton(joinPanel, "JoinNow", "Приєднатися", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), JoinGame, 20);
+            UiTheme.TextButton(joinPanel, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(-130f, 26f), new Vector2(230f, 56f), () => { Net.NetSession.Stop(); ShowJoin(false); }, 20);
+            joinPanel.gameObject.SetActive(false);
+        }
+
         private void ShowSettings(bool show)
         {
             menu.gameObject.SetActive(!show);
@@ -92,7 +148,7 @@ namespace BattleOfAges.UI
             RectTransform sub = UiTheme.Rect(root, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0f, -226f), new Vector2(1200f, 40f));
             UiTheme.Label(sub, "Text", "Збудуй поселення  ·  спорядь військо  ·  вистоїш проти набігів", 24, TextAnchor.MiddleCenter, UiTheme.Ink);
 
-            menu = UiTheme.Rect(root, "Menu", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(460f, 520f));
+            menu = UiTheme.Rect(root, "Menu", new Vector2(0.5f, 0.5f), new Vector2(0f, -110f), new Vector2(460f, 604f));
             UiTheme.PanelImage(menu);
             float y = -36f;
             continueButton = Big(menu, "Продовжити", ref y, Continue);
@@ -101,6 +157,7 @@ namespace BattleOfAges.UI
             y -= 18f;
             Big(menu, "Нова гра", ref y, () => ShowCampaign(true));
             Big(menu, "Завантажити", ref y, () => SaveSlotsUI.Open(false, RefreshContinue));
+            Big(menu, "Приєднатися до гри", ref y, () => ShowJoin(true));
             Big(menu, "Налаштування", ref y, () => ShowSettings(true));
             Big(menu, "Вихід", ref y, Quit);
 
@@ -128,6 +185,7 @@ namespace BattleOfAges.UI
 
             campaign = CampaignSetupUI.Build(root, () => ShowCampaign(false));
             campaign.Panel.gameObject.SetActive(false);
+            BuildJoinPanel(root);
 
             RectTransform ver = UiTheme.Rect(root, "Version", new Vector2(1f, 0f), new Vector2(-16f, 12f), new Vector2(400f, 24f));
             UiTheme.Label(ver, "Text", "v" + Application.version, 14, TextAnchor.LowerRight, UiTheme.InkDim);

@@ -81,6 +81,7 @@ namespace BattleOfAges.UI
             Vector2 at = settings.anchoredPosition;
             AddPauseButton("SaveButton", "Зберегти", at += step, () => SaveSlotsUI.Open(true));
             AddPauseButton("LoadButton", "Завантажити", at += step, () => SaveSlotsUI.Open(false));
+            AddPauseButton("OpenGameButton", "Відкрити гру в мережі", at += step, OpenGame);
             AddPauseButton("MainMenuButton", "Головне меню", at += step, SaveSystem.ToMainMenu);
             if (quitButton != null) ((RectTransform)quitButton.transform).anchoredPosition = at + step;
 
@@ -91,6 +92,14 @@ namespace BattleOfAges.UI
             RectTransform window = UiTheme.Rect(resume.parent, "PauseWindow", new Vector2(0.5f, 0.5f), new Vector2(0f, (top + bottom) * 0.5f), new Vector2(resume.rect.width + 140f, top - bottom));
             UiTheme.PanelImage(window).raycastTarget = false;
             window.SetAsFirstSibling();
+        }
+
+        /// <summary>Lets others in: says the address to give them.</summary>
+        private static void OpenGame()
+        {
+            if (Net.NetSession.IsGuest) { StrategyHud.Notify("Ви в чужій грі"); return; }
+            if (Net.NetSession.IsHost) { StrategyHud.Notify($"Гру вже відкрито: {Net.NetSession.AddressLine()}"); return; }
+            StrategyHud.Notify(Net.NetSession.Host() ? $"Гру відкрито: {Net.NetSession.AddressLine()}" : $"Порт {Net.NetLink.DefaultPort} зайнятий");
         }
 
         private void AddPauseButton(string name, string text, Vector2 position, UnityEngine.Events.UnityAction onClick)
