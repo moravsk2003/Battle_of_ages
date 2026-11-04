@@ -6,7 +6,9 @@
         "Unity.AI.Navigation",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Core.Runtime",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.Networking.Transport",
+        "Unity.Collections"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
