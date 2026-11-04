@@ -9,6 +9,7 @@ using BattleOfAges.Combat;
 using BattleOfAges.Player;
 using BattleOfAges.RTS;
 using BattleOfAges.SaveLoad;
+using BattleOfAges.Utils;
 
 namespace BattleOfAges.Net
 {
@@ -131,6 +132,21 @@ namespace BattleOfAges.Net
             Application.Quit(0);
         }
 
+        /// <summary>Where a body's bones really are: a head well below its height means a broken pose.</summary>
+        private static string KnightPose(RemoteBody body)
+        {
+            var character = body.GetComponentInChildren<GpuSkinnedCharacter>(true);
+            var animator = body.GetComponentInChildren<Animator>(true);
+            var skin = animator != null ? animator.GetComponentInChildren<SkinnedMeshRenderer>(true) : null;
+            float head = -1f, hips = -1f;
+            foreach (Transform t in body.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == "Head") head = t.position.y - body.transform.position.y;
+                if (t.name == "Hips") hips = t.position.y - body.transform.position.y;
+            }
+            return $"gpu {(character != null ? character.IsFar.ToString() : "none")}, animator {(animator != null && animator.enabled)}, skin {(skin != null ? skin.sharedMesh != null ? skin.sharedMesh.name + " " + skin.enabled : "no mesh" : "none")}, head {head:0.00} hips {hips:0.00} m above its feet";
+        }
+
         /// <summary>Two players in the same world, as the menu starts them: what each sees of the other goes in the log.</summary>
         private IEnumerator RunSession(string[] args, bool host, string address)
         {
@@ -164,10 +180,61 @@ namespace BattleOfAges.Net
             string step = Arg(args, "-netdemostep", "fight");
             NetSession.GuestSaveSeconds = 3f;
             bool stepDone = false;
+            string shot = Arg(args, "-netdemoshot", "");
+            float knightsSeen = -1f;
+            int knightStage = 0;
             while (Time.realtimeSinceStartup < end)
             {
                 yield return null;
                 NetSession now = NetSession.Current;
+                // "-netdemostep knights": the host raises knights 200 m from the guest; the guest sees them from afar, then walks up to them
+                if (host && step == "knights" && now != null && !stepDone && NpcKingdom.All.Count > 0)
+                {
+                    Vector3 guestAt = Vector3.zero;
+                    bool seen = false;
+                    now.Remote.ForEachHero(body => { guestAt = body.transform.position; seen = true; });
+                    if (seen && (guestAt - GameObject.Find("Player").transform.position).magnitude > 300f)
+                    {
+                        stepDone = true;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            HostileMobAI knight = NpcKingdom.All[0].AddSubject(UnitRank.Knight, guestAt + new Vector3(200f + i * 2.5f, 0f, i * 1.5f), false);
+                            knight.enabled = false;
+                        }
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: three knights raised 200 m from the guest at {guestAt.x:0},{guestAt.z:0}");
+                    }
+                }
+                if (!host && step == "knights" && now != null && now.Welcome != null && knightStage < 3)
+                {
+                    RemoteBody nearest = null;
+                    foreach (RemoteBody b in UnityEngine.Object.FindObjectsByType<RemoteBody>(FindObjectsSortMode.None))
+                        if (!b.IsBuilding && b.Id != UnitSnapshotWriter.HeroId && b.GetComponentInChildren<CharacterGear>(true) != null && b.GetComponentInChildren<CharacterGear>(true).Type == HumanoidModelBuilder.HumanType.KnightGuard) nearest = b;
+                    if (nearest != null && knightStage == 0)
+                    {
+                        knightStage = 1;
+                        knightsSeen = Time.realtimeSinceStartup;
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: far: {KnightPose(nearest)}");
+                    }
+                    if (knightStage == 1 && Time.realtimeSinceStartup > knightsSeen + 10f)
+                    {
+                        knightStage = 2;
+                        knightsSeen = Time.realtimeSinceStartup;
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: still far: {KnightPose(nearest)}");
+                        GameObject mine = GameObject.Find("Player");
+                        Vector3 to = nearest.transform.position + new Vector3(-4f, 0f, 0f);
+                        to.y = RtsUnit.GetTerrainHeight(to) + 1f;
+                        CharacterController cc = mine.GetComponent<CharacterController>();
+                        if (cc != null) cc.enabled = false;
+                        mine.transform.SetPositionAndRotation(to, Quaternion.LookRotation(Vector3.right));
+                        if (cc != null) cc.enabled = true;
+                    }
+                    if (knightStage == 2 && Time.realtimeSinceStartup > knightsSeen + 4f)
+                    {
+                        knightStage = 3;
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: near: {KnightPose(nearest)}");
+                        if (shot.Length > 0) ScreenCapture.CaptureScreenshot(shot);
+                    }
+                }
                 if (!host && step != "fight" && now != null && now.Welcome != null && Time.realtimeSinceStartup > 14f && !stepDone)
                 {
                     stepDone = true;

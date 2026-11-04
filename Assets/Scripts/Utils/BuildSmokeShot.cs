@@ -50,6 +50,7 @@ namespace BattleOfAges.Utils
             yield return new WaitForSecondsRealtime(8f);
             if (zones) Settlements();
             if (zones) yield return new WaitForSecondsRealtime(3f);
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeknights") >= 0) yield return Knights(path);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeworld") >= 0) yield return WorldWindows(path);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
@@ -72,6 +73,35 @@ namespace BattleOfAges.Utils
                 yield return new WaitForSecondsRealtime(1.5f);
             }
             Application.Quit();
+        }
+
+        /// <summary>With "-smokeknights": another player's knight beside a real one, right before the hero (path + ".knights.png").</summary>
+        private static IEnumerator Knights(string path)
+        {
+            GameObject player = Managers.GameContext.Player;
+            if (player == null) yield break;
+            Transform t = player.transform;
+            Vector3 Before(float side, float on)
+            {
+                Vector3 p = t.position + t.forward * on + t.right * side;
+                p.y = RTS.RtsUnit.GetTerrainHeight(p);
+                return p;
+            }
+            var remote = new GameObject("SmokeRemote").AddComponent<Net.RemoteUnits>();
+            byte[] packet = new byte[10 + Net.UnitRow.Bytes];
+            packet[0] = Net.UnitSnapshotWriter.Message;
+            packet[7] = 1;
+            packet[9] = 1;
+            Vector3 there = Before(-1.3f, 4.5f);
+            new Net.UnitRow { Id = 1, X = Net.UnitSnapshotWriter.Quantize(there.x), Z = Net.UnitSnapshotWriter.Quantize(there.z), Yaw = 128, Health = 200, Rank = (byte)Combat.UnitRank.Knight, Team = 5 }.Write(packet, 10);
+            remote.Apply(packet, packet.Length);
+            yield return null;
+            GameObject real = HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.KnightGuard, "SmokeKnight");
+            real.transform.SetPositionAndRotation(Before(1.3f, 4.5f), Quaternion.Euler(0f, t.eulerAngles.y + 180f, 0f));
+            yield return new WaitForSecondsRealtime(2f);
+            Debug.Log($"[Smoke] knights: remote bodies {remote.Count}");
+            ScreenCapture.CaptureScreenshot(path + ".knights.png");
+            yield return new WaitForSecondsRealtime(1f);
         }
 
         /// <summary>With "-smokeworld": the global map (path + ".world.png") and the list of players (path + ".players.png").</summary>
