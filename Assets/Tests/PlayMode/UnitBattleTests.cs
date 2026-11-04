@@ -155,8 +155,11 @@ namespace BattleOfAges.PlayModeTests
             UnitProgress.Setup(heroObj, UnitRank.General, hero: true);
             heroObj.AddComponent<HeroProgress>().ChooseClass(HeroClass.Mage);
             heroObj.GetComponent<Crafting.Equipment>().Equip(new Crafting.Item(Crafting.ItemType.Staff, 1));
-            HealthComponent weak = Enemy(new Vector3(10f, 0f, 0f), 1);
-            HealthComponent next = Enemy(new Vector3(12f, 0f, 2f), 10000);
+            // Far from the origin: bolts fly on to the nearest enemy, and an earlier test's unit near there would take some of them
+            Vector3 corner = new Vector3(7300f, 0f, 7300f);
+            heroObj.transform.position = corner;
+            HealthComponent weak = Enemy(corner + new Vector3(10f, 0f, 0f), 1);
+            HealthComponent next = Enemy(corner + new Vector3(12f, 0f, 2f), 10000);
             yield return null;
 
             int each = Mathf.RoundToInt(heroObj.GetComponent<CombatUnit>().AttackDamage * GameBalance.MageBoltShare);

@@ -63,14 +63,18 @@ namespace BattleOfAges.PlayModeTests
             NpcKingdom k = NpcKingdom.Found(Far + new Vector3(30f, 0f, 0f), "Таран", 0);
             k.Economy.HallLevel = 0;
             int before = target.CurrentHealth;
-            HostileMobAI[] raiders = { k.AddSubject(UnitRank.Warrior, k.Spot()), k.AddSubject(UnitRank.Warrior, k.Spot()), k.AddSubject(UnitRank.Warrior, k.Spot()) };
+            // Eight: where one stops depends on its place round the target
+            var raiders = new HostileMobAI[8];
+            for (int i = 0; i < raiders.Length; i++) raiders[i] = k.AddSubject(UnitRank.Warrior, k.Spot());
             foreach (HostileMobAI m in raiders) m.OrderAttack(target);
             yield return null;
             Time.timeScale = 4f;
             float end = Time.time + 60f;
-            while (Time.time < end && target.CurrentHealth == before) yield return null;
+            System.Func<int> striking = () => { int n = 0; foreach (HostileMobAI m in raiders) if (m != null && m.CurrentStateType == AIStateType.Attack) n++; return n; };
+            while (Time.time < end && striking() < raiders.Length) yield return null;
             string where = "";
             foreach (HostileMobAI m in raiders) where += $" [{(m != null ? $"{m.CurrentStateType}, {target.DistanceFrom(m.transform.position):0.0} m from the wall, range {m.AttackRange:0.0}, target {(m.CurrentCombatTarget != null ? m.CurrentCombatTarget.name : "-")}, dest {m.HasDestination}, can {m.Combat.CanAttack}" : "gone")}]";
+            Assert.AreEqual(raiders.Length, striking(), "every one of them gets to strike, none stops short:" + where);
             Assert.Less(target.CurrentHealth, before, "swords reach a hall from its wall:" + where);
         }
 

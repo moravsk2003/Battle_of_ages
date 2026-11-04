@@ -380,6 +380,13 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>
+        /// How near its place round a target is: near enough that it can strike from where it stops, stoppingDistance short of the
+        /// place (at 90% of its reach a swordsman stood at 3.4 m with a reach of 2.5, and stayed there for good).
+        /// </summary>
+        public float ApproachRadius => Mathf.Max(MinApproach, AttackRange * 0.9f - stoppingDistance);
+        private const float MinApproach = 0.8f;
+
+        /// <summary>
         /// Its own place round the target, at this reach (from the wall of a building). circling: the place turns round the
         /// target, a swordsman's footwork between blows; a place always turning made anyone with a long reach run round its
         /// target at 20 degrees a second, 9 m/s at a mage's range, and no one could catch it.
@@ -498,7 +505,7 @@ namespace BattleOfAges.AI
         {
             HostileMobAI mob = controller as HostileMobAI;
             if (mob == null || mob.CurrentCombatTarget == null) return;
-            Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.AttackRange * 0.9f);
+            Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.ApproachRadius);
             mob.SetMoveDestination(flankTarget);
         }
 
@@ -542,7 +549,7 @@ namespace BattleOfAges.AI
             if (mob.HandleWallInWay(mob.CurrentCombatTarget.transform.position)) return;
             if (dist > mob.AttackRange)
             {
-                Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.AttackRange * 0.9f);
+                Vector3 flankTarget = mob.GetFlankingDestination(mob.CurrentCombatTarget, mob.ApproachRadius);
                 mob.SetMoveDestination(flankTarget);
             }
         }
