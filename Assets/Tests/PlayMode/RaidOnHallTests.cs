@@ -75,6 +75,8 @@ namespace BattleOfAges.PlayModeTests
             string where = "";
             foreach (HostileMobAI m in raiders) where += $" [{(m != null ? $"{m.CurrentStateType}, {target.DistanceFrom(m.transform.position):0.0} m from the wall, range {m.AttackRange:0.0}, target {(m.CurrentCombatTarget != null ? m.CurrentCombatTarget.name : "-")}, dest {m.HasDestination}, can {m.Combat.CanAttack}" : "gone")}]";
             Assert.AreEqual(raiders.Length, striking(), "every one of them gets to strike, none stops short:" + where);
+            float blows = Time.time + 6f; // (all standing to strike, the first blow is still in its swing)
+            while (Time.time < blows && target.CurrentHealth >= before) yield return null;
             Assert.Less(target.CurrentHealth, before, "swords reach a hall from its wall:" + where);
         }
 

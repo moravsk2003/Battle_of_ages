@@ -11,7 +11,7 @@ namespace BattleOfAges.Utils
     /// "-smokemap" shoots the map view (team rings, plates) instead of first person; "-smokecampaign" starts a new
     /// campaign (seed 777) instead of opening the fixed scene, "-smokelake" puts the hero by its nearest lake;
     /// "-smokezones" (with a campaign): zones, a field, a market, a site, a second settlement and a caravan by the base,
-    /// and a second shot of the market's window beside path (path + ".market.png").
+    /// and a second shot of the market's window beside path (path + ".market.png"); "-smokeworld": shots of the global map and the list of players.
     /// </summary>
     public sealed class BuildSmokeShot : MonoBehaviour
     {
@@ -50,6 +50,7 @@ namespace BattleOfAges.Utils
             yield return new WaitForSecondsRealtime(8f);
             if (zones) Settlements();
             if (zones) yield return new WaitForSecondsRealtime(3f);
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeworld") >= 0) yield return WorldWindows(path);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
             if (zones && map) { UI.ZonePainter.Begin(World.ZoneType.Fields); yield return new WaitForSecondsRealtime(1f); } // the toolbar's line, the brush and the ring
@@ -71,6 +72,26 @@ namespace BattleOfAges.Utils
                 yield return new WaitForSecondsRealtime(1.5f);
             }
             Application.Quit();
+        }
+
+        /// <summary>With "-smokeworld": the global map (path + ".world.png") and the list of players (path + ".players.png").</summary>
+        private static IEnumerator WorldWindows(string path)
+        {
+            var opening = System.Diagnostics.Stopwatch.StartNew();
+            bool drawn = World.WorldMapPicture.Ready;
+            UI.WorldMapUI.Instance.Open();
+            Debug.Log($"[Smoke] world map: drawn ahead {drawn}, opened in {opening.ElapsedMilliseconds} ms");
+            yield return new WaitForSecondsRealtime(1f);
+            ScreenCapture.CaptureScreenshot(path + ".world.png");
+            yield return new WaitForSecondsRealtime(1f);
+            UI.WorldMapUI.Instance.Close();
+            UI.HudPlayerList list = FindFirstObjectByType<UI.HudPlayerList>();
+            if (list == null) yield break;
+            list.ShownAnyway = true;
+            yield return new WaitForSecondsRealtime(0.5f);
+            ScreenCapture.CaptureScreenshot(path + ".players.png");
+            yield return new WaitForSecondsRealtime(1f);
+            list.ShownAnyway = false;
         }
 
         /// <summary>With "-smokezones": what M5 makes at run time, in view of the map camera over the base.</summary>

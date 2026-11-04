@@ -172,8 +172,8 @@ namespace BattleOfAges.UI
             if (armyShown.Changed(army)) armyText.text = army.ToString();
             BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
             bool placing = map && placer != null && placer.IsPlacing;
-            modeText.text = placing ? placer.Hint : map ? "Мапа  ·  M — від першої особи  ·  F1 — довідка" : "Від першої особи  ·  M — мапа  ·  F1 — довідка";
-            mode.sizeDelta = placing ? new Vector2(600f, 70f) : new Vector2(470f, 44f); // the placing hint takes two lines
+            modeText.text = placing ? placer.Hint : map ? "M — від першої особи  ·  N — мапа світу  ·  F1 — довідка" : "M — мапа  ·  N — мапа світу  ·  F1 — довідка";
+            mode.sizeDelta = placing ? new Vector2(600f, 70f) : new Vector2(map ? 510f : 470f, 44f); // the placing hint takes two lines
         }
 
         /// <summary>The ore summary as a number: the total and the three highest tiers in stock with their counts.</summary>

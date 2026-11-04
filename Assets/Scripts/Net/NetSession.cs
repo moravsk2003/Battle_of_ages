@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using BattleOfAges.AI;
 using BattleOfAges.Building;
 using BattleOfAges.Combat;
 using BattleOfAges.Resources;
@@ -37,6 +38,15 @@ namespace BattleOfAges.Net
     [Serializable] public sealed class NetTrees { public List<TreeSave> Trees = new List<TreeSave>(); }
     [Serializable] public sealed class NetZones { public List<int> Cells = new List<int>(); }
     [Serializable] public sealed class NetText { public string Text; }
+    /// <summary>A player on the global map, by its number.</summary>
+    [Serializable] public struct NetPlayerAt { public int Number; public Vector3 At; }
+    /// <summary>What a guest cannot know by itself for the global map: the kingdoms (they are the host's) and where everyone is.</summary>
+    [Serializable]
+    public sealed class NetWorldMap
+    {
+        public List<WorldMapEntry> Kingdoms = new List<WorldMapEntry>();
+        public List<NetPlayerAt> Players = new List<NetPlayerAt>();
+    }
     /// <summary>A chunk's life: asked for (to the host), granted (from it), or free for the taking.</summary>
     [Serializable] public sealed class NetLife { public int X, Z; public bool Granted, Free; }
 
@@ -63,7 +73,7 @@ namespace BattleOfAges.Net
     {
         public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
                           TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12,
-                          RefusedMessage = 13, RosterMessage = 14;
+                          RefusedMessage = 13, RosterMessage = 14, WorldMapMessage = 15;
         /// <summary>How often a guest's game goes to its host, and the host's clock to its guests.</summary>
         public static float GuestSaveSeconds = 60f;
         private const float ClockSeconds = 5f, WorldSeconds = 1f;
@@ -97,6 +107,21 @@ namespace BattleOfAges.Net
         /// <summary>This machine's number among them.</summary>
         public int Number => link != null && link.IsHost ? 0 : Welcome != null ? Welcome.Number : -1;
 
+        /// <summary>Everyone's hero on the global map: known here on the host, told to the guests.</summary>
+        public List<NetPlayerAt> PlayersOnMap()
+        {
+            if (link == null || !link.IsHost) return playersTold;
+            var all = new List<NetPlayerAt>();
+            GameObject me = Managers.GameContext.Player;
+            if (me != null) all.Add(new NetPlayerAt { Number = 0, At = me.transform.position });
+            remote.ForEachHero(body =>
+            {
+                if (guestOf.TryGetValue(body.Owner, out GuestRecord g)) all.Add(new NetPlayerAt { Number = g.Number, At = body.transform.position });
+            });
+            return all;
+        }
+
+        private List<NetPlayerAt> playersTold = new List<NetPlayerAt>();
         private readonly List<int> players = new List<int> { 0 };
         private string refusedWhy;
 
@@ -166,6 +191,7 @@ namespace BattleOfAges.Net
             s.SendOwnSave(); // the last of it, going away properly
             s.StopListening();
             ZoneMap.ClearForeign();
+            WorldMapData.Tell(new List<WorldMapEntry>());
             Current = null;
             s.link?.Dispose();
             s.link = null;
@@ -239,6 +265,14 @@ namespace BattleOfAges.Net
             foreach (NetBuilding b in sentBuildings.Values) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
             foreach (NetBuilding b in shownBuildings.Keys) if (b.Owner != peer) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
             TellRoster($"Гравець {record.Number} зайшов у гру");
+            TellWorldMap();
+        }
+
+        /// <summary>The host: the kingdoms and everyone's place, to the guests.</summary>
+        private void TellWorldMap()
+        {
+            var told = new NetWorldMap { Kingdoms = WorldMapData.Now(), Players = PlayersOnMap() };
+            BroadcastText(WorldMapMessage, JsonUtility.ToJson(told));
         }
 
         /// <summary>The host: who is in the game now, to everyone, with what has just happened.</summary>
@@ -292,7 +326,7 @@ namespace BattleOfAges.Net
                 return;
             }
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
-            if (data[0] >= HelloMessage && data[0] <= RosterMessage) { ReceiveWorld(peer, data, length); return; }
+            if (data[0] >= HelloMessage && data[0] <= WorldMapMessage) { ReceiveWorld(peer, data, length); return; }
             if (data[0] == BuildingMessage)
             {
                 ReceiveBuilding(JsonUtility.FromJson<NetBuilding>(Encoding.UTF8.GetString(data, 1, length - 1)));
@@ -404,6 +438,7 @@ namespace BattleOfAges.Net
             {
                 nextClock = now + ClockSeconds;
                 BroadcastText(ClockMessage, JsonUtility.ToJson(new NetClock { Hours = WorldClock.GameHours }));
+                if (guestOf.Count > 0) TellWorldMap();
             }
             if (!link.IsHost && basePlaced && now >= nextGuestSave)
             {
@@ -531,6 +566,12 @@ namespace BattleOfAges.Net
                     return;
                 case GuestSaveMessage:
                     if (link.IsHost && guestOf.TryGetValue(peer, out GuestRecord record)) record.Save = text;
+                    return;
+                case WorldMapMessage:
+                    if (link.IsHost) return;
+                    NetWorldMap map = JsonUtility.FromJson<NetWorldMap>(text);
+                    WorldMapData.Tell(map.Kingdoms);
+                    playersTold = map.Players;
                     return;
                 case RefusedMessage:
                     if (!link.IsHost) refusedWhy = JsonUtility.FromJson<NetText>(text).Text; // (seen to after the poll: it closes the link)
