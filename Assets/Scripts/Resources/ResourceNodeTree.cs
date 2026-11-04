@@ -134,6 +134,7 @@ namespace BattleOfAges.Resources
                     // Yield initial 4 wood on tree fell
                     int fellYield = Mathf.Min(4, currentWoodRemaining);
                     currentWoodRemaining -= fellYield;
+                    SaveLoad.WorldPersistence.NoteTree(this);
                     OnWoodHarvested?.Invoke(fellYield);
                     return true;
                 }
@@ -149,6 +150,7 @@ namespace BattleOfAges.Resources
 
                     int woodExtracted = Mathf.Min(2, currentWoodRemaining);
                     currentWoodRemaining -= woodExtracted;
+                    SaveLoad.WorldPersistence.NoteTree(this);
 
                     OnWoodHarvested?.Invoke(woodExtracted);
 
@@ -177,11 +179,15 @@ namespace BattleOfAges.Resources
             return false;
         }
 
+        /// <summary>Someone else has taken from this pile (Net): how much is left.</summary>
+        public void SetWood(int wood) => currentWoodRemaining = Mathf.Clamp(wood, 0, maxWoodCapacity);
+
         public void ConvertToWoodPile()
         {
             if (currentState != TreeState.WholeTree) return;
 
             currentState = TreeState.WoodPile;
+            SaveLoad.WorldPersistence.NoteTree(this);
 
             // Hide all crown / foliage clusters
             for (int i = 0; i < transform.childCount; i++)

@@ -12,6 +12,8 @@ namespace BattleOfAges.SaveLoad
         /// <summary>2: kingdoms as KingdomState (M6 step 2). A save of 1 still has them as Kingdoms (SaveSystem.Migrate).</summary>
         public const int CurrentVersion = 2;
         public int Version = CurrentVersion;
+        /// <summary>The guests of this campaign, with their games (a host's save).</summary>
+        public List<Net.GuestRecord> Guests = new List<Net.GuestRecord>();
         /// <summary>The number the world's next entity gets.</summary>
         public int NextEntityId = 1;
         /// <summary>The player's name for this save (empty: none).</summary>

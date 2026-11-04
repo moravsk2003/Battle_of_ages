@@ -271,6 +271,14 @@ namespace BattleOfAges.World
             }
         }
 
+        /// <summary>A chunk's life may start now (Net.NetSession): if it stands here, near.</summary>
+        public void WakeLife(Vector2Int coord)
+        {
+            if (!activeChunks.TryGetValue(coord, out ProceduralBiomeChunk chunk) || chunk == null) return;
+            chunk.WakeLife(chunkSize);
+            if (!pendingChunks.Contains(chunk)) pendingChunks.Add(chunk);
+        }
+
         private void CreateFarTerrain()
         {
             GameObject farObj = new GameObject("FarTerrain");

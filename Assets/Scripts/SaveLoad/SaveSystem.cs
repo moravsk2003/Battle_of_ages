@@ -190,6 +190,7 @@ namespace BattleOfAges.SaveLoad
                 if (AI.KingdomRealm.Active) d.KingdomStates.AddRange(AI.KingdomRealm.AllStates()); // a campaign: the far ones too
                 else foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.KingdomStates.Add(k.ToState());
                 d.NextEntityId = WorldIds.Next;
+                d.Guests.AddRange(Net.GuestBook.All);
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null)
                 {
@@ -286,6 +287,15 @@ namespace BattleOfAges.SaveLoad
         {
             SaveData d = Read(slot);
             if (d == null) return false;
+            Net.NetSession.Stop(); // a game loaded here is a game of its own
+            Net.GuestBook.Load(d.Guests);
+            LoadFrom(d);
+            return true;
+        }
+
+        /// <summary>Starts this save's game: from a slot, or a guest's own, come back from its host.</summary>
+        public static bool LoadFrom(SaveData d)
+        {
             pending = d;
             newGamePending = false;
             AutosaveEnabled = true;
@@ -305,6 +315,7 @@ namespace BattleOfAges.SaveLoad
         public static void NewGame(CampaignSetup setup)
         {
             WorldIds.Reset(1);
+            if (!Net.NetSession.IsGuest) Net.GuestBook.Clear();
             setup = setup ?? new CampaignSetup();
             startingSetup = setup;
             pending = null;

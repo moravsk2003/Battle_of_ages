@@ -30,6 +30,7 @@ namespace BattleOfAges.World
         public static bool ZoneClearsTrees(Vector3 p)
         {
             ZoneType z = ZoneMap.At(p);
+            if (z == ZoneType.None) z = ZoneMap.ForeignAt(p);
             return (z != ZoneType.None && z != ZoneType.Forest) || AI.KingdomTown.Holds(p.x, p.z);
         }
 
@@ -97,6 +98,14 @@ namespace BattleOfAges.World
         private bool alive;
         private GameObject campRoot;
         private Vector3 campCentre;
+        private bool lifeHeld;
+        private Vector2Int lifeCoord;
+
+        /// <summary>The life of this chunk has come free or been granted (Net): it starts now, if it is not going already.</summary>
+        public void WakeLife(float size)
+        {
+            if (!alive && scattered && steps == null && !IsLowLOD) steps = LifeSteps(ChunkCoord, size);
+        }
 
         private IEnumerator steps;
         private Random.State random; // this chunk's scatter sequence, kept apart from everything that runs between its steps
@@ -422,6 +431,9 @@ namespace BattleOfAges.World
         private IEnumerator LifeSteps(Vector2Int coord, float size)
         {
             if (alive || !scattered || coord != ChunkCoord) yield break;
+            if (Net.NetSession.Active && !Net.NetSession.Current.MayLive(coord)) yield break; // someone else's, or not yet known: it wakes us if it comes free
+            lifeHeld = Net.NetSession.Active;
+            lifeCoord = coord;
             alive = true;
             float startX = coord.x * size - size * 0.5f, startZ = coord.y * size - size * 0.5f;
             int seed = WorldSettings.ChunkSeed(ChunkCoord);
@@ -516,6 +528,8 @@ namespace BattleOfAges.World
 
             if (buildingCamp != null) Destroy(buildingCamp);
             buildingCamp = null;
+            if (lifeHeld) Net.NetSession.Current?.ReleaseLife(lifeCoord); // (after its camp was told: the next owner starts from that)
+            lifeHeld = false;
         }
 
         private void OnDestroy()

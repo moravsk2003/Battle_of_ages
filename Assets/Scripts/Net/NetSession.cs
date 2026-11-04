@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using BattleOfAges.Building;
@@ -19,7 +20,21 @@ namespace BattleOfAges.Net
         public float WorldSize;
         public double GameHours;
         public Vector3 Site;
+        /// <summary>Its own game from the last time (empty: it is new here).</summary>
+        public string Save = "";
+        /// <summary>The world as it stands: what has been felled and killed.</summary>
+        public WorldSave World = new WorldSave();
+        /// <summary>Everyone's marked cells: x, z, type in a row.</summary>
+        public List<int> Zones = new List<int>();
     }
+
+    [Serializable] public sealed class NetHello { public string Token; }
+    [Serializable] public sealed class NetClock { public double Hours; }
+    [Serializable] public sealed class NetTrees { public List<TreeSave> Trees = new List<TreeSave>(); }
+    [Serializable] public sealed class NetZones { public List<int> Cells = new List<int>(); }
+    [Serializable] public sealed class NetText { public string Text; }
+    /// <summary>A chunk's life: asked for (to the host), granted (from it), or free for the taking.</summary>
+    [Serializable] public sealed class NetLife { public int X, Z; public bool Granted, Free; }
 
     /// <summary>A building of another player, as the others are told of it; Gone: it has fallen.</summary>
     [Serializable]
@@ -36,11 +51,17 @@ namespace BattleOfAges.Net
     /// same world from its seed and a kingdom of its own on a free site. Each simulates what is its own and sends it; the host
     /// passes everyone's on to everyone else. Nobody else's units are simulated here, only shown (RemoteUnits).
     /// A blow lands on a body here and goes to the owner of what it stands for, who applies it. NPC kingdoms are the host's: they
-    /// turn real by anyone's hero, on the host. Not yet: a swing shown, zones and resources of others, a player's kingdom going on without it.
+    /// turn real by anyone's hero, on the host. The world is shared: what is felled and killed, marked cells, the clock; a chunk's
+    /// animals and raiders have one owner, the first one there (LifeClaims). A guest's game is kept by the host (GuestBook) and comes
+    /// back with it. Not yet: a swing shown, a player's kingdom going on without it.
     /// </summary>
     public sealed class NetSession : MonoBehaviour
     {
-        public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4;
+        public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
+                          TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12;
+        /// <summary>How often a guest's game goes to its host, and the host's clock to its guests.</summary>
+        public static float GuestSaveSeconds = 60f;
+        private const float ClockSeconds = 5f, WorldSeconds = 1f;
         /// <summary>A player's site is at least this far from every hero of the campaign.</summary>
         private const float MinSiteDistance = 600f;
 
@@ -103,6 +124,7 @@ namespace BattleOfAges.Net
             s.joined = true;
             s.basePlaced = true;
             s.Wire();
+            s.Listen();
             return true;
         }
 
@@ -114,6 +136,7 @@ namespace BattleOfAges.Net
             if (s.link == null) { Stop(); return false; }
             s.connectDeadline = Time.realtimeSinceStartup + 15f;
             s.Wire();
+            s.Listen();
             return true;
         }
 
@@ -121,6 +144,9 @@ namespace BattleOfAges.Net
         {
             if (Current == null) return;
             NetSession s = Current;
+            s.SendOwnSave(); // the last of it, going away properly
+            s.StopListening();
+            ZoneMap.ClearForeign();
             Current = null;
             s.link?.Dispose();
             s.link = null;
@@ -168,11 +194,18 @@ namespace BattleOfAges.Net
 
         private void OnConnected(int peer)
         {
-            if (!link.IsHost) return;
+            if (!link.IsHost) Send(0, HelloMessage, JsonUtility.ToJson(new NetHello { Token = GuestBook.LocalToken }));
+        }
+
+        /// <summary>A guest has said who it is: its place, its game from last time if it has been here, and the world as it stands.</summary>
+        private void Greet(int peer, NetHello who)
+        {
+            GuestRecord record = GuestBook.Of(who.Token);
+            guestOf[peer] = record;
             var hello = new NetWelcome
             {
                 PlayerId = peer, WorldSeed = WorldSettings.Seed, WorldSize = WorldSettings.Size, GameHours = WorldClock.GameHours,
-                Site = SiteFor(peer, GameBalance.CampaignHeroes)
+                Site = SiteFor(record.Number, GameBalance.CampaignHeroes), Save = record.Save, World = WorldPersistence.Capture(), Zones = AllZones()
             };
             Send(peer, WelcomeMessage, JsonUtility.ToJson(hello));
             // What stands in the world already, its own and the others'
@@ -195,6 +228,8 @@ namespace BattleOfAges.Net
             {
                 remote.ForgetOwner(peer);
                 ForgetBuildingsOf(peer);
+                guestOf.Remove(peer);
+                foreach (Vector2Int freed in claims.ReleaseAll(peer)) TellFree(freed);
                 UI.StrategyHud.Notify($"Гравець {peer} вийшов");
                 return;
             }
@@ -215,6 +250,7 @@ namespace BattleOfAges.Net
                 return;
             }
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
+            if (data[0] >= HelloMessage && data[0] <= LifeMessage) { ReceiveWorld(peer, data, length); return; }
             if (data[0] == BuildingMessage)
             {
                 ReceiveBuilding(JsonUtility.FromJson<NetBuilding>(Encoding.UTF8.GetString(data, 1, length - 1)));
@@ -232,18 +268,25 @@ namespace BattleOfAges.Net
             playerId = hello.PlayerId;
             writer.Owner = (byte)playerId;
             remote.Self = (byte)playerId;
-            SaveSystem.NewGame(new CampaignSetup { Seed = hello.WorldSeed, Size = hello.WorldSize, Heroes = GameBalance.CampaignHeroes, KingShare = GameBalance.CampaignKingShare });
-            StartCoroutine(TakeItsPlace(hello));
+            bool back = !string.IsNullOrEmpty(hello.Save);
+            if (back) SaveSystem.LoadFrom(JsonUtility.FromJson<SaveData>(hello.Save)); // its own game from last time
+            else SaveSystem.NewGame(new CampaignSetup { Seed = hello.WorldSeed, Size = hello.WorldSize, Heroes = GameBalance.CampaignHeroes, KingShare = GameBalance.CampaignKingShare });
+            // The world is the host's, as it stands now, whatever this machine last knew
+            WorldPersistence.Load(hello.World);
+            ZoneMap.ClearForeign();
+            for (int i = 0; i + 2 < hello.Zones.Count; i += 3) ZoneMap.SetForeign(new Vector2Int(hello.Zones[i], hello.Zones[i + 1]), (ZoneType)hello.Zones[i + 2]);
+            StartCoroutine(TakeItsPlace(hello, back));
         }
 
-        private static IEnumerator TakeItsPlace(NetWelcome hello)
+        private static IEnumerator TakeItsPlace(NetWelcome hello, bool back)
         {
             yield return null;
             yield return null;
             while (Managers.GameContext.Player == null) yield return null;
             yield return null;
+            if (back) yield return new WaitForSeconds(1f); // (its save is applied when the scene is ready: it stands where it stood)
             WorldClock.GameHours = hello.GameHours;
-            MoveBase(hello.Site);
+            if (!back) MoveBase(hello.Site);
             if (Current != null) Current.basePlaced = true;
         }
 
@@ -301,9 +344,180 @@ namespace BattleOfAges.Net
             FlushHits();
             if (basePlaced && Time.realtimeSinceStartup >= nextBuildingCheck)
             {
-                nextBuildingCheck = Time.realtimeSinceStartup + 1f;
+                nextBuildingCheck = Time.realtimeSinceStartup + WorldSeconds;
                 CheckBuildings();
+                TellWorld();
             }
+            float now = Time.realtimeSinceStartup;
+            if (link.IsHost && now >= nextClock)
+            {
+                nextClock = now + ClockSeconds;
+                BroadcastText(ClockMessage, JsonUtility.ToJson(new NetClock { Hours = WorldClock.GameHours }));
+            }
+            if (!link.IsHost && basePlaced && now >= nextGuestSave)
+            {
+                nextGuestSave = now + GuestSaveSeconds;
+                SendOwnSave();
+            }
+        }
+
+        private void OnApplicationQuit() { if (Current == this) Stop(); }
+
+        // ------------------------------------------------------------------ the shared world
+
+        private readonly LifeClaims claims = new LifeClaims();
+        private readonly Dictionary<int, GuestRecord> guestOf = new Dictionary<int, GuestRecord>();
+        private readonly HashSet<Vector2Int> lifeAsked = new HashSet<Vector2Int>(), lifeGranted = new HashSet<Vector2Int>();
+        private readonly Dictionary<Vector2Int, ZoneType> toldZones = new Dictionary<Vector2Int, ZoneType>();
+        private float nextClock, nextGuestSave;
+
+        /// <summary>Chunks whose life is someone's (the host's count).</summary>
+        public int LifeClaimCount => claims.Count;
+
+        private void Listen()
+        {
+            WorldPersistence.ListeningToTrees = true;
+            WorldPersistence.CampChanged = c => BroadcastText(CampMessage, JsonUtility.ToJson(c));
+            WorldPersistence.AnimalKilled = key => BroadcastText(AnimalMessage, JsonUtility.ToJson(new NetText { Text = key }));
+            nextGuestSave = Time.realtimeSinceStartup + GuestSaveSeconds;
+        }
+
+        private void StopListening()
+        {
+            WorldPersistence.ListeningToTrees = false;
+            WorldPersistence.CampChanged = null;
+            WorldPersistence.AnimalKilled = null;
+        }
+
+        private void BroadcastText(byte kind, string text)
+        {
+            if (link == null) return;
+            byte[] utf = Encoding.UTF8.GetBytes(text);
+            var message = new byte[utf.Length + 1];
+            message[0] = kind;
+            Array.Copy(utf, 0, message, 1, utf.Length);
+            link.SendAll(NetChannel.Reliable, message, message.Length);
+        }
+
+        /// <summary>Whether this machine may bring a chunk's animals and raiders to life. A guest asks the first time and hears back: the chunk wakes then.</summary>
+        public bool MayLive(Vector2Int chunk)
+        {
+            if (link == null) return true;
+            if (link.IsHost) return claims.TryClaim(chunk, playerId);
+            if (lifeGranted.Contains(chunk)) return true;
+            if (joined && lifeAsked.Add(chunk)) Send(0, LifeMessage, JsonUtility.ToJson(new NetLife { X = chunk.x, Z = chunk.y }));
+            return false;
+        }
+
+        /// <summary>This machine has let a chunk go.</summary>
+        public void ReleaseLife(Vector2Int chunk)
+        {
+            if (link == null) return;
+            if (link.IsHost) { if (claims.Release(chunk, playerId)) TellFree(chunk); return; }
+            lifeAsked.Remove(chunk);
+            lifeGranted.Remove(chunk);
+            Send(0, LifeMessage, JsonUtility.ToJson(new NetLife { X = chunk.x, Z = chunk.y, Free = true }));
+        }
+
+        private void TellFree(Vector2Int chunk)
+        {
+            BroadcastText(LifeMessage, JsonUtility.ToJson(new NetLife { X = chunk.x, Z = chunk.y, Free = true }));
+            InfiniteWorldManager.Instance?.WakeLife(chunk);
+        }
+
+        private static List<int> AllZones()
+        {
+            var all = new List<int>();
+            foreach (KeyValuePair<Vector2Int, ZoneType> c in ZoneMap.Cells) { all.Add(c.Key.x); all.Add(c.Key.y); all.Add((int)c.Value); }
+            foreach (KeyValuePair<Vector2Int, ZoneType> c in ZoneMap.ForeignCells) { all.Add(c.Key.x); all.Add(c.Key.y); all.Add((int)c.Value); }
+            return all;
+        }
+
+        /// <summary>What has changed by hand here since the last look: trees, marked cells.</summary>
+        private void TellWorld()
+        {
+            List<TreeSave> trees = WorldPersistence.TakeChangedTrees();
+            if (trees.Count > 0) BroadcastText(TreesMessage, JsonUtility.ToJson(new NetTrees { Trees = trees }));
+
+            var cells = new NetZones();
+            foreach (KeyValuePair<Vector2Int, ZoneType> c in ZoneMap.Cells)
+            {
+                if (toldZones.TryGetValue(c.Key, out ZoneType was) && was == c.Value) continue;
+                cells.Cells.Add(c.Key.x); cells.Cells.Add(c.Key.y); cells.Cells.Add((int)c.Value);
+            }
+            List<Vector2Int> erased = null;
+            foreach (Vector2Int c in toldZones.Keys)
+                if (!ZoneMap.Cells.ContainsKey(c)) (erased ?? (erased = new List<Vector2Int>())).Add(c);
+            if (erased != null)
+                foreach (Vector2Int c in erased)
+                {
+                    toldZones.Remove(c);
+                    cells.Cells.Add(c.x); cells.Cells.Add(c.y); cells.Cells.Add((int)ZoneType.None);
+                }
+            for (int i = 0; i + 2 < cells.Cells.Count; i += 3)
+                if ((ZoneType)cells.Cells[i + 2] != ZoneType.None) toldZones[new Vector2Int(cells.Cells[i], cells.Cells[i + 1])] = (ZoneType)cells.Cells[i + 2];
+            if (cells.Cells.Count > 0) BroadcastText(ZonesMessage, JsonUtility.ToJson(cells));
+        }
+
+        /// <summary>A guest's whole game to its host, to come back to.</summary>
+        private void SendOwnSave()
+        {
+            if (link == null || link.IsHost || !basePlaced || !SaveSystem.InGame) return;
+            SaveData own = SaveSystem.Capture();
+            own.Guests.Clear();
+            own.KingdomStates.Clear();
+            Send(0, GuestSaveMessage, JsonUtility.ToJson(own));
+        }
+
+        private void ReceiveWorld(int peer, byte[] data, int length)
+        {
+            byte kind = data[0];
+            string text = Encoding.UTF8.GetString(data, 1, length - 1);
+            switch (kind)
+            {
+                case HelloMessage:
+                    if (link.IsHost) Greet(peer, JsonUtility.FromJson<NetHello>(text));
+                    return;
+                case GuestSaveMessage:
+                    if (link.IsHost && guestOf.TryGetValue(peer, out GuestRecord record)) record.Save = text;
+                    return;
+                case ClockMessage:
+                    if (!link.IsHost) WorldClock.GameHours = JsonUtility.FromJson<NetClock>(text).Hours;
+                    return;
+                case LifeMessage:
+                    ReceiveLife(peer, JsonUtility.FromJson<NetLife>(text));
+                    return;
+                case TreesMessage:
+                    foreach (TreeSave t in JsonUtility.FromJson<NetTrees>(text).Trees) WorldPersistence.ApplyTree(t);
+                    break;
+                case CampMessage:
+                    WorldPersistence.ApplyCamp(JsonUtility.FromJson<CampSave>(text));
+                    break;
+                case AnimalMessage:
+                    WorldPersistence.ApplyKilledAnimal(JsonUtility.FromJson<NetText>(text).Text);
+                    break;
+                case ZonesMessage:
+                    List<int> cells = JsonUtility.FromJson<NetZones>(text).Cells;
+                    for (int i = 0; i + 2 < cells.Count; i += 3) ZoneMap.SetForeign(new Vector2Int(cells[i], cells[i + 1]), (ZoneType)cells[i + 2]);
+                    break;
+                default:
+                    return;
+            }
+            if (link.IsHost) link.SendOthers(peer, NetChannel.Reliable, data, length); // passed on to the rest
+        }
+
+        private void ReceiveLife(int peer, NetLife life)
+        {
+            var chunk = new Vector2Int(life.X, life.Z);
+            if (link.IsHost)
+            {
+                if (life.Free) { if (claims.Release(chunk, peer)) TellFree(chunk); return; }
+                if (claims.TryClaim(chunk, peer)) Send(peer, LifeMessage, JsonUtility.ToJson(new NetLife { X = life.X, Z = life.Z, Granted = true }));
+                return;
+            }
+            if (life.Granted) lifeGranted.Add(chunk);
+            else if (life.Free) lifeAsked.Remove(chunk); // come free: whoever is there may ask again
+            InfiniteWorldManager.Instance?.WakeLife(chunk);
         }
 
         // ------------------------------------------------------------------ blows across

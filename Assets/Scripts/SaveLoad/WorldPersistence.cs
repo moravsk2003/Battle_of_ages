@@ -18,6 +18,61 @@ namespace BattleOfAges.SaveLoad
         private static readonly Dictionary<string, CampSave> Camps = new Dictionary<string, CampSave>();
         private static readonly HashSet<string> KilledAnimals = new HashSet<string>();
 
+        // ---- In a game with others (Net.NetSession): what changes here is told, what is told is applied
+        /// <summary>A camp's state or a killed animal to tell the others; null when alone.</summary>
+        public static System.Action<CampSave> CampChanged;
+        public static System.Action<string> AnimalKilled;
+        /// <summary>Trees are told only while someone listens; those changed since the last look.</summary>
+        public static bool ListeningToTrees;
+        private static readonly HashSet<ResourceNodeTree> dirtyTrees = new HashSet<ResourceNodeTree>();
+        private static readonly Dictionary<string, ResourceNodeTree> liveTrees = new Dictionary<string, ResourceNodeTree>();
+        private static bool applying;
+
+        /// <summary>A tree has changed by someone's hand here.</summary>
+        public static void NoteTree(ResourceNodeTree tree)
+        {
+            if (ListeningToTrees && !applying && tree != null && !string.IsNullOrEmpty(tree.PersistentKey)) dirtyTrees.Add(tree);
+        }
+
+        /// <summary>The trees changed since the last call, as they are now.</summary>
+        public static List<TreeSave> TakeChangedTrees()
+        {
+            var changed = new List<TreeSave>();
+            foreach (ResourceNodeTree t in dirtyTrees)
+            {
+                if (t == null || string.IsNullOrEmpty(t.PersistentKey)) continue;
+                RecordTree(t);
+                changed.Add(new TreeSave { Key = t.PersistentKey, State = (int)t.CurrentState, Wood = t.WoodRemaining });
+            }
+            dirtyTrees.Clear();
+            return changed;
+        }
+
+        /// <summary>What another player has done to a tree: remembered, and shown if it stands here now.</summary>
+        public static void ApplyTree(TreeSave s)
+        {
+            if (string.IsNullOrEmpty(s.Key)) return;
+            applying = true;
+            bool whole = s.State == (int)TreeState.WholeTree;
+            if (whole) Trees.Remove(s.Key);
+            else Trees[s.Key] = s;
+            if (liveTrees.TryGetValue(s.Key, out ResourceNodeTree tree) && tree != null && tree.PersistentKey == s.Key)
+            {
+                if (whole) { if (tree.CurrentState != TreeState.WholeTree) tree.ResetTreeState(); }
+                else if (tree.CurrentState != (TreeState)s.State) tree.ApplySavedState((TreeState)s.State, s.Wood);
+                else tree.SetWood(s.Wood);
+            }
+            applying = false;
+        }
+
+        /// <summary>What is known of a tree (a tree nobody has touched: false).</summary>
+        public static bool TryGetTree(string key, out TreeSave s) => Trees.TryGetValue(key, out s);
+
+        /// <summary>A camp as its owner left it: whoever brings it to life next starts from this.</summary>
+        public static void ApplyCamp(CampSave c) { if (c != null && !string.IsNullOrEmpty(c.Camp)) Camps[c.Camp] = c; }
+
+        public static void ApplyKilledAnimal(string key) { if (!string.IsNullOrEmpty(key)) KilledAnimals.Add(key); }
+
         /// <summary>True while one scene is replaced by another: the old world must not overwrite the loaded state.</summary>
         public static bool Suspended { get; set; }
 
@@ -26,6 +81,8 @@ namespace BattleOfAges.SaveLoad
             Trees.Clear();
             Camps.Clear();
             KilledAnimals.Clear();
+            dirtyTrees.Clear();
+            liveTrees.Clear();
         }
 
         public static void Load(WorldSave w)
@@ -56,6 +113,7 @@ namespace BattleOfAges.SaveLoad
         {
             if (tree == null) return;
             tree.PersistentKey = key;
+            if (key != null) liveTrees[key] = tree;
             if (key != null && Trees.TryGetValue(key, out TreeSave s)) tree.ApplySavedState((TreeState)s.State, s.Wood);
         }
 
@@ -111,6 +169,7 @@ namespace BattleOfAges.SaveLoad
             if (Suspended) return;
             if (camp == null) return;
             foreach (HostileMobAI mob in camp.GetComponentsInChildren<HostileMobAI>(true)) RecordMob(camp.name, mob);
+            if (CampChanged != null && Camps.TryGetValue(camp.name, out CampSave state)) CampChanged(state);
         }
 
         private static void RecordMob(string camp, HostileMobAI mob)
@@ -130,6 +189,7 @@ namespace BattleOfAges.SaveLoad
             CampSave c = CampOf(camp);
             if (!c.Killed.Contains(mob)) c.Killed.Add(mob);
             c.Alive.RemoveAll(m => m.Name == mob);
+            CampChanged?.Invoke(c);
         }
 
         private static CampSave CampOf(string camp)
@@ -147,7 +207,7 @@ namespace BattleOfAges.SaveLoad
             string key = animal.name;
             if (KilledAnimals.Contains(key)) { animal.SetActive(false); Object.Destroy(animal); return false; }
             HealthComponent hp = animal.GetComponent<HealthComponent>();
-            if (hp != null) hp.OnDeath += () => { if (!Suspended) KilledAnimals.Add(key); };
+            if (hp != null) hp.OnDeath += () => { if (Suspended) return; KilledAnimals.Add(key); AnimalKilled?.Invoke(key); };
             return true;
         }
     }

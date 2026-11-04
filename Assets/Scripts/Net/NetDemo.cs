@@ -157,12 +157,47 @@ namespace BattleOfAges.Net
             bool came = false, built = false;
             float nextBlow = 0f;
             int blows = 0;
+            // "-netdemostep leave": a guest changes its world and goes; "back": it comes back to see what it finds
+            string step = Arg(args, "-netdemostep", "fight");
+            NetSession.GuestSaveSeconds = 3f;
+            bool stepDone = false;
             while (Time.realtimeSinceStartup < end)
             {
                 yield return null;
                 NetSession now = NetSession.Current;
+                if (!host && step != "fight" && now != null && now.Welcome != null && Time.realtimeSinceStartup > 14f && !stepDone)
+                {
+                    stepDone = true;
+                    came = true;
+                    GameObject mine = GameObject.Find("Player");
+                    if (step == "leave")
+                    {
+                        Resources.ResourceManager.Instance.AddResource(Resources.ResourceType.Wood, 777 - Resources.ResourceManager.Instance.WoodCount);
+                        Resources.ResourceNodeTree tree = UnityEngine.Object.FindFirstObjectByType<Resources.ResourceNodeTree>();
+                        string key = "";
+                        foreach (Resources.ResourceNodeTree t in UnityEngine.Object.FindObjectsByType<Resources.ResourceNodeTree>(FindObjectsSortMode.None))
+                            if (!string.IsNullOrEmpty(t.PersistentKey) && !t.PersistentKey.StartsWith("scene:") && t.CurrentState == Resources.TreeState.WholeTree) { tree = t; key = t.PersistentKey; break; }
+                        if (tree != null) tree.ConvertToWoodPile();
+                        PlayerPrefs.SetString("NetDemoTree", key);
+                        PlayerPrefs.Save();
+                        World.ZoneMap.SetRaw(World.ZoneMap.CellOf(mine.transform.position), World.ZoneType.Fields);
+                        Vector3 to = mine.transform.position + new Vector3(40f, 0f, 25f);
+                        to.y = RtsUnit.GetTerrainHeight(to) + 1f;
+                        CharacterController cc = mine.GetComponent<CharacterController>();
+                        if (cc != null) cc.enabled = false;
+                        mine.transform.position = to;
+                        if (cc != null) cc.enabled = true;
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: wood 777, felled {key}, a cell marked, standing at {to.x:0},{to.z:0}");
+                    }
+                    else
+                    {
+                        string key = PlayerPrefs.GetString("NetDemoTree", "");
+                        bool known = SaveLoad.WorldPersistence.TryGetTree(key, out SaveLoad.TreeSave seen);
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: back: wood {Resources.ResourceManager.Instance.WoodCount}, at {mine.transform.position.x:0},{mine.transform.position.z:0}, its tree {key} known {known} state {(known ? seen.State : -1)}, its zones {World.ZoneMap.Cells.Count}");
+                    }
+                }
                 // The guest walks up to the host's hero and puts up a house at home; the host strikes it when it is near
-                if (!host && now != null && now.Welcome != null && Time.realtimeSinceStartup > 12f && !came)
+                if (!host && step == "fight" && now != null && now.Welcome != null && Time.realtimeSinceStartup > 12f && !came)
                 {
                     came = true;
                     GameObject mine = GameObject.Find("Player");
@@ -178,7 +213,7 @@ namespace BattleOfAges.Net
                         report.AppendLine($"t {Time.realtimeSinceStartup:0}: walked up to the host's hero, house built {built}");
                     }
                 }
-                if (host && now != null && Time.realtimeSinceStartup >= nextBlow)
+                if (host && step == "fight" && now != null && Time.realtimeSinceStartup >= nextBlow)
                 {
                     nextBlow = Time.realtimeSinceStartup + 1f;
                     GameObject me2 = GameObject.Find("Player");
@@ -196,7 +231,7 @@ namespace BattleOfAges.Net
                 string other = "not seen";
                 if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 otherAt, out int share)) other = $"at {otherAt.x:0},{otherAt.z:0} health {share}";
                 report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count}, " +
-                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
+                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)}, trees told {SaveLoad.WorldPersistence.Capture().Trees.Count}, others' zones {World.ZoneMap.ForeignCount}, guests {GuestBook.All.Count} save {(GuestBook.All.Count > 0 ? GuestBook.All[0].Save.Length : 0)}, life claims {(s != null ? s.LifeClaimCount : -1)}, clock {WorldClock.GameHours:0.00}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
             }
             Directory.CreateDirectory(Path.GetDirectoryName(log));
             File.WriteAllText(log, report.ToString());

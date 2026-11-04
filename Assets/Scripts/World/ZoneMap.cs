@@ -48,6 +48,21 @@ namespace BattleOfAges.World
         }
 
         public static ZoneType At(Vector3 p) => cells.TryGetValue(CellOf(p), out ZoneType t) ? t : ZoneType.None;
+
+        private static readonly Dictionary<Vector2Int, ZoneType> foreign = new Dictionary<Vector2Int, ZoneType>();
+
+        /// <summary>Another player's marked cells: nothing grows here for them, but the land is cleared alike, or a tree would stand on one machine and not the other.</summary>
+        public static int ForeignCount => foreign.Count;
+        public static ZoneType ForeignAt(Vector3 p) => foreign.TryGetValue(CellOf(p), out ZoneType t) ? t : ZoneType.None;
+
+        public static IReadOnlyDictionary<Vector2Int, ZoneType> ForeignCells => foreign;
+        public static void ClearForeign() => foreign.Clear();
+
+        public static void SetForeign(Vector2Int cell, ZoneType type)
+        {
+            if (type == ZoneType.None) foreign.Remove(cell);
+            else foreign[cell] = type;
+        }
         public static int Count(ZoneType type) => counts[(int)type];
 
         /// <summary>Cells of this type in a settlement (the nearest hall's); null or a single hall: all of them.</summary>

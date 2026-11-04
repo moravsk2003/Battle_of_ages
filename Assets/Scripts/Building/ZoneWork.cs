@@ -43,6 +43,7 @@ namespace BattleOfAges.Building
                 if (hours < GameBalance.ForestRegrowHours) { regrowing[tree] = hours; continue; }
                 regrowing.Remove(tree);
                 tree.ResetTreeState();
+                SaveLoad.WorldPersistence.NoteTree(tree);
             }
         }
 

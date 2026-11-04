@@ -114,6 +114,17 @@ namespace BattleOfAges.Net
             return true;
         }
 
+        /// <summary>What a row's Rank byte says beyond a rank: a camp's raider or an animal has a look of its own.</summary>
+        public const byte MobLook = 16, AnimalLook = 64;
+
+        private static byte Look(Component owner)
+        {
+            if (owner is AI.PeacefulAnimalAI animal) return (byte)(AnimalLook + (int)animal.Type);
+            if (owner is AI.HostileMobAI mob && mob.Kingdom == null) return (byte)(MobLook + (int)mob.MobType);
+            UnitProgress p = owner.GetComponent<UnitProgress>();
+            return p != null ? (byte)p.Rank : (byte)0;
+        }
+
         private bool Due(int id, float now, out UnitRow row)
         {
             row = default;
@@ -134,8 +145,7 @@ namespace BattleOfAges.Net
                 // A new unit (a number is used again when one dies)
                 k = default;
                 k.Owner = owner;
-                UnitProgress p = owner.GetComponent<UnitProgress>();
-                k.Rank = p != null ? (byte)p.Rank : (byte)0;
+                k.Rank = Look(owner);
                 k.Team = (byte)Mathf.Clamp(UnitSpatialGrid.Team(id), 0, 255);
                 k.SentAt = float.NegativeInfinity;
                 k.Health = 255;
@@ -307,14 +317,10 @@ namespace BattleOfAges.Net
             // Each a root of its own: a thousand moving children of one parent all go through one hierarchy
             var go = new GameObject("Remote_" + row.Id);
             go.transform.SetPositionAndRotation(PlaceOf(row), Quaternion.Euler(0f, row.Yaw / 255f * 360f, 0f));
-            if (WithModels)
-            {
-                GameObject model = HumanoidModelBuilder.CreateHumanoidModel(row.Id == UnitSnapshotWriter.HeroId ? HumanoidModelBuilder.HumanType.HeroPlayer : ModelFor((UnitRank)row.Rank), "VisualModel");
-                model.transform.SetParent(go.transform, false);
-            }
+            if (WithModels) DressBody(go, row);
             var b = new Body { Root = go.transform, Rank = row.Rank, Team = row.Team, Health = row.Health, LastHeard = Time.time };
             int who = key >> 16;
-            int rank = Mathf.Clamp(row.Rank, 0, GameBalance.RankHealth.Length - 1);
+            int rank = row.Rank < UnitSnapshotWriter.MobLook ? Mathf.Clamp(row.Rank, 0, GameBalance.RankHealth.Length - 1) : 1;
             b.Mark = go.AddComponent<RemoteBody>();
             b.Mark.Setup(who, row.Id, false, GameBalance.RankHealth[rank] * (row.Id == UnitSnapshotWriter.HeroId ? 3 : 1));
             if (WithModels)
@@ -328,6 +334,28 @@ namespace BattleOfAges.Net
             b.ToYaw = b.FromYaw = go.transform.eulerAngles.y;
             b.ToAt = b.FromAt = Time.time;
             bodies[key] = b;
+        }
+
+        private static void DressBody(GameObject go, UnitRow row)
+        {
+            if (row.Rank >= UnitSnapshotWriter.AnimalLook)
+            {
+                // Its model off a real animal, whose works go at once
+                GameObject real = AnimalModelBuilder.CreateAnimalPrefab((AI.AnimalType)(row.Rank - UnitSnapshotWriter.AnimalLook), "RemoteAnimal");
+                while (real.transform.childCount > 0) real.transform.GetChild(0).SetParent(go.transform, false);
+                DestroyImmediate(real);
+                return;
+            }
+            HumanoidModelBuilder.HumanType look;
+            if (row.Id == UnitSnapshotWriter.HeroId) look = HumanoidModelBuilder.HumanType.HeroPlayer;
+            else if (row.Rank >= UnitSnapshotWriter.MobLook)
+            {
+                var mob = (AI.HostileMobType)(row.Rank - UnitSnapshotWriter.MobLook);
+                look = mob == AI.HostileMobType.WarlordGuard ? HumanoidModelBuilder.HumanType.Warlord : mob == AI.HostileMobType.Goblin ? HumanoidModelBuilder.HumanType.Goblin : HumanoidModelBuilder.HumanType.Bandit;
+            }
+            else look = ModelFor((UnitRank)row.Rank);
+            GameObject model = HumanoidModelBuilder.CreateHumanoidModel(look, "VisualModel");
+            model.transform.SetParent(go.transform, false);
         }
 
         private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
