@@ -54,8 +54,17 @@ namespace BattleOfAges.Utils
                 return t;
             }
 
-            // 1. Central campfire
-            Piece("Campfire", CampBuilder.Fire, Vector3.zero, 0f);
+            // 1. Central campfire: the same as at home (NetSession.MoveBase finds the home one by the name "Campfire")
+            var fire = new GameObject("RaiderCampfire");
+            fire.transform.SetParent(root.transform, false);
+            fire.transform.localPosition = new Vector3(0f, RtsUnit.GetTerrainHeight(campCenter) - campCenter.y, 0f);
+            var glow = new GameObject("FireLight");
+            glow.transform.SetParent(fire.transform, false);
+            Light light = glow.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.62f, 0.3f);
+            light.range = 9f;
+            fire.AddComponent<CampfireModel>();
 
             // 2. Three raider tents, their doors to the fire; one solid volume each: the open A-frame let units walk in
             // and get wedged (AI movement has no pathfinding)

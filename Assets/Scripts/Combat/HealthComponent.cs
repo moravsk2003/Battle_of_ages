@@ -111,6 +111,16 @@ namespace BattleOfAges.Combat
             }
         }
 
+        /// <summary>Falls with no blow here: another player's unit, whose owner has said it is dead.</summary>
+        public void FallNow()
+        {
+            if (!IsAlive) return;
+            currentHealth = 0;
+            OnHealthChanged?.Invoke(currentHealth, maxHealth);
+            UI.GameSound.Died(this);
+            OnDeath?.Invoke();
+        }
+
         /// <summary>Extra healing per game hour as shares of max and of current HP (the tank's Regeneration, §8.1).</summary>
         public float RegenMaxPerHour { get; set; }
         public float RegenCurrentPerHour { get; set; }

@@ -28,6 +28,22 @@ namespace BattleOfAges.Utils
 
         public bool DrawsGear => Type != HumanoidModelBuilder.HumanType.KnightGuard && Body != null && BaseMesh != null;
 
+        /// <summary>Another player's unit: what it is known to wear, with no Equipment of it here.</summary>
+        public void Show(List<Item> worn)
+        {
+            if (!DrawsGear) return;
+            Key.Clear();
+            foreach (Item item in worn)
+                if (!item.IsEmpty && !(FixedHelmet && item.Type == ItemType.Helmet)) Key.Append((int)item.Type).Append(':').Append(item.Level).Append(',');
+            string key = Key.ToString();
+            if (key == shown && Body.sharedMesh != null) return;
+            shown = key;
+            Worn.Clear();
+            foreach (Item item in worn)
+                if (!item.IsEmpty && !(FixedHelmet && item.Type == ItemType.Helmet)) Worn.Add(item);
+            SkinnedMeshLod.SetMesh(Body, Worn.Count == 0 ? BaseMesh : GearMeshBuilder.Compose(this, Worn, key));
+        }
+
         public void Show(Equipment equipment)
         {
             if (!DrawsGear) return;

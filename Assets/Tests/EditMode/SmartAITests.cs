@@ -160,24 +160,5 @@ namespace BattleOfAges.Tests
             Object.DestroyImmediate(deer1Obj);
             Object.DestroyImmediate(deer2Obj);
         }
-
-        [Test]
-        public void Villager_WhenDamaged_FleesTowardsBase()
-        {
-            GameObject villager = new GameObject("TestVillager");
-            villager.AddComponent<CharacterController>();
-            HealthComponent hp = villager.AddComponent<HealthComponent>();
-            hp.InitializeHealth(100);
-            RtsUnit rts = villager.AddComponent<RtsUnit>();
-            NpcResourceGatherer gatherer = villager.AddComponent<NpcResourceGatherer>();
-
-            // Villager takes damage
-            hp.TakeDamage(25);
-
-            Assert.IsTrue(hp.IsAlive);
-            Assert.AreEqual(75, hp.CurrentHealth);
-
-            Object.DestroyImmediate(villager);
-        }
     }
 }

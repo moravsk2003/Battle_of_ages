@@ -115,7 +115,11 @@ namespace BattleOfAges.Building
             GameObject stones = GameObject.Find("StylizedBoulders");
             if (stones == null) return;
             foreach (Transform t in stones.transform)
-                if (Covers(transform.position, t.position.x, t.position.z)) t.gameObject.SetActive(false);
+                if (Covers(transform.position, t.position.x, t.position.z))
+                {
+                    t.gameObject.SetActive(false);
+                    World.SolidProps.Remove(t);
+                }
         }
 
         private static bool Covers(Vector3 middle, float x, float z)

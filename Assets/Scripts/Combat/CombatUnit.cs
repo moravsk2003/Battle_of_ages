@@ -52,6 +52,8 @@ namespace BattleOfAges.Combat
 
         /// <summary>Raised when an attack swing starts (rigged characters play their attack clip).</summary>
         public event Action OnAttackStarted;
+        /// <summary>How many swings it has begun (a swing is told to the other players by this changing).</summary>
+        public int AttacksStarted { get; private set; }
         /// <summary>Raised when one of this unit's hits killed the target.</summary>
         public event Action<HealthComponent> Killed;
         private UnitProgress progress;
@@ -198,6 +200,7 @@ namespace BattleOfAges.Combat
             if (!isPunching)
             {
                 isPunching = true;
+                AttacksStarted++;
                 OnAttackStarted?.Invoke();
                 punchProgress = 0f;
             }

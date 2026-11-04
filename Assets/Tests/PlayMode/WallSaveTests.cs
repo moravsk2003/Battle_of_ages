@@ -30,6 +30,7 @@ namespace BattleOfAges.PlayModeTests
             try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch { }
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator SaveThenLoad_KeepsTheWallsOreDamageTurnAndLevel()
         {

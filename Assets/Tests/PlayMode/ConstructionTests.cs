@@ -66,6 +66,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.GreaterOrEqual(ConstructionSite.SecondsFor(house), GameBalance.BuildBaseSeconds);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AMine_DoesNothing_TillWorkersBuildIt_ByStages()
         {
@@ -101,6 +102,7 @@ namespace BattleOfAges.PlayModeTests
             foreach (NpcResourceGatherer w in new List<NpcResourceGatherer>(WorkerRegistry.ActiveWorkers)) if (w != null) Object.Destroy(w.gameObject);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AWideField_IsBuilt_ByAWorkerComingFromAnySide()
         {

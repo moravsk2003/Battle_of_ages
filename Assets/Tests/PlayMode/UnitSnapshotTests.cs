@@ -30,7 +30,7 @@ namespace BattleOfAges.PlayModeTests
         [Test]
         public void ARow_ComesBackAsItWent()
         {
-            var row = new UnitRow { Id = 4097, X = 12345, Z = 54321, Yaw = 200, Health = 150, Rank = 2, Team = 7 };
+            var row = new UnitRow { Id = 4097, X = 12345, Z = 54321, Yaw = 200, Health = 150, Rank = 2, Team = 7, Gear = 25 };
             var bytes = new byte[UnitRow.Bytes];
             row.Write(bytes, 0);
             UnitRow back = UnitRow.Read(bytes, 0);

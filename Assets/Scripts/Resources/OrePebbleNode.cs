@@ -17,8 +17,11 @@ namespace BattleOfAges.Resources
         private Vector2Int gridCell;
         private bool inGrid;
 
-        private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; }
-        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; }
+        /// <summary>The rock's foot, to walk round (its collider is much wider: it is what a click finds).</summary>
+        private const float SolidRadius = 0.35f;
+
+        private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; StandSolid(); }
+        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; World.SolidProps.Remove(this); }
 
         // Moved after it was enabled (placed by a builder, or respawned): into its new cell
         private void Update()
@@ -26,6 +29,13 @@ namespace BattleOfAges.Resources
             if (!transform.hasChanged) return;
             transform.hasChanged = false;
             if (inGrid) gridCell = ResourceGrid.Move(this, gridCell);
+            StandSolid();
+        }
+
+        private void StandSolid()
+        {
+            if (IsPickedUp) World.SolidProps.Remove(this);
+            else World.SolidProps.Set(this, transform.position, SolidRadius);
         }
 
         public int PickupPebble()
@@ -33,6 +43,7 @@ namespace BattleOfAges.Resources
             if (IsPickedUp) return 0;
 
             IsPickedUp = true;
+            World.SolidProps.Remove(this);
             int rolledTier = OreTierHelper.DeterminePebbleOreTier();
 
             StartCoroutine(RespawnRoutine(3.0f));
@@ -55,6 +66,7 @@ namespace BattleOfAges.Resources
             transform.position = newPos;
             TargetedBy = null;
             IsPickedUp = false;
+            StandSolid();
 
             SetVisualsActive(true);
         }

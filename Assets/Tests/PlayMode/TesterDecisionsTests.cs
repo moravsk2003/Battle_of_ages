@@ -84,6 +84,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(farOff.Health, raider.CurrentCombatTarget);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AnArchersCampaign_StartsWithABow_AndTheArtifactIsABow()
         {
@@ -100,6 +101,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(hero.GetComponent<CombatUnit>().IsRanged, "and it shoots");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator WithAnEmptyLarder_PeopleDie_OneByOne()
         {
@@ -162,6 +164,7 @@ namespace BattleOfAges.PlayModeTests
             }
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator InACraftsZone_AMasterMakesGoods_WhileTheStockCanSpareThem()
         {
@@ -190,6 +193,7 @@ namespace BattleOfAges.PlayModeTests
             Object.Destroy(built);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator ASave_KeepsItsName_ThroughResaves()
         {
@@ -203,6 +207,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual("Після", SaveSystem.Meta(2).Title);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AutoWalk_CarriesTheHeroForward_AndTheMapEndsIt()
         {
@@ -223,6 +228,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Greater(Vector3.Dot(moved.normalized, fp.transform.forward), 0.9f, "forward");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator Settings_ShowOneCategoryAtATime()
         {

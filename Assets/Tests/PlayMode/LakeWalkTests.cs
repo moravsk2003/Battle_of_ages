@@ -23,6 +23,7 @@ namespace BattleOfAges.PlayModeTests
             WorldSettings.Set(0, 0f);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AWorkerSentAcrossALake_KeepsToTheShore()
         {

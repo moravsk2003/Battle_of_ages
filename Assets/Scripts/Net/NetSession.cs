@@ -17,6 +17,8 @@ namespace BattleOfAges.Net
     public sealed class NetWelcome
     {
         public int PlayerId, WorldSeed;
+        /// <summary>The number it goes by in this game (kept between visits, unlike the connection's PlayerId).</summary>
+        public int Number;
         public float WorldSize;
         public double GameHours;
         public Vector3 Site;
@@ -28,7 +30,9 @@ namespace BattleOfAges.Net
         public List<int> Zones = new List<int>();
     }
 
-    [Serializable] public sealed class NetHello { public string Token; }
+    [Serializable] public sealed class NetHello { public string Token, Version; }
+    /// <summary>Who is in the game (by their numbers: 0 is the host), and what has just happened, to say on the screen.</summary>
+    [Serializable] public sealed class NetRoster { public List<int> Players = new List<int>(); public string Said = ""; }
     [Serializable] public sealed class NetClock { public double Hours; }
     [Serializable] public sealed class NetTrees { public List<TreeSave> Trees = new List<TreeSave>(); }
     [Serializable] public sealed class NetZones { public List<int> Cells = new List<int>(); }
@@ -58,7 +62,8 @@ namespace BattleOfAges.Net
     public sealed class NetSession : MonoBehaviour
     {
         public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
-                          TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12;
+                          TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12,
+                          RefusedMessage = 13, RosterMessage = 14;
         /// <summary>How often a guest's game goes to its host, and the host's clock to its guests.</summary>
         public static float GuestSaveSeconds = 60f;
         private const float ClockSeconds = 5f, WorldSeconds = 1f;
@@ -81,6 +86,20 @@ namespace BattleOfAges.Net
         public long BytesOut => link != null ? link.BytesSent : 0;
         public NetWelcome Welcome { get; private set; }
 
+        /// <summary>This game's version, which must be the same on every machine of a session.</summary>
+        public static string GameVersion => VersionOverride ?? Application.version;
+        /// <summary>Another version than the build's (a check of the refusal).</summary>
+        public static string VersionOverride;
+        public static bool SameVersion(string a, string b) => string.Equals(a, b, StringComparison.Ordinal);
+
+        /// <summary>Who is in the game, by number (0 is the host).</summary>
+        public IReadOnlyList<int> Players => players;
+        /// <summary>This machine's number among them.</summary>
+        public int Number => link != null && link.IsHost ? 0 : Welcome != null ? Welcome.Number : -1;
+
+        private readonly List<int> players = new List<int> { 0 };
+        private string refusedWhy;
+
         private NetLink link;
         private int playerId;
         private RemoteUnits remote;
@@ -90,7 +109,7 @@ namespace BattleOfAges.Net
         private float connectDeadline;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { Current = null; Failed = null; }
+        private static void ResetStatics() { Current = null; Failed = null; VersionOverride = null; }
 
         /// <summary>What to tell the others: this machine's address on the local network and the port.</summary>
         public static string AddressLine()
@@ -194,23 +213,45 @@ namespace BattleOfAges.Net
 
         private void OnConnected(int peer)
         {
-            if (!link.IsHost) Send(0, HelloMessage, JsonUtility.ToJson(new NetHello { Token = GuestBook.LocalToken }));
+            if (!link.IsHost) Send(0, HelloMessage, JsonUtility.ToJson(new NetHello { Token = GuestBook.LocalToken, Version = GameVersion }));
         }
 
         /// <summary>A guest has said who it is: its place, its game from last time if it has been here, and the world as it stands.</summary>
         private void Greet(int peer, NetHello who)
         {
+            if (!SameVersion(who.Version, GameVersion))
+            {
+                // Told, not thrown out: a connection cut at once could lose the reason. It goes away on hearing it.
+                string theirs = string.IsNullOrEmpty(who.Version) ? "стара" : who.Version;
+                Send(peer, RefusedMessage, JsonUtility.ToJson(new NetText { Text = $"Різні версії гри: у хоста {GameVersion}, у вас {theirs}" }));
+                UI.StrategyHud.Notify($"Гравець не зайшов: у нього версія {theirs}, у вас {GameVersion}");
+                return;
+            }
             GuestRecord record = GuestBook.Of(who.Token);
             guestOf[peer] = record;
             var hello = new NetWelcome
             {
-                PlayerId = peer, WorldSeed = WorldSettings.Seed, WorldSize = WorldSettings.Size, GameHours = WorldClock.GameHours,
+                PlayerId = peer, Number = record.Number, WorldSeed = WorldSettings.Seed, WorldSize = WorldSettings.Size, GameHours = WorldClock.GameHours,
                 Site = SiteFor(record.Number, GameBalance.CampaignHeroes), Save = record.Save, World = WorldPersistence.Capture(), Zones = AllZones()
             };
             Send(peer, WelcomeMessage, JsonUtility.ToJson(hello));
             // What stands in the world already, its own and the others'
             foreach (NetBuilding b in sentBuildings.Values) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
             foreach (NetBuilding b in shownBuildings.Keys) if (b.Owner != peer) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
+            TellRoster($"Гравець {record.Number} зайшов у гру");
+        }
+
+        /// <summary>The host: who is in the game now, to everyone, with what has just happened.</summary>
+        private void TellRoster(string said)
+        {
+            players.Clear();
+            players.Add(0);
+            foreach (GuestRecord g in guestOf.Values) players.Add(g.Number);
+            players.Sort();
+            var roster = new NetRoster { Said = said };
+            roster.Players.AddRange(players);
+            BroadcastText(RosterMessage, JsonUtility.ToJson(roster));
+            UI.StrategyHud.Notify(said);
         }
 
         private void Send(int peer, byte kind, string text)
@@ -228,9 +269,10 @@ namespace BattleOfAges.Net
             {
                 remote.ForgetOwner(peer);
                 ForgetBuildingsOf(peer);
+                bool wasIn = guestOf.TryGetValue(peer, out GuestRecord left);
                 guestOf.Remove(peer);
                 foreach (Vector2Int freed in claims.ReleaseAll(peer)) TellFree(freed);
-                UI.StrategyHud.Notify($"Гравець {peer} вийшов");
+                if (wasIn) TellRoster($"Гравець {left.Number} вийшов із гри");
                 return;
             }
             string why = joined ? "Зв'язок із хостом втрачено" : "Не вдалося приєднатися";
@@ -250,7 +292,7 @@ namespace BattleOfAges.Net
                 return;
             }
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
-            if (data[0] >= HelloMessage && data[0] <= LifeMessage) { ReceiveWorld(peer, data, length); return; }
+            if (data[0] >= HelloMessage && data[0] <= RosterMessage) { ReceiveWorld(peer, data, length); return; }
             if (data[0] == BuildingMessage)
             {
                 ReceiveBuilding(JsonUtility.FromJson<NetBuilding>(Encoding.UTF8.GetString(data, 1, length - 1)));
@@ -288,6 +330,7 @@ namespace BattleOfAges.Net
             WorldClock.GameHours = hello.GameHours;
             if (!back) MoveBase(hello.Site);
             if (Current != null) Current.basePlaced = true;
+            UI.StrategyHud.Notify($"Ви в грі як гравець {hello.Number}. {UI.HudTips.Key(InputSystem.KeyAction.PlayerList)} — хто ще тут");
         }
 
         /// <summary>The start the scene gives (hero, people, chests, buildings at the origin) moved to this player's site.</summary>
@@ -331,6 +374,14 @@ namespace BattleOfAges.Net
             if (link == null) return;
             link.Poll();
             if (link == null) return; // (it may have ended in Poll)
+            if (refusedWhy != null)
+            {
+                string why = refusedWhy;
+                refusedWhy = null;
+                Failed?.Invoke(why);
+                Stop();
+                return;
+            }
             if (!joined)
             {
                 if (Time.realtimeSinceStartup < connectDeadline) return;
@@ -480,6 +531,16 @@ namespace BattleOfAges.Net
                     return;
                 case GuestSaveMessage:
                     if (link.IsHost && guestOf.TryGetValue(peer, out GuestRecord record)) record.Save = text;
+                    return;
+                case RefusedMessage:
+                    if (!link.IsHost) refusedWhy = JsonUtility.FromJson<NetText>(text).Text; // (seen to after the poll: it closes the link)
+                    return;
+                case RosterMessage:
+                    if (link.IsHost) return;
+                    NetRoster roster = JsonUtility.FromJson<NetRoster>(text);
+                    players.Clear();
+                    players.AddRange(roster.Players);
+                    if (!string.IsNullOrEmpty(roster.Said) && basePlaced) UI.StrategyHud.Notify(roster.Said);
                     return;
                 case ClockMessage:
                     if (!link.IsHost) WorldClock.GameHours = JsonUtility.FromJson<NetClock>(text).Hours;

@@ -9,12 +9,13 @@ namespace BattleOfAges.PlayModeTests
 {
     /// <summary>
     /// A tester's knight stood against a house for good: sent somewhere round its corner, it took touching the wall within 4 m
-    /// of the destination for arriving (FieldReportProbe.UnitsRoundTheHouse: 4 m short from 248 to 158 degrees).
+    /// of the destination for arriving (it stopped 4 m short, coming from 248 to 158 degrees).
     /// </summary>
     public class WalkRoundHouseTests
     {
         private static readonly Vector3 Far = new Vector3(5000f, 0f, 5000f);
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator SentRoundACorner_AUnitGetsThere_NotJustToTheWall()
         {

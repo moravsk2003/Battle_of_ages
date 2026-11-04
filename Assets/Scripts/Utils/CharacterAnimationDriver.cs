@@ -118,6 +118,9 @@ namespace BattleOfAges.Utils
             }
         }
 
+        /// <summary>A swing from outside: another player's unit has no CombatUnit here to say so.</summary>
+        public void PlaySwing() => HandleAttack();
+
         private void HandleAttack()
         {
             if (animator == null || !animator.enabled || (health != null && !health.IsAlive)) return;

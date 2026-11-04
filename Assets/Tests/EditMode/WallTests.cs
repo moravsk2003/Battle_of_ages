@@ -10,6 +10,35 @@ namespace BattleOfAges.Tests
     {
         private static System.Func<Vector3, float> SlopeAlongZ(float degrees) => p => p.z * Mathf.Tan(degrees * Mathf.Deg2Rad);
 
+        /// <summary>A tester saw the grass through a pier: rays from outside, from above and below, all along its height, must meet it.</summary>
+        [Test]
+        public void APier_HasNoCracksToSeeThrough()
+        {
+            var go = new GameObject("PierCracks");
+            try
+            {
+                MeshCollider solid = go.AddComponent<MeshCollider>();
+                solid.sharedMesh = Utils.WallBuilder.PierMesh;
+                Physics.SyncTransforms();
+                float r = Utils.WallBuilder.PierApothem;
+                string open = "";
+                for (int side = 0; side < 8; side++)
+                {
+                    float a = side * Mathf.PI / 4f;
+                    Vector3 flat = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                    foreach (float tilt in new[] { 0.7f, -0.7f, 0.2f, -0.2f })
+                        for (float y = 0.6f; y < 3.3f; y += 0.003f)
+                        {
+                            Vector3 onFace = flat * r + Vector3.up * y;
+                            var ray = new Ray(onFace + (flat + Vector3.up * tilt).normalized * 2f, -(flat + Vector3.up * tilt).normalized);
+                            if (!solid.Raycast(ray, out _, 2.3f)) { open = $"side {side}, height {y:0.000}, tilt {tilt}"; break; }
+                        }
+                }
+                Assert.IsEmpty(open, "a ray went in between the courses");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         [Test]
         public void BetterOre_MakesAStrongerWall()
         {

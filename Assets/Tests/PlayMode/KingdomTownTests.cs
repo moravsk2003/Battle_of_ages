@@ -76,6 +76,7 @@ namespace BattleOfAges.PlayModeTests
             CollectionAssert.AreEqual(places, placesAgain, "where it stands comes from the name");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AUnit_GoesThroughTheWay_NotThroughTheWall()
         {

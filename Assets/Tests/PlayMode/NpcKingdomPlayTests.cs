@@ -60,6 +60,7 @@ namespace BattleOfAges.PlayModeTests
             while (Time.time < end && !done()) yield return null;
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(300000)]
         public IEnumerator Raid_WalksToTheTarget_DestroysIt_AndComesHome()
         {

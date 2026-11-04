@@ -78,6 +78,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(target.CurrentHealth, before, "swords reach a hall from its wall:" + where);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator AMage_StandsAndCasts_NotRunningRoundItsTarget()
         {

@@ -178,6 +178,7 @@ namespace BattleOfAges.PlayModeTests
             StringAssert.Contains("7777", NetSession.AddressLine());
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(60000)]
         public IEnumerator AGuestLeft_WithNoAnswer_IsToldSo()
         {

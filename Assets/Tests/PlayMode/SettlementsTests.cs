@@ -96,6 +96,7 @@ namespace BattleOfAges.PlayModeTests
             done(a, go.GetComponent<TownHall>());
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ASecondHall_IsASettlementOfItsOwn_AndASaveKeepsIt()
         {
@@ -189,6 +190,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreSame(other, Caravan.All[0].To);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator OnTheMap_AnArrowShowsWhereTheHeroLooks()
         {
@@ -217,6 +219,7 @@ namespace BattleOfAges.PlayModeTests
             UnityEngine.Debug.Log("[ArrowState] " + state);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator Caravans_CarryGoodsWhereTheyRunShort_OneARouteAtATime()
         {
@@ -260,6 +263,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsFalse(Caravans.Send(b, a, CaravanGood.Ore, 10), "nothing to send, nothing goes");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(300000)]
         public IEnumerator Settlers_RaiseTheHall_AndWorkForTheirOwnStock_WithTheHeroFarAway()
         {
@@ -298,6 +302,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(home, a.Stock.WoodCount, "into its own stock");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator TheAlarm_CallsTheSettlementInDanger_TheOtherWorksOn_AndAFallenOneTakesItsStock()
         {

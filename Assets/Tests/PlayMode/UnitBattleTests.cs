@@ -361,6 +361,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(raider.CurrentHealth, raider.MaxHealth, "Idle soldiers should fight raiders within reach on their own.");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator FallenSoldier_StopsBlocking_AndIsRemovedLater()
         {

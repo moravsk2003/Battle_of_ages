@@ -36,14 +36,13 @@ namespace BattleOfAges.Utils
 
         private const float TentW = 1.55f, TentL = 1.6f, TentH = 2.05f;
 
-        private static Mesh tent, tentFar, barricade, fire, standard, clutter;
+        private static Mesh tent, tentFar, barricade, standard, clutter;
         private static MeshKit kit;
         private static System.Random rng;
 
         public static Mesh Tent => tent != null ? tent : (tent = Make("RaiderTent", 11, BuildTent));
         public static Mesh TentFar => tentFar != null ? tentFar : (tentFar = Make("RaiderTentFar", 11, BuildTentFar));
         public static Mesh Barricade => barricade != null ? barricade : (barricade = Make("SpikeBarricade", 12, BuildBarricade));
-        public static Mesh Fire => fire != null ? fire : (fire = Make("Campfire", 13, BuildFire));
         public static Mesh Standard => standard != null ? standard : (standard = Make("WarStandard", 14, BuildStandard));
         public static Mesh Clutter => clutter != null ? clutter : (clutter = Make("CampClutter", 15, BuildClutter));
 
@@ -178,28 +177,6 @@ namespace BattleOfAges.Utils
                 }
                 B(new Vector3(x, 0.34f, 0f), new Vector3(0.22f, 0.29f, 0.29f), Rope, ClothS, 0.04f);
             }
-        }
-
-        private static void BuildFire()
-        {
-            for (int k = 0; k < 11; k++)
-            {
-                float a = k / 11f * Mathf.PI * 2f + Rand(-0.1f, 0.1f);
-                Vector3 c = new Vector3(Mathf.Cos(a) * 0.72f, 0.1f, Mathf.Sin(a) * 0.72f);
-                Color t = Stone * Rand(0.8f, 1.1f);
-                B(c, new Vector3(Rand(0.24f, 0.34f), Rand(0.16f, 0.24f), Rand(0.2f, 0.28f)), t, StoneS, 0.05f, Quaternion.Euler(Rand(-10f, 10f), a * Mathf.Rad2Deg, Rand(-10f, 10f)), 0.04f,
-                  p => Color.Lerp(t, Char, Mathf.Clamp01(-p.z * 2f + 0.2f) * 0.6f)); // sooty on the inner side
-            }
-            // Embers and ash, a teepee of charred logs
-            B(new Vector3(0f, 0.04f, 0f), new Vector3(1.0f, 0.06f, 1.0f), Char, DarkS, 0.2f, null, 0.08f, p => p.sqrMagnitude < 0.08f ? Ember : Char);
-            for (int k = 0; k < 6; k++)
-            {
-                float a = k / 6f * Mathf.PI * 2f;
-                Vector3 foot = new Vector3(Mathf.Cos(a) * 0.45f, 0.04f, Mathf.Sin(a) * 0.45f);
-                Pole(foot, new Vector3(Mathf.Cos(a) * 0.06f, 0.62f, Mathf.Sin(a) * 0.06f), 0.06f, Char);
-            }
-            for (int k = 0; k < 7; k++)
-                B(new Vector3(Rand(-0.25f, 0.25f), 0.08f, Rand(-0.25f, 0.25f)), new Vector3(0.12f, 0.08f, 0.1f), Ember * Rand(0.8f, 1.1f), GlowS, 0.03f, Quaternion.Euler(0f, Rand(0f, 360f), 0f), 0.02f);
         }
 
         private static void BuildStandard()

@@ -46,6 +46,7 @@ namespace BattleOfAges.PlayModeTests
             seconds[0] = Time.time - start;
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator AnAxeI_FellsAnArmload_AQuarterFaster()
         {

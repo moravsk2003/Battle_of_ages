@@ -39,6 +39,7 @@ namespace BattleOfAges.UI
             BuildMapButtons();
             HudMinimap.Create(root);
             HudToasts.Create(root);
+            HudPlayerList.Create(root);
             Advisor.Create(root);
             CombatFeedback.Create(root);
         }

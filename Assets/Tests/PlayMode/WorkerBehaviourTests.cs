@@ -69,6 +69,7 @@ namespace BattleOfAges.PlayModeTests
             farthest(best);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator SoldierChasingOnItsOwn_StopsAtTheLeash_AndGoesBack()
         {
@@ -92,6 +93,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(Flat(soldier.transform.position, start), 4f, "and walked back to where it stood");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator OrderedAttack_HasNoLeash()
         {

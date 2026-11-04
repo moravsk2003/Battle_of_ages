@@ -56,7 +56,14 @@ namespace BattleOfAges.Resources
         private bool inGrid;
 
         private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; }
-        private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; felled.Remove(this); }
+        private void OnDisable()
+        {
+            if (inGrid) ResourceGrid.Remove(this, gridCell);
+            inGrid = false;
+            felled.Remove(this);
+            World.SolidProps.Remove(this);
+            standsSolid = false; // (back in the pool: its next place says so again)
+        }
 
         private static readonly HashSet<ResourceNodeTree> felled = new HashSet<ResourceNodeTree>();
         /// <summary>The stumps in the loaded land (in a Forest zone they grow back: ZoneWork).</summary>
@@ -188,6 +195,7 @@ namespace BattleOfAges.Resources
 
             currentState = TreeState.WoodPile;
             SaveLoad.WorldPersistence.NoteTree(this);
+            World.SolidProps.Remove(this); // a stump and logs: walked over
 
             // Hide all crown / foliage clusters
             for (int i = 0; i < transform.childCount; i++)
@@ -252,6 +260,22 @@ namespace BattleOfAges.Resources
             }
         }
 
+        /// <summary>This tree has its place now: while it stands, units walk round its trunk (World.SolidProps).</summary>
+        public void StandSolid()
+        {
+            standsSolid = true;
+            ShowTrunk();
+        }
+
+        private bool standsSolid;
+
+        private void ShowTrunk()
+        {
+            if (!standsSolid || currentState != TreeState.WholeTree || !isActiveAndEnabled) return;
+            CapsuleCollider trunk = GetComponent<CapsuleCollider>();
+            World.SolidProps.Set(this, transform.position, (trunk != null ? trunk.radius : 0.45f) * transform.lossyScale.x);
+        }
+
         /// <summary>Id of this tree in the world save ("chunkX,chunkY:index" or a scene path); set where it is placed.</summary>
         public string PersistentKey { get; set; }
         public bool IsUntouched => currentState == TreeState.WholeTree && currentWoodRemaining >= maxWoodCapacity;
@@ -307,6 +331,7 @@ namespace BattleOfAges.Resources
                 capsule.radius = 0.45f;
                 capsule.height = 3.4f;
             }
+            ShowTrunk();
         }
     }
 }

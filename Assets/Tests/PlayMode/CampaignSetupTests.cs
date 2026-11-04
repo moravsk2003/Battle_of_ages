@@ -43,6 +43,7 @@ namespace BattleOfAges.PlayModeTests
             return list;
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator EveryWorld_HasItsCentralEmpire_FarFromThePlayer()
         {
@@ -80,6 +81,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(epoch + 1, CentralEmpire.WorldEpoch, "a new epoch");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ALoad_LooksWhereTheSaveLooked()
         {
@@ -99,6 +101,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(33f, Mathf.DeltaAngle(0f, Camera.main.transform.localEulerAngles.x), 0.5f, "on the camera itself");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ThePlayerBearingTheArtifact_IsTheOnlyEmpire()
         {
@@ -113,6 +116,7 @@ namespace BattleOfAges.PlayModeTests
             CentralEmpire.WorldEpoch = epoch;
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator TheChosenWorldAndHero_AreTheCampaigns()
         {

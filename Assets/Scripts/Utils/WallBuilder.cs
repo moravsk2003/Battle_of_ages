@@ -192,6 +192,8 @@ namespace BattleOfAges.Utils
 
         /// <summary>Width of the merlon on a pier (the segments' own merlons keep clear of it).</summary>
         private const float PierMerlonW = 0.8f;
+        /// <summary>Half the height and the depth of the joint between a pier's courses.</summary>
+        private const float PierJoint = 0.012f, PierJointDepth = 0.03f;
         /// <summary>A pier's top stands this much above the walkway (a flush one would flicker against the flags).</summary>
         public const float PierTopRise = 0.03f;
         /// <summary>Flat-to-flat half width of a pier (the octagon's circumradius is PierR).</summary>
@@ -241,8 +243,13 @@ namespace BattleOfAges.Utils
                 for (float y = 0.5f; y < top - 0.25f; y += 0.45f)
                 {
                     float y1 = Mathf.Min(y + 0.45f, top - 0.2f);
-                    OctBand(r, y, r, y1 - 0.02f, Block(y, Stone));
-                    OctBand(r - 0.025f, y1 - 0.02f, r - 0.025f, y1, Core); // the joint
+                    bool last = y1 >= top - 0.2f - 0.001f;
+                    float stoneTop = last ? y1 : y1 - PierJoint, stoneFoot = y > 0.5f ? y + PierJoint : y;
+                    OctBand(r, stoneFoot, r, stoneTop, Block(y, Stone));
+                    if (last) continue;
+                    // The joint, a closed groove: a straight step in left the ledge open, and through it one saw right through the pier
+                    OctBand(r, stoneTop, r - PierJointDepth, y1, Core);
+                    OctBand(r - PierJointDepth, y1, r, y1 + PierJoint, Core);
                 }
             OctBand(r, top - 0.2f, r + 0.1f, top - 0.12f, StoneLight * 0.9f);
             OctBand(r + 0.1f, top - 0.12f, r + 0.1f, top, StoneLight * 0.9f);

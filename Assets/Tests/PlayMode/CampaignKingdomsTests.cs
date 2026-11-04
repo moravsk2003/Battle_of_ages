@@ -41,6 +41,7 @@ namespace BattleOfAges.PlayModeTests
             cc.enabled = false; hero.transform.position = to; cc.enabled = true;
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(240000)]
         public IEnumerator ACampaign_HasItsHeroes_NearOnesReal_FarOnesData()
         {

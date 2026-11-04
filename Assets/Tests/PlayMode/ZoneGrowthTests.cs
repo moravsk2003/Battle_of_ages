@@ -239,6 +239,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(Vector2.Distance(new Vector2(middle.x, middle.z), new Vector2(place.x, place.z)), 1f, "the same place in the middle");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(60000)]
         public IEnumerator AWalker_ShouldersThroughARowOfUnits_InsteadOfGoingRound()
         {

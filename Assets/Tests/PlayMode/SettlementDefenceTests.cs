@@ -70,6 +70,7 @@ namespace BattleOfAges.PlayModeTests
             while (Time.time < end && !done()) yield return null;
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(300000)]
         public IEnumerator EnemyNearTheHall_RaisesTheAlarm_PeopleFightIt_ThenGoBackToWork()
         {
@@ -144,6 +145,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(job.IsWorking);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator TheAlarm_GathersPeopleRoundTheHall_NotIntoIt()
         {
@@ -177,6 +179,7 @@ namespace BattleOfAges.PlayModeTests
             }
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(300000)]
         public IEnumerator ARaidThatRuns_IsLetGo_AndThePeopleGoBack()
         {

@@ -75,6 +75,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(2, PiersNear(Far, 20f), "the free end's pier went with its segment, the shared one stays");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator Gate_OpensForThePlayer_AndCloses()
         {
@@ -206,6 +207,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(ownAtGate.z, Far.z - 4f, "own go through the gate");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator Villager_SentBehindTheWall_WalksThroughTheGate()
         {
@@ -229,6 +231,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(Vector3.Distance(v.transform.position, target), 1.5f, $"arrived behind the wall (at {v.transform.position - Far}; track{track})");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator Villager_GoesThroughTheGate_AndRoundAWallRightBehindIt()
         {
@@ -276,6 +279,7 @@ namespace BattleOfAges.PlayModeTests
             return (m.GetComponent<AI.HostileMobAI>(), wall.GetComponent<HealthComponent>(), targetHp);
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator WeakAttackers_ClimbALadder_IntoTheSettlement()
         {
@@ -307,6 +311,7 @@ namespace BattleOfAges.PlayModeTests
             done(false);
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator WallFallsUnderAClimber_ItDropsToTheGround_AndGoesOn()
         {
@@ -328,6 +333,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(mob.transform.position.z, Far.z - 1.7f, $"and goes on through the gap (at {mob.transform.position - Far} after {t:0} s)");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator ClimberKilledOnTheLadder_FallsDown_AndFreesTheLadder()
         {
@@ -352,6 +358,7 @@ namespace BattleOfAges.PlayModeTests
         /// A whole assault: six raiders of three kinds against a 20 m wall line — the strong break through, the rest take
         /// ladders in turns — and nobody stands stuck outside: each one gets in (or dies) and none waits still for long.
         /// </summary>
+        [Category("Slow")]
         [UnityTest, Timeout(300000)]
         public IEnumerator Assault_OnAWallLine_EveryoneGetsIn_NobodyStuck()
         {
@@ -405,6 +412,7 @@ namespace BattleOfAges.PlayModeTests
             foreach (SiegeLadder l in new List<SiegeLadder>(SiegeLadder.Active)) if (l != null) Object.Destroy(l.gameObject);
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator TwoClimbers_TakeTurns_OnOneLadder()
         {
@@ -450,6 +458,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(0, SiegeLadder.Active.Count, "no ladder for the strong");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator Defender_GoesUpTheStairsToAPost_AndComesDown()
         {
@@ -492,6 +501,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsFalse(WallWalk.FreePost(Far).Valid);
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator OnTheWalkway_AClimberFightsTheDefender()
         {
@@ -606,6 +616,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(Mathf.Abs(c.x - (Far.x + 2f)), 0.05f, "a right angle at most");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator Archer_OnThePost_ReachesFurtherThanOnTheGround()
         {
@@ -644,6 +655,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(unit.IsPostedOnWall, "and stayed up");
         }
 
+        [Category("Slow")]
         [UnityTest]
         public IEnumerator Alarm_SendsTheArcherUp_AndDownAgain()
         {

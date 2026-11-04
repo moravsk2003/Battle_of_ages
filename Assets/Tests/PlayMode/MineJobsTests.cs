@@ -65,6 +65,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.GreaterOrEqual(WorkerRegistry.MinerCount, 1);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(120000)]
         public IEnumerator HaulerOnALongRoad_BringsTheOreIn()
         {

@@ -71,6 +71,7 @@ namespace BattleOfAges.PlayModeTests
             return (attacker, target, army);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ACampaignArmy_TurnsReal_WhereItIs_WithItsTarget()
         {
@@ -95,6 +96,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsNotNull(real.Raiders[0].CurrentCombatTarget, "they know where they are going");
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ACampaignArmy_FoldsBack_NobodyLost_WhenTheHeroLeaves()
         {
@@ -126,6 +128,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(back.Armies[0].WithHero);
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ABattleBegun_IsNotFoldedUp()
         {

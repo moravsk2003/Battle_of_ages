@@ -11,6 +11,8 @@ namespace BattleOfAges.RTS
     public static class GroundMotor
     {
         private const float OutOfBuildingSpeed = 3f;
+        /// <summary>A unit at a prop's edge is not in it: only a good way in counts as inside.</summary>
+        private const float InsidePropShare = 0.8f;
         /// <summary>Max rise per horizontal metre (~55 degrees), like the units' CharacterController slope limit.</summary>
         private const float MaxClimb = 1.43f;
 
@@ -30,6 +32,15 @@ namespace BattleOfAges.RTS
                 t.position = outAt;
                 return outStep / dt;
             }
+            if (dt > 0f && World.SolidProps.Inside(p, radius * InsidePropShare, out Vector3 outOfProp))
+            {
+                // In a trunk or a rock (shoved there, or it grew round it): out of it first
+                Vector3 outStep = Vector3.ClampMagnitude(outOfProp, Mathf.Max(desiredVelocity.magnitude, OutOfBuildingSpeed) * dt);
+                Vector3 outAt = p + outStep;
+                outAt.y = RtsUnit.GetTerrainHeight(outAt);
+                t.position = outAt;
+                return outStep / dt;
+            }
             Vector3 v = desiredVelocity;
             v.y = 0f;
             if (gridId >= 0) v += UnitSpatialGrid.Separation(gridId, p, radius, v.sqrMagnitude > 0.01f ? Combat.GameBalance.WalkerSeparation : Combat.GameBalance.StandingSeparation);
@@ -41,6 +52,7 @@ namespace BattleOfAges.RTS
             Vector3 step = Building.WallBarriers.Constrain(p, v * dt, radius, own);
             step = AI.KingdomTown.Constrain(p, step, radius);
             step = World.Lakes.Constrain(p, step, radius); // nobody swims: along the shore instead
+            step = World.SolidProps.Constrain(p, step, radius); // nobody walks into a tree or a rock: along its edge instead
             if (step.sqrMagnitude < 1e-10f) return Vector3.zero;
             v = step / dt;
             Vector3 np = p + step;

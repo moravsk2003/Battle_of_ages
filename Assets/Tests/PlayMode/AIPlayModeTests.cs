@@ -41,6 +41,7 @@ namespace BattleOfAges.PlayModeTests
             spawned.Clear();
         }
 
+        [Category("Slow")]
         [UnityTest, Order(1)]
         public IEnumerator HostileCamp_MobsPatrolAroundTheirOwnCamp()
         {
@@ -156,6 +157,7 @@ namespace BattleOfAges.PlayModeTests
             return top;
         }
 
+        [Category("Slow")]
         [UnityTest, Order(3)]
         public IEnumerator WildBoar_HasBoarStats_IsAnimated_AndGrazesNearSpawn()
         {
@@ -197,6 +199,7 @@ namespace BattleOfAges.PlayModeTests
         /// The assault is launched towards five directions, so the squad has to get past different camp
         /// obstacles (campfire, tents, barricades) on the way out — AI movement has no pathfinding.
         /// </summary>
+        [Category("Slow")]
         [UnityTest, Order(4)]
         public IEnumerator SettlementLeader_AssaultOrder_SquadReachesPlayerFromAnyDirection()
         {

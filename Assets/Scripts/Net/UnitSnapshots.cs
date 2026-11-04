@@ -2,24 +2,25 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
 
 namespace BattleOfAges.Net
 {
-    /// <summary>One unit in a snapshot, as it goes on the wire: position and heading quantized, health a share. 10 bytes (§14.2).</summary>
+    /// <summary>One unit in a snapshot, as it goes on the wire: position and heading quantized, health a share, what it wears. 11 bytes (§14.2).</summary>
     public struct UnitRow
     {
-        public const int Bytes = 10;
+        public const int Bytes = 11;
         public ushort Id, X, Z;
-        public byte Yaw, Health, Rank, Team;
+        public byte Yaw, Health, Rank, Team, Gear;
 
         public void Write(byte[] b, int at)
         {
             b[at] = (byte)Id; b[at + 1] = (byte)(Id >> 8);
             b[at + 2] = (byte)X; b[at + 3] = (byte)(X >> 8);
             b[at + 4] = (byte)Z; b[at + 5] = (byte)(Z >> 8);
-            b[at + 6] = Yaw; b[at + 7] = Health; b[at + 8] = Rank; b[at + 9] = Team;
+            b[at + 6] = Yaw; b[at + 7] = Health; b[at + 8] = Rank; b[at + 9] = Team; b[at + 10] = Gear;
         }
 
         public static UnitRow Read(byte[] b, int at) => new UnitRow
@@ -27,7 +28,7 @@ namespace BattleOfAges.Net
             Id = (ushort)(b[at] | b[at + 1] << 8),
             X = (ushort)(b[at + 2] | b[at + 3] << 8),
             Z = (ushort)(b[at + 4] | b[at + 5] << 8),
-            Yaw = b[at + 6], Health = b[at + 7], Rank = b[at + 8], Team = b[at + 9]
+            Yaw = b[at + 6], Health = b[at + 7], Rank = b[at + 8], Team = b[at + 9], Gear = b[at + 10]
         };
     }
 
@@ -53,9 +54,12 @@ namespace BattleOfAges.Net
         {
             public Component Owner;
             public ushort X, Z;
-            public byte Yaw, Health, Rank, Team;
+            public byte Yaw, Health, Rank, Team, Swing, Gear;
             public float SentAt;
             public int GoneLeft;
+            public HealthComponent Hp;
+            public CombatUnit Combat;
+            public Equipment Worn;
         }
 
         private Known[] known = new Known[512];
@@ -70,6 +74,9 @@ namespace BattleOfAges.Net
         public HealthComponent Hero { get; set; }
         private float heroSentAt = float.NegativeInfinity;
         private UnitRow heroLast;
+        private HealthComponent heroCombatOf;
+        private CombatUnit heroCombat;
+        private Equipment heroWorn;
 
         public static ushort Quantize(float v) => (ushort)Mathf.Clamp(Mathf.RoundToInt((v + HalfExtent) / (2f * HalfExtent) * 65535f), 0, 65535);
         public static float Unquantize(ushort q) => q / 65535f * 2f * HalfExtent - HalfExtent;
@@ -107,8 +114,16 @@ namespace BattleOfAges.Net
                 Health = Hero.IsAlive ? (byte)Mathf.Clamp(Mathf.CeilToInt((float)Hero.CurrentHealth / Mathf.Max(1, Hero.MaxHealth) * 200f), 1, 200) : (byte)0,
                 Rank = (byte)UnitRank.General, Team = UnitSpatialGrid.TeamPlayer
             };
-            bool same = row.X == heroLast.X && row.Z == heroLast.Z && row.Yaw == heroLast.Yaw && row.Health == heroLast.Health;
+            if (heroCombatOf != Hero)
+            {
+                heroCombatOf = Hero;
+                heroCombat = Hero.GetComponent<CombatUnit>();
+                heroWorn = Hero.GetComponent<Equipment>();
+            }
+            if (heroCombat != null && (heroCombat.AttacksStarted & 1) != 0) row.Rank |= SwingBit;
+            bool same = row.X == heroLast.X && row.Z == heroLast.Z && row.Yaw == heroLast.Yaw && row.Health == heroLast.Health && row.Rank == heroLast.Rank;
             if (same && now - heroSentAt < RefreshSeconds) return false;
+            row.Gear = GearOf(heroWorn);
             heroLast = row;
             heroSentAt = now;
             return true;
@@ -116,6 +131,44 @@ namespace BattleOfAges.Net
 
         /// <summary>What a row's Rank byte says beyond a rank: a camp's raider or an animal has a look of its own.</summary>
         public const byte MobLook = 16, AnimalLook = 64;
+        /// <summary>The Rank byte's top bit: flips with each swing the unit begins, so that a swing shows on the other machines.</summary>
+        public const byte SwingBit = 128;
+        /// <summary>A gone row's Yaw: it fell in battle (else it only left, a far army folding up).</summary>
+        public const byte FellYaw = 1;
+
+        // The Gear byte: the weapon in the low three bits, then a bit for each other slot
+        private const int WeaponMask = 7, ShieldBit = 8, HelmetBit = 16, ChestBit = 32, GlovesBit = 64, BootsBit = 128;
+        private static readonly ItemType[] Weapons = { ItemType.Sword, ItemType.Bow, ItemType.Staff, ItemType.Axe, ItemType.Pickaxe };
+        /// <summary>A level for what is shown: the level changes the stats, which stay with the owner.</summary>
+        private const int ShownLevel = 1;
+
+        /// <summary>What a unit wears, in the byte that goes with it.</summary>
+        public static byte GearOf(Equipment worn)
+        {
+            if (worn == null) return 0;
+            int gear = 0;
+            Item weapon = worn[EquipSlot.Weapon];
+            if (!weapon.IsEmpty) gear = Array.IndexOf(Weapons, weapon.Type) + 1;
+            if (!worn[EquipSlot.Shield].IsEmpty) gear |= ShieldBit;
+            if (!worn[EquipSlot.Helmet].IsEmpty) gear |= HelmetBit;
+            if (!worn[EquipSlot.Chest].IsEmpty) gear |= ChestBit;
+            if (!worn[EquipSlot.Gloves].IsEmpty) gear |= GlovesBit;
+            if (!worn[EquipSlot.Boots].IsEmpty) gear |= BootsBit;
+            return (byte)gear;
+        }
+
+        /// <summary>The same byte read: the pieces to show.</summary>
+        public static void ReadGear(byte gear, bool withHelmet, List<Item> into)
+        {
+            into.Clear();
+            int weapon = gear & WeaponMask;
+            if (weapon > 0 && weapon <= Weapons.Length) into.Add(new Item(Weapons[weapon - 1], ShownLevel));
+            if ((gear & ShieldBit) != 0) into.Add(new Item(ItemType.Shield, ShownLevel));
+            if ((gear & HelmetBit) != 0 || withHelmet) into.Add(new Item(ItemType.Helmet, ShownLevel));
+            if ((gear & ChestBit) != 0) into.Add(new Item(ItemType.Armor, ShownLevel));
+            if ((gear & GlovesBit) != 0) into.Add(new Item(ItemType.Gloves, ShownLevel));
+            if ((gear & BootsBit) != 0) into.Add(new Item(ItemType.Boots, ShownLevel));
+        }
 
         private static byte Look(Component owner)
         {
@@ -134,8 +187,9 @@ namespace BattleOfAges.Net
             {
                 if (k.GoneLeft <= 0) return false;
                 k.GoneLeft--;
+                byte fell = k.Hp != null && !k.Hp.IsAlive ? FellYaw : (byte)0;
                 if (k.GoneLeft == 0) k.Owner = null;
-                row = new UnitRow { Id = (ushort)id, X = k.X, Z = k.Z, Yaw = k.Yaw, Health = 0, Rank = k.Rank, Team = k.Team };
+                row = new UnitRow { Id = (ushort)id, X = k.X, Z = k.Z, Yaw = fell, Health = 0, Rank = k.Rank, Team = k.Team };
                 return true;
             }
             Component owner = UnitSpatialGrid.Owner(id);
@@ -149,6 +203,8 @@ namespace BattleOfAges.Net
                 k.Team = (byte)Mathf.Clamp(UnitSpatialGrid.Team(id), 0, 255);
                 k.SentAt = float.NegativeInfinity;
                 k.Health = 255;
+                k.Combat = owner.GetComponent<CombatUnit>();
+                k.Worn = owner.GetComponent<Equipment>();
             }
             Vector3 p3 = UnitSpatialGrid.Position(id);
             ushort x = Quantize(p3.x), z = Quantize(p3.z);
@@ -156,10 +212,13 @@ namespace BattleOfAges.Net
             HealthComponent hp = UnitSpatialGrid.Health(id);
             byte health = (byte)Mathf.Clamp(Mathf.CeilToInt((float)hp.CurrentHealth / Mathf.Max(1, hp.MaxHealth) * 200f), 1, 200);
             float step = MovedMetres / (2f * HalfExtent) * 65535f;
-            bool changed = Mathf.Abs(x - k.X) > step || Mathf.Abs(z - k.Z) > step || Mathf.Abs(yaw - k.Yaw) > 4 || health != k.Health;
+            byte swing = k.Combat != null && (k.Combat.AttacksStarted & 1) != 0 ? SwingBit : (byte)0;
+            bool changed = Mathf.Abs(x - k.X) > step || Mathf.Abs(z - k.Z) > step || Mathf.Abs(yaw - k.Yaw) > 4 || health != k.Health || swing != k.Swing;
             if (!changed && now - k.SentAt < RefreshSeconds) return false;
-            k.X = x; k.Z = z; k.Yaw = yaw; k.Health = health; k.SentAt = now; k.GoneLeft = GoneRepeats;
-            row = new UnitRow { Id = (ushort)id, X = x, Z = z, Yaw = yaw, Health = health, Rank = k.Rank, Team = k.Team };
+            k.X = x; k.Z = z; k.Yaw = yaw; k.Health = health; k.Swing = swing; k.SentAt = now; k.GoneLeft = GoneRepeats;
+            k.Hp = hp;
+            k.Gear = GearOf(k.Worn);
+            row = new UnitRow { Id = (ushort)id, X = x, Z = z, Yaw = yaw, Health = health, Rank = (byte)(k.Rank | swing), Team = k.Team, Gear = k.Gear };
             return true;
         }
 
@@ -216,24 +275,34 @@ namespace BattleOfAges.Net
         }
 
         private void OnDestroy() { if (Health != null) Health.OnTakeDamage -= OnHit; }
+
+        /// <summary>Its owner says it has fallen: it falls here too, and lies as the fallen do.</summary>
+        public void Fall()
+        {
+            Health.OnTakeDamage -= OnHit;
+            UnitCorpse.AttachTo(gameObject);
+            Health.FallNow();
+        }
     }
 
     /// <summary>
     /// A player's view of units it does not simulate (M8 step 3): a body for each, a little behind the snapshots so it moves between
-    /// two known places. No AI: only what it looks like and something to strike. A swing is not shown yet.
+    /// two known places. No AI: what it looks like and wears, its swing and its fall, and something to strike.
     /// </summary>
     public sealed class RemoteUnits : MonoBehaviour
     {
         private const float RenderDelay = 0.15f, ForgetAfter = 6f;
         private const int SpawnsPerFrame = 40;
+        private const float BodyRadius = 0.45f;
 
         private sealed class Body
         {
             public Transform Root;
             public Vector3 From, To;
             public float FromAt, ToAt, FromYaw, ToYaw, LastHeard;
-            public byte Rank, Team, Health;
+            public byte Rank, Team, Health, Gear, Swing;
             public RemoteBody Mark;
+            public CharacterAnimationDriver Driver;
             public int GridId = -1;
         }
 
@@ -251,6 +320,7 @@ namespace BattleOfAges.Net
         private readonly Dictionary<int, Body> bodies = new Dictionary<int, Body>();
         private readonly Dictionary<int, UnitRow> waiting = new Dictionary<int, UnitRow>();
         private readonly List<int> forget = new List<int>();
+        private readonly List<Item> worn = new List<Item>(6);
         private Action<UnitRow> onRow;
         private int owner;
 
@@ -277,13 +347,29 @@ namespace BattleOfAges.Net
         private void OnRow(UnitRow row)
         {
             int key = Key(owner, row.Id);
+            byte swing = (byte)(row.Rank & UnitSnapshotWriter.SwingBit);
+            row.Rank &= unchecked((byte)~UnitSnapshotWriter.SwingBit);
             if (row.Health == 0)
             {
                 waiting.Remove(key);
-                Remove(key);
+                if (row.Yaw == UnitSnapshotWriter.FellYaw && row.Id != UnitSnapshotWriter.HeroId && row.Rank < UnitSnapshotWriter.AnimalLook) Fall(key);
+                else Remove(key);
                 return;
             }
-            if (bodies.TryGetValue(key, out Body b) && b.Rank == row.Rank && b.Team == row.Team) Retarget(b, row);
+            if (bodies.TryGetValue(key, out Body b) && b.Rank == row.Rank && b.Team == row.Team)
+            {
+                Retarget(b, row);
+                if (swing != b.Swing)
+                {
+                    b.Swing = swing;
+                    if (b.Driver != null) b.Driver.PlaySwing();
+                }
+                if (row.Gear != b.Gear)
+                {
+                    b.Gear = row.Gear;
+                    Wear(b, row.Id);
+                }
+            }
             else
             {
                 if (b != null) Remove(key); // the number has passed to another unit
@@ -309,6 +395,8 @@ namespace BattleOfAges.Net
         private static Vector3 PlaceOf(UnitRow row)
         {
             float x = UnitSnapshotWriter.Unquantize(row.X), z = UnitSnapshotWriter.Unquantize(row.Z);
+            // Its owner may have no such tree loaded (a kingdom far from the host walks where no chunk is): it shows beside it, not in it
+            if (World.SolidProps.Inside(new Vector3(x, 0f, z), BodyRadius, out Vector3 way)) { x += way.x; z += way.z; }
             return new Vector3(x, RtsUnit.GetTerrainHeight(new Vector3(x, 0f, z)), z);
         }
 
@@ -318,7 +406,8 @@ namespace BattleOfAges.Net
             var go = new GameObject("Remote_" + row.Id);
             go.transform.SetPositionAndRotation(PlaceOf(row), Quaternion.Euler(0f, row.Yaw / 255f * 360f, 0f));
             if (WithModels) DressBody(go, row);
-            var b = new Body { Root = go.transform, Rank = row.Rank, Team = row.Team, Health = row.Health, LastHeard = Time.time };
+            var b = new Body { Root = go.transform, Rank = row.Rank, Team = row.Team, Health = row.Health, Gear = row.Gear, LastHeard = Time.time };
+            b.Driver = go.GetComponentInChildren<CharacterAnimationDriver>();
             int who = key >> 16;
             int rank = row.Rank < UnitSnapshotWriter.MobLook ? Mathf.Clamp(row.Rank, 0, GameBalance.RankHealth.Length - 1) : 1;
             b.Mark = go.AddComponent<RemoteBody>();
@@ -327,13 +416,23 @@ namespace BattleOfAges.Net
             {
                 // Solid and hittable the way units are: a capsule the probes pass by and a blow finds
                 CharacterController cc = go.AddComponent<CharacterController>();
-                cc.height = 2f; cc.radius = 0.45f; cc.center = new Vector3(0f, 1f, 0f);
+                cc.height = 2f; cc.radius = BodyRadius; cc.center = new Vector3(0f, 1f, 0f);
             }
-            b.GridId = UnitSpatialGrid.Register(b.Mark, b.Mark.Health, TeamOf(row.Team, who), 0.45f);
+            b.GridId = UnitSpatialGrid.Register(b.Mark, b.Mark.Health, TeamOf(row.Team, who), BodyRadius);
+            if (WithModels) Wear(b, row.Id);
             b.To = b.From = go.transform.position;
             b.ToYaw = b.FromYaw = go.transform.eulerAngles.y;
             b.ToAt = b.FromAt = Time.time;
             bodies[key] = b;
+        }
+
+        /// <summary>What it is known to wear, on its model. A hero always has its helmet: under it the model has a bare head with no hair.</summary>
+        private void Wear(Body b, ushort id)
+        {
+            CharacterGear gear = b.Root != null ? b.Root.GetComponentInChildren<CharacterGear>() : null;
+            if (gear == null) return;
+            UnitSnapshotWriter.ReadGear(b.Gear, id == UnitSnapshotWriter.HeroId, worn);
+            gear.Show(worn);
         }
 
         private static void DressBody(GameObject go, UnitRow row)
@@ -375,6 +474,16 @@ namespace BattleOfAges.Net
             forget.Clear();
             foreach (int key in waiting.Keys) if (key >> 16 == who) forget.Add(key);
             foreach (int key in forget) waiting.Remove(key);
+        }
+
+        /// <summary>Fallen in battle: it plays its fall and lies there, and is nobody's business any more.</summary>
+        private void Fall(int id)
+        {
+            if (!bodies.TryGetValue(id, out Body b)) return;
+            if (!WithModels || b.Root == null) { Remove(id); return; }
+            bodies.Remove(id);
+            if (b.GridId >= 0) UnitSpatialGrid.Unregister(b.GridId);
+            b.Mark.Fall();
         }
 
         private void Remove(int id)

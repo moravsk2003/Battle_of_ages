@@ -73,9 +73,13 @@
 ## 6. Тести й інструменти
 
 - **EditMode** (`Assets/Tests/EditMode`) — правила й формули; **PlayMode** — поведінка в сцені. Нова система — з тестами
-  обох видів. Запуск у batch — `unity.ps1 -Mode EditMode|PlayMode [-Filter ...]` (лише один batch Unity одночасно).
-- **Інструменти перегляду** (Explicit, PlayMode): `UiCapture`, `MenuCapture`, `ObjectCapture`, `KnightCapture`,
-  `GearCapture`... — знімки в `CAPTURE_DIR`; заміри — `PerformanceProbe`, `StressTest`, `BalanceProbe`, `SessionSim`.
+  обох видів.
+- **Запуск у batch** (лише один batch Unity одночасно, проєкт закритий у редакторі): `tools\run_tests.ps1` — скорочений прогін, усі
+  правила й PlayMode без тестів `[Category("Slow")]`; це звичайний запуск, у тому числі перед випуском. `-Full` — усе, лише на прохання автора; `-Filter X` — лише потрібні.
+  Тест, що йде понад 3 секунди, позначаємо `Slow`, крім кількох головних для перевірки гри (збереження, новий світ, сцена без помилок).
+- **Інструменти перегляду** (Explicit, PlayMode): `UiCapture`, `MenuCapture`, `ObjectCapture`, `ModelCapture`, `KnightCapture`,
+  `AnimalCapture`, `GearCapture`, `GraphicsCapture`, `GpuSkinCapture` — знімки в `CAPTURE_DIR`; заміри — `PerformanceProbe`, `StressTest`,
+  `GrassProbe`, `BalanceProbe`, `SessionSim`, `BanditRaidSim`. Разові інструменти, що вже дали відповідь, видаляємо: їх легко написати знову.
 - Редакторські інструменти перебудови (`Assets/Editor`): моделі персонажів, руки від першої особи, сцена, збірки
   (`BuildGameTool`).
 
@@ -86,12 +90,12 @@
 - **Земля:** `InfiniteWorldManager.HoldSettlements` тримає чанки навколо кожної ратуші, навіть коли герой далеко.
 - **Зони:** `ZoneMap` (клітинки 8 м), `ZonePainter` (пензель), `ZoneToolbar` (кнопки мапи), `ZoneGrower` (ставить ділянки), `ConstructionSite` (будують робітники), `WorkPlace` (поле,
   лісопилка), `Caravans` (між поселеннями).
-- **Рух:** `GroundMotor` (рельєф, озера, стіни, `Footprints` будівель); `GameBalance.WalkerSeparation`, `StandingSeparation`, `PressBeforeBypass`.
+- **Рух:** `GroundMotor` (рельєф, озера, стіни, `Footprints` будівель, `SolidProps`: стовбури, валуни й руда); `GameBalance.WalkerSeparation`, `StandingSeparation`, `PressBeforeBypass`.
 - **Абстрактний шар:** `KingdomRealm` (далекі королівства даними), `KingdomEconomy`, `AbstractBattle` / `UnitStats` (бій цифрами). Після зміни бойового балансу зіграти заново
   `AbstractBattleCalibration.PlayTheBattles`.
 - **Імперія:** `NpcKingdom.IsEmpire` у кожній кампанії, `CentralEmpire.Active` лише коли її тримає гравець.
 
-Заміри: `PaceSim` (темп зі справжнього старту; `SIM_ZONES`: що дає кожна зона), `ZoneCapture`, `SettlementCapture`, `PushProbe`.
+Заміри: `PaceSim` (темп зі справжнього старту; `SIM_ZONES`: що дає кожна зона), `PushProbe`.
 
 ## 7. Відомий борг
 

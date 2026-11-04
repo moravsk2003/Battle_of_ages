@@ -139,6 +139,9 @@ namespace BattleOfAges.Net
             ushort port = ushort.Parse(Arg(args, "-netdemoport", NetLink.DefaultPort.ToString()));
             Application.runInBackground = true;
             var report = new StringBuilder();
+            string asVersion = Arg(args, "-netdemoversion", "");
+            if (asVersion.Length > 0) NetSession.VersionOverride = asVersion;
+            report.AppendLine($"version {NetSession.GameVersion}");
             if (host)
             {
                 SaveSystem.NewGame(new CampaignSetup { Seed = 777, Size = World.WorldSettings.DefaultSize, Heroes = 16, KingShare = 0.75f, Class = HeroClass.Tank });
@@ -230,7 +233,7 @@ namespace BattleOfAges.Net
                 GameObject me = GameObject.Find("Player");
                 string other = "not seen";
                 if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 otherAt, out int share)) other = $"at {otherAt.x:0},{otherAt.z:0} health {share}";
-                report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count}, " +
+                report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, number {(s != null ? s.Number : -1)}, in the game [{(s != null ? string.Join(",", s.Players) : "")}], seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count}, " +
                                   $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)}, trees told {SaveLoad.WorldPersistence.Capture().Trees.Count}, others' zones {World.ZoneMap.ForeignCount}, guests {GuestBook.All.Count} save {(GuestBook.All.Count > 0 ? GuestBook.All[0].Save.Length : 0)}, life claims {(s != null ? s.LifeClaimCount : -1)}, clock {WorldClock.GameHours:0.00}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
             }
             Directory.CreateDirectory(Path.GetDirectoryName(log));

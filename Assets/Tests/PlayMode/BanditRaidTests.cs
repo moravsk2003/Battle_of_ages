@@ -36,6 +36,7 @@ namespace BattleOfAges.PlayModeTests
             try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch { }
         }
 
+        [Category("Slow")]
         [UnityTest, Timeout(180000)]
         public IEnumerator ABand_ComesAtItsHour_ForTheSettlement_AndTheNextIsBigger()
         {

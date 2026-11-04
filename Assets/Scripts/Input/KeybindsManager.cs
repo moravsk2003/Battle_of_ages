@@ -21,7 +21,8 @@ namespace BattleOfAges.InputSystem
         AlertJump,
         UseFullHeal,
         UseLightning,
-        AutoWalk
+        AutoWalk,
+        PlayerList
     }
 
     /// <summary>
@@ -48,7 +49,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.AlertJump,       KeyCode.Space },
             { KeyAction.UseFullHeal,     KeyCode.Alpha1 },
             { KeyAction.UseLightning,    KeyCode.Alpha2 },
-            { KeyAction.AutoWalk,        KeyCode.V }
+            { KeyAction.AutoWalk,        KeyCode.V },
+            { KeyAction.PlayerList,      KeyCode.Tab }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -68,7 +70,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.AlertJump,       "До місця нападу (мапа)" },
             { KeyAction.UseFullHeal,     "Артефакт: повне зцілення" },
             { KeyAction.UseLightning,    "Артефакт: блискавка" },
-            { KeyAction.AutoWalk,        "Автоходьба" }
+            { KeyAction.AutoWalk,        "Автоходьба" },
+            { KeyAction.PlayerList,      "Хто в грі (утримувати)" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

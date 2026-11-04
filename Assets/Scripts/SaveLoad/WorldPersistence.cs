@@ -115,6 +115,7 @@ namespace BattleOfAges.SaveLoad
             tree.PersistentKey = key;
             if (key != null) liveTrees[key] = tree;
             if (key != null && Trees.TryGetValue(key, out TreeSave s)) tree.ApplySavedState((TreeState)s.State, s.Wood);
+            tree.StandSolid();
         }
 
         public static void RecordTree(ResourceNodeTree tree)
