@@ -32,9 +32,11 @@ namespace BattleOfAges.RTS
                 t.position = outAt;
                 return outStep / dt;
             }
-            if (dt > 0f && World.SolidProps.Inside(p, radius * InsidePropShare, out Vector3 outOfProp))
+            if (dt > 0f && World.SolidProps.Inside(p, radius * InsidePropShare, out _))
             {
-                // In a trunk or a rock (shoved there, or it grew round it): out of it first
+                // In a trunk or a rock (shoved there, or it grew round it): out of it first, right to its edge. (Pushed only as far
+                // as this check's own line, a unit stayed a hair inside it for good, pushed out each frame and never walking on.)
+                World.SolidProps.Inside(p, radius, out Vector3 outOfProp);
                 Vector3 outStep = Vector3.ClampMagnitude(outOfProp, Mathf.Max(desiredVelocity.magnitude, OutOfBuildingSpeed) * dt);
                 Vector3 outAt = p + outStep;
                 outAt.y = RtsUnit.GetTerrainHeight(outAt);

@@ -19,7 +19,7 @@ namespace BattleOfAges.PlayModeTests
         private static readonly Vector3 Far = new Vector3(-5200f, 0f, -5200f);
         private readonly List<GameObject> spawned = new List<GameObject>();
 
-        // (a campaign left by another test bounds the world, and Far lies beyond its mountains)
+        // (a campaign left by another test would bound the world, and Far lies beyond its mountains)
         [SetUp]
         public void Setup() => WorldSettings.Set(0, 0f);
 
@@ -58,6 +58,34 @@ namespace BattleOfAges.PlayModeTests
             Assert.Greater(way.x, 0f, "the short way out");
             SolidProps.Remove(rock);
             Assert.IsFalse(SolidProps.Inside(Far + new Vector3(0.5f, 0f, 0f), 0.4f, out _), "gone, it stops nobody");
+        }
+
+        /// <summary>A unit coming out of a rock stopped a hair inside the line of "inside", and only ever got pushed from then on.</summary>
+        [Test]
+        public void OneComingOutOfARock_WalksOn_FromAnyPlaceInIt()
+        {
+            Rock(Far, 1.5f);
+            var body = new GameObject("Walker");
+            spawned.Add(body);
+            Vector3 goal = Far + new Vector3(-9f, 0f, 0.3f);
+            const float radius = 0.4f;
+            foreach (float from in new[] { 0.3f, 1.0f, 1.5f + radius * 0.8f - 0.001f, 1.5f + radius * 0.8f + 0.001f, 1.5f + radius })
+                foreach (float angle in new[] { 0.6f, 1.2f, 2.4f, 4.0f, 5.5f })
+                {
+                    Vector3 at = Far + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * from;
+                    at.y = RTS.RtsUnit.GetTerrainHeight(at);
+                    body.transform.position = at;
+                    for (int i = 0; i < 2000; i++)
+                    {
+                        Vector3 way = goal - body.transform.position;
+                        way.y = 0f;
+                        if (way.magnitude < 0.3f) break;
+                        GroundMotor.Move(body.transform, -1, way.normalized * 4.5f, radius, 0.02f);
+                    }
+                    Vector3 left = goal - body.transform.position;
+                    left.y = 0f;
+                    Assert.Less(left.magnitude, 0.5f, $"from {from:0.000} m at {angle} rad: it stood at {body.transform.position - Far}");
+                }
         }
 
         /// <summary>A worker walking dead straight at a rock's middle stood there for good: an even chance, by where it came from.</summary>
