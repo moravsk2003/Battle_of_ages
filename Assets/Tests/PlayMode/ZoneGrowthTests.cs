@@ -27,6 +27,7 @@ namespace BattleOfAges.PlayModeTests
             if (ResourceManager.Instance == null) spawned.Add(new GameObject("Resources", typeof(ResourceManager)));
             ResourceManager.Instance.SetState(200, new[] { new KeyValuePair<int, int>(0, 100) });
             ResourceManager.Instance.SetFood(100f);
+            foreach (ConstructionSite s in new List<ConstructionSite>(ConstructionSite.All)) if (s != null) Object.Destroy(s.gameObject); // (an earlier test's: this one counts them)
             foreach (BuildingNode b in new List<BuildingNode>(BuildingNode.Active)) if (b != null) Object.Destroy(b.gameObject);
             // Earlier tests' free workers would take the places a test means for its own (a field has two)
             foreach (NpcResourceGatherer w in new List<NpcResourceGatherer>(WorkerRegistry.ActiveWorkers)) if (w != null) Object.Destroy(w.gameObject);
