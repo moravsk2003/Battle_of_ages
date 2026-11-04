@@ -127,8 +127,10 @@ namespace BattleOfAges.UI
             Vector3 from = strokeOn ? strokeFrom : cursor;
             strokeFrom = cursor;
             strokeOn = true;
-            if (erase) { EraseStroke(from, cursor, Brush); return; }
-            PaintStroke(from, cursor, Brush, Tool, out string refused);
+            if (erase) { Net.CommandBus.Submit(new Net.PaintZoneCommand { From = from, To = cursor, Radius = Brush, Erase = true }); return; }
+            var stroke = new Net.PaintZoneCommand { From = from, To = cursor, Radius = Brush, Zone = Tool };
+            Net.CommandBus.Submit(stroke);
+            string refused = stroke.Refused;
             if (refused != null && (refused != lastRefusal || Time.unscaledTime - refusalAt > 3f))
             {
                 lastRefusal = refused;
@@ -150,7 +152,7 @@ namespace BattleOfAges.UI
             return changed;
         }
 
-        private static void EraseStroke(Vector3 from, Vector3 to, float radius)
+        public static void EraseStroke(Vector3 from, Vector3 to, float radius)
         {
             int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(from, to) / (radius * 0.5f)));
             for (int i = 1; i <= steps; i++) ZoneMap.Erase(Vector3.Lerp(from, to, i / (float)steps), radius);

@@ -63,7 +63,7 @@ namespace BattleOfAges.UI
         }
 
         /// <summary>Makes one exchange if the stock has it; false otherwise.</summary>
-        private static bool Trade(Good give, int giveAmount, Good take, int takeAmount)
+        public static bool Trade(Good give, int giveAmount, Good take, int takeAmount)
         {
             ResourceManager rm = ResourceManager.Instance;
             if (rm == null || Have(give) < giveAmount) return false;
@@ -121,7 +121,7 @@ namespace BattleOfAges.UI
             {
                 var (give, giveN, take, takeN) = list[i];
                 float y = -116f - i * 60f;
-                Button b = UiTheme.TextButton(panel, "Offer" + i, $"{giveN} {Name(give)}  →  {takeN} {Name(take)}", new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(460f, 50f), () => { Trade(give, giveN, take, takeN); Refresh(); }, 19);
+                Button b = UiTheme.TextButton(panel, "Offer" + i, $"{giveN} {Name(give)}  →  {takeN} {Name(take)}", new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(460f, 50f), () => { Net.CommandBus.Submit(new Net.TradeCommand { Give = give, GiveAmount = giveN, Take = take, TakeAmount = takeN }); Refresh(); }, 19);
                 offers[i] = new Offer { Give = give, GiveAmount = giveN, Take = take, TakeAmount = takeN, Button = b };
             }
             RectTransform row = UiTheme.Rect(panel, "Caravans", new Vector2(0.5f, 1f), new Vector2(0f, -490f), new Vector2(580f, 100f));

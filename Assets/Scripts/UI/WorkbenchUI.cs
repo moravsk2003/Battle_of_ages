@@ -193,7 +193,7 @@ namespace BattleOfAges.UI
             if (bench == null) bench = WorkbenchNode.Instance;
             if (bench == null) return;
             int count = all ? WorkbenchNode.SmeltableCount(smeltTier) : 1;
-            if (count <= 0 || !bench.TryEnqueueSmelt(smeltTier, count)) StrategyHud.Notify($"Не вистачає руди {CraftingTask.Tier(smeltTier)}: потрібно {Combat.GameBalance.SmeltRatio}");
+            Net.CommandBus.Submit(new Net.SmeltCommand { Bench = Net.WorldEntity.IdOf(bench).Value, Tier = smeltTier, Count = count });
             RefreshAll();
         }
 
@@ -221,22 +221,21 @@ namespace BattleOfAges.UI
         {
             if (bench == null) bench = WorkbenchNode.Instance;
             if (bench == null) return;
-            if (!bench.TryEnqueueItem(type, selectedLevel)) StrategyHud.Notify("Не вистачає ресурсів");
+            Net.CommandBus.Submit(new Net.CraftCommand { Bench = Net.WorldEntity.IdOf(bench).Value, Item = type, Level = selectedLevel });
             RefreshAll();
         }
 
         private void CallWorker()
         {
             if (bench == null) return;
-            RtsUnit u = bench.AssignNearestFreeWorker();
-            if (u == null) StrategyHud.Notify(bench.IsWorkerFull ? "Усі місця біля верстака зайняті" : "Немає вільних робітників");
+            Net.CommandBus.Submit(new Net.BenchWorkerCommand { Bench = Net.WorldEntity.IdOf(bench).Value, Call = true });
             RefreshAll();
         }
 
         private void ReleaseWorker()
         {
             if (bench == null) return;
-            bench.UnassignLastWorker();
+            Net.CommandBus.Submit(new Net.BenchWorkerCommand { Bench = Net.WorldEntity.IdOf(bench).Value, Call = false });
             RefreshAll();
         }
 

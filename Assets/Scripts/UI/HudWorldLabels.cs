@@ -342,7 +342,7 @@ namespace BattleOfAges.UI
             RectTransform tr = UiTheme.Rect(hallLabel, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 52f));
             hallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             hallText.supportRichText = true;
-            hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Viewed != null && TownHall.Viewed.TryUpgrade()) GameSound.Play2D(GameSound.Kind.Fanfare); }, 13);
+            hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Viewed != null) Net.CommandBus.Submit(new Net.UpgradeHallCommand { Hall = Net.WorldEntity.IdOf(TownHall.Viewed).Value }); }, 13);
             hallButtonText = hallButton.GetComponentInChildren<Text>();
             hallButtonText.supportRichText = true;
             hallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -362,7 +362,7 @@ namespace BattleOfAges.UI
                 RectTransform tr = UiTheme.Rect(wallRow, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
                 wallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
                 wallText.supportRichText = true;
-                wallButton = UiTheme.TextButton(wallRow, "UpgradeWalls", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 44f), () => { if (Fortifications.TryUpgrade()) GameSound.Play2D(GameSound.Kind.Fanfare); }, 13);
+                wallButton = UiTheme.TextButton(wallRow, "UpgradeWalls", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 44f), () => Net.CommandBus.Submit(new Net.UpgradeWallsCommand()), 13);
                 wallButtonText = wallButton.GetComponentInChildren<Text>();
                 wallButtonText.supportRichText = true;
                 wallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;

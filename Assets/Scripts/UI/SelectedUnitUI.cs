@@ -239,10 +239,9 @@ namespace BattleOfAges.UI
         private void IssueDirectiveToSelected(GatherDirective directive)
         {
             if (commander == null) return;
-            int n = 0;
-            foreach (RtsUnit unit in commander.SelectedUnits)
-                if (unit != null && unit.TryGetComponent(out NpcResourceGatherer gatherer)) { gatherer.SetGatherDirective(directive); n++; }
-            if (n == 0) StrategyHud.Notify("Серед обраних немає робітників");
+            var ids = new List<int>();
+            foreach (RtsUnit unit in commander.SelectedUnits) if (unit != null) ids.Add(Net.WorldEntity.IdOf(unit).Value);
+            Net.CommandBus.Submit(new Net.SetDirectiveCommand { Units = ids.ToArray(), Directive = directive });
         }
 
         private void DeselectAll()

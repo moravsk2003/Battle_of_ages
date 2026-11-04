@@ -388,44 +388,50 @@ namespace BattleOfAges.Building
                 return;
             }
 
-            ResourceManager rm = ResourceManager.Instance;
-            if (rm == null)
+            if (ResourceManager.Instance == null)
             {
                 CancelPlacement();
                 return;
             }
 
-            if (!Combat.CentralEmpire.Active) // building is free for the Central Empire
-            {
-                if (def.WoodCost > 0) rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
-                if (def.OreCost > 0)
-                {
-                    if (WallSegment.IsWall(def.Type)) rm.ConsumeOre(OreTierOf(def), def.OreCost); // a wall is as strong as its ore
-                    else rm.ConsumeOreAtLeast(OreTierOf(def), def.OreCost); // others take its tier or better, the commonest first
-                }
-            }
-
-            GameObject building = CreateBuilding(currentBuildingType);
-
-            if (building != null)
-            {
-                building.transform.SetPositionAndRotation(buildPos, buildRot);
-                GameSound.At(GameSound.Kind.Place, buildPos);
-                WallSegment wall = building.GetComponent<WallSegment>();
-                if (wall != null) wall.OreTier = wallTier;
-
-                BuildingNode node = building.GetComponent<BuildingNode>();
-                if (node != null)
-                {
-                    if (World.WorldSettings.Bounded) ConstructionSite.Begin(building, currentBuildingType); // a campaign: workers build it (M5)
-                    else node.OnBuilt();
-                }
-            }
+            Net.CommandBus.Submit(new Net.PlaceBuildingCommand { Type = currentBuildingType, Position = buildPos, Rotation = buildRot, WallTier = wallTier });
 
             if (WallSegment.IsWall(def.Type) && !CanAffordTier(def, wallTier)) wallTier = NextWallTier(wallTier, def.OreCost); // that ore ran out: go on with other
             if (!CanAfford(def))
             {
                 CancelPlacement();
+            }
+        }
+
+        /// <summary>Pays for and raises a building where the interface has found room for it (Net.PlaceBuildingCommand); not if the stock can no longer pay.</summary>
+        public void PlaceNow(BuildingType type, Vector3 buildPos, Quaternion buildRot, int tier)
+        {
+            BuildingDefinition def = BuildingData.GetDefinition(type);
+            ResourceManager rm = ResourceManager.Instance;
+            int oreTier = WallSegment.IsWall(type) ? tier : def.OreTierRequired;
+            if (rm == null || !CanAffordTier(def, oreTier)) return;
+            if (!Combat.CentralEmpire.Active) // building is free for the Central Empire
+            {
+                if (def.WoodCost > 0) rm.ConsumeResource(ResourceType.Wood, def.WoodCost);
+                if (def.OreCost > 0)
+                {
+                    if (WallSegment.IsWall(def.Type)) rm.ConsumeOre(oreTier, def.OreCost); // a wall is as strong as its ore
+                    else rm.ConsumeOreAtLeast(oreTier, def.OreCost); // others take its tier or better, the commonest first
+                }
+            }
+
+            GameObject building = CreateBuilding(type);
+            if (building == null) return;
+            building.transform.SetPositionAndRotation(buildPos, buildRot);
+            GameSound.At(GameSound.Kind.Place, buildPos);
+            WallSegment wall = building.GetComponent<WallSegment>();
+            if (wall != null) wall.OreTier = tier;
+
+            BuildingNode node = building.GetComponent<BuildingNode>();
+            if (node != null)
+            {
+                if (World.WorldSettings.Bounded) ConstructionSite.Begin(building, type); // a campaign: workers build it
+                else node.OnBuilt();
             }
         }
 

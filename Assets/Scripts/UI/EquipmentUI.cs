@@ -178,24 +178,23 @@ namespace BattleOfAges.UI
         private void OnSlotClicked(EquipSlot slot)
         {
             if (Target != null && Target.IsLocked(slot)) { StrategyHud.Notify("Артефакт не знімається"); return; }
-            if (Armory.Instance.UnequipToStore(Target, slot)) Refresh();
+            Net.CommandBus.Submit(new Net.EquipCommand { Units = new[] { Net.WorldEntity.IdOf(Target).Value }, TakeOff = true, Slot = slot });
+            Refresh();
         }
 
         private void OnStoreItemClicked(Item item)
         {
             if (toAll && targets.Count > 1)
             {
-                int given = GearDispenser.GiveEach(targets, item);
-                int left = 0;
-                foreach (Equipment e in targets) if (e != null && !e.IsLocked(item.Slot) && !e[item.Slot].Equals(item)) left++;
-                StrategyHud.Notify(given == 0 ? "Усі обрані вже мають " + item
-                                   : $"{item}: видано {given}" + (left > 0 ? $", ще {left} без — на складі скінчилось" : ""));
+                var ids = new System.Collections.Generic.List<int>();
+                foreach (Equipment e in targets) if (e != null) ids.Add(Net.WorldEntity.IdOf(e).Value);
+                Net.CommandBus.Submit(new Net.EquipCommand { Units = ids.ToArray(), Item = item.Type, Level = item.Level });
                 Refresh();
                 return;
             }
             if (Target != null && Target.IsLocked(item.Slot)) { StrategyHud.Notify("Цей слот тримає артефакт"); return; }
-            if (Armory.Instance.EquipFromStore(Target, item))
-                Refresh();
+            Net.CommandBus.Submit(new Net.EquipCommand { Units = new[] { Net.WorldEntity.IdOf(Target).Value }, Item = item.Type, Level = item.Level });
+            Refresh();
         }
 
         /// <summary>The best from the store for the chosen (all, or this one): armour, and the weapon of the kind held.</summary>

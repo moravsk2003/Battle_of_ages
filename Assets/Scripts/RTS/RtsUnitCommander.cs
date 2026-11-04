@@ -203,7 +203,7 @@ namespace BattleOfAges.RTS
         {
             tempUnitsBuffer.Clear();
             foreach (RtsUnit u in selectedUnits) if (u != null) tempUnitsBuffer.Add(u);
-            if (tempUnitsBuffer.Count > 0) { MoveInFormation(tempUnitsBuffer, point); GameSound.Play2D(GameSound.Kind.OrderMove); }
+            if (tempUnitsBuffer.Count > 0) Net.CommandBus.Submit(Net.UnitOrderCommand.For(Net.UnitOrderCommand.Kind.Move, tempUnitsBuffer, null, point));
             tempUnitsBuffer.Clear();
         }
 
@@ -218,11 +218,7 @@ namespace BattleOfAges.RTS
             foreach (RtsUnit u in selectedUnits) if (u != null) tempUnitsBuffer.Add(u);
             // On open ground under a tree's leaves: the tree (a trunk is hard to hit from above)
             ResourceNodeTree crown = IsOpenGround(hit.collider) ? ResourceGrid.CrownUnderRay(ray, hit.point) : null;
-            if (crown != null)
-            {
-                foreach (RtsUnit u in tempUnitsBuffer) { NpcResourceGatherer g = u.GetComponent<NpcResourceGatherer>(); if (g != null) g.CommandHarvestTree(crown); }
-                GameSound.Play2D(GameSound.Kind.OrderWork);
-            }
+            if (crown != null) Net.CommandBus.Submit(Net.UnitOrderCommand.For(Net.UnitOrderCommand.Kind.Tree, tempUnitsBuffer, crown, hit.point));
             else OrderUnits(hit, tempUnitsBuffer);
             tempUnitsBuffer.Clear();
         }
@@ -236,101 +232,19 @@ namespace BattleOfAges.RTS
         private static void OrderUnits(RaycastHit hit, List<RtsUnit> units)
         {
             Collider target = hit.collider;
-            // Any order but to its own bench calls a worker off the workbench (else it walked back once let go)
-            WorkbenchNode toBench = target.GetComponentInParent<WorkbenchNode>();
-            foreach (RtsUnit unit in units) WorkbenchNode.CallOff(unit, toBench);
-            ConstructionSite toSite = target.GetComponentInParent<ConstructionSite>();
-            WorkPlace toPlace = target.GetComponentInParent<WorkPlace>();
-            ForEachGatherer(units, g => { if (g.AtSite) g.LeaveSite(null); if (g.AtPlace && g.AssignedPlace != toPlace) g.LeavePlace(null); }); // any order takes it off the site or field it was at
-            if (toPlace != null)
-            {
-                int hands = 0;
-                ForEachGatherer(units, g => { if (g.AssignToPlace(toPlace, true)) hands++; });
-                if (hands == 0) StrategyHud.Notify("Тут усі місця зайняті");
-                else GameSound.Play2D(GameSound.Kind.OrderWork);
-                return;
-            }
-            if (toSite != null)
-            {
-                int builders = 0;
-                ForEachGatherer(units, g => { if (g.AssignToSite(toSite)) builders++; });
-                if (builders == 0) StrategyHud.Notify($"Біля будівництва всі {ConstructionSite.MaxBuilders} місця зайняті");
-                else GameSound.Play2D(GameSound.Kind.OrderWork);
-                return;
-            }
-
-            // Own wall: up onto it, to the free posts nearest the click (§10.5)
-            if (target.GetComponentInParent<WallSegment>() != null || target.GetComponentInParent<WallPier>() != null)
-            {
-                int sent = 0;
-                foreach (RtsUnit unit in units)
-                    if (unit.OnWall || unit.SendToWall(WallWalk.FreePost(hit.point, unit))) sent++;
-                if (sent == 0) StrategyHud.Notify("На стіну не піднятися: потрібна стіна зі сходами (і вільні місця)");
-                else GameSound.Play2D(GameSound.Kind.OrderMove);
-                return;
-            }
-
+            var kind = Net.UnitOrderCommand.Kind.Move;
+            Component what = null;
             HealthComponent enemy = target.GetComponentInParent<HealthComponent>();
-            if (enemy != null && enemy.IsAlive && enemy.GetComponent<BuildingNode>() == null) // not an own building
-            {
-                foreach (RtsUnit unit in units) unit.IssueAttackCommand(enemy);
-                GameSound.Play2D(GameSound.Kind.OrderAttack);
-                return;
-            }
-
-            MineNode mine = target.GetComponentInParent<MineNode>();
-            if (mine != null)
-            {
-                ForEachGatherer(units, g => { if (!mine.IsFullWorkers) g.AssignToWorkInMine(mine); });
-                GameSound.Play2D(GameSound.Kind.OrderWork);
-                return;
-            }
-
-            if (toBench != null)
-            {
-                int called = 0;
-                foreach (RtsUnit unit in units) if (toBench.AssignWorker(unit)) called++;
-                if (called == 0 && toBench.IsWorkerFull) StrategyHud.Notify("Усі 4 місця біля верстака зайняті");
-                else if (called > 0) GameSound.Play2D(GameSound.Kind.OrderWork);
-                return;
-            }
-
-            ResourceNodeTree tree = target.GetComponentInParent<ResourceNodeTree>();
-            if (tree != null) { ForEachGatherer(units, g => g.CommandHarvestTree(tree)); GameSound.Play2D(GameSound.Kind.OrderWork); return; }
-
-            OrePebbleNode pebble = target.GetComponentInParent<OrePebbleNode>();
-            if (pebble != null) { ForEachGatherer(units, g => g.CommandHarvestPebble(pebble)); GameSound.Play2D(GameSound.Kind.OrderWork); return; }
-
-            if (target.GetComponentInParent<StorageChestNode>() != null) { ForEachGatherer(units, g => g.CommandDeliverToChest()); GameSound.Play2D(GameSound.Kind.OrderWork); return; }
-
-            MoveInFormation(units, hit.point);
-            GameSound.Play2D(GameSound.Kind.OrderMove);
-        }
-
-        private static void ForEachGatherer(List<RtsUnit> units, System.Action<NpcResourceGatherer> order)
-        {
-            foreach (RtsUnit unit in units)
-                if (unit.TryGetComponent(out NpcResourceGatherer gatherer)) order(gatherer);
-        }
-
-        /// <summary>Spreads the units over a square grid (2.2 m apart) around the clicked point.</summary>
-        private static void MoveInFormation(List<RtsUnit> units, Vector3 point)
-        {
-            const float spacing = 2.2f;
-            int count = units.Count;
-            int cols = Mathf.CeilToInt(Mathf.Sqrt(count));
-            for (int i = 0; i < count; i++)
-            {
-                Vector3 offset = count > 1
-                    ? new Vector3((i % cols - cols / 2f) * spacing, 0f, (i / cols - cols / 2f) * spacing)
-                    : Vector3.zero;
-                Vector3 target = point + offset;
-                target.y = RtsUnit.GetTerrainHeight(target);
-                // Sent to a place it stays there, ready to fight, until sent to work (an army would walk back to the trees)
-                NpcResourceGatherer job = units[i].GetComponent<NpcResourceGatherer>();
-                if (job != null) job.SetGatherDirective(GatherDirective.Idle);
-                units[i].IssueMoveCommand(target);
-            }
+            if ((what = target.GetComponentInParent<WorkPlace>()) != null) kind = Net.UnitOrderCommand.Kind.Place;
+            else if ((what = target.GetComponentInParent<ConstructionSite>()) != null) kind = Net.UnitOrderCommand.Kind.Site;
+            else if (target.GetComponentInParent<WallSegment>() != null || target.GetComponentInParent<WallPier>() != null) kind = Net.UnitOrderCommand.Kind.Wall;
+            else if (enemy != null && enemy.IsAlive && enemy.GetComponent<BuildingNode>() == null) { kind = Net.UnitOrderCommand.Kind.Attack; what = enemy; } // not an own building
+            else if ((what = target.GetComponentInParent<MineNode>()) != null) kind = Net.UnitOrderCommand.Kind.Mine;
+            else if ((what = target.GetComponentInParent<WorkbenchNode>()) != null) kind = Net.UnitOrderCommand.Kind.Bench;
+            else if ((what = target.GetComponentInParent<ResourceNodeTree>()) != null) kind = Net.UnitOrderCommand.Kind.Tree;
+            else if ((what = target.GetComponentInParent<OrePebbleNode>()) != null) kind = Net.UnitOrderCommand.Kind.Pebble;
+            else if (target.GetComponentInParent<StorageChestNode>() != null) kind = Net.UnitOrderCommand.Kind.Chest;
+            Net.CommandBus.Submit(Net.UnitOrderCommand.For(kind, units, what, hit.point));
         }
 
         private Rect GetScreenRect(Vector3 screenPos1, Vector3 screenPos2)
