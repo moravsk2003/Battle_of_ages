@@ -128,7 +128,7 @@ namespace BattleOfAges.Net
                 return true;
             }
             Component owner = UnitSpatialGrid.Owner(id);
-            if (owner == null) return false;
+            if (owner == null || owner is RemoteBody) return false; // only what is simulated here
             if (k.Owner != owner)
             {
                 // A new unit (a number is used again when one dies)
@@ -179,8 +179,38 @@ namespace BattleOfAges.Net
     }
 
     /// <summary>
+    /// Someone else's unit or building here: it can be struck, by units through the grid or by a hero's blow, but its health is its
+    /// owner's. A hit goes to the owner (NetSession.SendHit); what comes back in the snapshots is the truth. It never dies here.
+    /// </summary>
+    public sealed class RemoteBody : MonoBehaviour
+    {
+        public int Owner;
+        public int Id;
+        public bool IsBuilding;
+        public HealthComponent Health { get; private set; }
+
+        public void Setup(int owner, int id, bool building, int health)
+        {
+            Owner = owner;
+            Id = id;
+            IsBuilding = building;
+            Health = gameObject.AddComponent<HealthComponent>();
+            Health.InitializeHealth(health);
+            Health.OnTakeDamage += OnHit;
+        }
+
+        private void OnHit(int damage)
+        {
+            NetSession.Current?.SendHit(Owner, Id, IsBuilding, damage);
+            if (Health.CurrentHealth < 1) Health.SetCurrentHealth(1); // its owner decides when it falls
+        }
+
+        private void OnDestroy() { if (Health != null) Health.OnTakeDamage -= OnHit; }
+    }
+
+    /// <summary>
     /// A player's view of units it does not simulate (M8 step 3): a body for each, a little behind the snapshots so it moves between
-    /// two known places. No AI, no collider, no combat: only what it looks like. A swing is not shown yet.
+    /// two known places. No AI: only what it looks like and something to strike. A swing is not shown yet.
     /// </summary>
     public sealed class RemoteUnits : MonoBehaviour
     {
@@ -193,6 +223,19 @@ namespace BattleOfAges.Net
             public Vector3 From, To;
             public float FromAt, ToAt, FromYaw, ToYaw, LastHeard;
             public byte Rank, Team, Health;
+            public RemoteBody Mark;
+            public int GridId = -1;
+        }
+
+        /// <summary>The side of another player's units here (each player's own are TeamPlayer on its machine).</summary>
+        public static int TeamOf(int rowTeam, int owner) => rowTeam == UnitSpatialGrid.TeamPlayer ? RemotePlayerTeam + owner : rowTeam;
+        public const int RemotePlayerTeam = 1000;
+
+        /// <summary>Other players' heroes as they are here.</summary>
+        public void ForEachHero(System.Action<RemoteBody> visit)
+        {
+            foreach (KeyValuePair<int, Body> kv in bodies)
+                if ((kv.Key & 0xFFFF) == UnitSnapshotWriter.HeroId && kv.Value.Mark != null) visit(kv.Value.Mark);
         }
 
         private readonly Dictionary<int, Body> bodies = new Dictionary<int, Body>();
@@ -249,6 +292,8 @@ namespace BattleOfAges.Net
             b.ToAt = now + RenderDelay;
             b.LastHeard = now;
             b.Health = row.Health;
+            HealthComponent hp = b.Mark.Health;
+            hp.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(row.Health / 200f * hp.MaxHealth)));
         }
 
         private static Vector3 PlaceOf(UnitRow row)
@@ -268,6 +313,17 @@ namespace BattleOfAges.Net
                 model.transform.SetParent(go.transform, false);
             }
             var b = new Body { Root = go.transform, Rank = row.Rank, Team = row.Team, Health = row.Health, LastHeard = Time.time };
+            int who = key >> 16;
+            int rank = Mathf.Clamp(row.Rank, 0, GameBalance.RankHealth.Length - 1);
+            b.Mark = go.AddComponent<RemoteBody>();
+            b.Mark.Setup(who, row.Id, false, GameBalance.RankHealth[rank] * (row.Id == UnitSnapshotWriter.HeroId ? 3 : 1));
+            if (WithModels)
+            {
+                // Solid and hittable the way units are: a capsule the probes pass by and a blow finds
+                CharacterController cc = go.AddComponent<CharacterController>();
+                cc.height = 2f; cc.radius = 0.45f; cc.center = new Vector3(0f, 1f, 0f);
+            }
+            b.GridId = UnitSpatialGrid.Register(b.Mark, b.Mark.Health, TeamOf(row.Team, who), 0.45f);
             b.To = b.From = go.transform.position;
             b.ToYaw = b.FromYaw = go.transform.eulerAngles.y;
             b.ToAt = b.FromAt = Time.time;
@@ -297,12 +353,17 @@ namespace BattleOfAges.Net
         {
             if (!bodies.TryGetValue(id, out Body b)) return;
             bodies.Remove(id);
+            if (b.GridId >= 0) UnitSpatialGrid.Unregister(b.GridId);
             if (b.Root != null) Destroy(b.Root.gameObject);
         }
 
         private void OnDestroy()
         {
-            foreach (Body b in bodies.Values) if (b.Root != null) Destroy(b.Root.gameObject);
+            foreach (Body b in bodies.Values)
+            {
+                if (b.GridId >= 0) UnitSpatialGrid.Unregister(b.GridId);
+                if (b.Root != null) Destroy(b.Root.gameObject);
+            }
             bodies.Clear();
         }
 

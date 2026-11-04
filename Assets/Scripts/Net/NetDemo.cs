@@ -154,17 +154,49 @@ namespace BattleOfAges.Net
             }
             float end = Time.realtimeSinceStartup + seconds;
             float nextRow = Time.realtimeSinceStartup + 5f;
+            bool came = false, built = false;
+            float nextBlow = 0f;
+            int blows = 0;
             while (Time.realtimeSinceStartup < end)
             {
                 yield return null;
+                NetSession now = NetSession.Current;
+                // The guest walks up to the host's hero and puts up a house at home; the host strikes it when it is near
+                if (!host && now != null && now.Welcome != null && Time.realtimeSinceStartup > 12f && !came)
+                {
+                    came = true;
+                    GameObject mine = GameObject.Find("Player");
+                    GameObject house = Building.BuildingPlacementSystem.CreateBuilding(Building.BuildingType.WorkerHouse);
+                    if (house != null) { Vector3 at = mine.transform.position + new Vector3(12f, 0f, 12f); at.y = RtsUnit.GetTerrainHeight(at); house.transform.position = at; built = true; }
+                    if (now.Remote.TryGet(0, UnitSnapshotWriter.HeroId, out Vector3 hostAt, out _))
+                    {
+                        CharacterController cc = mine.GetComponent<CharacterController>();
+                        if (cc != null) cc.enabled = false;
+                        hostAt.y = RtsUnit.GetTerrainHeight(hostAt) + 1f;
+                        mine.transform.position = hostAt + new Vector3(1.5f, 0f, 0f);
+                        if (cc != null) cc.enabled = true;
+                        report.AppendLine($"t {Time.realtimeSinceStartup:0}: walked up to the host's hero, house built {built}");
+                    }
+                }
+                if (host && now != null && Time.realtimeSinceStartup >= nextBlow)
+                {
+                    nextBlow = Time.realtimeSinceStartup + 1f;
+                    GameObject me2 = GameObject.Find("Player");
+                    now.Remote.ForEachHero(body =>
+                    {
+                        Vector3 off = body.transform.position - me2.transform.position;
+                        off.y = 0f;
+                        if (off.magnitude < 6f) { body.Health.TakeDamage(40); blows++; }
+                    });
+                }
                 if (Time.realtimeSinceStartup < nextRow) continue;
                 nextRow = Time.realtimeSinceStartup + 5f;
                 NetSession s = NetSession.Current;
                 GameObject me = GameObject.Find("Player");
                 string other = "not seen";
-                if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 at, out int share)) other = $"at {at.x:0},{at.z:0} health {share}";
+                if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 otherAt, out int share)) other = $"at {otherAt.x:0},{otherAt.z:0} health {share}";
                 report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count}, " +
-                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
+                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
             }
             Directory.CreateDirectory(Path.GetDirectoryName(log));
             File.WriteAllText(log, report.ToString());

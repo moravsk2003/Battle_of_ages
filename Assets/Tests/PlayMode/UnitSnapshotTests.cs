@@ -92,6 +92,11 @@ namespace BattleOfAges.PlayModeTests
             two.Health.TakeDamage(int.MaxValue / 2, ignoreArmor: true);
             yield return Run(writer, 1f);
             Assert.IsFalse(remote.TryGet(0, (ushort)idTwo, out _, out _), "fallen, it is gone");
+            // (a body in the grid is not sent on by the one who shows it)
+            int rows = writer.RowsSent;
+            one.Health.Heal(1);
+            yield return Run(writer, 0.3f);
+            Assert.Less(writer.RowsSent - rows, 10, "only what it simulates, not the bodies it shows");
         }
 
         [UnityTest, Timeout(60000)]

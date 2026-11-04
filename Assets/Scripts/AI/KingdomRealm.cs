@@ -225,7 +225,7 @@ namespace BattleOfAges.AI
         {
             foreach (ArmyState a in s.Armies)
             {
-                if (Flat(a.Position, hero) < GameBalance.MaterializeRadius) return true;
+                if (AnyPlayerWithin(a.Position, GameBalance.MaterializeRadius)) return true;
                 if (a.TargetsPlayer && Flat(a.Position, home) < GameBalance.MaterializeRadius) return true;
                 if (a.Returning || a.TargetsPlayer) continue;
                 Vector3? real = RealHome(a.TargetKingdomId);
@@ -243,6 +243,16 @@ namespace BattleOfAges.AI
         }
 
         private static float Flat(Vector3 a, Vector3 b) { a.y = 0f; b.y = 0f; return Vector3.Distance(a, b); }
+
+        /// <summary>A player (this one, or anyone in a game with others) is this near.</summary>
+        public static bool AnyPlayerWithin(Vector3 at, float radius)
+        {
+            if (Flat(at, Hero()) < radius) return true;
+            if (!Net.NetSession.IsHost) return false;
+            bool near = false;
+            Net.NetSession.Current.Remote.ForEachHero(h => { if (Flat(h.transform.position, at) < radius) near = true; });
+            return near;
+        }
 
         /// <summary>Makes real what should be (the nearest to home, those by the hero) and folds the rest into their states.</summary>
         public void Sync()
@@ -268,9 +278,9 @@ namespace BattleOfAges.AI
                 bool nearHome = i < GameBalance.RealKingdomsNearHome;
                 if (s != null)
                 {
-                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius || wanted.Contains(s.Id)) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
+                    if (nearHome || AnyPlayerWithin(s.Home, GameBalance.MaterializeRadius) || wanted.Contains(s.Id)) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
                 }
-                else if (!nearHome && !wanted.Contains(k.StateId) && Flat(k.Home, hero) > GameBalance.DematerializeRadius && k.CanFold(home, hero) && !k.UnderRaid())
+                else if (!nearHome && !wanted.Contains(k.StateId) && !AnyPlayerWithin(k.Home, GameBalance.DematerializeRadius) && k.CanFold(home, hero) && !k.UnderRaid())
                 {
                     far.Add(k.ToState());
                     k.Dissolve();

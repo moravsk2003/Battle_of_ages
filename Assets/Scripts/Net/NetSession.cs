@@ -21,15 +21,26 @@ namespace BattleOfAges.Net
         public Vector3 Site;
     }
 
+    /// <summary>A building of another player, as the others are told of it; Gone: it has fallen.</summary>
+    [Serializable]
+    public sealed class NetBuilding
+    {
+        public int Owner, Id, Type;
+        public Vector3 Position;
+        public float Yaw;
+        public bool Gone;
+    }
+
     /// <summary>
     /// A game with others (M8 step 4, docs/GAME_DESIGN.md §14.2, §18.4): the host owns the campaign, a player joins by IP and gets the
     /// same world from its seed and a kingdom of its own on a free site. Each simulates what is its own and sends it; the host
     /// passes everyone's on to everyone else. Nobody else's units are simulated here, only shown (RemoteUnits).
-    /// Not yet: other players' buildings, fighting across the wire, the NPC kingdoms by a player far from the host.
+    /// A blow lands on a body here and goes to the owner of what it stands for, who applies it. NPC kingdoms are the host's: they
+    /// turn real by anyone's hero, on the host. Not yet: a swing shown, zones and resources of others, a player's kingdom going on without it.
     /// </summary>
     public sealed class NetSession : MonoBehaviour
     {
-        public const byte WelcomeMessage = 2;
+        public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4;
         /// <summary>A player's site is at least this far from every hero of the campaign.</summary>
         private const float MinSiteDistance = 600f;
 
@@ -90,6 +101,7 @@ namespace BattleOfAges.Net
             if (s.link == null) { Stop(); return false; }
             s.playerId = 0;
             s.joined = true;
+            s.basePlaced = true;
             s.Wire();
             return true;
         }
@@ -113,6 +125,7 @@ namespace BattleOfAges.Net
             s.link?.Dispose();
             s.link = null;
             if (s.remote != null) Destroy(s.remote.gameObject);
+            foreach (GameObject shown in s.shownBuildings.Values) if (shown != null) Destroy(shown);
             Destroy(s.gameObject);
         }
 
@@ -162,6 +175,9 @@ namespace BattleOfAges.Net
                 Site = SiteFor(peer, GameBalance.CampaignHeroes)
             };
             Send(peer, WelcomeMessage, JsonUtility.ToJson(hello));
+            // What stands in the world already, its own and the others'
+            foreach (NetBuilding b in sentBuildings.Values) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
+            foreach (NetBuilding b in shownBuildings.Keys) if (b.Owner != peer) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
         }
 
         private void Send(int peer, byte kind, string text)
@@ -178,6 +194,7 @@ namespace BattleOfAges.Net
             if (link.IsHost)
             {
                 remote.ForgetOwner(peer);
+                ForgetBuildingsOf(peer);
                 UI.StrategyHud.Notify($"Гравець {peer} вийшов");
                 return;
             }
@@ -195,6 +212,13 @@ namespace BattleOfAges.Net
                 remote.Apply(data, length);
                 // The host passes each one's units on to the others
                 if (link.IsHost) link.SendOthers(peer, NetChannel.Fast, data, length);
+                return;
+            }
+            if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
+            if (data[0] == BuildingMessage)
+            {
+                ReceiveBuilding(JsonUtility.FromJson<NetBuilding>(Encoding.UTF8.GetString(data, 1, length - 1)));
+                if (link.IsHost) link.SendOthers(peer, NetChannel.Reliable, data, length);
                 return;
             }
             if (data[0] == WelcomeMessage && !link.IsHost && !joined) Enter(JsonUtility.FromJson<NetWelcome>(Encoding.UTF8.GetString(data, 1, length - 1)));
@@ -220,6 +244,7 @@ namespace BattleOfAges.Net
             yield return null;
             WorldClock.GameHours = hello.GameHours;
             MoveBase(hello.Site);
+            if (Current != null) Current.basePlaced = true;
         }
 
         /// <summary>The start the scene gives (hero, people, chests, buildings at the origin) moved to this player's site.</summary>
@@ -273,6 +298,183 @@ namespace BattleOfAges.Net
             GameObject player = Managers.GameContext.Player;
             writer.Hero = player != null ? player.GetComponent<HealthComponent>() : null;
             writer.Tick(link, Time.realtimeSinceStartup);
+            FlushHits();
+            if (basePlaced && Time.realtimeSinceStartup >= nextBuildingCheck)
+            {
+                nextBuildingCheck = Time.realtimeSinceStartup + 1f;
+                CheckBuildings();
+            }
+        }
+
+        // ------------------------------------------------------------------ blows across
+
+        private const int HitBytes = 8;
+        private byte[] hitBatch = new byte[3 + HitBytes * 256];
+        private int hitsWaiting;
+
+        /// <summary>A blow on a body here: it goes to the one who owns what it stands for, in the next batch.</summary>
+        public void SendHit(int owner, int id, bool building, int damage)
+        {
+            if (link == null || damage <= 0) return;
+            int at = 3 + hitsWaiting * HitBytes;
+            if (at + HitBytes > hitBatch.Length) { FlushHits(); at = 3; }
+            hitBatch[at] = (byte)owner;
+            hitBatch[at + 1] = building ? (byte)1 : (byte)0;
+            hitBatch[at + 2] = (byte)id; hitBatch[at + 3] = (byte)(id >> 8); hitBatch[at + 4] = (byte)(id >> 16); hitBatch[at + 5] = (byte)(id >> 24);
+            int d = Mathf.Min(damage, 65535);
+            hitBatch[at + 6] = (byte)d; hitBatch[at + 7] = (byte)(d >> 8);
+            hitsWaiting++;
+        }
+
+        private void FlushHits()
+        {
+            if (hitsWaiting == 0) return;
+            hitBatch[0] = HitsMessage;
+            hitBatch[1] = (byte)hitsWaiting; hitBatch[2] = (byte)(hitsWaiting >> 8);
+            int length = 3 + hitsWaiting * HitBytes;
+            hitsWaiting = 0;
+            if (link.IsHost) RouteFromHost(hitBatch, length, applyHere: false);
+            else link.Send(0, NetChannel.Reliable, hitBatch, length);
+        }
+
+        private void ReceiveHits(byte[] data, int length)
+        {
+            if (link.IsHost) RouteFromHost(data, length, applyHere: true);
+            else ApplyHits(data, length);
+        }
+
+        /// <summary>The host's own blows and those it passes on: each row to its owner, its own applied here.</summary>
+        private void RouteFromHost(byte[] data, int length, bool applyHere)
+        {
+            int rows = data[1] | data[2] << 8;
+            var one = new byte[3 + HitBytes];
+            one[0] = HitsMessage;
+            one[1] = 1;
+            for (int i = 0; i < rows; i++)
+            {
+                int at = 3 + i * HitBytes;
+                if (at + HitBytes > length) return;
+                int owner = data[at];
+                if (owner == playerId) { ApplyRow(data, at); continue; }
+                Array.Copy(data, at, one, 3, HitBytes);
+                link.Send(owner, NetChannel.Reliable, one, one.Length);
+            }
+        }
+
+        private void ApplyHits(byte[] data, int length)
+        {
+            int rows = data[1] | data[2] << 8;
+            for (int i = 0; i < rows && 3 + (i + 1) * HitBytes <= length; i++) ApplyRow(data, 3 + i * HitBytes);
+        }
+
+        private void ApplyRow(byte[] b, int at)
+        {
+            bool building = b[at + 1] != 0;
+            int id = b[at + 2] | b[at + 3] << 8 | b[at + 4] << 16 | b[at + 5] << 24;
+            int damage = b[at + 6] | b[at + 7] << 8;
+            HealthComponent target;
+            if (building) target = WorldEntity.Find<HealthComponent>(id);
+            else if (id == UnitSnapshotWriter.HeroId) target = Managers.GameContext.PlayerHealth;
+            else target = id >= 0 && id < UnitSpatialGrid.Capacity && UnitSpatialGrid.IsAlive(id) ? UnitSpatialGrid.Health(id) : null;
+            if (target != null && target.IsAlive) target.TakeDamage(damage);
+        }
+
+        // ------------------------------------------------------------------ buildings across
+
+        private readonly System.Collections.Generic.Dictionary<int, NetBuilding> sentBuildings = new System.Collections.Generic.Dictionary<int, NetBuilding>();
+        private readonly System.Collections.Generic.Dictionary<NetBuilding, GameObject> shownBuildings = new System.Collections.Generic.Dictionary<NetBuilding, GameObject>();
+        private readonly System.Collections.Generic.List<int> goneBuildings = new System.Collections.Generic.List<int>();
+        private readonly System.Collections.Generic.HashSet<int> seenBuildings = new System.Collections.Generic.HashSet<int>();
+        private float nextBuildingCheck;
+        private bool basePlaced;
+
+        /// <summary>Others' buildings shown here.</summary>
+        public int RemoteBuildingCount => shownBuildings.Count;
+
+        /// <summary>Whatever has gone up or come down here since the last look, however it happened, is told to the others.</summary>
+        private void CheckBuildings()
+        {
+            seenBuildings.Clear();
+            foreach (BuildingNode node in BuildingNode.Active)
+            {
+                if (node == null || BuildGhost.Is(node)) continue;
+                int id = WorldEntity.IdOf(node).Value;
+                seenBuildings.Add(id);
+                if (sentBuildings.ContainsKey(id)) continue;
+                var b = new NetBuilding { Owner = playerId, Id = id, Type = (int)node.Type, Position = node.transform.position, Yaw = node.transform.eulerAngles.y };
+                sentBuildings[id] = b;
+                Broadcast(b);
+            }
+            goneBuildings.Clear();
+            foreach (int id in sentBuildings.Keys) if (!seenBuildings.Contains(id)) goneBuildings.Add(id);
+            foreach (int id in goneBuildings)
+            {
+                NetBuilding b = sentBuildings[id];
+                sentBuildings.Remove(id);
+                b.Gone = true;
+                Broadcast(b);
+            }
+        }
+
+        private void Broadcast(NetBuilding b)
+        {
+            byte[] utf = Encoding.UTF8.GetBytes(JsonUtility.ToJson(b));
+            var message = new byte[utf.Length + 1];
+            message[0] = BuildingMessage;
+            Array.Copy(utf, 0, message, 1, utf.Length);
+            link.SendAll(NetChannel.Reliable, message, message.Length);
+        }
+
+        private NetBuilding FindShown(int owner, int id)
+        {
+            foreach (NetBuilding known in shownBuildings.Keys) if (known.Owner == owner && known.Id == id) return known;
+            return null;
+        }
+
+        private void ReceiveBuilding(NetBuilding b)
+        {
+            if (b.Owner == playerId) return;
+            NetBuilding known = FindShown(b.Owner, b.Id);
+            if (b.Gone)
+            {
+                if (known == null) return;
+                Destroy(shownBuildings[known]);
+                shownBuildings.Remove(known);
+                return;
+            }
+            if (known == null) shownBuildings[b] = ShowBuilding(b);
+        }
+
+        private void ForgetBuildingsOf(int owner)
+        {
+            var leaving = new System.Collections.Generic.List<NetBuilding>();
+            foreach (NetBuilding b in shownBuildings.Keys) if (b.Owner == owner) leaving.Add(b);
+            foreach (NetBuilding b in leaving)
+            {
+                Destroy(shownBuildings[b]);
+                shownBuildings.Remove(b);
+            }
+        }
+
+        /// <summary>The look of a building and something to strike: its models from a real one, whose works go at once (nothing of it counts here).</summary>
+        private static GameObject ShowBuilding(NetBuilding b)
+        {
+            var type = (BuildingType)b.Type;
+            var shown = new GameObject("RemoteBuilding_" + type);
+            DontDestroyOnLoad(shown);
+            shown.transform.SetPositionAndRotation(b.Position, Quaternion.Euler(0f, b.Yaw, 0f));
+            GameObject real = BuildingPlacementSystem.CreateBuilding(type);
+            BuildingDefinition def = BuildingData.GetDefinition(type);
+            if (real != null)
+            {
+                while (real.transform.childCount > 0) real.transform.GetChild(0).SetParent(shown.transform, false);
+                DestroyImmediate(real);
+            }
+            BoxCollider box = shown.AddComponent<BoxCollider>();
+            box.size = def.Size;
+            box.center = new Vector3(0f, def.Size.y * 0.5f, 0f);
+            shown.AddComponent<RemoteBody>().Setup(b.Owner, b.Id, true, Mathf.Max(1, def.MaxHealth));
+            return shown;
         }
     }
 }

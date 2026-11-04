@@ -393,6 +393,8 @@ namespace BattleOfAges.AI
                 TownHall hall = TownHall.Current;
                 HealthComponent h = hall != null ? hall.GetComponent<HealthComponent>() : null;
                 Consider(h != null && h.IsAlive ? h : PlayerHero());
+                // In a game with others: its other players' heroes too (the bodies here stand for them)
+                if (Net.NetSession.IsHost) Net.NetSession.Current.Remote.ForEachHero(body => Consider(body.Health));
             }
             // Not one that another king is already raiding: the player sits in the middle, the nearest for every king, and
             // the kings took turns on it (the session sim: 1 against 3 again)
@@ -401,7 +403,7 @@ namespace BattleOfAges.AI
             float Way(HealthComponent t)
             {
                 float d = (t.transform.position - Home).magnitude;
-                return t.GetComponent<TownHall>() != null || t.gameObject == Managers.GameContext.Player ? d * GameBalance.KingdomPlayerTargetFactor : d;
+                return t.GetComponent<TownHall>() != null || t.gameObject == Managers.GameContext.Player || t.GetComponent<Net.RemoteBody>() != null ? d * GameBalance.KingdomPlayerTargetFactor : d;
             }
             targets.Sort((a, b) => Way(a).CompareTo(Way(b)));
             return targets;
@@ -702,7 +704,7 @@ namespace BattleOfAges.AI
             {
                 if (m == null) continue;
                 Vector3 p = m.transform.position;
-                if (FlatDistance(p, hero) < reach || FlatDistance(p, playerHome) < reach) return false;
+                if (KingdomRealm.AnyPlayerWithin(p, reach) || FlatDistance(p, playerHome) < reach) return false;
                 if (NearestEnemyUnit(p, GameBalance.KingdomRaidSearchRadius) != null) return false;
                 if (raidTarget != null && FlatDistance(p, raidTarget.transform.position) <= GameBalance.KingdomRaidSearchRadius) return false;
             }
