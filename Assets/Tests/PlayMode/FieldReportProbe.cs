@@ -63,7 +63,7 @@ namespace BattleOfAges.PlayModeTests
             report.AppendLine($"seed {WorldSettings.Seed}, size {WorldSettings.Size}, hero speed {hero.GetComponent<CombatUnit>().MoveSpeed:0.0} m/s, hall at home {TownHall.Current != null}");
             var rows = new List<(float d, string line)>();
             foreach (NpcKingdom k in NpcKingdom.All) rows.Add((Flat(k.Home, home), $"real {k.KingdomName}{(k.Free ? " (вільний)" : "")}{(k.IsEmpire ? " (імперія)" : "")}, first raid at {k.FirstRaidAt:0.0} h"));
-            foreach (KingdomSave s in KingdomRealm.Far) rows.Add((Flat(s.Home, home), $"far {s.Name}{(s.Free ? " (вільний)" : "")}{(s.Empire ? " (імперія)" : "")}"));
+            foreach (KingdomState s in KingdomRealm.Far) rows.Add((Flat(s.Home, home), $"far {s.Name}{(s.Free ? " (вільний)" : "")}{(s.Empire ? " (імперія)" : "")}"));
             foreach (var r in rows.OrderBy(r => r.d)) report.AppendLine($"{r.d:0} m: {r.line}");
 
             double started = WorldClock.GameHours;

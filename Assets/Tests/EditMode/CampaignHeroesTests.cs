@@ -43,7 +43,7 @@ namespace BattleOfAges.Tests
         public void AHeroStarts_WithFivePeopleAndSomeWood_NoHall()
         {
             WorldSettings.Set(2024, WorldSettings.DefaultSize);
-            KingdomSave s = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Тест", false, 5, new System.Random(1));
+            KingdomState s = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Тест", false, 5, new System.Random(1));
             Assert.IsTrue(s.HasKing);
             Assert.AreEqual((int)UnitRank.General, s.King.Rank, "the hero is the strongest kind");
             Assert.AreEqual(GameBalance.KingdomStartPeople, s.Subjects.Count);
@@ -55,8 +55,8 @@ namespace BattleOfAges.Tests
         public void AFarKingdom_GrowsByFormula_AFreeHeroBuildsNoHall()
         {
             WorldSettings.Set(2024, WorldSettings.DefaultSize);
-            KingdomSave king = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Король", false, 5, new System.Random(1));
-            KingdomSave free = KingdomRealm.NewState(new Vector3(-3000f, 0f, 2000f), "Ватага", true, 6, new System.Random(2));
+            KingdomState king = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Король", false, 5, new System.Random(1));
+            KingdomState free = KingdomRealm.NewState(new Vector3(-3000f, 0f, 2000f), "Ватага", true, 6, new System.Random(2));
             var rows = new System.Text.StringBuilder();
             for (int h = 1; h <= 72; h++)
             {
@@ -70,7 +70,7 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(0, free.Hall, "a free hero camps");
             Assert.LessOrEqual(free.Subjects.Count, Building.TownHall.CapForLevel(0), "up to a camp's cap");
             int warriors = 0;
-            foreach (SubjectSave u in king.Subjects) if (u.Rank >= (int)UnitRank.Warrior) warriors++;
+            foreach (UnitState u in king.Subjects) if (u.Rank >= (int)UnitRank.Warrior) warriors++;
             TestContext.WriteLine($"warriors after 3 days: {warriors}");
         }
 
@@ -78,7 +78,7 @@ namespace BattleOfAges.Tests
         public void AFarInterregnum_EndsWithTheStrongestReigning()
         {
             WorldSettings.Set(2024, WorldSettings.DefaultSize);
-            KingdomSave s = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Без короля", false, 5, new System.Random(1));
+            KingdomState s = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Без короля", false, 5, new System.Random(1));
             s.HasKing = false;
             s.Interregnum = 30f;
             s.Subjects[2].Rank = (int)UnitRank.Knight;

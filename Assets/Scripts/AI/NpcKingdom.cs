@@ -625,21 +625,26 @@ namespace BattleOfAges.AI
             nextTeam = UnitSpatialGrid.TeamKingdomFirst;
         }
 
-        private static SaveLoad.SubjectSave SaveOf(HostileMobAI m)
+        private static SaveLoad.UnitState SaveOf(HostileMobAI m)
         {
             UnitProgress p = m.GetComponent<UnitProgress>();
-            return new SaveLoad.SubjectSave { Rank = p != null ? (int)p.Rank : 0, BattleXp = p != null ? p.BattleXp : 0, Health = m.Health.CurrentHealth, Position = m.transform.position };
+            return new SaveLoad.UnitState { Rank = p != null ? (int)p.Rank : 0, BattleXp = p != null ? p.BattleXp : 0, Health = m.Health.CurrentHealth, Position = m.transform.position };
         }
 
-        public SaveLoad.KingdomSave ToSave()
+        public SaveLoad.KingdomState ToState()
         {
             Prune();
-            var s = new SaveLoad.KingdomSave
+            var s = new SaveLoad.KingdomState
             {
-                Name = KingdomName, Home = Home, Hall = Economy.HallLevel, HallHealth = Hall != null ? Hall.CurrentHealth : 0,
+                Id = stateIds.Id, Name = KingdomName, Home = Home, Hall = Economy.HallLevel, HallHealth = Hall != null ? Hall.CurrentHealth : 0,
                 Wood = Economy.Wood, Ore = Economy.Ore, Births = Economy.BirthCarry, Age = Age, Interregnum = InterregnumLeft, Defeated = IsDefeated,
                 Free = Free, Team = Team, Empire = IsEmpire
             };
+            s.Hero.Id = stateIds.Hero;
+            s.Capital.Id = stateIds.Settlement;
+            s.Capital.Garrison.Id = stateIds.Garrison;
+            s.EnsureIds();
+            stateIds = (s.Id, s.Hero.Id, s.Capital.Id, s.Capital.Garrison.Id); // (a kingdom founded here gets its numbers the first time)
             if (IsDefeated) return s;
             foreach (HostileMobAI m in subjects) s.Subjects.Add(SaveOf(m));
             s.Subjects.AddRange(arriving); // not in the scene yet: still its people
@@ -659,13 +664,15 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>A kingdom back from a save (its king grows again to the saved level, spending the points its usual way).</summary>
-        public static NpcKingdom FromSave(SaveLoad.KingdomSave s, bool gradual = false)
+        public static NpcKingdom FromState(SaveLoad.KingdomState s, bool gradual = false)
         {
             var root = new GameObject("NpcKingdom_" + s.Name);
             root.transform.position = s.Home;
             NpcKingdom k = root.AddComponent<NpcKingdom>();
             if (!all.Contains(k)) all.Add(k);
             k.KingdomName = s.Name;
+            s.EnsureIds();
+            k.stateIds = (s.Id, s.Hero.Id, s.Capital.Id, s.Capital.Garrison.Id);
             k.Free = s.Free;
             k.IsEmpire = s.Empire;
             k.Economy.Free = s.Empire;
@@ -680,7 +687,7 @@ namespace BattleOfAges.AI
             if (Application.isPlaying && !s.Free) k.Town = KingdomTown.Attach(k);
             if (s.Defeated) { k.IsDefeated = true; return k; }
             if (gradual) k.arriving.AddRange(s.Subjects); // a few a frame (ArriveMore): a grown kingdom was a hitch of hundreds of ms
-            else foreach (SaveLoad.SubjectSave u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
+            else foreach (SaveLoad.UnitState u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
             if (s.HasKing)
             {
                 HostileMobAI king = k.AddSubject((UnitRank)s.King.Rank, s.King.Position);
@@ -694,7 +701,9 @@ namespace BattleOfAges.AI
             return k;
         }
 
-        private readonly List<SaveLoad.SubjectSave> arriving = new List<SaveLoad.SubjectSave>();
+        private readonly List<SaveLoad.UnitState> arriving = new List<SaveLoad.UnitState>();
+        /// <summary>The numbers of its state (SaveLoad.KingdomState): they stay through turning far and real.</summary>
+        private (SaveLoad.EntityId Id, SaveLoad.EntityId Hero, SaveLoad.EntityId Settlement, SaveLoad.EntityId Garrison) stateIds;
 
         /// <summary>People of a kingdom made real gradually, still to come into the scene.</summary>
         public int Arriving => arriving.Count;
@@ -704,14 +713,14 @@ namespace BattleOfAges.AI
         {
             for (int i = 0; i < max && arriving.Count > 0; i++)
             {
-                SaveLoad.SubjectSave u = arriving[0];
+                SaveLoad.UnitState u = arriving[0];
                 arriving.RemoveAt(0);
                 Restore(AddSubject((UnitRank)u.Rank, u.Position), u);
             }
             return arriving.Count > 0;
         }
 
-        private static void Restore(HostileMobAI m, SaveLoad.SubjectSave u)
+        private static void Restore(HostileMobAI m, SaveLoad.UnitState u)
         {
             UnitProgress p = m.GetComponent<UnitProgress>();
             if (p != null) p.AddBattleXp(u.BattleXp);
@@ -780,6 +789,7 @@ namespace BattleOfAges.AI
             InterregnumLeft = 0f;
             HostileMobAI heir = Strongest();
             if (heir == null) { Fall("нікого не лишилось"); return; }
+            stateIds.Hero = default; // another person: a new number at the next ToState
             Crown(heir, RandomClass());
             StrategyHud.Notify($"{KingdomName}: новий король");
         }

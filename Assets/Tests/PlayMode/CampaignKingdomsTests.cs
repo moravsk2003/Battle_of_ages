@@ -50,14 +50,14 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(others, NpcKingdom.All.Count + KingdomRealm.Far.Count, "every hero of the campaign is there");
             Assert.AreEqual(GameBalance.RealKingdomsNearHome, NpcKingdom.All.Count, "the nearest ones are real");
             int free = 0;
-            foreach (KingdomSave s in KingdomRealm.Far) if (s.Free) free++;
+            foreach (KingdomState s in KingdomRealm.Far) if (s.Free) free++;
             foreach (NpcKingdom k in NpcKingdom.All) if (k.Free) free++;
             Assert.Greater(free, 0, "some heroes are free");
 
             // Go to a far one: it turns real; go home: it folds back into its state
             PlayerCombatController hero = Object.FindFirstObjectByType<PlayerCombatController>();
-            KingdomSave target = KingdomRealm.Far[0];
-            foreach (KingdomSave s in KingdomRealm.Far) if (s.Home.magnitude > target.Home.magnitude) target = s;
+            KingdomState target = KingdomRealm.Far[0];
+            foreach (KingdomState s in KingdomRealm.Far) if (s.Home.magnitude > target.Home.magnitude) target = s;
             string name = target.Name;
             Teleport(hero, target.Home + new Vector3(60f, 0f, 0f));
             yield return new WaitForSeconds(2.5f);

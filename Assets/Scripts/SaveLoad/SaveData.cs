@@ -9,7 +9,11 @@ namespace BattleOfAges.SaveLoad
     [Serializable]
     public class SaveData
     {
-        public int Version = 1;
+        /// <summary>2: kingdoms as KingdomState (M6 step 2). A save of 1 still has them as Kingdoms (SaveSystem.Migrate).</summary>
+        public const int CurrentVersion = 2;
+        public int Version = CurrentVersion;
+        /// <summary>The number the world's next entity gets.</summary>
+        public int NextEntityId = 1;
         /// <summary>The player's name for this save (empty: none).</summary>
         public string Title = "";
         public long SavedAtTicks;
@@ -37,13 +41,15 @@ namespace BattleOfAges.SaveLoad
         public WorldSave World = new WorldSave();
         public List<ArtifactSave> Pickups = new List<ArtifactSave>(); // artifacts and shards on the ground
         public int WorldEpoch;
-        public List<KingdomSave> Kingdoms = new List<KingdomSave>(); // NPC kings (§12)
+        public List<KingdomState> KingdomStates = new List<KingdomState>(); // NPC kings (§12), near and far
+        public List<KingdomSave> Kingdoms = new List<KingdomSave>(); // the same in a save of version 1: read, no longer written
         public bool KingdomsFounded;  // false in saves from before the NPC kings: they are founded on load
         public int WallLevel;         // Fortifications (0 in old saves: level I)
 
         public int OreTotal { get { int n = 0; foreach (TierCount t in Ore) n += t.Count; return n; } }
     }
 
+    /// <summary>A kingdom in a save of version 1, only read now (KingdomState.FromOldSave).</summary>
     [Serializable]
     public class KingdomSave
     {

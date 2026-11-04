@@ -10,14 +10,14 @@ namespace BattleOfAges.AI
     /// <summary>
     /// Every NPC hero of a campaign (M1 steps 4-5, docs/GAME_DESIGN.md §18.2): kings and free heroes on their start
     /// sites. A kingdom is real (NpcKingdom, people and a hall) when it is one of the few nearest the player's home or
-    /// the hero comes near; otherwise it is only its state (the save's KingdomSave), and it grows by formula once a game
+    /// the hero comes near; otherwise it is only its state (the save's KingdomState), and it grows by formula once a game
     /// hour on the same numbers as a real one (work, births, promotions, the hall): the first small piece of the
     /// abstract layer (§6.2, M6). Coming near makes it real from its state; leaving folds it back. The endless seed-0
     /// world keeps M0's three kings at hand and does not use this.
     /// </summary>
     public sealed class KingdomRealm : MonoBehaviour
     {
-        private static readonly List<KingdomSave> far = new List<KingdomSave>();
+        private static readonly List<KingdomState> far = new List<KingdomState>();
         private static KingdomRealm instance;
         private float hourClock, syncClock;
         /// <summary>People of a kingdom made real that come into the scene each frame.</summary>
@@ -25,7 +25,7 @@ namespace BattleOfAges.AI
 
         public static bool Active => WorldSettings.Bounded;
         /// <summary>The kingdoms that are only data now.</summary>
-        public static IReadOnlyList<KingdomSave> Far => far;
+        public static IReadOnlyList<KingdomState> Far => far;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics() { far.Clear(); instance = null; }
@@ -41,7 +41,7 @@ namespace BattleOfAges.AI
         /// <summary>Is any kingdom against the player still standing out of sight (no victory yet)?</summary>
         public static bool AnyStandingFar()
         {
-            foreach (KingdomSave s in far) if (!s.Defeated && !s.Free) return true;
+            foreach (KingdomState s in far) if (!s.Defeated && !s.Free) return true;
             return false;
         }
 
@@ -60,7 +60,7 @@ namespace BattleOfAges.AI
                 float d = Flat(from, p);
                 if (d < best) { best = d; bestName = n; bestAt = p; }
             }
-            foreach (KingdomSave s in far) if (!s.Defeated && !s.Free) Consider(s.Name, s.Home);
+            foreach (KingdomState s in far) if (!s.Defeated && !s.Free) Consider(s.Name, s.Home);
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated && !k.Free && k.AgainstPlayer) Consider(k.KingdomName, k.Home);
             name = bestName;
             at = bestAt;
@@ -84,7 +84,7 @@ namespace BattleOfAges.AI
             {
                 bool free = i >= kings && i != empire;
                 string name = NpcKingdom.CampaignNames[i % NpcKingdom.CampaignNames.Length];
-                KingdomSave state = NewState(sites[i], i == empire ? "Центральна імперія" : free ? "Ватага: " + name : name, free, RTS.UnitSpatialGrid.TeamKingdomFirst + i, rng);
+                KingdomState state = NewState(sites[i], i == empire ? "Центральна імперія" : free ? "Ватага: " + name : name, free, RTS.UnitSpatialGrid.TeamKingdomFirst + i, rng);
                 if (i == empire)
                 {
                     state.Empire = true;
@@ -114,17 +114,17 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>A hero's start (§7.1): the hero, KingdomStartPeople people and KingdomStartWood wood on level ground, no hall.</summary>
-        public static KingdomSave NewState(Vector3 site, string name, bool free, int team, System.Random rng)
+        public static KingdomState NewState(Vector3 site, string name, bool free, int team, System.Random rng)
         {
             BuildSite.FindLevel(site, 7f, GameBalance.KingdomSiteSearchRadius, GameBalance.KingdomSiteMaxRise, out site);
-            var s = new KingdomSave
+            var s = new KingdomState
             {
                 Name = name, Home = site, Hall = 0, Wood = GameBalance.KingdomStartWood, Free = free, Team = team, HasKing = true,
                 KingClass = rng.Next((int)HeroClass.Tank, (int)HeroClass.Dd + 1),
-                King = new SubjectSave { Rank = (int)UnitRank.General, Position = Around(site, rng) }
+                King = new UnitState { Rank = (int)UnitRank.General, Position = Around(site, rng) }
             };
-            for (int i = 0; i < GameBalance.KingdomStartPeople; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Person, Position = Around(site, rng) });
-            return s;
+            for (int i = 0; i < GameBalance.KingdomStartPeople; i++) s.Subjects.Add(new UnitState { Rank = (int)UnitRank.Person, Position = Around(site, rng) });
+            return s.EnsureIds();
         }
 
         private static Vector3 Around(Vector3 home, System.Random rng)
@@ -138,15 +138,15 @@ namespace BattleOfAges.AI
         // ------------------------------------------------------------------ saves
 
         /// <summary>Every kingdom for a save, real or far.</summary>
-        public static List<KingdomSave> AllStates()
+        public static List<KingdomState> AllStates()
         {
-            var list = new List<KingdomSave>(far);
-            foreach (NpcKingdom k in NpcKingdom.All) if (k != null) list.Add(k.ToSave());
+            var list = new List<KingdomState>(far);
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null) list.Add(k.ToState());
             return list;
         }
 
         /// <summary>A loaded campaign: all of them far first, then the ones that should be real become real.</summary>
-        public static void Load(List<KingdomSave> states)
+        public static void Load(List<KingdomState> states)
         {
             NpcKingdom.RemoveAll();
             far.Clear();
@@ -164,7 +164,7 @@ namespace BattleOfAges.AI
             hourClock += hours;
             if (hourClock >= 1f)
             {
-                foreach (KingdomSave s in far) Advance(s, hourClock);
+                foreach (KingdomState s in far) Advance(s, hourClock);
                 hourClock = 0f;
             }
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && k.Arriving > 0) k.ArriveMore(ArrivalsPerFrame);
@@ -187,8 +187,8 @@ namespace BattleOfAges.AI
         {
             if (!Active) return;
             Vector3 home = HomeOfPlayer(), hero = Hero();
-            var standing = new List<(float d, KingdomSave s, NpcKingdom k)>();
-            foreach (KingdomSave s in far) if (!s.Defeated) standing.Add((Flat(s.Home, home), s, null));
+            var standing = new List<(float d, KingdomState s, NpcKingdom k)>();
+            foreach (KingdomState s in far) if (!s.Defeated) standing.Add((Flat(s.Home, home), s, null));
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated) standing.Add((Flat(k.Home, home), null, k));
             standing.Sort((a, b) => a.d.CompareTo(b.d));
             for (int i = 0; i < standing.Count; i++)
@@ -197,11 +197,11 @@ namespace BattleOfAges.AI
                 bool nearHome = i < GameBalance.RealKingdomsNearHome;
                 if (s != null)
                 {
-                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius) { far.Remove(s); NpcKingdom.FromSave(s, gradual: true); }
+                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
                 }
                 else if (!nearHome && Flat(k.Home, hero) > GameBalance.DematerializeRadius && !k.Raiding && !k.UnderRaid())
                 {
-                    far.Add(k.ToSave());
+                    far.Add(k.ToState());
                     k.Dissolve();
                 }
             }
@@ -212,7 +212,7 @@ namespace BattleOfAges.AI
         /// hall's cap, people become warriors from work, the hall is raised when the room runs out (not a free hero's),
         /// an interregnum runs out into the strongest one's reign.
         /// </summary>
-        public static void Advance(KingdomSave s, float hours)
+        public static void Advance(KingdomState s, float hours)
         {
             if (s.Defeated || hours <= 0f) return;
             s.Age += hours;
@@ -225,13 +225,13 @@ namespace BattleOfAges.AI
             var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births, Free = s.Empire };
             int born = economy.Tick(hours, s.Empire ? 0 : s.Subjects.Count, s.Subjects.Count);
             var rng = new System.Random(s.Name.GetHashCode() ^ Mathf.FloorToInt(s.Age * 7f)); // (the same hour's draws: births, work, training)
-            for (int i = 0; i < born; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Person, Position = Around(s.Home, rng) });
+            for (int i = 0; i < born; i++) s.Subjects.Add(new UnitState { Rank = (int)UnitRank.Person, Position = Around(s.Home, rng) });
             double chance = 1.0 - System.Math.Pow(1.0 - GameBalance.WorkPromotionPerHour, hours);
-            if (!s.Empire) foreach (SubjectSave u in s.Subjects) if (u.Rank == (int)UnitRank.Person && rng.NextDouble() < chance) u.Rank = (int)UnitRank.Warrior;
+            if (!s.Empire) foreach (UnitState u in s.Subjects) if (u.Rank == (int)UnitRank.Person && rng.NextDouble() < chance) u.Rank = (int)UnitRank.Warrior;
             // Training, as a real one's (NpcKingdom.PromoteWorkers)
             int hall = Mathf.Clamp(s.Hall, 0, GameBalance.KingdomKnightTraining.Length - 1);
             double knight = 1.0 - System.Math.Pow(1.0 - GameBalance.KingdomKnightTraining[hall], hours), general = 1.0 - System.Math.Pow(1.0 - GameBalance.KingdomGeneralTraining[hall], hours);
-            foreach (SubjectSave u in s.Subjects)
+            foreach (UnitState u in s.Subjects)
             {
                 if (u.Rank == (int)UnitRank.Warrior && rng.NextDouble() < knight) u.Rank = (int)UnitRank.Knight;
                 else if (u.Rank == (int)UnitRank.Knight && rng.NextDouble() < general) u.Rank = (int)UnitRank.General;
@@ -242,17 +242,19 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>The strongest one left reigns (§7.2); nobody left: the kingdom is gone.</summary>
-        private static void Crown(KingdomSave s)
+        private static void Crown(KingdomState s)
         {
             if (s.Subjects.Count == 0) { s.Defeated = true; return; }
-            SubjectSave best = s.Subjects[0];
-            foreach (SubjectSave u in s.Subjects) if (u.Rank > best.Rank || (u.Rank == best.Rank && u.BattleXp > best.BattleXp)) best = u;
+            UnitState best = s.Subjects[0];
+            foreach (UnitState u in s.Subjects) if (u.Rank > best.Rank || (u.Rank == best.Rank && u.BattleXp > best.BattleXp)) best = u;
             s.Subjects.Remove(best);
             s.King = best;
             s.HasKing = true;
+            s.Hero.Id = default; // another person
             s.KingClass = Random.Range((int)HeroClass.Tank, (int)HeroClass.Dd + 1);
             s.KingTotalXp = 0;
             s.Interregnum = 0f;
+            s.EnsureIds();
         }
     }
 }

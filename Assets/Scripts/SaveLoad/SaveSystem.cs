@@ -100,6 +100,18 @@ namespace BattleOfAges.SaveLoad
 
         // ------------------------------------------------------------------ save
 
+        /// <summary>Brings a save of an older version to the current shape (nothing lost: WorldStateTests).</summary>
+        public static void Migrate(SaveData d)
+        {
+            if (d.Version < 2)
+            {
+                d.KingdomStates.Clear();
+                foreach (KingdomSave old in d.Kingdoms) d.KingdomStates.Add(KingdomState.FromOldSave(old));
+                d.Kingdoms.Clear();
+            }
+            d.Version = SaveData.CurrentVersion;
+        }
+
         /// <summary>Saves to the slot. title: the player's name for it; null keeps the one the slot has.</summary>
         public static bool Save(int slot, string title = null)
         {
@@ -170,8 +182,9 @@ namespace BattleOfAges.SaveLoad
                 d.WorldEpoch = CentralEmpire.WorldEpoch;
                 d.WallLevel = Fortifications.Level;
                 d.KingdomsFounded = true;
-                if (AI.KingdomRealm.Active) d.Kingdoms.AddRange(AI.KingdomRealm.AllStates()); // a campaign: the far ones too
-                else foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.Kingdoms.Add(k.ToSave());
+                if (AI.KingdomRealm.Active) d.KingdomStates.AddRange(AI.KingdomRealm.AllStates()); // a campaign: the far ones too
+                else foreach (AI.NpcKingdom k in AI.NpcKingdom.All) if (k != null) d.KingdomStates.Add(k.ToState());
+                d.NextEntityId = EntityIds.Next;
                 HeroSkills skills = player.GetComponent<HeroSkills>();
                 if (skills != null)
                 {
@@ -286,6 +299,7 @@ namespace BattleOfAges.SaveLoad
         /// <summary>A new campaign with these choices (the setup screen; null: a random world with the defaults).</summary>
         public static void NewGame(CampaignSetup setup)
         {
+            EntityIds.Reset(1);
             setup = setup ?? new CampaignSetup();
             startingSetup = setup;
             pending = null;
@@ -524,8 +538,10 @@ namespace BattleOfAges.SaveLoad
                 if (hp != null && d.Player.Health > 0) hp.SetCurrentHealth(d.Player.Health);
             }
             AI.NpcKingdom.RemoveAll();
-            if (d.KingdomsFounded && AI.KingdomRealm.Active) AI.KingdomRealm.Load(d.Kingdoms); // near ones real, the rest as data
-            else if (d.KingdomsFounded) foreach (KingdomSave k in d.Kingdoms) AI.NpcKingdom.FromSave(k);
+            EntityIds.Reset(d.NextEntityId);
+            Migrate(d);
+            if (d.KingdomsFounded && AI.KingdomRealm.Active) AI.KingdomRealm.Load(d.KingdomStates); // near ones real, the rest as data
+            else if (d.KingdomsFounded) foreach (KingdomState k in d.KingdomStates) AI.NpcKingdom.FromState(k);
             else FoundKingdoms(); // a save from before the NPC kings
             var mapCam = Managers.GameContext.MapCamera;
             if (mapCam != null && d.Player.HasMapCamera) mapCam.transform.position = d.Player.MapCameraPosition;

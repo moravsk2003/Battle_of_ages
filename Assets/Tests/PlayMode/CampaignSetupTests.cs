@@ -36,10 +36,10 @@ namespace BattleOfAges.PlayModeTests
             try { if (Directory.Exists(folder)) Directory.Delete(folder, true); } catch { }
         }
 
-        private static List<KingdomSave> Empires()
+        private static List<KingdomState> Empires()
         {
-            var list = new List<KingdomSave>();
-            foreach (KingdomSave s in KingdomRealm.AllStates()) if (s.Empire) list.Add(s);
+            var list = new List<KingdomState>();
+            foreach (KingdomState s in KingdomRealm.AllStates()) if (s.Empire) list.Add(s);
             return list;
         }
 
@@ -48,28 +48,28 @@ namespace BattleOfAges.PlayModeTests
         {
             SaveSystem.NewGame(new CampaignSetup { Seed = 4242, Size = 8000f, Heroes = 10, KingShare = 0.5f, Class = HeroClass.Tank, HasArtifact = true, Artifact = ArtifactType.Vampiric });
             yield return new WaitForSeconds(3f);
-            List<KingdomSave> empires = Empires();
+            List<KingdomState> empires = Empires();
             Assert.AreEqual(1, empires.Count, "one, from the start");
-            KingdomSave empire = empires[0];
+            KingdomState empire = empires[0];
             Assert.AreEqual("Центральна імперія", empire.Name);
             Assert.IsFalse(empire.Free);
             Assert.IsTrue(empire.HasKing, "with its emperor");
-            foreach (KingdomSave s in KingdomRealm.AllStates()) Assert.LessOrEqual(s.Home.sqrMagnitude, empire.Home.sqrMagnitude + 1f, "no one further from the player's start: " + s.Name);
+            foreach (KingdomState s in KingdomRealm.AllStates()) Assert.LessOrEqual(s.Home.sqrMagnitude, empire.Home.sqrMagnitude + 1f, "no one further from the player's start: " + s.Name);
 
             // A far empire: no work, the hall for nothing
             float wood = empire.Wood;
-            KingdomSave far = null;
-            foreach (KingdomSave s in KingdomRealm.Far) if (s.Empire) far = s;
+            KingdomState far = null;
+            foreach (KingdomState s in KingdomRealm.Far) if (s.Empire) far = s;
             Assert.IsNotNull(far, "far at the start");
             for (int h = 0; h < 80; h++) KingdomRealm.Advance(far, 1f);
             Assert.AreEqual(wood, far.Wood, 1e-3f, "no one works");
             Assert.Greater(far.Hall, 1, "and the hall rises anyway");
-            foreach (SubjectSave u in far.Subjects) Assert.AreEqual((int)UnitRank.Person, u.Rank, "work makes no warriors there");
+            foreach (UnitState u in far.Subjects) Assert.AreEqual((int)UnitRank.Person, u.Rank, "work makes no warriors there");
 
             // Real: armed by rank; the emperor's death is the end, and a new epoch
             int epoch = CentralEmpire.WorldEpoch;
             KingdomRealm.Load(KingdomRealm.AllStates());
-            NpcKingdom real = NpcKingdom.FromSave(JsonUtility.FromJson<KingdomSave>(JsonUtility.ToJson(far)));
+            NpcKingdom real = NpcKingdom.FromState(JsonUtility.FromJson<KingdomState>(JsonUtility.ToJson(far)));
             Assert.IsTrue(real.IsEmpire, "a save keeps it");
             Assert.AreEqual(GameBalance.EmpireHeroGear, real.King.GetComponent<BattleOfAges.Crafting.Equipment>()[BattleOfAges.Crafting.EquipSlot.Weapon].Level, "the emperor's weapon (a sword, a bow or a staff by its class)");
             HostileMobAI person = real.Subjects[0];
@@ -123,7 +123,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(8000f, WorldSettings.Size);
             Assert.AreEqual(9, NpcKingdom.All.Count + KingdomRealm.Far.Count, "nine other heroes");
             int free = 0;
-            foreach (KingdomSave s in KingdomRealm.Far) if (s.Free) free++;
+            foreach (KingdomState s in KingdomRealm.Far) if (s.Free) free++;
             foreach (NpcKingdom k in NpcKingdom.All) if (k.Free) free++;
             Assert.That(free, Is.InRange(4, 5), "half of them kings");
 

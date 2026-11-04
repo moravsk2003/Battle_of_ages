@@ -138,10 +138,10 @@ namespace BattleOfAges.PlayModeTests
             WorldSettings.Set(2024, WorldSettings.DefaultSize);
             int Knights(int hall)
             {
-                KingdomSave s = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Навчання", false, 5, new System.Random(3));
+                KingdomState s = KingdomRealm.NewState(new Vector3(3000f, 0f, -2000f), "Навчання", false, 5, new System.Random(3));
                 s.Hall = hall;
                 s.Subjects.Clear();
-                for (int i = 0; i < 400; i++) s.Subjects.Add(new SubjectSave { Rank = (int)UnitRank.Warrior });
+                for (int i = 0; i < 400; i++) s.Subjects.Add(new UnitState { Rank = (int)UnitRank.Warrior });
                 s.Wood = 0;
                 KingdomRealm.Advance(s, 24f);
                 return s.Subjects.Count(u => u.Rank >= (int)UnitRank.Knight);

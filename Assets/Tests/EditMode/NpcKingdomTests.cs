@@ -154,10 +154,10 @@ namespace BattleOfAges.Tests
             k.AddSubject(UnitRank.Knight, k.Spot(), withModel: false);
             k.King.GetComponent<HeroProgress>().AddXp(HeroProgress.XpForLevelUp(1) + HeroProgress.XpForLevelUp(2) + 30);
             k.Economy.Wood = 42f;
-            SaveLoad.KingdomSave s = JsonUtility.FromJson<SaveLoad.KingdomSave>(JsonUtility.ToJson(k.ToSave()));
+            SaveLoad.KingdomState s = JsonUtility.FromJson<SaveLoad.KingdomState>(JsonUtility.ToJson(k.ToState()));
             NpcKingdom.RemoveAll();
 
-            NpcKingdom r = NpcKingdom.FromSave(s);
+            NpcKingdom r = NpcKingdom.FromState(s);
             Assert.AreEqual(2, r.Economy.HallLevel);
             Assert.AreEqual(42f, r.Economy.Wood, 1e-3);
             Assert.AreEqual(5, r.Population);

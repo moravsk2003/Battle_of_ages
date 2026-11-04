@@ -39,7 +39,7 @@ namespace BattleOfAges.PlayModeTests
 
         private NpcKingdom Kingdom(string name, int gear, Vector3 home)
         {
-            NpcKingdom k = NpcKingdom.FromSave(new KingdomSave { Name = name, Home = home, Hall = gear + 1, Wood = 0f, Team = 0 });
+            NpcKingdom k = NpcKingdom.FromState(new KingdomState { Name = name, Home = home, Hall = gear + 1, Wood = 0f, Team = 0 });
             k.enabled = false; // the battle alone: no births, no raids, no thinking
             spawned.Add(k.gameObject);
             return k;
