@@ -39,7 +39,7 @@ namespace BattleOfAges.PlayModeTests
         }
 
         /// <summary>A unit of the player's side (no AI: it only stands and takes it).</summary>
-        private HealthComponent PlayerSide(Vector3 at, UnitRank rank, string name)
+        internal HealthComponent PlayerSide(Vector3 at, UnitRank rank, string name)
         {
             var go = new GameObject(name, typeof(HealthComponent), typeof(CombatUnit));
             at.y = RtsUnit.GetTerrainHeight(at); // (a world left by an earlier scene test may have hills)

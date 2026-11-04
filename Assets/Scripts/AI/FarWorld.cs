@@ -11,19 +11,30 @@ namespace BattleOfAges.AI
     /// The world out of sight (M6 step 3, docs/GAME_DESIGN.md §6.2): once a game hour kings send raids on the same terms as
     /// real ones (NpcKingdom.Think), armies march at the pace of their slowest, battles are decided by AbstractBattle, a
     /// lost hall ends a kingdom, a dead king starts an interregnum and half the people leave; free heroes walk the world.
-    /// Plain data: no object in the scene is touched. An army whose target has turned real goes home for now: armies coming
-    /// into the player's sight are M6 step 4. Not modelled yet: free bands fighting on the road, heroes' levels and classes.
+    /// Plain data: no object in the scene is touched; an army coming into the player's sight turns real where it is
+    /// (KingdomRealm.Sync, NpcKingdom.FromState). Not modelled yet: free bands fighting on the road, heroes' levels and classes.
     /// </summary>
     public static class FarWorld
     {
-        /// <summary>One game hour (or several) of this kingdom against the others that are only data.</summary>
-        public static void Hour(KingdomState s, IReadOnlyList<KingdomState> world, float hours, System.Random rng, Vector3? keepOutOf = null)
+        /// <summary>The player's settlement as a far king sees it: where, and how strong what guards it is (KingdomEconomy.Power).</summary>
+        public struct PlayerTarget
+        {
+            public Vector3 Position;
+            public float Guards;
+        }
+
+        /// <summary>
+        /// One game hour (or several) of this kingdom against the others that are only data. player: the settlement a raid may go
+        /// for; realHome: where a kingdom that is real now stands, by its id (an army on its way to one goes on).
+        /// </summary>
+        public static void Hour(KingdomState s, IReadOnlyList<KingdomState> world, float hours, System.Random rng, Vector3? keepOutOf = null,
+                                PlayerTarget? player = null, System.Func<WorldId, Vector3?> realHome = null)
         {
             if (s.Defeated || hours <= 0f) return;
-            for (int i = s.Armies.Count - 1; i >= 0; i--) MoveArmy(s, s.Armies[i], world, hours, rng);
+            for (int i = s.Armies.Count - 1; i >= 0; i--) MoveArmy(s, s.Armies[i], world, hours, rng, player, realHome);
             if (s.Defeated) return;
             if (s.Free) Wander(s, hours, rng, keepOutOf);
-            else ConsiderRaid(s, world);
+            else ConsiderRaid(s, world, player);
         }
 
         private static float FirstRaidAt(KingdomState s) => GameBalance.KingdomFirstRaidHours * (1f + Mathf.Repeat(KingdomTown.Seed(s.Name) * 0.618034f, 1f));
@@ -82,7 +93,7 @@ namespace BattleOfAges.AI
         // ------------------------------------------------------------------ raids
 
         /// <summary>The terms of NpcKingdom.Think: not before its first hour, one at a time, after the cooldown, not with an enemy on its way; at the nearest it is strong enough for.</summary>
-        public static bool ConsiderRaid(KingdomState s, IReadOnlyList<KingdomState> world)
+        public static bool ConsiderRaid(KingdomState s, IReadOnlyList<KingdomState> world, PlayerTarget? player = null)
         {
             if (s.Free || !s.HasKing || s.Armies.Count > 0 || s.Age < FirstRaidAt(s)) return false;
             if (s.Age < s.LastRaidEnd + GameBalance.KingdomRaidCooldownHours || Attacked(s, world)) return false;
@@ -103,6 +114,13 @@ namespace BattleOfAges.AI
                 nearest = d;
                 target = t;
             }
+            // The player as if nearer, as a real king weighs it (GameBalance.KingdomPlayerTargetFactor)
+            if (player.HasValue && ours >= GameBalance.KingdomRaidPowerRatio * player.Value.Guards
+                && FlatDistance(player.Value.Position, s.Home) * GameBalance.KingdomPlayerTargetFactor < nearest)
+            {
+                StartRaid(s, party, null).TargetsPlayer = true;
+                return true;
+            }
             if (target == null) return false;
             StartRaid(s, party, target);
             return true;
@@ -120,7 +138,7 @@ namespace BattleOfAges.AI
 
         public static ArmyState StartRaid(KingdomState s, List<UnitState> party, KingdomState target)
         {
-            var army = new ArmyState { Position = s.Home, TargetKingdomId = target.Id, WithHero = s.HasKing, StartCount = party.Count };
+            var army = new ArmyState { Position = s.Home, TargetKingdomId = target != null ? target.Id : default, WithHero = s.HasKing, StartCount = party.Count };
             foreach (UnitState u in party) s.Subjects.Remove(u);
             army.Units.AddRange(party);
             s.Armies.Add(army);
@@ -149,14 +167,16 @@ namespace BattleOfAges.AI
             return null;
         }
 
-        private static void MoveArmy(KingdomState s, ArmyState army, IReadOnlyList<KingdomState> world, float hours, System.Random rng)
+        private static void MoveArmy(KingdomState s, ArmyState army, IReadOnlyList<KingdomState> world, float hours, System.Random rng, PlayerTarget? player, System.Func<WorldId, Vector3?> realHome)
         {
-            KingdomState target = army.Returning ? null : Find(world, army.TargetKingdomId);
-            if (!army.Returning && (target == null || target.Defeated)) army.Returning = true;
+            KingdomState target = army.Returning || army.TargetsPlayer ? null : Find(world, army.TargetKingdomId);
+            // Its target real now, or the player's: it marches on, and turns real itself on coming near (KingdomRealm.Sync)
+            Vector3? beyond = army.Returning ? null : army.TargetsPlayer ? player?.Position : target == null ? realHome?.Invoke(army.TargetKingdomId) : null;
+            if (!army.Returning && !beyond.HasValue && (target == null || target.Defeated)) army.Returning = true;
             // Still on the way and someone is coming for the home: back to defend it (as NpcKingdom.LeadRaid)
             if (!army.Returning && !army.AtTarget && Attacked(s, world)) army.Returning = true;
 
-            Vector3 to = army.Returning ? s.Home : target.Home;
+            Vector3 to = army.Returning ? s.Home : beyond ?? target.Home;
             float left = FlatDistance(army.Position, to), step = MetresPerHour(s, army) * hours;
             if (left > step + GameBalance.KingdomGuardRadius)
             {
@@ -165,6 +185,7 @@ namespace BattleOfAges.AI
                 army.Position += way.normalized * step;
                 return;
             }
+            if (!army.Returning && beyond.HasValue) return; // at the door: only real units fight there
             army.Position = to;
             if (army.Returning) ComeHome(s, army, rng);
             else

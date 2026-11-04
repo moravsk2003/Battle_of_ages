@@ -190,8 +190,48 @@ namespace BattleOfAges.AI
                 float hours = s.PendingHours;
                 s.PendingHours = 0f;
                 Advance(s, hours);
-                FarWorld.Hour(s, far, hours, new System.Random(KingdomTown.Seed(s.Name) ^ Mathf.FloorToInt(s.Age * 7f)), home);
+                FarWorld.Hour(s, far, hours, new System.Random(KingdomTown.Seed(s.Name) ^ Mathf.FloorToInt(s.Age * 7f)), home, PlayerAs(s), RealHome);
             }
+        }
+
+        private static readonly int[] guardBuffer = new int[256];
+
+        /// <summary>The player's settlement as this far king weighs it; none while the player has no hall and no hero (the same terms as RaidTargets).</summary>
+        private static FarWorld.PlayerTarget? PlayerAs(KingdomState s)
+        {
+            if (TownHall.Current == null && Managers.GameContext.Player == null) return null;
+            Vector3 at = TownHall.Current != null ? TownHall.Current.transform.position : Hero();
+            var guards = new List<HealthComponent>();
+            int n = RTS.UnitSpatialGrid.QueryEnemies(at, GameBalance.KingdomGuardRadius, s.Team, guardBuffer);
+            for (int i = 0; i < n; i++)
+            {
+                HealthComponent h = RTS.UnitSpatialGrid.Health(guardBuffer[i]);
+                if (h != null && h.IsAlive) guards.Add(h);
+            }
+            GameObject player = Managers.GameContext.Player;
+            HealthComponent hero = player != null ? player.GetComponent<HealthComponent>() : null;
+            if (hero != null && hero.IsAlive && !guards.Contains(hero) && Flat(hero.transform.position, at) <= GameBalance.KingdomGuardRadius) guards.Add(hero);
+            return new FarWorld.PlayerTarget { Position = at, Guards = NpcKingdom.PowerOf(guards) };
+        }
+
+        private static Vector3? RealHome(WorldId id)
+        {
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated && k.StateId == id) return k.Home;
+            return null;
+        }
+
+        /// <summary>An army of this far kingdom has come where it must be real: by the hero, by the player's home, or at a real kingdom it goes for.</summary>
+        private static bool ArmyInSight(KingdomState s, Vector3 home, Vector3 hero)
+        {
+            foreach (ArmyState a in s.Armies)
+            {
+                if (Flat(a.Position, hero) < GameBalance.MaterializeRadius) return true;
+                if (a.TargetsPlayer && Flat(a.Position, home) < GameBalance.MaterializeRadius) return true;
+                if (a.Returning || a.TargetsPlayer) continue;
+                Vector3? real = RealHome(a.TargetKingdomId);
+                if (real.HasValue && Flat(a.Position, real.Value) < GameBalance.ArmyMeetsRealRadius) return true;
+            }
+            return false;
         }
 
         private static Vector3 HomeOfPlayer() => TownHall.Current != null ? TownHall.Current.transform.position : Vector3.zero;
@@ -210,6 +250,15 @@ namespace BattleOfAges.AI
             if (!Active) return;
             Vector3 home = HomeOfPlayer(), hero = Hero();
             var standing = new List<(float d, KingdomState s, NpcKingdom k)>();
+            // A far kingdom an army in sight goes for must be there when it arrives
+            var wanted = new HashSet<WorldId>();
+            foreach (KingdomState s in far)
+                if (!s.Defeated && ArmyInSight(s, home, hero))
+                {
+                    wanted.Add(s.Id);
+                    foreach (ArmyState a in s.Armies) if (!a.Returning && !a.TargetsPlayer) wanted.Add(a.TargetKingdomId);
+                }
+            foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated && !k.RaidTargetId.IsNone) wanted.Add(k.RaidTargetId);
             foreach (KingdomState s in far) if (!s.Defeated) standing.Add((Flat(s.Home, home), s, null));
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated) standing.Add((Flat(k.Home, home), null, k));
             standing.Sort((a, b) => a.d.CompareTo(b.d));
@@ -219,9 +268,9 @@ namespace BattleOfAges.AI
                 bool nearHome = i < GameBalance.RealKingdomsNearHome;
                 if (s != null)
                 {
-                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
+                    if (nearHome || Flat(s.Home, hero) < GameBalance.MaterializeRadius || wanted.Contains(s.Id)) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
                 }
-                else if (!nearHome && Flat(k.Home, hero) > GameBalance.DematerializeRadius && !k.Raiding && !k.UnderRaid())
+                else if (!nearHome && !wanted.Contains(k.StateId) && Flat(k.Home, hero) > GameBalance.DematerializeRadius && k.CanFold(home, hero) && !k.UnderRaid())
                 {
                     far.Add(k.ToState());
                     k.Dissolve();

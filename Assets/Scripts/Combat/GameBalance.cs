@@ -304,6 +304,8 @@ namespace BattleOfAges.Combat
         public static float CampaignKingShare = 0.75f;
         public static int RealKingdomsNearHome = 3;
         public static float MaterializeRadius = 1200f, DematerializeRadius = 1700f;
+        /// <summary>A far army this near a real kingdom it goes for turns real to fight it.</summary>
+        public static float ArmyMeetsRealRadius = 150f;
         public static float KingdomDistance = 600f;
         /// <summary>The start of every NPC king: a hero (a general, like the player) and this many people and wood, no hall.</summary>
         public static int KingdomStartPeople = 5, KingdomStartWood = 10;

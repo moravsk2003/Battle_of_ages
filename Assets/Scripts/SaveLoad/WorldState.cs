@@ -73,6 +73,8 @@ namespace BattleOfAges.SaveLoad
         public WorldId TargetKingdomId;
         public int StartCount;
         public bool WithHero, Returning, AtTarget;
+        /// <summary>It goes for the player's settlement, not another kingdom (it turns real on coming near: KingdomRealm).</summary>
+        public bool TargetsPlayer;
     }
 
     /// <summary>A settlement as data (§6.2): its hall, its stock, who stands in it. A free hero's camp is one with no hall.</summary>

@@ -44,7 +44,7 @@ namespace BattleOfAges.AI
         public readonly KingdomEconomy Economy = new KingdomEconomy();
         public HostileMobAI King { get; private set; }
         public bool IsDefeated { get; private set; }
-        public bool Raiding => raiders.Count > 0;
+        public bool Raiding => raiders.Count > 0 || arrivingArmy.Count > 0;
         public float InterregnumLeft { get; private set; }
         public bool InInterregnum => InterregnumLeft > 0f;
         /// <summary>Game hours since the kingdom was founded.</summary>
@@ -457,9 +457,33 @@ namespace BattleOfAges.AI
             raiders.AddRange(party);
             raidSize = party.Count;
             raidTarget = target;
+            raidAtPlayer = target.GetComponent<TownHall>() != null || target.gameObject == Managers.GameContext.Player;
             foreach (HostileMobAI m in raiders) m.OrderAttack(target);
             RaidStarted?.Invoke(this, target);
             StrategyHud.Notify($"{KingdomName} іде в набіг{Whom(target)}: {raidSize} бійців!");
+        }
+
+        /// <summary>A raid that turned real finds its target among those in the scene (it goes home if there is none), and everyone sets on it.</summary>
+        private void ResolveRaidTarget()
+        {
+            HealthComponent target = null;
+            if (raidAtPlayer)
+            {
+                TownHall hall = TownHall.Current;
+                HealthComponent h = hall != null ? hall.GetComponent<HealthComponent>() : null;
+                target = h != null && h.IsAlive ? h : PlayerHero();
+            }
+            else
+                foreach (NpcKingdom k in all)
+                {
+                    if (k == null || k == this || k.IsDefeated || k.stateIds.Id != raidPending) continue;
+                    target = k.Economy.HallLevel > 0 ? k.Hall : k.King != null ? k.King.Health : null;
+                }
+            raidPending = default;
+            if (target == null || !target.IsAlive) { raidAtPlayer = false; EndRaid(retreat: false); return; }
+            raidTarget = target;
+            foreach (HostileMobAI m in raiders) if (m != null) m.OrderAttack(target);
+            if (raidAtPlayer) StrategyHud.Notify($"{KingdomName} іде в набіг на вас: {raidSize} бійців!");
         }
 
         /// <summary>Who a raid goes at, for the message: the same words looked as if every raid were coming for the player.</summary>
@@ -479,6 +503,8 @@ namespace BattleOfAges.AI
         /// <summary>Once a second on a raid: turn back after heavy losses, else keep every raider fighting something.</summary>
         private void LeadRaid()
         {
+            if (arrivingArmy.Count > 0) return; // still coming into the scene
+            if (raidTarget == null && (raidAtPlayer || !raidPending.IsNone)) ResolveRaidTarget();
             if (raidSize > 0 && raiders.Count <= raidSize * (1f - GameBalance.KingdomRaidRetreatLosses)) { EndRaid(retreat: true); return; }
             // On the march the raid keeps together at the pace of its slowest one; near the enemy everyone runs
             bool marching = true;
@@ -534,6 +560,8 @@ namespace BattleOfAges.AI
             raiders.Clear();
             raidSize = 0;
             raidTarget = null;
+            raidPending = default;
+            raidAtPlayer = false;
         }
 
         /// <summary>The nearest enemy unit, enemy hall (and against the player: the player's hero and buildings) within this radius.</summary>
@@ -631,6 +659,58 @@ namespace BattleOfAges.AI
             return new SaveLoad.UnitState { Rank = p != null ? (int)p.Rank : 0, BattleXp = p != null ? p.BattleXp : 0, Health = m.Health.CurrentHealth, Position = m.transform.position };
         }
 
+        /// <summary>Its number in the world's state.</summary>
+        public SaveLoad.WorldId StateId { get { EnsureStateIds(); return stateIds.Id; } }
+
+        private void EnsureStateIds()
+        {
+            if (stateIds.Id.IsNone) stateIds.Id = SaveLoad.WorldIds.New();
+        }
+
+        /// <summary>The kingdom its raid goes for (none: no raid, or at the player).</summary>
+        public SaveLoad.WorldId RaidTargetId
+        {
+            get
+            {
+                if (!raidPending.IsNone) return raidPending;
+                NpcKingdom owner = raidTarget != null ? OwnerOf(raidTarget) : null;
+                return owner != null ? owner.StateId : default;
+            }
+        }
+
+        private static NpcKingdom OwnerOf(HealthComponent target)
+        {
+            foreach (NpcKingdom k in all)
+            {
+                if (k == null) continue;
+                if (k.Hall == target || (k.King != null && k.King.Health == target)) return k;
+                foreach (HostileMobAI m in k.subjects) if (m != null && m.Health == target) return k;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// It can turn back into data: a raid only while no one of it is in sight of the player or at its fight. A battle that
+        /// has begun is never folded up (docs/GAME_DESIGN.md §6.3).
+        /// </summary>
+        public bool CanFold(Vector3 playerHome, Vector3 hero)
+        {
+            if (!Raiding) return true;
+            if (arrivingArmy.Count > 0) return false;
+            float reach = GameBalance.DematerializeRadius;
+            foreach (HostileMobAI m in raiders)
+            {
+                if (m == null) continue;
+                Vector3 p = m.transform.position;
+                if (FlatDistance(p, hero) < reach || FlatDistance(p, playerHome) < reach) return false;
+                if (NearestEnemyUnit(p, GameBalance.KingdomRaidSearchRadius) != null) return false;
+                if (raidTarget != null && FlatDistance(p, raidTarget.transform.position) <= GameBalance.KingdomRaidSearchRadius) return false;
+            }
+            return true;
+        }
+
+        private static float FlatDistance(Vector3 a, Vector3 b) { a.y = 0f; b.y = 0f; return Vector3.Distance(a, b); }
+
         public SaveLoad.KingdomState ToState()
         {
             Prune();
@@ -646,8 +726,10 @@ namespace BattleOfAges.AI
             s.EnsureIds();
             stateIds = (s.Id, s.Hero.Id, s.Capital.Id, s.Capital.Garrison.Id); // (a kingdom founded here gets its numbers the first time)
             if (IsDefeated) return s;
-            foreach (HostileMobAI m in subjects) s.Subjects.Add(SaveOf(m));
+            foreach (HostileMobAI m in subjects) if (!raiders.Contains(m)) s.Subjects.Add(SaveOf(m));
             s.Subjects.AddRange(arriving); // not in the scene yet: still its people
+            if (Raiding) s.Armies.Add(RaidAsArmy());
+            s.EnsureIds();
             if (King != null && King.Health.IsAlive)
             {
                 s.HasKing = true;
@@ -661,6 +743,25 @@ namespace BattleOfAges.AI
                 }
             }
             return s;
+        }
+
+        /// <summary>The raid under way as data: who, where they have got to, at whom.</summary>
+        private SaveLoad.ArmyState RaidAsArmy()
+        {
+            var army = new SaveLoad.ArmyState { StartCount = raidSize, WithHero = King != null && raiders.Contains(King), TargetKingdomId = RaidTargetId, TargetsPlayer = raidAtPlayer };
+            Vector3 sum = Vector3.zero;
+            int n = 0;
+            foreach (HostileMobAI m in raiders)
+            {
+                if (m == null) continue;
+                sum += m.transform.position;
+                n++;
+                if (m != King) army.Units.Add(SaveOf(m));
+            }
+            foreach (SaveLoad.UnitState u in arrivingArmy) { sum += u.Position; n++; army.Units.Add(u); }
+            army.Position = n > 0 ? sum / n : Home;
+            if (raidTarget != null && !raidAtPlayer && army.TargetKingdomId.IsNone) army.Returning = true; // a band of its own, no kingdom: home
+            return army;
         }
 
         /// <summary>A kingdom back from a save (its king grows again to the saved level, spending the points its usual way).</summary>
@@ -681,21 +782,21 @@ namespace BattleOfAges.AI
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
             k.Age = s.Age;
             k.LastRaidEnd = s.LastRaidEnd;
-            // Its armies on the far roads come home with it, for now (M6 step 4: they will turn real where they are)
-            foreach (SaveLoad.ArmyState army in s.Armies) s.Subjects.AddRange(army.Units);
-            s.Armies.Clear();
             // Kings do not all set off at once, as a new one (a state does not keep it: the same hour for the same name)
             k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * (1f + Mathf.Repeat(KingdomTown.Seed(s.Name) * 0.618034f, 1f));
             k.BuildHall();
             if (s.Hall > 0 && s.HallHealth > 0) k.Hall.SetCurrentHealth(s.HallHealth);
             if (Application.isPlaying && !s.Free) k.Town = KingdomTown.Attach(k);
             if (s.Defeated) { k.IsDefeated = true; return k; }
+            k.RaiseArmies(s, gradual);
             if (gradual) k.arriving.AddRange(s.Subjects); // a few a frame (ArriveMore): a grown kingdom was a hitch of hundreds of ms
             else foreach (SaveLoad.UnitState u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
             if (s.HasKing)
             {
-                HostileMobAI king = k.AddSubject((UnitRank)s.King.Rank, s.King.Position);
+                bool leadsArmy = s.Armies.Count > 0 && s.Armies[0].WithHero;
+                HostileMobAI king = k.AddSubject((UnitRank)s.King.Rank, leadsArmy ? s.Armies[0].Position : s.King.Position);
                 k.Crown(king, (HeroClass)s.KingClass);
+                if (leadsArmy && !s.Armies[0].Returning) k.raiders.Add(king);
                 HeroProgress hero = king.GetComponent<HeroProgress>();
                 hero.AddXp(s.KingTotalXp);
                 HeroAutoPilot.SpendPoints(king.gameObject);
@@ -706,22 +807,58 @@ namespace BattleOfAges.AI
         }
 
         private readonly List<SaveLoad.UnitState> arriving = new List<SaveLoad.UnitState>();
+        /// <summary>Its army's people still to come into the scene, where the army has got to.</summary>
+        private readonly List<SaveLoad.UnitState> arrivingArmy = new List<SaveLoad.UnitState>();
+        /// <summary>A raid that turned real: the kingdom it goes for, until that one is there too; whether it goes for the player; whether it is on its way home.</summary>
+        private SaveLoad.WorldId raidPending;
+        private bool raidAtPlayer, armyReturning;
         /// <summary>The numbers of its state (SaveLoad.KingdomState): they stay through turning far and real.</summary>
         private (SaveLoad.WorldId Id, SaveLoad.WorldId Hero, SaveLoad.WorldId Settlement, SaveLoad.WorldId Garrison) stateIds;
 
         /// <summary>People of a kingdom made real gradually, still to come into the scene.</summary>
-        public int Arriving => arriving.Count;
+        public int Arriving => arriving.Count + arrivingArmy.Count;
+
+        /// <summary>Its armies from the far roads turn real where they are (M6 step 4), marching on or going home.</summary>
+        private void RaiseArmies(SaveLoad.KingdomState s, bool gradual)
+        {
+            if (s.Armies.Count == 0) return;
+            SaveLoad.ArmyState army = s.Armies[0];
+            for (int i = 1; i < s.Armies.Count; i++) s.Subjects.AddRange(s.Armies[i].Units); // (one at a time so far)
+            armyReturning = army.Returning;
+            raidAtPlayer = army.TargetsPlayer && !army.Returning;
+            raidPending = army.Returning ? default : army.TargetKingdomId;
+            raidSize = army.StartCount > 0 ? army.StartCount : army.Units.Count;
+            foreach (SaveLoad.UnitState u in army.Units)
+            {
+                Vector2 r = Random.insideUnitCircle * Mathf.Min(3f + Mathf.Sqrt(army.Units.Count), 18f);
+                u.Position = army.Position + new Vector3(r.x, 0f, r.y);
+                u.Position.y = RtsUnit.GetTerrainHeight(u.Position);
+                arrivingArmy.Add(u);
+            }
+            if (!gradual) ArriveMore(int.MaxValue);
+        }
 
         /// <summary>Brings up to this many of its people into the scene (KingdomRealm, each frame); false when none are left to come.</summary>
         public bool ArriveMore(int max)
         {
-            for (int i = 0; i < max && arriving.Count > 0; i++)
+            while (max > 0 && arriving.Count > 0)
             {
                 SaveLoad.UnitState u = arriving[0];
                 arriving.RemoveAt(0);
                 Restore(AddSubject((UnitRank)u.Rank, u.Position), u);
+                max--;
             }
-            return arriving.Count > 0;
+            while (max > 0 && arrivingArmy.Count > 0)
+            {
+                max--;
+                SaveLoad.UnitState u = arrivingArmy[arrivingArmy.Count - 1];
+                arrivingArmy.RemoveAt(arrivingArmy.Count - 1);
+                HostileMobAI m = AddSubject((UnitRank)u.Rank, u.Position);
+                Restore(m, u);
+                if (armyReturning) m.ChangeState(AIStateType.Retreat); // on its way home, from where it had got to
+                else raiders.Add(m);
+            }
+            return Arriving > 0;
         }
 
         private static void Restore(HostileMobAI m, SaveLoad.UnitState u)

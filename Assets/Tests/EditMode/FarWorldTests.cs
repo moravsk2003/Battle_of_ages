@@ -180,6 +180,56 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void AFarKing_GoesForThePlayer_IfStrongEnough_AsIfNearer()
+        {
+            KingdomState king = Kingdom("На гравця", new Vector3(0f, 0f, 3000f), 3, 40);
+            KingdomState neighbour = Kingdom("Сусід", new Vector3(0f, 0f, 3800f), 1, 4);
+            var world = new List<KingdomState> { king, neighbour };
+            var strongPlayer = new FarWorld.PlayerTarget { Position = new Vector3(0f, 0f, 1500f), Guards = FarWorld.Power(king, king.Subjects, true) };
+            Assert.IsTrue(FarWorld.ConsiderRaid(king, world, strongPlayer));
+            Assert.AreEqual(neighbour.Id, king.Armies[0].TargetKingdomId, "too strong: the neighbour instead");
+            Assert.IsFalse(king.Armies[0].TargetsPlayer);
+
+            KingdomState other = Kingdom("Інший", new Vector3(0f, 0f, 3000f), 3, 40);
+            KingdomState near = Kingdom("Ближче", new Vector3(0f, 0f, 3900f), 1, 4);
+            var player = new FarWorld.PlayerTarget { Position = new Vector3(0f, 0f, 1500f), Guards = 1f }; // 1500 m counts as 750, before 900
+            var others = new List<KingdomState> { other, near };
+            Assert.IsTrue(FarWorld.ConsiderRaid(other, others, player));
+            Assert.IsTrue(other.Armies[0].TargetsPlayer, "the player, though the neighbour is nearer");
+
+            // It marches up to the settlement and waits there for the real fight, losing no one
+            int people = other.Armies[0].Units.Count;
+            for (int h = 0; h < 40; h++) FarWorld.Hour(other, others, 1f, rng, null, player);
+            Assert.AreEqual(1, other.Armies.Count, "still on its raid");
+            Assert.AreEqual(people, other.Armies[0].Units.Count);
+            Assert.Less((other.Armies[0].Position - player.Position).magnitude, GameBalance.KingdomGuardRadius + 400f, "at the door");
+        }
+
+        [Test]
+        public void AnArmyOnTheRoad_MarchesOn_ThoughItsTargetIsRealNow()
+        {
+            KingdomState attacker = Kingdom("Хід", new Vector3(0f, 0f, 3000f), 3, 40);
+            KingdomState target = Kingdom("Справжня", new Vector3(0f, 0f, 3800f), 1, 4);
+            var world = new List<KingdomState> { attacker, target };
+            FarWorld.ConsiderRaid(attacker, world);
+            WorldId id = target.Id;
+            Vector3 home = target.Home;
+            var alone = new List<KingdomState> { attacker }; // it has gone from the far ones
+            float start = (attacker.Armies[0].Position - home).magnitude;
+            FarWorld.Hour(attacker, alone, 1f, rng, null, null, w => w == id ? home : (Vector3?)null);
+            Assert.IsFalse(attacker.Armies[0].Returning);
+            Assert.Less((attacker.Armies[0].Position - home).magnitude, start);
+            FarWorld.Hour(attacker, alone, 1f, rng);
+            for (int h = 0; h < 10 && attacker.Armies.Count > 0; h++)
+            {
+                Assert.IsTrue(attacker.Armies[0].Returning, "it is gone altogether: home");
+                FarWorld.Hour(attacker, alone, 1f, rng);
+            }
+            Assert.AreEqual(0, attacker.Armies.Count, "and home it came");
+            Assert.AreEqual(40, attacker.Subjects.Count, "with everyone");
+        }
+
+        [Test]
         public void AnArmyOnTheRoad_IsSaved_AndItsPeopleAreNotLostTurningReal()
         {
             KingdomState attacker = Kingdom("Збережене", new Vector3(0f, 0f, 3000f), 3, 40);
