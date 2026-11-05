@@ -14,7 +14,7 @@ namespace BattleOfAges.Combat
     {
         public const float Speed = 45f, Length = 0.8f, StuckSeconds = 4f, MaxLife = 3f;
         /// <summary>Height of the arc for each metre of the shot.</summary>
-        public const float ArcPerMetre = 0.04f;
+        public const float ArcPerMetre = 0.06f; // high enough to see the flight from the map, low enough to stay quick
 
         private static readonly Stack<ArrowShot> pool = new Stack<ArrowShot>();
         private static Mesh mesh;
@@ -41,7 +41,7 @@ namespace BattleOfAges.Combat
             a.target = target;
             a.damage = damage;
             a.piercing = piercing;
-            a.from = shooter.transform.position + Vector3.up * 1.45f + shooter.transform.forward * 0.4f;
+            a.from = shooter.transform.position + Vector3.up * 1.45f + shooter.transform.forward * 0.7f; // off the bow: the shot holds it out at the shoulder
             a.aim = Chest(target);
             a.flight = Mathf.Max(0.05f, Vector3.Distance(a.from, a.aim) / Speed);
             a.t = 0f;

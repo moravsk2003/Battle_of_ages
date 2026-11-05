@@ -123,6 +123,8 @@ namespace BattleOfAges.AI
         /// <summary>Its side, set directly (the calibration's two armies).</summary>
         public int TeamForTests { set => Team = value; }
 
+        private int warriorsMade;
+
         private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
         {
             UnitRank.Person => HumanoidModelBuilder.HumanType.Villager,
@@ -141,7 +143,9 @@ namespace BattleOfAges.AI
             go.AddComponent<HealthComponent>();
             go.AddComponent<CombatUnit>();
             HostileMobAI mob = go.AddComponent<HostileMobAI>();
-            mob.InitializeAsSubject(rank, KitFor(rank));
+            Item[] kit = KitFor(rank);
+            if (rank == UnitRank.Warrior && GameBalance.KingdomArcherEvery > 0 && ++warriorsMade % GameBalance.KingdomArcherEvery == 0) kit = UnitStats.ArcherKit(kit);
+            mob.InitializeAsSubject(rank, kit);
             mob.Team = Team;
             mob.Kingdom = this;
             mob.SetGuardOrigin(Home);
@@ -160,7 +164,9 @@ namespace BattleOfAges.AI
         {
             // A new soldier gets its kit from the kingdom's smiths
             Equipment gear = p.GetComponent<Equipment>();
-            if (gear != null && p.Rank != UnitRank.Person) foreach (Item it in KitFor(p.Rank)) if (!it.IsEmpty) gear.Equip(it);
+            if (gear == null || p.Rank == UnitRank.Person) return;
+            Item[] kit = gear.HasBow ? UnitStats.ArcherKit(KitFor(p.Rank)) : KitFor(p.Rank); // an archer stays one
+            foreach (Item it in kit) if (!it.IsEmpty) gear.Equip(it);
         }
 
         /// <summary>Makes this unit the king: a hero of its rank (x2), level 1, this class.</summary>

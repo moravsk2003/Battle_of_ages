@@ -40,7 +40,32 @@ namespace BattleOfAges.EditorTools
         private static readonly Vector3 SwordUpper = new Vector3(0.28f, -0.92f, 0.22f), SwordFore = new Vector3(0.12f, -0.12f, 1f), Blade = new Vector3(0.06f, 0.78f, 0.62f);
         private static readonly Vector3 ShieldUpper = new Vector3(-0.38f, -0.72f, 0.58f), ShieldFore = new Vector3(0.20f, -0.84f, 0.50f), ShieldFace = new Vector3(-0.30f, 0.05f, 0.95f); // the forearm mostly down: the shield's point follows it
 
-        private const float AttackLength = 0.8f;
+        private const float AttackLength = 0.8f, ShootLength = 1f;
+
+        /// <summary>A bow shot: the chest's turn, how far the bow arm is up on the target (0..1), the drawing arm in the chest's frame.</summary>
+        private struct Shot
+        {
+            public float Time, Twist, Aim;
+            public Vector3 Upper, Fore;
+            public Shot(float time, float twist, float aim, Vector3 upper, Vector3 fore) { Time = time; Twist = twist; Aim = aim; Upper = upper; Fore = fore; }
+        }
+
+        private static readonly Vector3 BowArmUpper = new Vector3(-0.15f, -0.95f, 0.2f), BowArmFore = new Vector3(0f, -0.6f, 0.8f);
+
+        /// <summary>
+        /// Up on the target, the string drawn to the cheek, loosed when the arrow leaves (GameBalance.BowWindup, 0.5 s),
+        /// the hand flying back past the ear, the bow lowered. The chest turns side-on to the target, the head stays on it.
+        /// </summary>
+        private static readonly Shot[] Shooting =
+        {
+            new Shot(0f, 0f, 0f, new Vector3(0.20f, -0.95f, 0.15f), new Vector3(0.05f, -0.6f, 0.8f)),
+            new Shot(0.15f, 60f, 1f, new Vector3(0.10f, -0.40f, 0.90f), new Vector3(-0.90f, 0.30f, 0.30f)), // the hand on the string
+            new Shot(0.30f, 60f, 1f, new Vector3(0.85f, 0.10f, 0.20f), new Vector3(-0.60f, 0.45f, 0.65f)),  // the elbow comes round the side, not through the chest
+            new Shot(0.46f, 60f, 1f, new Vector3(0.55f, 0.25f, -0.80f), new Vector3(-0.75f, 0.24f, 0.62f)), // drawn to the cheek
+            new Shot(0.52f, 60f, 1f, new Vector3(0.60f, 0.25f, -0.76f), new Vector3(-0.55f, 0.45f, 0.40f)), // loosed: the hand jumps back by the ear, the arm stays bent
+            new Shot(0.75f, 60f, 1f, new Vector3(0.60f, 0.18f, -0.78f), new Vector3(-0.50f, 0.35f, 0.45f)),
+            new Shot(ShootLength, 0f, 0f, new Vector3(0.20f, -0.95f, 0.15f), new Vector3(0.05f, -0.6f, 0.8f)),
+        };
 
         /// <summary>From the guard up over the right shoulder, down across at the moment the hit lands (GameBalance.MeleeWindup, 0.35 s), back to the guard.</summary>
         private static readonly Pose[] Swing =
@@ -68,7 +93,11 @@ namespace BattleOfAges.EditorTools
             {
                 Directory.CreateDirectory(VillagerOutDir);
                 var rig = new Rig(model, idle, false);
-                var made = new Dictionary<string, AnimationClip> { ["Attack"] = Save(Bake("Attack", idle, AttackLength, rig, rig.SwingAt), VillagerOutDir) };
+                var made = new Dictionary<string, AnimationClip>
+                {
+                    ["Attack"] = Save(Bake("Attack", idle, AttackLength, rig, rig.SwingAt), VillagerOutDir),
+                    ["Shoot"] = Save(Bake("Shoot", idle, ShootLength, rig, rig.ShootAt), VillagerOutDir),
+                };
                 PointAnimator(VillagerControllerPath, made);
                 Debug.Log($"[KnightClips] villager attack {made["Attack"].length:F2} s, blade along palm {(rig.BladeSign > 0f ? "+" : "-")}X");
             }
@@ -95,6 +124,7 @@ namespace BattleOfAges.EditorTools
                     ["Walk"] = Save(Bake("Walk", Source("Walk"), Source("Walk").length, rig, t => rig.HoldGuard(0.10f)), OutDir),
                     ["Run"] = Save(Bake("Run", Source("Run"), Source("Run").length, rig, t => rig.HoldGuard(0.14f)), OutDir),
                     ["Attack"] = Save(Bake("Attack", Source("Idle"), AttackLength, rig, rig.SwingAt), OutDir),
+                    ["Shoot"] = Save(Bake("Shoot", Source("Idle"), ShootLength, rig, rig.ShootAt), OutDir),
                     ["Death"] = Save(Bake("Death", Source("Death"), Source("Death").length, rig, t => rig.FallWithSword(t, Source("Death").length)), OutDir),
                 };
                 PointAnimator(ControllerPath, made);
@@ -120,6 +150,8 @@ namespace BattleOfAges.EditorTools
             public readonly float BladeSign; // along palm X: the two rigs differ, the blade leaves the fist on the thumb's side
             private readonly bool shield;
             private readonly Transform torso, head, upperR, foreR, palmR, knucklesR, upperL, foreL, palmL;
+            private float lastBowTurn;
+            private readonly float bowSign; // the bow's grip along the left palm's X column, the way GearMeshBuilder builds it
             private readonly Vector3 right, up, forward;
             private readonly Quaternion restTorso;
 
@@ -139,6 +171,12 @@ namespace BattleOfAges.EditorTools
                 forward = Vector3.Cross(right, up);
                 restTorso = torso.rotation;
                 BladeSign = knight ? -1f : Mathf.Sign(Vector3.Dot(palmR.right, Find("Thumb1.R").position - palmR.position));
+                // GearMeshBuilder: the grip along -X of the bind matrix (whose axes may be mirrored), turned to point forward
+                SkinnedMeshRenderer body = model.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                int palm = Array.IndexOf(body.bones, palmL);
+                Vector3 bindX = palm >= 0 ? body.transform.localToWorldMatrix.MultiplyVector(body.sharedMesh.bindposes[palm].inverse.GetColumn(0)).normalized : -forward;
+                Vector3 grip = Vector3.Dot(-bindX, forward) >= 0f ? -bindX : bindX;
+                bowSign = Vector3.Dot(grip, bindX) > 0f ? 1f : -1f;
             }
 
             private Vector3 Chest(Vector3 d) => torso.rotation * Quaternion.Inverse(restTorso) * (right * d.x + up * d.y + forward * d.z).normalized;
@@ -195,6 +233,70 @@ namespace BattleOfAges.EditorTools
                 if (shield) HoldShield(0f);
             }
 
+            /// <summary>A bone's axis as its matrix has it (mirrored where the rig is), as the bind matrices see it.</summary>
+            private static Vector3 Column(Transform bone, int axis) => ((Vector3)bone.localToWorldMatrix.GetColumn(axis)).normalized;
+
+            public void ShootAt(float t)
+            {
+                int next = 1;
+                while (next < Shooting.Length - 1 && Shooting[next].Time < t) next++;
+                Shot a = Shooting[next - 1], b = Shooting[next];
+                float s = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a.Time, b.Time, t));
+
+                float twist = Mathf.Lerp(a.Twist, b.Twist, s), aim = Mathf.Lerp(a.Aim, b.Aim, s);
+                torso.rotation = Quaternion.AngleAxis(twist, up) * torso.rotation;
+                head.rotation = Quaternion.AngleAxis(-twist * 0.9f, up) * head.rotation; // eyes on the target
+
+                // The bow arm straight out at the target (the body's forward, not the turned chest's)
+                Aim(upperL, foreL, Vector3.Slerp(Chest(BowArmUpper), forward, aim));
+                Aim(foreL, palmL, Vector3.Slerp(Chest(BowArmFore), forward, aim));
+                Quaternion hanging = palmL.rotation;
+                palmL.rotation = Quaternion.FromToRotation(Column(palmL, 0) * bowSign, forward) * palmL.rotation;
+                // The limbs (across the grip and the palm's Z) upright, canted a little
+                Vector3 limbs = Vector3.ProjectOnPlane(Vector3.Cross(forward, Column(palmL, 2)), forward);
+                Vector3 upright = Quaternion.AngleAxis(-12f, forward) * up;
+                float turn = Vector3.SignedAngle(limbs, upright, forward);
+                // The bow is the same either way up: of the two, the turn nearest the last frame's (no flip between frames)
+                float other = turn > 0f ? turn - 180f : turn + 180f;
+                if (t > 0f && Mathf.Abs(Mathf.DeltaAngle(other, lastBowTurn)) < Mathf.Abs(Mathf.DeltaAngle(turn, lastBowTurn))) turn = other;
+                else if (t <= 0f && Mathf.Abs(other) < Mathf.Abs(turn)) turn = other;
+                lastBowTurn = turn;
+                palmL.rotation = Quaternion.AngleAxis(turn, forward) * palmL.rotation;
+                palmL.rotation = Quaternion.Slerp(hanging, palmL.rotation, aim);
+
+                AimArm(upperR, foreR, palmR, Chest(Vector3.Slerp(a.Upper.normalized, b.Upper.normalized, s)), Chest(Vector3.Slerp(a.Fore.normalized, b.Fore.normalized, s)), t <= 0f);
+            }
+
+            private Vector3 lastHinge;
+
+            /// <summary>
+            /// Two bones with the elbow a hinge: the upper arm turns about itself so the arm bends in the plane of the two
+            /// directions (the way its elbow bent before), the forearm folds about that hinge only. Aim's shortest turn
+            /// is unstable for a forearm folded back near 180 degrees: it spins about its own length from frame to frame.
+            /// The hinge keeps its side from frame to frame (the first frame: the way the elbow bent in the clip).
+            /// </summary>
+            private void AimArm(Transform upper, Transform fore, Transform hand, Vector3 upperDir, Vector3 foreDir, bool first)
+            {
+                Vector3 hinge = Vector3.Cross(fore.position - upper.position, hand.position - fore.position);
+                Quaternion before = upper.rotation;
+                Aim(upper, fore, upperDir);
+                hinge = upper.rotation * Quaternion.Inverse(before) * hinge;
+                Vector3 want = Vector3.Cross(upperDir.normalized, foreDir.normalized);
+                if (hinge.sqrMagnitude < 1e-10f) { Aim(fore, hand, foreDir); return; }
+                if (want.magnitude < 0.15f) // the arm nearly straight: its bend's plane is noise, the last frame's hinge stays
+                {
+                    if (first) { Aim(fore, hand, foreDir); return; }
+                    want = Vector3.ProjectOnPlane(lastHinge, upperDir);
+                    if (want.sqrMagnitude < 1e-6f) { Aim(fore, hand, foreDir); return; }
+                }
+                else if (Vector3.Dot(want, first ? hinge : lastHinge) < 0f) want = -want;
+                want.Normalize();
+                lastHinge = want;
+                upper.rotation = Quaternion.AngleAxis(Vector3.SignedAngle(Vector3.ProjectOnPlane(hinge, upperDir), want, upperDir), upperDir) * upper.rotation;
+                Vector3 now = Vector3.ProjectOnPlane(hand.position - fore.position, want);
+                fore.rotation = Quaternion.AngleAxis(Vector3.SignedAngle(now, foreDir, want), want) * fore.rotation;
+            }
+
             /// <summary>The fall stays as it was; the blade leaves the guard and ends flat on the ground beside the body.</summary>
             public void FallWithSword(float t, float length)
             {
@@ -241,7 +343,7 @@ namespace BattleOfAges.EditorTools
                 Curve(clip, path, "m_LocalRotation.w", frames, step, f => localRotation[f, bone].w);
             }
             AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(source);
-            settings.loopTime = source.isLooping && name != "Attack";
+            settings.loopTime = source.isLooping && name != "Attack" && name != "Shoot";
             settings.stopTime = length;
             AnimationUtility.SetAnimationClipSettings(clip, settings);
             clip.EnsureQuaternionContinuity();
@@ -263,6 +365,9 @@ namespace BattleOfAges.EditorTools
         private static void PointAnimator(string controllerPath, Dictionary<string, AnimationClip> made)
         {
             var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath);
+            AnimatorControllerLayer[] layers = controller.layers;
+            if (made.TryGetValue("Shoot", out AnimationClip shot) && layers.Length > 1 && !layers[1].stateMachine.states.Any(s => s.state.name == "Shoot"))
+                layers[1].stateMachine.AddState("Shoot").motion = shot; // CharacterAnimationDriver plays it for a bow
             foreach (AnimatorControllerLayer layer in controller.layers)
                 foreach (ChildAnimatorState child in layer.stateMachine.states)
                 {

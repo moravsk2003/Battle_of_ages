@@ -51,6 +51,24 @@ namespace BattleOfAges.AI
             return kit;
         }
 
+        /// <summary>The same kit for an archer: a bow of the sword's level (a melee weapon's, at least 1) instead, no shield (a bow takes both hands).</summary>
+        public static Item[] ArcherKit(Item[] kit)
+        {
+            var archer = new Item[6];
+            int level = 1;
+            for (int i = 0; i < 6 && kit != null && i < kit.Length; i++)
+            {
+                Item item = kit[i];
+                if (item.IsEmpty) continue;
+                if (item.Slot == EquipSlot.Weapon) { level = Mathf.Max(1, item.Level); continue; }
+                if (item.Slot == EquipSlot.Shield) continue;
+                archer[(int)item.Slot] = item;
+            }
+            var bow = new Item(ItemType.Bow, level);
+            archer[(int)bow.Slot] = bow;
+            return archer;
+        }
+
         /// <summary>The Central Empire's kit (§9.1.1): every piece, of the level its rank has.</summary>
         public static Item[] EmpireKit(UnitRank rank)
         {

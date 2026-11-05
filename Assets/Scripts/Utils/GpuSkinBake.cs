@@ -29,7 +29,7 @@ namespace BattleOfAges.Utils
         }
 
         public Texture2D Texture { get; private set; }
-        public Clip Idle, Walk, Run, Attack, Death;
+        public Clip Idle, Walk, Run, Attack, Death, Shoot;
         public Vector4 Info;   // anchor column, mask row
 
         private static readonly Dictionary<string, GpuSkinBake> Bakes = new Dictionary<string, GpuSkinBake>();
@@ -92,7 +92,7 @@ namespace BattleOfAges.Utils
 
             // Rows per clip
             var bake = new GpuSkinBake();
-            var order = new[] { "Idle", "Walk", "Run", "Attack", "Death" };
+            var order = new[] { "Idle", "Walk", "Run", "Attack", "Death", "Shoot" };
             var plan = new List<(AnimationClip clip, int frames)>();
             int rows = 0;
             foreach (string name in order)
@@ -113,6 +113,7 @@ namespace BattleOfAges.Utils
                     case "Run": bake.Run = info; break;
                     case "Attack": bake.Attack = info; break;
                     case "Death": bake.Death = info; break;
+                    case "Shoot": bake.Shoot = info; break;
                 }
             }
             if (!bake.Walk.Valid) bake.Walk = bake.Idle;

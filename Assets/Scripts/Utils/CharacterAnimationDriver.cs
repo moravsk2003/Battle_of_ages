@@ -35,7 +35,9 @@ namespace BattleOfAges.Utils
         private CombatUnit combat;
         private HealthComponent health;
         private float attackTimer;      // seconds left in the upper-body swing
-        private float attackLength = 0.9f;
+        private float attackLength = 0.9f, shootLength = 1f;
+        private bool hasShoot;
+        private CharacterGear gear;
         private float upperWeight;
         private float sentSpeed = -1f;
         private float sentRate = 1f;
@@ -63,7 +65,10 @@ namespace BattleOfAges.Utils
             if (animator != null && animator.runtimeAnimatorController != null)
             {
                 foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+                {
                     if (clip.name == "Attack") attackLength = clip.length;
+                    if (clip.name == "Shoot") { shootLength = clip.length; hasShoot = true; }
+                }
                 foreach (AnimatorControllerParameter p in animator.parameters) if (p.nameHash == LocoRateId) hasRate = true;
             }
         }
@@ -126,10 +131,21 @@ namespace BattleOfAges.Utils
             if (animator == null || !animator.enabled || (health != null && !health.IsAlive)) return;
             if (animator.layerCount > UpperBodyLayer)
             {
-                animator.Play("Attack", UpperBodyLayer, 0f);
-                attackTimer = attackLength;
+                bool shoot = hasShoot && HoldsBow;
+                animator.Play(shoot ? "Shoot" : "Attack", UpperBodyLayer, 0f);
+                attackTimer = shoot ? shootLength : attackLength;
             }
             else animator.SetTrigger(AttackId);
+        }
+
+        /// <summary>A bow in the hands (the gear shown on the model: also another player's unit).</summary>
+        private bool HoldsBow
+        {
+            get
+            {
+                if (gear == null) gear = GetComponentInChildren<CharacterGear>(true);
+                return gear != null && gear.HoldsBow;
+            }
         }
 
         private void HandleDeath()

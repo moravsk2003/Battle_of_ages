@@ -28,9 +28,14 @@ namespace BattleOfAges.Utils
 
         public bool DrawsGear => Type != HumanoidModelBuilder.HumanType.KnightGuard && Body != null && BaseMesh != null;
 
+        /// <summary>The weapon is a bow: the animation shoots instead of swinging (known even where the gear is not drawn).</summary>
+        public bool HoldsBow { get; private set; }
+
         /// <summary>Another player's unit: what it is known to wear, with no Equipment of it here.</summary>
         public void Show(List<Item> worn)
         {
+            HoldsBow = false;
+            foreach (Item item in worn) if (!item.IsEmpty && item.Type == ItemType.Bow) HoldsBow = true;
             if (!DrawsGear) return;
             Key.Clear();
             foreach (Item item in worn)
@@ -46,6 +51,7 @@ namespace BattleOfAges.Utils
 
         public void Show(Equipment equipment)
         {
+            HoldsBow = equipment != null && equipment.HasBow;
             if (!DrawsGear) return;
             Worn.Clear();
             Key.Clear();

@@ -311,6 +311,17 @@ namespace BattleOfAges.Crafting
             }
         }
 
+        private static int campMobs;
+
+        /// <summary>A camp's mob: its type's kit, and every GameBalance.CampArcherEvery-th bandit or goblin an archer.</summary>
+        public static Item[] ForCamp(HostileMobType type)
+        {
+            Item[] kit = For(type);
+            if (type == HostileMobType.WarlordGuard || GameBalance.CampArcherEvery <= 0) return kit;
+            campMobs++;
+            return campMobs % GameBalance.CampArcherEvery == 0 ? AI.UnitStats.ArcherKit(kit) : kit;
+        }
+
         public static Item[] For(HostileMobType type) => For(
             type == HostileMobType.WarlordGuard ? HumanoidModelBuilder.HumanType.Warlord
             : type == HostileMobType.Goblin ? HumanoidModelBuilder.HumanType.Goblin

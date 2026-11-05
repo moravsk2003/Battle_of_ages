@@ -50,6 +50,7 @@ namespace BattleOfAges.Utils
         private CombatUnit combat;
         private HealthComponent health;
 
+        private CharacterGear gear;
         private MeshRenderer gpuRenderer;
         private MeshFilter gpuFilter;
         private MaterialPropertyBlock block;
@@ -306,7 +307,8 @@ namespace BattleOfAges.Utils
         private void HandleAttack()
         {
             if (!IsFar || dead || !bake.Attack.Valid) return;
-            swing = bake.Attack.Play(Now);
+            if (gear == null) gear = GetComponentInChildren<CharacterGear>(true);
+            swing = (gear != null && gear.HoldsBow && bake.Shoot.Valid ? bake.Shoot : bake.Attack).Play(Now);
             swing.y = -Mathf.Abs(swing.y); // played once
             Push();
         }

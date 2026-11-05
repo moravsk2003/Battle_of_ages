@@ -139,7 +139,7 @@ namespace BattleOfAges.AI
             Equipment gear = GetComponent<Equipment>();
             if (gear == null) gear = gameObject.AddComponent<Equipment>();
             gear.DropsLoot = true;
-            gear.LoadSlots(subjectKit ?? StartingKits.For(mobType));
+            gear.LoadSlots(subjectKit ?? StartingKits.ForCamp(mobType));
             UnitRank rank = subjectRank ?? RankOf(mobType);
             UnitRanks.Apply(gameObject, rank, subjectHero, range: attackRange);
             UnitProgress.Setup(gameObject, rank, subjectHero);

@@ -121,6 +121,8 @@ namespace BattleOfAges.Combat
         public static float MeleeSlowFactor = 0.5f, MeleeSlowSeconds = 1f;
         /// <summary>Wind-up: seconds from the start of a swing to its hit (a started swing lands even if the striker falls).</summary>
         public static float MeleeWindup = 0.35f, BowWindup = 0.5f, MageWindup = 0.2f;
+        /// <summary>Archers among the enemies: every this many of a camp's bandits or goblins, and of a kingdom's warriors, has a bow.</summary>
+        public static int CampArcherEvery = 4, KingdomArcherEvery = 3;
         public static float RangedRootSeconds = 0.5f;
         /// <summary>The pull of a battle (BattleFront): 5% faster towards the enemy, slower away, checked this often within this radius.</summary>
         public static float BattlePull = 0.05f, BattleFrontSeconds = 10f, BattleRadius = 30f;

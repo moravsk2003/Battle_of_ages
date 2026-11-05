@@ -771,7 +771,7 @@ namespace BattleOfAges.Utils
 
         private static void BuildWeapon(Rig r, Kit kit, ItemType type, int level)
         {
-            int hand = r.Bone("Palm.R");
+            int hand = r.Bone(type == ItemType.Bow ? "Palm.L" : "Palm.R"); // the bow in the left hand: the right one draws the string
             if (hand < 0) return;
             // As the role weapons: out of the fist along palm +X (villager rig) or -X (knight rig); built along +Y
             Vector3 blade = -r.BoneX[hand]; // (both skeletons: the bind matrices are mirrored relative to the attachment frames)
