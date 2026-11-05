@@ -74,6 +74,26 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator AKnightOrGeneral_TakingABow_IsSculptedWithIt([Values(HumanoidModelBuilder.HumanType.KnightGuard, HumanoidModelBuilder.HumanType.General)] HumanoidModelBuilder.HumanType rank)
+        {
+            Make(rank);
+            yield return null;
+            CharacterGear Gear() => unit.GetComponentInChildren<CharacterGear>(true);
+            Assert.IsFalse(Gear().SculptedBow);
+            Equipment e = unit.GetComponent<Equipment>();
+            e.Equip(new Item(ItemType.Bow, 3));
+            Assert.AreEqual(1, unit.GetComponentsInChildren<CharacterGear>(true).Length, "the old body is out at once");
+            Assert.AreEqual(rank, Gear().Type);
+            Assert.IsTrue(Gear().SculptedBow, "a bow in his hands");
+            Assert.IsTrue(Gear().HoldsBow, "and he shoots with it");
+            Assert.IsFalse(Gear().WrongSculpt);
+            e.Equip(new Item(ItemType.Sword, 3));
+            Assert.IsFalse(Gear().SculptedBow, "the sword and shield back");
+            yield return null;
+            Assert.IsNotNull(unit.GetComponentInChildren<Animator>());
+        }
+
+        [UnityTest]
         public IEnumerator AUnitBuiltWithAnotherModel_GetsItsRanksOne()
         {
             Make(HumanoidModelBuilder.HumanType.Villager);

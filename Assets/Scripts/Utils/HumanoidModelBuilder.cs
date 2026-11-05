@@ -22,10 +22,11 @@ namespace BattleOfAges.Utils
             Soldier
         }
 
-        public static GameObject CreateHumanoidModel(HumanType type, string name = "HumanoidModel")
+        /// <param name="bow">A sculpted knight or general holding a bow instead of sword and shield (CharacterGear.Sculpted).</param>
+        public static GameObject CreateHumanoidModel(HumanType type, string name = "HumanoidModel", bool bow = false)
         {
             // Prefer the rigged, animated FBX characters; fall back to the procedural primitive build.
-            GameObject rigged = RiggedCharacterBuilder.TryCreate(type, name);
+            GameObject rigged = RiggedCharacterBuilder.TryCreate(type, name, bow);
             if (rigged != null) return rigged;
             if (type == HumanType.Bandit || type == HumanType.Goblin || type == HumanType.Soldier) type = HumanType.Villager;
             else if (type == HumanType.Warlord || type == HumanType.General) type = HumanType.KnightGuard;

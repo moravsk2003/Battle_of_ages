@@ -23,7 +23,7 @@ namespace BattleOfAges.Utils
 
         private static readonly Dictionary<string, Material> MaterialCache = new Dictionary<string, Material>();
 
-        public static GameObject TryCreate(HumanoidModelBuilder.HumanType type, string name)
+        public static GameObject TryCreate(HumanoidModelBuilder.HumanType type, string name, bool bow = false)
         {
             CharacterModelLibrary lib = CharacterModelLibrary.Instance;
             if (lib == null) return null;
@@ -52,13 +52,15 @@ namespace BattleOfAges.Utils
 
             // The knight guard has its own sculpted body and gear on this skeleton
             bool sculpted = type == HumanoidModelBuilder.HumanType.KnightGuard || type == HumanoidModelBuilder.HumanType.General;
-            if (sculpted && KnightModelBuilder.Build(root, model.transform, type == HumanoidModelBuilder.HumanType.General ? KnightModelBuilder.GeneralStyle : KnightModelBuilder.KnightStyle))
+            if (sculpted && KnightModelBuilder.Build(root, model.transform, type == HumanoidModelBuilder.HumanType.General ? KnightModelBuilder.GeneralStyle : KnightModelBuilder.KnightStyle, bow))
             {
                 // The Animator bound the imported body when it got its controller; with the sculpted skin unknown to
                 // it, CullUpdateTransforms saw nothing visible and never moved the bones (knights spawned in play
                 // stood still). Rebind makes it see the new skin.
                 animator.Rebind();
-                root.AddComponent<CharacterGear>().Type = type; // sculpted armour: the gear only changes stats
+                CharacterGear sculpt = root.AddComponent<CharacterGear>(); // sculpted armour: the gear only changes stats
+                sculpt.Type = type;
+                sculpt.SculptedBow = bow;
                 model.AddComponent<FootIK>();
                 root.AddComponent<CharacterAnimationDriver>();
                 return root;

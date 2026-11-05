@@ -67,16 +67,19 @@ namespace BattleOfAges.Utils
             public Transform[] UpperLeg = new Transform[2], LowerLeg = new Transform[2], Foot = new Transform[2];
             public Vector3[] Shoulder = new Vector3[2], Elbow = new Vector3[2], Wrist = new Vector3[2], Knuckles = new Vector3[2];
             public Vector3[] Hip = new Vector3[2], Knee = new Vector3[2], Ankle = new Vector3[2];
-            public Matrix4x4 SwordFrame, ShieldFrame; // character space
+            public Matrix4x4 SwordFrame, ShieldFrame, BowFrame; // character space
 
             public Vector3 P(Transform t) => Root.InverseTransformPoint(t.position);
         }
 
-        /// <summary>Replaces the imported body of a freshly built (rest pose) knight rig; false if bones are missing.</summary>
-        public static bool Build(GameObject root, Transform model, Style look = null)
+        /// <summary>
+        /// Replaces the imported body of a freshly built (rest pose) knight rig; false if bones are missing. With a bow
+        /// the sculpt holds it in the left hand and has no shield (a bow takes both hands): an armoured archer.
+        /// </summary>
+        public static bool Build(GameObject root, Transform model, Style look = null, bool bow = false)
         {
             style = look ?? KnightStyle;
-            string Key = style.Key;
+            string Key = style.Key + (bow ? "Bow" : "");
             var timer = System.Diagnostics.Stopwatch.StartNew();
             var sdf = new SdfCreature(root.transform)
             {
@@ -91,7 +94,7 @@ namespace BattleOfAges.Utils
                 if (rig == null) return false;
                 Body(sdf, rig);
                 Hands(sdf, rig);
-                Plate(sdf, rig);
+                Plate(sdf, rig, bow);
                 skins = sdf.ApplyWithLod(Key, NearCell, FarCell, NearScreenHeight, CullScreenHeight, oneRenderer: true);
                 Debug.Log($"[{Key}] declared and built in {timer.ElapsedMilliseconds} ms");
             }
@@ -153,6 +156,12 @@ namespace BattleOfAges.Utils
             Vector3 down = Vector3.ProjectOnPlane(r.Wrist[0] - r.Elbow[0], up).normalized;
             // Off the forearm and shifted away from the body, so the shield clears the surcoat when the arm hangs
             Vector3 away = Vector3.ProjectOnPlane(Vector3.left, up).normalized;
+            // Bow: the grip through the left fist along the palm matrix's X (turned to point forward), the limbs across it
+            // and the palm's Z, as GearMeshBuilder builds a worn bow and the Shoot clip aims it
+            Vector3 bx = root.InverseTransformDirection(((Vector3)r.Palm[0].localToWorldMatrix.GetColumn(0)).normalized);
+            Vector3 bz = root.InverseTransformDirection(((Vector3)r.Palm[0].localToWorldMatrix.GetColumn(2)).normalized);
+            Vector3 grip = Vector3.Dot(-bx, Vector3.forward) >= 0f ? -bx : bx;
+            r.BowFrame = Matrix4x4.TRS(Vector3.Lerp(r.Wrist[0], r.Knuckles[0], 0.75f), Quaternion.LookRotation(Vector3.ProjectOnPlane(bz, grip).normalized, grip), Vector3.one);
             r.ShieldFrame = Matrix4x4.TRS(Vector3.Lerp(r.Elbow[0], r.Wrist[0], 0.45f) + up * 0.075f + away * 0.06f, Quaternion.LookRotation(-down, up), Vector3.one);
             return r;
         }
@@ -262,7 +271,7 @@ namespace BattleOfAges.Utils
 
         // ------------------------------------------------------------------ hard-surface plate and gear
 
-        private static void Plate(SdfCreature sdf, Rig r)
+        private static void Plate(SdfCreature sdf, Rig r, bool bow)
         {
             sdf.RigidMesh(r.Head, Helm(r, true), Helm(r, false));
             for (int s = 0; s < 2; s++)
@@ -271,8 +280,12 @@ namespace BattleOfAges.Utils
                 sdf.RigidMesh(r.LowerArm[s], Forearm(r, s, true), Forearm(r, s, false));
                 sdf.RigidMesh(r.LowerLeg[s], Leg(r, s, true), Leg(r, s, false));
             }
-            sdf.RigidMesh(r.Palm[1], Sword(r.SwordFrame, true), Sword(r.SwordFrame, false));
-            sdf.RigidMesh(r.LowerArm[0], Shield(r.ShieldFrame, true), Shield(r.ShieldFrame, false));
+            if (bow) sdf.RigidMesh(r.Palm[0], Bow(r.BowFrame, true), Bow(r.BowFrame, false));
+            else
+            {
+                sdf.RigidMesh(r.Palm[1], Sword(r.SwordFrame, true), Sword(r.SwordFrame, false));
+                sdf.RigidMesh(r.LowerArm[0], Shield(r.ShieldFrame, true), Shield(r.ShieldFrame, false));
+            }
             sdf.RigidMesh(r.Hips, Buckle(new Vector3(0f, 0.757f, 0.113f)), null);
             if (style.Cape.a > 0f) sdf.RigidMesh(r.Torso, Cape(true), Cape(false));
         }
@@ -570,6 +583,42 @@ namespace BattleOfAges.Utils
                 Matrix4x4 wm = Matrix4x4.TRS(wingC, Quaternion.FromToRotation(Vector3.up, new Vector3(x, 0f, 0.25f).normalized), new Vector3(1f, 1f, 1.25f));
                 kit.Lathe(wm, new[] { V2(0f, 0.012f), V2(0.03f, 0.008f), V2(0.038f, 0.002f), V2(0.036f, -0.003f), V2(0f, -0.002f) }, 20, SteelS, (i, a) => Steel * 0.97f);
             }
+            return kit;
+        }
+
+        /// <summary>
+        /// A war bow through the fist (grip at the origin): limbs along the frame's ±X curving forward (+Y) to horn
+        /// tips, a leather grip, the string straight behind; gilded tips on a general's.
+        /// </summary>
+        private static MeshKit Bow(Matrix4x4 m, bool near)
+        {
+            var kit = new MeshKit();
+            int n = near ? 17 : 5, ring = near ? 6 : 4;
+            const float Half = 0.68f, Belly = 0.1f;
+            var limb = new Vector3[n, ring];
+            for (int i = 0; i < n; i++)
+            {
+                float s = -1f + 2f * i / (n - 1);
+                float y = (1f - s * s) * Belly - 0.04f * Mathf.Pow(Mathf.Abs(s), 6f); // recurved tips
+                float half = Mathf.Lerp(0.019f, 0.007f, Mathf.Abs(s));
+                for (int j = 0; j < ring; j++)
+                {
+                    float a = j * Mathf.PI * 2f / ring;
+                    limb[i, j] = m.MultiplyPoint3x4(new Vector3(s * Half, y + Mathf.Sin(a) * half * 0.7f, Mathf.Cos(a) * half));
+                }
+            }
+            kit.Grid(limb, true, WoodS, (i, j) => Mathf.Abs(i - (n - 1) / 2) <= (near ? 1 : 0) ? DarkLeather
+                                                  : (i == 0 || i == n - 1) ? (style.Crown ? style.Trim : Iron) : Wood);
+            // String, from tip to tip behind the grip
+            Vector3 top = m.MultiplyPoint3x4(new Vector3(Half, -0.04f, 0f)), bottom = m.MultiplyPoint3x4(new Vector3(-Half, -0.04f, 0f));
+            Vector3 along = (top - bottom).normalized, u = Vector3.Cross(along, Vector3.up).sqrMagnitude > 1e-4f ? Vector3.Cross(along, Vector3.up).normalized : Vector3.right, w = Vector3.Cross(along, u);
+            var str = new Vector3[2, 4];
+            for (int j = 0; j < 4; j++)
+            {
+                Vector3 off = (u * Mathf.Cos(j * Mathf.PI * 0.5f) + w * Mathf.Sin(j * Mathf.PI * 0.5f)) * 0.0028f;
+                str[0, j] = bottom + off; str[1, j] = top + off;
+            }
+            kit.Grid(str, true, ClothS, (i, j) => new Color(0.86f, 0.82f, 0.70f));
             return kit;
         }
 

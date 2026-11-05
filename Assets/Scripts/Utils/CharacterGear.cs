@@ -26,7 +26,16 @@ namespace BattleOfAges.Utils
         private static readonly StringBuilder Key = new StringBuilder(64);
         private static readonly List<Item> Worn = new List<Item>(6);
 
-        public bool DrawsGear => Type != HumanoidModelBuilder.HumanType.KnightGuard && Type != HumanoidModelBuilder.HumanType.General && Body != null && BaseMesh != null;
+        public bool DrawsGear => !Sculpted && Body != null && BaseMesh != null;
+
+        /// <summary>The knight's and the general's armour and arms are sculpted into the model: the worn gear is not drawn.</summary>
+        public bool Sculpted => Type == HumanoidModelBuilder.HumanType.KnightGuard || Type == HumanoidModelBuilder.HumanType.General;
+
+        /// <summary>A sculpted model made with a bow in its hands (no sword, no shield).</summary>
+        public bool SculptedBow;
+
+        /// <summary>A sculpted model holds the other weapon than its gear's: it has to be made again (RankModel, other players' units).</summary>
+        public bool WrongSculpt => Sculpted && SculptedBow != HoldsBow;
 
         /// <summary>The weapon is a bow: the animation shoots instead of swinging (known even where the gear is not drawn).</summary>
         public bool HoldsBow { get; private set; }

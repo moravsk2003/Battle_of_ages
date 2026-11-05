@@ -433,6 +433,17 @@ namespace BattleOfAges.Net
             if (gear == null) return;
             UnitSnapshotWriter.ReadGear(b.Gear, id == UnitSnapshotWriter.HeroId, worn);
             gear.Show(worn);
+            if (!gear.WrongSculpt) return;
+            // A knight took a bow (or put it down): his sculpt holds the other weapon
+            GameObject model = HumanoidModelBuilder.CreateHumanoidModel(gear.Type, gear.name, gear.HoldsBow);
+            model.transform.SetParent(gear.transform.parent, false);
+            model.transform.localPosition = gear.transform.localPosition;
+            model.transform.localRotation = gear.transform.localRotation;
+            gear.gameObject.SetActive(false);
+            gear.transform.SetParent(null, false);
+            Destroy(gear.gameObject);
+            b.Driver = model.GetComponentInChildren<CharacterAnimationDriver>();
+            model.GetComponentInChildren<CharacterGear>().Show(worn);
         }
 
         private static void DressBody(GameObject go, UnitRow row)
