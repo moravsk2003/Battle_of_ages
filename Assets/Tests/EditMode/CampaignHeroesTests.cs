@@ -39,6 +39,26 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(sites, StartSites.Choose(15), "the same for the seed");
         }
 
+        /// <summary>The author found every kingdom far off (1.5 km round the base at least): fifty fit a 4 km world, the nearest close by.</summary>
+        [Test]
+        public void FiftyKingdoms_FitASmallWorld_TheNearestCloseBy()
+        {
+            WorldSettings.Set(2024, CampaignSetup.FirstSize);
+            List<Vector3> sites = StartSites.Choose(50);
+            float nearest = float.MaxValue, minApart = float.MaxValue;
+            for (int i = 0; i < sites.Count; i++)
+            {
+                nearest = Mathf.Min(nearest, new Vector2(sites[i].x, sites[i].z).magnitude);
+                for (int j = 0; j < i; j++) minApart = Mathf.Min(minApart, Vector3.Distance(sites[i], sites[j]));
+                Assert.IsTrue(WorldSettings.Inside(sites[i], 0f), "inside the mountains");
+            }
+            TestContext.WriteLine($"{sites.Count} sites in 4 km: the nearest {nearest:0} m from the base, at least {minApart:0} m apart (spacing {StartSites.Spacing(50):0})");
+            Assert.AreEqual(50, sites.Count, "room for fifty");
+            Assert.Greater(nearest, StartSites.BaseClearance, "not at the door");
+            Assert.Less(nearest, 1000f, "but near");
+            Assert.Greater(minApart, 150f, "each a town's room");
+        }
+
         [Test]
         public void AHeroStarts_WithFivePeopleAndSomeWood_NoHall()
         {

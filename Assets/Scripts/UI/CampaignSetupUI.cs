@@ -16,7 +16,7 @@ namespace BattleOfAges.UI
         private readonly CampaignSetup setup = new CampaignSetup();
         private InputField seedField;
         private Text summary, classText, classDescription, artifactText, artifactDescription;
-        private int sizeIndex = Array.IndexOf(CampaignSetup.Sizes, World.WorldSettings.DefaultSize);
+        private int sizeIndex = Array.IndexOf(CampaignSetup.Sizes, CampaignSetup.FirstSize);
         private int heroesIndex = Array.IndexOf(CampaignSetup.HeroCounts, 16), shareIndex = 1;
         private int classIndex, artifactIndex;
         private bool tips = !Advisor.Hidden;
@@ -132,7 +132,7 @@ namespace BattleOfAges.UI
             int kings = Mathf.RoundToInt(others * CampaignSetup.KingShares[shareIndex]);
             float km = CampaignSetup.Sizes[sizeIndex] / 1000f;
             summary.text = $"Крім вас — {others} героїв: {kings} королів і {others - kings} вільних ватаг, кожен на своїй стоянці. "
-                         + $"Світ {km:0} × {km:0} км, гори по краю, озера; ближчі сусіди — за 1,5–3 км.";
+                         + $"Світ {km:0} × {km:0} км, гори по краю, озера; ближчі сусіди — від {World.StartSites.ClearanceFor(CampaignSetup.Sizes[sizeIndex]) / 1000f:0.#} км.";
             classDescription.text = HeroClassRules.Description(Classes[classIndex]) + "\n" + TipText.Dim("Клас обирається один раз.");
             artifactDescription.text = Artifacts.Description(Artifacts.All[artifactIndex]);
         }

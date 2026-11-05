@@ -309,6 +309,11 @@ namespace BattleOfAges.Combat
         public static float CampaignKingShare = 0.75f;
         public static int RealKingdomsNearHome = 3;
         public static float MaterializeRadius = 1200f, DematerializeRadius = 1700f;
+        /// <summary>
+        /// Of those by a player, only the nearest this many are real at once (fifty kingdoms in a 4 km world put thirty within
+        /// MaterializeRadius); one stays real while it is among the nearest this many and two more.
+        /// </summary>
+        public static int RealKingdomsByPlayers = 8;
         /// <summary>A far army this near a real kingdom it goes for turns real to fight it.</summary>
         public static float ArmyMeetsRealRadius = 150f;
         public static float KingdomDistance = 600f;

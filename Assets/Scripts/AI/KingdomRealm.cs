@@ -254,6 +254,14 @@ namespace BattleOfAges.AI
             return near;
         }
 
+        /// <summary>How far the nearest player's hero is.</summary>
+        public static float PlayerDistance(Vector3 at)
+        {
+            float best = Flat(at, Hero());
+            if (Net.NetSession.IsHost) Net.NetSession.Current.Remote.ForEachHero(h => best = Mathf.Min(best, Flat(h.transform.position, at)));
+            return best;
+        }
+
         /// <summary>Makes real what should be (the nearest to home, those by the hero) and folds the rest into their states.</summary>
         public void Sync()
         {
@@ -272,15 +280,23 @@ namespace BattleOfAges.AI
             foreach (KingdomState s in far) if (!s.Defeated) standing.Add((Flat(s.Home, home), s, null));
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && !k.IsDefeated) standing.Add((Flat(k.Home, home), null, k));
             standing.Sort((a, b) => a.d.CompareTo(b.d));
+            // By the players: the nearest few only, however many stand round them
+            var byPlayers = new List<(float d, int i)>(standing.Count);
+            for (int i = 0; i < standing.Count; i++) byPlayers.Add((PlayerDistance(standing[i].s != null ? standing[i].s.Home : standing[i].k.Home), i));
+            byPlayers.Sort((a, b) => a.d.CompareTo(b.d));
+            var playerRank = new int[standing.Count];
+            for (int r = 0; r < byPlayers.Count; r++) playerRank[byPlayers[r].i] = r;
             for (int i = 0; i < standing.Count; i++)
             {
                 var (_, s, k) = standing[i];
                 bool nearHome = i < GameBalance.RealKingdomsNearHome;
+                float pd = byPlayers[playerRank[i]].d;
                 if (s != null)
                 {
-                    if (nearHome || AnyPlayerWithin(s.Home, GameBalance.MaterializeRadius) || wanted.Contains(s.Id)) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
+                    bool byPlayer = pd < GameBalance.MaterializeRadius && playerRank[i] < GameBalance.RealKingdomsByPlayers;
+                    if (nearHome || byPlayer || wanted.Contains(s.Id)) { far.Remove(s); NpcKingdom.FromState(s, gradual: true); }
                 }
-                else if (!nearHome && !wanted.Contains(k.StateId) && !AnyPlayerWithin(k.Home, GameBalance.DematerializeRadius) && k.CanFold(home, hero) && !k.UnderRaid())
+                else if (!nearHome && !wanted.Contains(k.StateId) && (pd >= GameBalance.DematerializeRadius || playerRank[i] >= GameBalance.RealKingdomsByPlayers + 2) && k.CanFold(home, hero) && !k.UnderRaid())
                 {
                     far.Add(k.ToState());
                     k.Dissolve();

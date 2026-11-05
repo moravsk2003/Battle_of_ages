@@ -10,8 +10,16 @@ namespace BattleOfAges.World
     /// </summary>
     public static class StartSites
     {
-        /// <summary>No other hero's site this near the player's base (it starts at the origin).</summary>
-        public const float BaseClearance = 1500f;
+        /// <summary>
+        /// No other hero's site this near the player's base (it starts at the origin): a tenth of the world, 400 m to 1.5 km
+        /// (a fixed 1.5 km kept every kingdom far off, the author said, 2026-11-05).
+        /// </summary>
+        public static float BaseClearance => ClearanceFor(WorldSettings.Bounded ? WorldSettings.Size : 0f);
+
+        public static float ClearanceFor(float worldSize) => worldSize > 0f ? Mathf.Clamp(worldSize * 0.1f, 400f, 1500f) : 1500f;
+
+        /// <summary>Sites at least this far apart: up to fifty kingdoms in a 4 km world (was 700 m).</summary>
+        public const float MinSpacing = 300f;
         /// <summary>A lake this near is good (water), nearer is its shore.</summary>
         public const float WaterNear = 60f, WaterFar = 900f;
         public const float MaxSlope = 0.12f;
@@ -48,7 +56,7 @@ namespace BattleOfAges.World
         {
             float half = WorldSettings.Bounded ? WorldSettings.PlayableHalf : CoarseWorldMap.UnboundedExtent * 0.5f;
             float area = 4f * half * half;
-            return Mathf.Clamp(0.75f * Mathf.Sqrt(area / (count + 1)), 700f, 3500f);
+            return Mathf.Clamp(0.75f * Mathf.Sqrt(area / (count + 1)), MinSpacing, 3500f);
         }
 
         /// <summary>
@@ -68,13 +76,13 @@ namespace BattleOfAges.World
                 }
             candidates.Sort((a, b) => b.score.CompareTo(a.score));
 
-            float spacing = Spacing(count);
+            float spacing = Spacing(count), clearance = BaseClearance;
             var picked = new List<Vector3>();
             for (int round = 0; round < 6 && picked.Count < count; round++, spacing *= 0.8f)
                 foreach (var c in candidates)
                 {
                     if (picked.Count >= count) break;
-                    if (new Vector2(c.at.x, c.at.z).magnitude < Mathf.Max(BaseClearance, spacing)) continue;
+                    if (new Vector2(c.at.x, c.at.z).magnitude < Mathf.Max(clearance, spacing)) continue;
                     bool free = true;
                     foreach (Vector3 p in picked)
                         if ((new Vector2(p.x - c.at.x, p.z - c.at.z)).sqrMagnitude < spacing * spacing) { free = false; break; }

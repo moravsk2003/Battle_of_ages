@@ -9,8 +9,10 @@ namespace BattleOfAges.SaveLoad
     /// </summary>
     public sealed class CampaignSetup
     {
-        public static readonly float[] Sizes = { 8000f, 12000f, 16000f, 24000f };
-        public static readonly int[] HeroCounts = { 10, 13, 16, 20, 25, 30 };
+        public static readonly float[] Sizes = { 4000f, 8000f, 12000f, 16000f, 24000f };
+        /// <summary>The world the setup window offers first: a small one, the kingdoms near (the author's choice, 2026-11-05).</summary>
+        public const float FirstSize = 4000f;
+        public static readonly int[] HeroCounts = { 10, 13, 16, 20, 25, 30, 40, 51 }; // 51: fifty kingdoms and the player
         public static readonly float[] KingShares = { 0.5f, 0.75f, 1f };
 
         /// <summary>0: a random world.</summary>
