@@ -90,6 +90,7 @@
 - **Земля:** `InfiniteWorldManager.HoldSettlements` тримає чанки навколо кожної ратуші, навіть коли герой далеко.
 - **Зони:** `ZoneMap` (клітинки 8 м), `ZonePainter` (пензель), `ZoneToolbar` (кнопки мапи), `ZoneGrower` (ставить ділянки), `ConstructionSite` (будують робітники), `WorkPlace` (поле,
   лісопилка), `Caravans` (між поселеннями).
+- **Люди:** `SettlementLabor` (хто де працює, межі районів), вікно `NpcGatherCommandUI`, панель будівлі `SelectedBuildingUI`, снос `BuildingDemolition`; накази через `LaborCommand`, `DemolishCommand`.
 - **Рух:** `GroundMotor` (рельєф, озера, стіни, `Footprints` будівель, `SolidProps`: стовбури, валуни й руда); `GameBalance.WalkerSeparation`, `StandingSeparation`, `PressBeforeBypass`.
 - **Абстрактний шар:** `KingdomRealm` (далекі королівства даними), `KingdomEconomy`, `AbstractBattle` / `UnitStats` (бій цифрами). Після зміни бойового балансу зіграти заново
   `AbstractBattleCalibration.PlayTheBattles`.

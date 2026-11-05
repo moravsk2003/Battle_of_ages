@@ -14,6 +14,8 @@ namespace BattleOfAges.SaveLoad
         public int Version = CurrentVersion;
         /// <summary>The guests of this campaign, with their games (a host's save).</summary>
         public List<Net.GuestRecord> Guests = new List<Net.GuestRecord>();
+        /// <summary>How many a district takes by itself (the people's window).</summary>
+        public List<Building.LaborLimitSave> LaborLimits = new List<Building.LaborLimitSave>();
         /// <summary>The number the world's next entity gets.</summary>
         public int NextEntityId = 1;
         /// <summary>The player's name for this save (empty: none).</summary>

@@ -51,6 +51,7 @@ namespace BattleOfAges.Utils
             if (zones) Settlements();
             if (zones) yield return new WaitForSecondsRealtime(3f);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeknights") >= 0) yield return Knights(path);
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokelabor") >= 0) yield return LaborWindows(path);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeworld") >= 0) yield return WorldWindows(path);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
@@ -73,6 +74,35 @@ namespace BattleOfAges.Utils
                 yield return new WaitForSecondsRealtime(1.5f);
             }
             Application.Quit();
+        }
+
+        /// <summary>With "-smokelabor": on the map, the people's window, a building's panel, the units' panel and the building row.</summary>
+        private static IEnumerator LaborWindows(string path)
+        {
+            Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap);
+            yield return new WaitForSecondsRealtime(1.5f);
+            RTS.RtsUnitCommander commander = Managers.GameContext.Commander;
+            UI.NpcGatherCommandUI.Instance.OpenMenu();
+            yield return new WaitForSecondsRealtime(1f);
+            ScreenCapture.CaptureScreenshot(path + ".labor.png");
+            yield return new WaitForSecondsRealtime(1f);
+            UI.NpcGatherCommandUI.Instance.CloseMenu();
+            if (commander != null && Building.BuildingNode.Active.Count > 0)
+            {
+                commander.SelectBuilding(Building.BuildingNode.Active[0]);
+                yield return new WaitForSecondsRealtime(1f);
+                ScreenCapture.CaptureScreenshot(path + ".building.png");
+                yield return new WaitForSecondsRealtime(1f);
+                commander.SelectEveryone();
+                yield return new WaitForSecondsRealtime(1f);
+                ScreenCapture.CaptureScreenshot(path + ".units.png");
+                yield return new WaitForSecondsRealtime(1f);
+                commander.DeselectAll();
+            }
+            if (UI.ZoneToolbar.Instance != null && !UI.ZoneToolbar.Instance.BuildOpen) UI.ZoneToolbar.Instance.ToggleBuild();
+            yield return new WaitForSecondsRealtime(1f);
+            ScreenCapture.CaptureScreenshot(path + ".toolbar.png");
+            yield return new WaitForSecondsRealtime(1f);
         }
 
         /// <summary>With "-smokeknights": another player's knight beside a real one, right before the hero (path + ".knights.png").</summary>

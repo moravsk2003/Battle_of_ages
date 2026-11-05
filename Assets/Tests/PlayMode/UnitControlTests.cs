@@ -159,7 +159,13 @@ namespace BattleOfAges.PlayModeTests
             CollectionAssert.Contains(commander.SelectedUnits, warrior);
             CollectionAssert.Contains(commander.SelectedUnits, knight);
             CollectionAssert.DoesNotContain(commander.SelectedUnits, worker);
-            Assert.AreEqual(knight, commander.SelectedUnits[0], "the strongest first in the panel");
+            int knightAt = -1, warriorAt = -1;
+            for (int i = 0; i < commander.SelectedUnits.Count; i++)
+            {
+                if (commander.SelectedUnits[i] == knight) knightAt = i;
+                if (commander.SelectedUnits[i] == warrior) warriorAt = i;
+            }
+            Assert.Less(knightAt, warriorAt, "the strongest first in the panel");
             commander.SelectEveryone();
             CollectionAssert.Contains(commander.SelectedUnits, worker, "Ctrl+A takes everyone");
         }

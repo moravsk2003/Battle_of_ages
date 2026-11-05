@@ -1,39 +1,50 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using BattleOfAges.RTS;
+using BattleOfAges.Building;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
+using BattleOfAges.Net;
 
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// UI modal for configuring and balancing worker allocation across different village jobs.
-    /// Opened with the 'K' key. Uses WorkerRegistry for instant zero-GC distribution.
+    /// The people's window (K): who of a settlement works where, by district and by job, each settlement on its own tab. Every button
+    /// works at once: one more takes the nearest free person, one less sends the person back to working on their own (SettlementLabor).
     /// </summary>
     [DisallowMultipleComponent]
     public class NpcGatherCommandUI : MonoBehaviour
     {
         public static NpcGatherCommandUI Instance { get; private set; }
 
-        private GameObject commandPanelObj;
-        private Text statusText;
-        private Text titleTxt;
+        private const float Width = 860f, RowH = 42f, RowGap = 4f, RefreshEvery = 0.25f;
+        private const int MaxTabs = 6;
 
-        // Allocation counts
-        private int branchesCount = 0;
-        private int chopCount = 0;
-        private int pebblesCount = 0;
-        private int haulCount = 0;
-        private int autoCount = 0;
+        private sealed class Row
+        {
+            public LaborJob Job;
+            public Text Name, Detail, Value;
+            public Button Minus, Plus, Free;
+        }
 
-        // Counter UI Texts
-        private Text branchesText;
-        private Text chopText;
-        private Text pebblesText;
-        private Text haulText;
-        private Text autoText;
+        private GameObject window;
+        private Text title, summary, said;
+        private readonly List<Row> rows = new List<Row>();
+        private readonly List<Button> tabs = new List<Button>();
+        private TownHall shownHall;
+        private float refresh;
 
         public bool IsOpen { get; private set; }
+        /// <summary>The settlement on show (null: the one there is, with no hall yet).</summary>
+        public TownHall ShownHall => shownHall;
+        /// <summary>The line at the top, for tests.</summary>
+        public string SummaryText => summary != null ? summary.text : "";
+        /// <summary>What a row's value says now (tests).</summary>
+        public string ValueOf(LaborJob job)
+        {
+            foreach (Row r in rows) if (r.Job == job) return r.Value.text;
+            return "";
+        }
 
         private void Awake()
         {
@@ -44,20 +55,18 @@ namespace BattleOfAges.UI
             }
             Instance = this;
             IsOpen = false;
-
-            BuildCommandUI();
-            KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
+            for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject); // the scene's old window
+            Build();
+            KeybindsManager.OnKeybindsChanged += ShowTitle;
         }
 
         private void OnDestroy()
         {
-            KeybindsManager.OnKeybindsChanged -= UpdateHeaderText;
+            KeybindsManager.OnKeybindsChanged -= ShowTitle;
+            if (Instance == this) Instance = null;
         }
 
-        private void Start()
-        {
-            CloseMenu();
-        }
+        private void Start() => CloseMenu();
 
         private void Update()
         {
@@ -71,27 +80,17 @@ namespace BattleOfAges.UI
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
                 }
-
-                if (UniversalInput.GetKeyDownEscape() || IsToggleKeyPressed())
+                if (UniversalInput.GetKeyDownEscape() || KeybindsManager.GetKeyDown(KeyAction.WorkerCommandUI))
                 {
                     CloseMenu();
                     return;
                 }
+                refresh -= Time.unscaledDeltaTime;
+                if (refresh <= 0f) Refresh();
+                return;
             }
-            else
-            {
-                if (GameWindows.InventoryOpen || GameWindows.BuildMenuOpen) return;
-
-                if (IsToggleKeyPressed())
-                {
-                    OpenMenu();
-                }
-            }
-        }
-
-        private bool IsToggleKeyPressed()
-        {
-            return KeybindsManager.GetKeyDown(KeyAction.WorkerCommandUI);
+            if (GameWindows.InventoryOpen || GameWindows.BuildMenuOpen) return;
+            if (KeybindsManager.GetKeyDown(KeyAction.WorkerCommandUI)) OpenMenu();
         }
 
         public void ToggleMenu()
@@ -103,337 +102,192 @@ namespace BattleOfAges.UI
         public void OpenMenu()
         {
             IsOpen = true;
-            if (commandPanelObj == null) BuildCommandUI();
-            if (commandPanelObj != null) commandPanelObj.SetActive(true);
-
+            if (window != null) window.SetActive(true);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-
-            SyncWithCurrentWorkerState();
-            UpdateHeaderText();
+            shownHall = TownHall.Viewed != null ? TownHall.Viewed : TownHall.Current;
+            said.text = "";
+            ShowTitle();
+            Refresh();
         }
 
         public void CloseMenu()
         {
             IsOpen = false;
-            if (commandPanelObj != null) commandPanelObj.SetActive(false);
-
-            foreach (Transform child in transform)
+            if (window != null) window.SetActive(false);
+            if (GameWindows.InventoryOpen || GameWindows.BuildMenuOpen || GameWindows.Paused) return;
+            GameModeManager modes = GameContext.Modes;
+            if (modes == null || modes.CurrentMode == GameMode.FirstPerson)
             {
-                if (child != null) child.gameObject.SetActive(false);
-            }
-
-            if ((InventoryUI.Instance == null || !InventoryUI.Instance.IsOpen) &&
-                (BuildMenuUI.Instance == null || !BuildMenuUI.Instance.IsOpen) &&
-                !GameWindows.Paused)
-            {
-                GameModeManager gmm = Managers.GameContext.Modes;
-                if (gmm == null || gmm.CurrentMode == GameMode.FirstPerson)
-                {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
-                }
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
             }
         }
 
-        private void SyncWithCurrentWorkerState()
-        {
-            branchesCount = WorkerRegistry.GetDirectiveWorkerCount(GatherDirective.WoodGatherBranchesOnly);
-            chopCount = WorkerRegistry.GetDirectiveWorkerCount(GatherDirective.WoodChopTreesOnly);
-            pebblesCount = WorkerRegistry.GetDirectiveWorkerCount(GatherDirective.OrePebblesOnly);
-            haulCount = WorkerRegistry.GetDirectiveWorkerCount(GatherDirective.HaulOreFromMineToChest);
-            autoCount = WorkerRegistry.GetDirectiveWorkerCount(GatherDirective.Auto);
+        // ------------------------------------------------------------------ what it shows
 
-            UpdateUIValues();
+        private void ShowTitle()
+        {
+            if (title == null) return;
+            string key = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.WorkerCommandUI));
+            title.text = $"Розподіл людей  <size=17><color=#B8A88E>[{key}]</color></size>";
         }
 
-        private void UpdateUIValues()
+        private void Refresh()
         {
-            if (branchesText != null) branchesText.text = branchesCount.ToString();
-            if (chopText != null) chopText.text = chopCount.ToString();
-            if (pebblesText != null) pebblesText.text = pebblesCount.ToString();
-            if (haulText != null) haulText.text = haulCount.ToString();
-            if (autoText != null) autoText.text = autoCount.ToString();
+            refresh = RefreshEvery;
+            if (shownHall == null && TownHall.All.Count > 0) shownHall = TownHall.All[0];
+            ShowTabs();
+            int people = SettlementLabor.PeopleCount(shownHall), free = SettlementLabor.FreeCount(shownHall);
+            summary.text = $"Людей: <color=#F5CC73>{people}</color>{(shownHall != null ? $" із {shownHall.Cap}" : "")}   ·   самостійно: <color=#F5CC73>{free}</color>   ·   без діла: <color={(HudIdle(shownHall) > 0 ? "#DB5242" : "#F5CC73")}>{HudIdle(shownHall)}</color>";
+            foreach (Row row in rows) ShowRow(row);
+        }
 
-            int totalWorkers = WorkerRegistry.DistributableCount;
-            int totalAssigned = branchesCount + chopCount + pebblesCount + haulCount + autoCount;
+        private static int HudIdle(TownHall hall)
+        {
+            int n = 0;
+            foreach (RTS.NpcResourceGatherer w in RTS.WorkerRegistry.ActiveWorkers)
+                if (w != null && w.IsIdle && (hall == null || TownHall.All.Count <= 1 || TownHall.Nearest(w.transform.position) == hall)) n++;
+            return n;
+        }
 
-            if (statusText != null)
+        private void ShowRow(Row row)
+        {
+            LaborRow r = SettlementLabor.RowOf(row.Job, shownHall);
+            row.Value.text = r.Places >= 0 ? $"{r.Hands} / {r.Places}" : r.Hands.ToString();
+            bool building = r.Places >= 0;
+            string detail = "";
+            if (building) detail = r.Buildings == 0 ? (row.Job == LaborJob.Building ? "нічого не будується" : "ще не збудовано") : $"споруд: {r.Buildings}";
+            if (r.Limit >= 0) detail += (detail.Length > 0 ? "  ·  " : "") + $"самі не більше {r.Limit}";
+            row.Detail.text = detail;
+            row.Minus.interactable = r.Hands > 0;
+            row.Plus.interactable = !building || r.Hands < r.Places;
+            if (row.Free != null && row.Free.gameObject.activeSelf != (r.Limit >= 0)) row.Free.gameObject.SetActive(r.Limit >= 0);
+        }
+
+        private void ShowTabs()
+        {
+            IReadOnlyList<TownHall> halls = TownHall.All;
+            bool several = halls.Count > 1;
+            for (int i = 0; i < tabs.Count; i++)
             {
-                int miners = WorkerRegistry.MinerCount;
-                statusText.text = $"Усього робітників: {totalWorkers}  |  Налаштовано: {totalAssigned}" + (miners > 0 ? $"  |  у шахтах: {miners}" : "");
+                bool on = several && i < halls.Count;
+                if (tabs[i].gameObject.activeSelf != on) tabs[i].gameObject.SetActive(on);
+                if (!on) continue;
+                Text label = tabs[i].GetComponentInChildren<Text>();
+                label.text = $"{halls[i].Title} {Crafting.ItemTypeNames.Roman(halls[i].Level)}";
+                label.color = halls[i] == shownHall ? UiTheme.Gold : UiTheme.Ink;
             }
         }
 
-        private int GetTotalAssignedExcept(GatherDirective exceptDirective)
+        private void Order(LaborJob job, LaborCommand.Kind kind)
         {
-            int sum = 0;
-            if (exceptDirective != GatherDirective.WoodGatherBranchesOnly) sum += branchesCount;
-            if (exceptDirective != GatherDirective.WoodChopTreesOnly) sum += chopCount;
-            if (exceptDirective != GatherDirective.OrePebblesOnly) sum += pebblesCount;
-            if (exceptDirective != GatherDirective.HaulOreFromMineToChest) sum += haulCount;
-            if (exceptDirective != GatherDirective.Auto) sum += autoCount;
-            return sum;
+            said.text = "";
+            CommandBus.Submit(new LaborCommand { Order = kind, Job = job, Hall = WorldEntity.IdOf(shownHall).Value });
+            Refresh();
         }
 
-        private void ChangeJobCount(GatherDirective directive, int delta)
+        /// <summary>A refusal in the window itself, where the player is looking.</summary>
+        public void Say(string text)
         {
-            int total = WorkerRegistry.DistributableCount;
-            int currentlyAssignedOther = GetTotalAssignedExcept(directive);
-            int maxAllowed = Mathf.Max(0, total - currentlyAssignedOther);
-
-            switch (directive)
-            {
-                case GatherDirective.WoodGatherBranchesOnly:
-                    branchesCount = Mathf.Clamp(branchesCount + delta, 0, maxAllowed);
-                    break;
-                case GatherDirective.WoodChopTreesOnly:
-                    chopCount = Mathf.Clamp(chopCount + delta, 0, maxAllowed);
-                    break;
-                case GatherDirective.OrePebblesOnly:
-                    pebblesCount = Mathf.Clamp(pebblesCount + delta, 0, maxAllowed);
-                    break;
-                case GatherDirective.HaulOreFromMineToChest:
-                    haulCount = Mathf.Clamp(haulCount + delta, 0, maxAllowed);
-                    break;
-                case GatherDirective.Auto:
-                    autoCount = Mathf.Clamp(autoCount + delta, 0, maxAllowed);
-                    break;
-            }
-
-            UpdateUIValues();
+            if (IsOpen && said != null) said.text = text;
+            else StrategyHud.Notify(text);
         }
 
-        public void ApplyCurrentAllocation()
+        // ------------------------------------------------------------------ build
+
+        private void Build()
         {
-            WorkerRegistry.ApplyJobDistribution(branchesCount, chopCount, pebblesCount, haulCount, autoCount);
-            int total = WorkerRegistry.DistributableCount;
-
-            if (statusText != null)
-            {
-                statusText.text = $"Розподіл застосовано для {total} робітників!";
-            }
-        }
-
-        public void SetAllToDirective(GatherDirective directive)
-        {
-            WorkerRegistry.IssueDirectiveToAll(directive);
-            SyncWithCurrentWorkerState();
-
-            if (statusText != null)
-            {
-                statusText.text = "Усім робітникам призначено нову роботу";
-            }
-        }
-
-        private void BuildCommandUI()
-        {
-            Canvas canvas = gameObject.GetComponent<Canvas>();
+            Canvas canvas = GetComponent<Canvas>();
             if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 95;
-
-            CanvasScaler scaler = gameObject.GetComponent<CanvasScaler>();
+            CanvasScaler scaler = GetComponent<CanvasScaler>();
             if (scaler == null) scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
+            if (GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
 
-            if (gameObject.GetComponent<GraphicRaycaster>() == null)
+            int count = SettlementLabor.Districts.Length + SettlementLabor.Jobs.Length;
+            float top = 148f, height = top + count * (RowH + RowGap) + 2f * 30f + 74f;
+            RectTransform panel = UiTheme.Rect(transform, "PeoplePanel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(Width, height));
+            window = panel.gameObject;
+            UiTheme.PanelImage(panel);
+            PopIn.On(panel);
+
+            RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(600f, 44f));
+            title = UiTheme.Label(head, "Text", "", 28, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            title.supportRichText = true;
+            ShowTitle();
+            UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-14f, -10f), new Vector2(44f, 42f), CloseMenu, 26);
+
+            // One tab per settlement (shown only with more than one)
+            const float tabW = 132f;
+            for (int i = 0; i < MaxTabs; i++)
             {
-                gameObject.AddComponent<GraphicRaycaster>();
+                int index = i;
+                Button tab = UiTheme.TextButton(panel, "Tab" + i, "", new Vector2(0f, 1f), new Vector2(22f + i * (tabW + 4f), -58f), new Vector2(tabW, 34f), () =>
+                {
+                    IReadOnlyList<TownHall> halls = TownHall.All;
+                    if (index < halls.Count) { shownHall = halls[index]; said.text = ""; Refresh(); }
+                }, 14);
+                tab.gameObject.SetActive(false);
+                tabs.Add(tab);
             }
 
-            Font font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? UnityEngine.Resources.GetBuiltinResource<Font>("Arial.ttf");
+            RectTransform sumRect = UiTheme.Rect(panel, "Summary", new Vector2(0f, 1f), new Vector2(24f, -96f), new Vector2(Width - 48f, 26f));
+            summary = UiTheme.Label(sumRect, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
+            summary.supportRichText = true;
+            RectTransform saidRect = UiTheme.Rect(panel, "Said", new Vector2(0f, 1f), new Vector2(24f, -120f), new Vector2(Width - 48f, 24f));
+            said = UiTheme.Label(saidRect, "Text", "", 15, TextAnchor.MiddleLeft, UiTheme.Bad);
 
-            // Main Panel Window
-            RectTransform panelRect = UiTheme.Child(transform, "NpcCommandPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-            PopIn.On(panelRect);
-            commandPanelObj = panelRect.gameObject;
-            panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(760f, 620f);
+            float y = -top;
+            y = Section(panel, "Райони: люди при спорудах", y);
+            foreach (LaborJob job in SettlementLabor.Districts) y = MakeRow(panel, job, y);
+            y = Section(panel, "Робота без споруд", y);
+            foreach (LaborJob job in SettlementLabor.Jobs) y = MakeRow(panel, job, y);
 
-            Image panelBg = commandPanelObj.AddComponent<Image>();
-            panelBg.color = new Color(0.05f, 0.08f, 0.15f, 0.97f);
+            Button allFree = UiTheme.TextButton(panel, "AllFree", "Усім: самостійно", new Vector2(0f, 0f), new Vector2(24f, 16f), new Vector2(250f, 46f), () => Order(LaborJob.Standing, LaborCommand.Kind.AllOnTheirOwn), 16);
+            Tooltip.Set(allFree.gameObject, () => TipText.Title("Усім: самостійно", UiTheme.Gold) + "\nУсі, хто не при споруді, самі беруться за те, чого бракує. Хто стоїть, теж іде працювати.");
+            Button clear = UiTheme.TextButton(panel, "ClearLimits", "Зняти обмеження", new Vector2(0f, 0f), new Vector2(284f, 16f), new Vector2(250f, 46f), () => Order(LaborJob.Fields, LaborCommand.Kind.ClearLimits), 16);
+            Tooltip.Set(clear.gameObject, () => TipText.Title("Зняти обмеження", UiTheme.Gold) + "\nРайони знову беруть вільних людей, скільки є місць.");
 
-            // Header Bar
-            RectTransform headerRect = UiTheme.Child(commandPanelObj.transform, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f));
-            GameObject headerObj = headerRect.gameObject;
-            headerRect.pivot = new Vector2(0.5f, 1f);
-            headerRect.anchoredPosition = Vector2.zero;
-            headerRect.sizeDelta = new Vector2(0f, 60f);
-
-            Image headerBg = headerObj.AddComponent<Image>();
-            headerBg.color = new Color(0.10f, 0.16f, 0.28f, 0.98f);
-
-            RectTransform titleRect = UiTheme.Child(headerObj.transform, "TitleText", Vector2.zero, Vector2.one, new Vector2(50f, 0f), new Vector2(-50f, 0f));
-            GameObject titleObj = titleRect.gameObject;
-
-            titleTxt = titleObj.AddComponent<Text>();
-            titleTxt.font = font;
-            titleTxt.fontSize = 26;
-            titleTxt.fontStyle = FontStyle.Bold;
-            titleTxt.alignment = TextAnchor.MiddleCenter;
-            titleTxt.color = new Color(0.3f, 0.95f, 1.0f);
-            titleTxt.raycastTarget = false;
-            UpdateHeaderText();
-
-            // Header Close Button [ X ]
-            RectTransform closeRect = UiTheme.Child(headerObj.transform, "CloseBtn", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f));
-            GameObject closeBtnObj = closeRect.gameObject;
-            closeRect.pivot = new Vector2(1f, 0.5f);
-            closeRect.anchoredPosition = new Vector2(-12f, 0f);
-            closeRect.sizeDelta = new Vector2(40f, 40f);
-
-            Image closeBg = closeBtnObj.AddComponent<Image>();
-            closeBg.color = new Color(0.85f, 0.20f, 0.20f, 0.95f);
-            Button closeBtn = UiTheme.AddButton(closeBtnObj);
-            closeBtn.onClick.AddListener(CloseMenu);
-
-            RectTransform closeTxtRect = UiTheme.Child(closeBtnObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject closeTxtObj = closeTxtRect.gameObject;
-            Text closeTxt = UiTheme.PlainText(closeTxtObj, font, 20, TextAnchor.MiddleCenter, Color.white, "×", style: FontStyle.Bold, raycast: false);
-            closeTxt.fontSize = 28;
-
-            // Status Subheader Text
-            RectTransform statusRect = UiTheme.Child(commandPanelObj.transform, "StatusText", new Vector2(0f, 0.81f), new Vector2(1f, 0.89f), new Vector2(25f, 0f), new Vector2(-25f, 0f));
-            GameObject statusObj = statusRect.gameObject;
-
-            statusText = statusObj.AddComponent<Text>();
-            statusText.font = font;
-            statusText.fontSize = 18;
-            statusText.fontStyle = FontStyle.Bold;
-            statusText.alignment = TextAnchor.MiddleCenter;
-            statusText.color = new Color(0.85f, 0.94f, 1.0f);
-            statusText.text = "Налаштуйте кількість робітників на кожну задачу:";
-            statusText.raycastTarget = false;
-
-            // Rows Container with VerticalLayoutGroup
-            RectTransform containerRect = UiTheme.Child(commandPanelObj.transform, "RowsContainer", new Vector2(0.03f, 0.22f), new Vector2(0.97f, 0.79f), Vector2.zero, Vector2.zero);
-            GameObject rowsContainer = containerRect.gameObject;
-
-            VerticalLayoutGroup layout = rowsContainer.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 10f;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
-
-            // 5 Job Allocation Rows
-            branchesText = CreateJobCounterRow(rowsContainer.transform, font, "Збирання гілок (без нищення дерев)", GatherDirective.WoodGatherBranchesOnly);
-            chopText = CreateJobCounterRow(rowsContainer.transform, font, "Рубання дерев на дрова", GatherDirective.WoodChopTreesOnly);
-            pebblesText = CreateJobCounterRow(rowsContainer.transform, font, "Збір камінчиків руди", GatherDirective.OrePebblesOnly);
-            haulText = CreateJobCounterRow(rowsContainer.transform, font, "Перевезення руди з шахти в скриню", GatherDirective.HaulOreFromMineToChest);
-            autoText = CreateJobCounterRow(rowsContainer.transform, font, "Самостійно (беруться за те, чого бракує)", GatherDirective.Auto);
-
-            // Bottom Action Buttons Bar
-            RectTransform barRect = UiTheme.Child(commandPanelObj.transform, "BottomBar", new Vector2(0.03f, 0.04f), new Vector2(0.97f, 0.18f), Vector2.zero, Vector2.zero);
-            GameObject bottomBar = barRect.gameObject;
-
-            HorizontalLayoutGroup barLayout = bottomBar.AddComponent<HorizontalLayoutGroup>();
-            barLayout.spacing = 10f;
-            barLayout.childControlWidth = true;
-            barLayout.childControlHeight = true;
-            barLayout.childForceExpandWidth = true;
-            barLayout.childForceExpandHeight = true;
-
-            CreateActionButton(bottomBar.transform, font, "Застосувати", new Color(0.12f, 0.52f, 0.22f), ApplyCurrentAllocation);
-            CreateActionButton(bottomBar.transform, font, "Усім: самостійно", new Color(0.18f, 0.32f, 0.55f), () => SetAllToDirective(GatherDirective.Auto));
-            CreateActionButton(bottomBar.transform, font, "Усім: рубати", new Color(0.55f, 0.35f, 0.12f), () => SetAllToDirective(GatherDirective.WoodChopTreesOnly));
-            CreateActionButton(bottomBar.transform, font, "Усім: камінці руди", new Color(0.35f, 0.40f, 0.45f), () => SetAllToDirective(GatherDirective.OrePebblesOnly));
-
-            if (commandPanelObj != null) commandPanelObj.SetActive(false);
+            window.SetActive(false);
         }
 
-        private void UpdateHeaderText()
+        private static float Section(RectTransform panel, string text, float y)
         {
-            if (titleTxt != null)
-            {
-                KeyCode key = KeybindsManager.GetKey(KeyAction.WorkerCommandUI);
-                string keyName = KeybindsManager.GetKeyDisplayString(key);
-                titleTxt.text = $"Розподіл робіт  <size=17><color=#B8A88E>[{keyName}]</color></size>";
-            }
+            RectTransform r = UiTheme.Rect(panel, "Section", new Vector2(0f, 1f), new Vector2(24f, y), new Vector2(Width - 48f, 26f));
+            UiTheme.Label(r, "Text", text, 16, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            return y - 30f;
         }
 
-        private Text CreateJobCounterRow(Transform parent, Font font, string label, GatherDirective directive)
+        private float MakeRow(RectTransform panel, LaborJob job, float y)
         {
-            GameObject rowObj = new GameObject("JobRow", typeof(RectTransform));
-            rowObj.transform.SetParent(parent, false);
+            var row = new Row { Job = job };
+            RectTransform r = UiTheme.Rect(panel, "Row_" + job, new Vector2(0f, 1f), new Vector2(18f, y), new Vector2(Width - 36f, RowH));
+            UiTheme.PanelImage(r, UiTheme.ButtonSprite, new Color(0.72f, 0.7f, 0.68f));
+            Tooltip.Set(r.gameObject, () => TipText.Title(SettlementLabor.NameOf(job), UiTheme.Gold) + "\n" + SettlementLabor.TipOf(job));
 
-            LayoutElement rowElement = rowObj.AddComponent<LayoutElement>();
-            rowElement.minHeight = 52f;
-            rowElement.preferredHeight = 52f;
-            rowElement.flexibleHeight = 0f;
+            RectTransform name = UiTheme.Rect(r, "Name", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(240f, RowH));
+            row.Name = UiTheme.Label(name, "Text", SettlementLabor.NameOf(job), 17, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            RectTransform detail = UiTheme.Rect(r, "Detail", new Vector2(0f, 0.5f), new Vector2(254f, 0f), new Vector2(290f, RowH));
+            row.Detail = UiTheme.Label(detail, "Text", "", 14, TextAnchor.MiddleLeft, UiTheme.InkDim);
 
-            Image rowBg = rowObj.AddComponent<Image>();
-            rowBg.color = new Color(0.10f, 0.16f, 0.26f, 0.95f);
+            row.Free = UiTheme.TextButton(r, "Free", "×", new Vector2(1f, 0.5f), new Vector2(-192f, 0f), new Vector2(30f, 30f), () => Order(job, LaborCommand.Kind.ClearLimits), 16);
+            Tooltip.Set(row.Free.gameObject, () => TipText.Title("Зняти обмеження", UiTheme.Gold) + "\nРайон знову бере вільних людей, скільки є місць.");
+            row.Free.gameObject.SetActive(false);
 
-            // Job Title Label
-            RectTransform labelRect = UiTheme.Child(rowObj.transform, "Label", new Vector2(0.02f, 0f), new Vector2(0.60f, 1f), Vector2.zero, Vector2.zero);
-            GameObject labelObj = labelRect.gameObject;
+            row.Minus = UiTheme.TextButton(r, "Minus", "−", new Vector2(1f, 0.5f), new Vector2(-140f, 0f), new Vector2(44f, 34f), () => Order(job, LaborCommand.Kind.Remove), 22);
+            RectTransform value = UiTheme.Rect(r, "Value", new Vector2(1f, 0.5f), new Vector2(-62f, 0f), new Vector2(72f, 34f));
+            UiTheme.PanelImage(value, UiTheme.SlotSprite).raycastTarget = false;
+            row.Value = UiTheme.Label(value, "Text", "0", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            row.Plus = UiTheme.TextButton(r, "Plus", "+", new Vector2(1f, 0.5f), new Vector2(-10f, 0f), new Vector2(44f, 34f), () => Order(job, LaborCommand.Kind.Add), 22);
 
-            Text labelTxt = UiTheme.PlainText(labelObj, font, 16, TextAnchor.MiddleLeft, Color.white, label, style: FontStyle.Bold, raycast: false);
-
-            // Minus Button [-]
-            RectTransform minusRect = UiTheme.Child(rowObj.transform, "MinusBtn", new Vector2(0.62f, 0.12f), new Vector2(0.72f, 0.88f), Vector2.zero, Vector2.zero);
-            GameObject minusBtnObj = minusRect.gameObject;
-
-            Image minusBg = minusBtnObj.AddComponent<Image>();
-            minusBg.color = new Color(0.45f, 0.15f, 0.15f, 0.95f);
-            Button minusBtn = UiTheme.AddButton(minusBtnObj);
-            minusBtn.onClick.AddListener(() => ChangeJobCount(directive, -1));
-
-            RectTransform minusTxtRect = UiTheme.Child(minusBtnObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject minusTxtObj = minusTxtRect.gameObject;
-            Text minusTxt = UiTheme.PlainText(minusTxtObj, font, 22, TextAnchor.MiddleCenter, Color.white, "-", style: FontStyle.Bold, raycast: false);
-
-            // Counter Display [ 0 ]
-            RectTransform countRect = UiTheme.Child(rowObj.transform, "CountBox", new Vector2(0.73f, 0.12f), new Vector2(0.86f, 0.88f), Vector2.zero, Vector2.zero);
-            GameObject countObj = countRect.gameObject;
-
-            Image countBg = countObj.AddComponent<Image>();
-            countBg.color = new Color(0.04f, 0.08f, 0.14f, 0.95f);
-
-            RectTransform countTxtRect = UiTheme.Child(countObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject countTxtObj = countTxtRect.gameObject;
-
-            Text countTxt = UiTheme.PlainText(countTxtObj, font, 20, TextAnchor.MiddleCenter, new Color(0.3f, 0.95f, 1.0f), "0", style: FontStyle.Bold, raycast: false);
-
-            // Plus Button [+]
-            RectTransform plusRect = UiTheme.Child(rowObj.transform, "PlusBtn", new Vector2(0.87f, 0.12f), new Vector2(0.97f, 0.88f), Vector2.zero, Vector2.zero);
-            GameObject plusBtnObj = plusRect.gameObject;
-
-            Image plusBg = plusBtnObj.AddComponent<Image>();
-            plusBg.color = new Color(0.15f, 0.45f, 0.20f, 0.95f);
-            Button plusBtn = UiTheme.AddButton(plusBtnObj);
-            plusBtn.onClick.AddListener(() => ChangeJobCount(directive, 1));
-
-            RectTransform plusTxtRect = UiTheme.Child(plusBtnObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject plusTxtObj = plusTxtRect.gameObject;
-            Text plusTxt = UiTheme.PlainText(plusTxtObj, font, 22, TextAnchor.MiddleCenter, Color.white, "+", style: FontStyle.Bold, raycast: false);
-
-            return countTxt;
-        }
-
-        private void CreateActionButton(Transform parent, Font font, string label, Color color, UnityEngine.Events.UnityAction onClick)
-        {
-            GameObject btnObj = new GameObject("ActionBtn", typeof(RectTransform));
-            btnObj.transform.SetParent(parent, false);
-
-            Image bg = btnObj.AddComponent<Image>();
-            bg.color = color;
-
-            Button btn = UiTheme.AddButton(btnObj);
-            ColorBlock cb = btn.colors;
-            cb.normalColor = color;
-            cb.highlightedColor = color * 1.25f;
-            cb.pressedColor = color * 0.85f;
-            btn.colors = cb;
-            btn.onClick.AddListener(onClick);
-
-            RectTransform txtRect = UiTheme.Child(btnObj.transform, "Text", Vector2.zero, Vector2.one);
-            GameObject txtObj = txtRect.gameObject;
-
-            Text txt = UiTheme.PlainText(txtObj, font, 15, TextAnchor.MiddleCenter, Color.white, label, style: FontStyle.Bold, raycast: false);
+            rows.Add(row);
+            return y - RowH - RowGap;
         }
     }
 }

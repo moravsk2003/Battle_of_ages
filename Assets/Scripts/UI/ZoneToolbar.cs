@@ -19,6 +19,14 @@ namespace BattleOfAges.UI
         private static readonly string[] SizeNames = { "М", "С", "В" };
         private static readonly string[] SizeTips = { "малий", "середній", "великий" };
 
+        /// <summary>The toolbar on the screen: B opens its building row.</summary>
+        public static ZoneToolbar Instance { get; private set; }
+
+        /// <summary>Whether the building row is open (tests).</summary>
+        public bool BuildOpen => open;
+
+        private float nextCounts;
+        private Text[] zoneLabels;
         private Button build, eraser;
         private Button[] zoneButtons;
         private Button[] sizes;
@@ -38,6 +46,7 @@ namespace BattleOfAges.UI
             rt.anchorMax = Vector2.one;
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             ZoneToolbar bar = go.AddComponent<ZoneToolbar>();
+            Instance = bar;
             bar.Build(rt);
             return bar;
         }
@@ -48,7 +57,7 @@ namespace BattleOfAges.UI
             row = rowRect.gameObject;
 
             // The first row: always there
-            float x = -2f * MainStep;
+            float x = -2.5f * MainStep;
             Button Main(string name, string text, UnityEngine.Events.UnityAction click, string tip)
             {
                 Button b = UiTheme.TextButton(rowRect, name, text, new Vector2(0.5f, 1f), new Vector2(x, TopY), new Vector2(MainW, RowH), click, 16);
@@ -58,6 +67,8 @@ namespace BattleOfAges.UI
             }
             build = Main("Build", "Будівництво", ToggleBuild, TipText.Title("Будівництво", UiTheme.Gold) + "\nЗони, які робітники забудовують самі, і споруди: ратуша, стіни, скриня.");
             eraser = Main("Eraser", "Стерти", ToggleEraser, TipText.Title("Стерти розмітку", UiTheme.Gold) + "\nТягніть ЛКМ по розмітці. Споруди, що вже стоять, лишаються.\n" + TipText.Dim("Також клавіша Delete."));
+            Button people = Main("People", "Люди", () => NpcGatherCommandUI.Instance?.ToggleMenu(), TipText.Title("Розподіл людей", UiTheme.Gold) + "\nХто де працює: райони, робота, кожне поселення окремо.");
+            Tooltip.Set(people.gameObject, () => TipText.Title("Розподіл людей", UiTheme.Gold) + "\nХто де працює: райони, робота, кожне поселення окремо.  " + TipText.Key(HudTips.Key(InputSystem.KeyAction.WorkerCommandUI)));
             Main("ResetView", "Скинути вигляд", ResetView, TipText.Title("Скинути вигляд", UiTheme.Gold) + "\nЗвичайний нахил, поворот і масштаб мапи.");
             Main("ToHero", "До героя", ToHero, TipText.Title("До героя", UiTheme.Gold) + "\nНавести мапу на свого героя.");
             Main("ToBase", "До бази", ToBase, TipText.Title("До бази", UiTheme.Gold) + "\nНавести мапу на ратушу. Натискайте ще раз, щоб перейти до наступного поселення.");
@@ -70,10 +81,12 @@ namespace BattleOfAges.UI
             float width = (types.Length + 1) * Step + SizeNames.Length * SizeStep + 14f;
             x = -width * 0.5f + ButtonW * 0.5f;
             zoneButtons = new Button[types.Length];
+            zoneLabels = new Text[types.Length];
             for (int i = 0; i < types.Length; i++)
             {
                 ZoneType type = types[i];
                 zoneButtons[i] = UiTheme.TextButton(zonesRect, "Zone_" + type, ZoneMap.Name(type), new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(ButtonW, RowH), () => Toggle(type), 16);
+                zoneLabels[i] = zoneButtons[i].GetComponentInChildren<Text>();
                 RectTransform stripe = UiTheme.Child(zoneButtons[i].transform, "Stripe", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(7f, 5f), new Vector2(-7f, 11f));
                 Image img = stripe.gameObject.AddComponent<Image>();
                 Color c = ZoneMap.Colour(type);
@@ -108,7 +121,8 @@ namespace BattleOfAges.UI
             Apply();
         }
 
-        private void ToggleBuild()
+        /// <summary>Opens or closes the row of zones and buildings.</summary>
+        public void ToggleBuild()
         {
             open = !open;
             if (!open) ZonePainter.Stop();
@@ -164,11 +178,25 @@ namespace BattleOfAges.UI
             if (!campaign) return;
             if (ZonePainter.Painting && !open) { open = true; zonesRow.SetActive(true); } // the eraser, Delete: the sizes in reach
             Apply();
+            if (open && Time.unscaledTime >= nextCounts) { nextCounts = Time.unscaledTime + 0.5f; ShowCounts(); }
             bool painting = ZonePainter.Painting;
             if (statusPanel.gameObject.activeSelf != painting) { statusPanel.gameObject.SetActive(painting); nextStatus = 0f; }
             if (!painting || Time.unscaledTime < nextStatus) return;
             nextStatus = Time.unscaledTime + 0.25f;
             status.text = StatusText();
+        }
+
+        /// <summary>On each zone's button how it stands: the buildings there of those its cells call for.</summary>
+        private void ShowCounts()
+        {
+            ZoneType[] types = ZoneMap.Types;
+            for (int i = 0; i < types.Length; i++) zoneLabels[i].text = LabelOf(types[i], TownHall.Viewed);
+        }
+
+        public static string LabelOf(ZoneType zone, TownHall hall)
+        {
+            ZoneGrower.Progress(zone, hall, out int cells, out int wanted, out int have, out int sites);
+            return cells == 0 && have == 0 ? ZoneMap.Name(zone) : $"{ZoneMap.Name(zone)} {have - sites}/{wanted}";
         }
 
         /// <summary>What is in hand lit up; trade waits for a hall II.</summary>

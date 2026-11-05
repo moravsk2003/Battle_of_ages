@@ -172,7 +172,7 @@ namespace BattleOfAges.UI
             if (armyShown.Changed(army)) armyText.text = army.ToString();
             BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
             bool placing = map && placer != null && placer.IsPlacing;
-            modeText.text = placing ? placer.Hint : map ? "M — від першої особи  ·  N — мапа світу  ·  F1 — довідка" : "M — мапа  ·  N — мапа світу  ·  F1 — довідка";
+            modeText.text = placing ? placer.Hint : map ? "M — від першої особи  ·  N — світ  ·  F1 — довідка" : "M — мапа  ·  N — мапа світу  ·  F1 — довідка";
             mode.sizeDelta = placing ? new Vector2(600f, 70f) : new Vector2(map ? 510f : 470f, 44f); // the placing hint takes two lines
         }
 

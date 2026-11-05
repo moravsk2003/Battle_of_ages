@@ -6,6 +6,9 @@ namespace BattleOfAges.Combat
     /// </summary>
     public static class GameBalance
     {
+        /// <summary>The share of its price a building pulled down gives back (a site given up: all not yet built).</summary>
+        public const float DemolishRefund = 0.5f;
+
         // ------------------------------------------------------------------ time (§4)
 
         /// <summary>Real seconds in one game hour (a game day is 24 of them).</summary>

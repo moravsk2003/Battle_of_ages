@@ -19,7 +19,7 @@ namespace BattleOfAges.UI
         public static SelectedUnitUI Instance { get; private set; }
 
         private const int CardColumns = 9, CardRows = 2;
-        private const float CardSize = 44f, CardGap = 4f;
+        private const float CardSize = 38f, CardGap = 3f; // two rows under the title
 
         private GameObject panelObj;
         private Text titleText, statusText, statsText, hpText;
@@ -359,7 +359,7 @@ namespace BattleOfAges.UI
                 UiTheme.PanelImage(card, UiTheme.SlotSprite);
                 UiTheme.AddButton(card.gameObject).onClick.AddListener(() => OnCardClicked(index));
                 Tooltip.Set(card.gameObject, () => index < cards.Count && cards[index].unit != null ? CardTip(cards[index].unit) : null);
-                RectTransform ic = UiTheme.Rect(card, "Icon", new Vector2(0.5f, 0.5f), new Vector2(0f, 3f), new Vector2(32f, 32f));
+                RectTransform ic = UiTheme.Rect(card, "Icon", new Vector2(0.5f, 0.5f), new Vector2(0f, 3f), new Vector2(26f, 26f));
                 Image icon = ic.gameObject.AddComponent<Image>();
                 icon.preserveAspect = true; icon.raycastTarget = false;
                 RectTransform hb = UiTheme.Rect(card, "Hp", new Vector2(0.5f, 0f), new Vector2(0f, 4f), new Vector2(CardSize - 10f, 5f));

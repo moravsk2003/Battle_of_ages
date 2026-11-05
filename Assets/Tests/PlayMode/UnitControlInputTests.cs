@@ -82,6 +82,18 @@ namespace BattleOfAges.PlayModeTests
             yield return null;
         }
 
+        [UnityTearDown]
+        public IEnumerator LeaveTheScene()
+        {
+            Scene empty = SceneManager.CreateScene("Empty_" + System.Guid.NewGuid().ToString("N"));
+            SceneManager.SetActiveScene(empty);
+            for (int i = SceneManager.sceneCount - 1; i >= 0; i--)
+            {
+                Scene scene = SceneManager.GetSceneAt(i);
+                if (scene != empty && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
+            }
+        }
+
         [UnityTest, Timeout(120000)]
         public IEnumerator TheMouseAndKeys_ChooseAndOrder_AndADragOfTheMap_OrdersNobody()
         {
@@ -136,6 +148,32 @@ namespace BattleOfAges.PlayModeTests
             // X stops it
             yield return Keys(Key.X);
             Assert.IsFalse(unit.HasMoveTarget, "X");
+
+            // A click on a building: its panel; Esc lets go of it; K opens the people's window
+            commander.DeselectAll();
+            // A house of its own, far from anyone: nobody near to be taken for it
+            Vector3 lot = stands + new Vector3(60f, 0f, 60f);
+            lot.y = RtsUnit.GetTerrainHeight(lot);
+            GameObject houseGo = Building.BuildingPlacementSystem.CreateBuilding(Building.BuildingType.WorkerHouse);
+            houseGo.transform.position = lot;
+            Building.BuildingNode building = houseGo.GetComponent<Building.BuildingNode>();
+            GameContext.MapCamera.LookAtGround(lot);
+            yield return new WaitForSeconds(1f);
+            cam = ViewCamera.Current;
+            Physics.SyncTransforms();
+            yield return Click(0, Screen2(lot + Vector3.up * 1.5f));
+            Assert.AreEqual(building, commander.SelectedBuilding, "a click chooses it");
+            yield return null;
+            Assert.IsTrue(UI.SelectedBuildingUI.Instance.Showing, "and its panel shows");
+            StringAssert.Contains(Building.BuildingData.GetDefinition(building.Type).DisplayName.Substring(0, 3), UI.SelectedBuildingUI.Instance.TitleText + building.Type + Building.BuildingData.GetDefinition(building.Type).DisplayName);
+            yield return Keys(Key.Escape);
+            Assert.IsNull(commander.SelectedBuilding, "Esc lets go of it");
+            Assert.AreEqual(GameMode.RtsMap, GameContext.Modes.CurrentMode);
+            yield return Keys(Key.K);
+            Assert.IsTrue(UI.GameWindows.WorkersOpen, "K opens the people's window");
+            yield return Keys(Key.K);
+            Assert.IsFalse(UI.GameWindows.WorkersOpen, "and closes it");
+            commander.SelectOnly(unit);
 
             // Esc lets go first, and only then leaves the map
             yield return Keys(Key.Escape);

@@ -84,7 +84,9 @@ namespace BattleOfAges.UI
 
                 if (IsToggleKeyPressed())
                 {
-                    OpenMenu();
+                    // In a campaign B is the same as the "Будівництво" button: the zones and the buildings
+                    if (World.WorldSettings.Bounded && ZoneToolbar.Instance != null) ZoneToolbar.Instance.ToggleBuild();
+                    else OpenMenu();
                 }
             }
         }

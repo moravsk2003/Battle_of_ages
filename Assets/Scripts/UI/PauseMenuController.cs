@@ -210,6 +210,7 @@ namespace BattleOfAges.UI
                     // First Esc lets go of those chosen, the next leaves the map
                     RTS.RtsUnitCommander commander = Managers.GameContext.Commander;
                     if (commander != null && commander.SelectedUnits.Count > 0) { commander.DeselectAll(); return; }
+                    if (commander != null && commander.SelectedBuilding != null) { commander.SelectBuilding(null); return; }
                     gameModeManager.SetGameMode(GameMode.FirstPerson);
                     return;
                 }

@@ -106,7 +106,8 @@ namespace BattleOfAges.Net
         {
             typeof(UnitOrderCommand), typeof(SetDirectiveCommand), typeof(PaintZoneCommand), typeof(PlaceBuildingCommand),
             typeof(UpgradeHallCommand), typeof(UpgradeWallsCommand), typeof(ToggleAlarmCommand), typeof(TradeCommand),
-            typeof(CraftCommand), typeof(SmeltCommand), typeof(BenchWorkerCommand), typeof(EquipCommand)
+            typeof(CraftCommand), typeof(SmeltCommand), typeof(BenchWorkerCommand), typeof(EquipCommand),
+            typeof(LaborCommand), typeof(DemolishCommand)
         };
 
         public static string Encode(GameCommand c) => Array.IndexOf(Types, c.GetType()) + "|" + JsonUtility.ToJson(c);
@@ -292,6 +293,45 @@ namespace BattleOfAges.Net
             }
             if (n == 0) Say("Серед обраних немає робітників");
         }
+    }
+
+    /// <summary>The people's window and a building's panel: one more or one less at a job, in a settlement or at one building.</summary>
+    [Serializable]
+    public sealed class LaborCommand : GameCommand
+    {
+        public enum Kind { Add, Remove, ClearLimits, AllOnTheirOwn }
+
+        public Kind Order;
+        public LaborJob Job;
+        public int Hall;
+        /// <summary>At this very building (0: wherever there is room).</summary>
+        public int Building;
+
+        public override void Execute()
+        {
+            TownHall hall = Hall != 0 ? WorldEntity.Find<TownHall>(Hall) : null;
+            BuildingNode node = Building != 0 ? WorldEntity.Find<BuildingNode>(Building) : null;
+            string no = null;
+            switch (Order)
+            {
+                case Kind.Add: no = node != null ? SettlementLabor.AddTo(node.gameObject, hall, Job) : SettlementLabor.Add(Job, hall); break;
+                case Kind.Remove: no = node != null ? SettlementLabor.RemoveFrom(node.gameObject, hall, Job) : SettlementLabor.Remove(Job, hall); break;
+                case Kind.ClearLimits: SettlementLabor.ClearLimits(hall); break;
+                case Kind.AllOnTheirOwn: SettlementLabor.AllOnTheirOwn(hall); break;
+            }
+            if (no == null) return;
+            if (NpcGatherCommandUI.Instance != null && NpcGatherCommandUI.Instance.IsOpen) NpcGatherCommandUI.Instance.Say(no);
+            else Say(no);
+        }
+    }
+
+    /// <summary>Pulls a building down, or gives up a site.</summary>
+    [Serializable]
+    public sealed class DemolishCommand : GameCommand
+    {
+        public int Building;
+
+        public override void Execute() => BuildingDemolition.Run(WorldEntity.Find<BuildingNode>(Building));
     }
 
     // ------------------------------------------------------------------ land and buildings

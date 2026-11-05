@@ -27,6 +27,7 @@ namespace BattleOfAges.Building
         public float Progress { get; private set; }
         public float WorkSeconds { get; private set; }
         public int BuilderCount => builders.Count;
+        public IReadOnlyList<NpcResourceGatherer> Builders => builders;
         public int PresentBuilders { get; private set; }
         public bool NeedsHands => builders.Count < MaxBuilders;
         public string DisplayName => BuildingData.GetDefinition(Type).DisplayName;

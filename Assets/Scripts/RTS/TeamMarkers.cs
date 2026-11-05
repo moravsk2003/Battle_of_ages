@@ -131,6 +131,14 @@ namespace BattleOfAges.RTS
                 Add(ringBatches, marks[i].color, Matrix4x4.TRS(marks[i].at + Vector3.up * 0.15f, Quaternion.identity, new Vector3(s, 1f, s)));
             }
 
+            Building.BuildingNode chosen = Managers.GameContext.Commander != null ? Managers.GameContext.Commander.SelectedBuilding : null;
+            if (chosen != null)
+            {
+                Vector3 size = Building.BuildingData.GetDefinition(chosen.Type).Size;
+                float r = Mathf.Max(size.x, size.z) * 0.5f + 1f;
+                Add(ringBatches, Selected, Matrix4x4.TRS(chosen.transform.position + Vector3.up * 0.2f, Quaternion.identity, new Vector3(r, 1f, r)));
+            }
+
             Draw(ring, ringBatches, target);
             Draw(badge, badgeBatches, target);
         }

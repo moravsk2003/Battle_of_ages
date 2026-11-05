@@ -36,6 +36,18 @@ namespace BattleOfAges.RTS
         private RtsUnit lastClicked;
         private float lastClickAt = -10f;
         private readonly List<RtsUnit>[] groups = new List<RtsUnit>[GroupCount];
+        private BuildingNode selectedBuilding;
+
+        /// <summary>The building chosen with a click (its panel: SelectedBuildingUI); null when units are chosen instead.</summary>
+        public BuildingNode SelectedBuilding => selectedBuilding != null && !BuildGhost.Is(selectedBuilding) ? selectedBuilding : null;
+
+        /// <summary>Chooses this building and lets go of the units (null: nothing).</summary>
+        public void SelectBuilding(BuildingNode node)
+        {
+            if (node != null) DeselectAll();
+            selectedBuilding = node;
+            if (node != null) UiSound.Play(UiSound.Kind.Open);
+        }
         private int lastGroupTapped = -1;
         private float lastGroupTappedAt = -10f;
 
@@ -77,6 +89,7 @@ namespace BattleOfAges.RTS
                 GameObject selUIObj = new GameObject("SelectedUnitUI");
                 selUIObj.AddComponent<SelectedUnitUI>();
             }
+            if (FindFirstObjectByType<SelectedBuildingUI>() == null) new GameObject("SelectedBuildingUI").AddComponent<SelectedBuildingUI>();
         }
 
         private void Update()
@@ -310,7 +323,8 @@ namespace BattleOfAges.RTS
             bool isShift = UniversalInput.IsShiftHeld();
             Ray ray = mapCamera.ScreenPointToRay(mousePos);
 
-            if (Physics.Raycast(ray, out RaycastHit hit, 1000f))
+            RaycastHit hit = default;
+            if (Physics.Raycast(ray, out hit, 1000f))
             {
                 RtsUnit hitUnit = hit.collider.GetComponentInParent<RtsUnit>();
                 if (hitUnit != null)
@@ -320,14 +334,19 @@ namespace BattleOfAges.RTS
                 }
 
                 WorkbenchNode wb = hit.collider.GetComponentInParent<WorkbenchNode>();
-                if (wb != null)
+                if (wb != null && wb.enabled)
                 {
+                    SelectBuilding(wb.GetComponent<BuildingNode>());
                     WorkbenchUI.EnsureInstance().OpenUI(wb);
                     return;
                 }
                 MarketNode market = hit.collider.GetComponentInParent<MarketNode>();
-                if (market != null && market.enabled) { TradeUI.Open(); return; }
-
+                if (market != null && market.enabled)
+                {
+                    SelectBuilding(market.GetComponent<BuildingNode>());
+                    TradeUI.Open();
+                    return;
+                }
             }
 
             // Near a unit on the screen: it was meant (behind a tree's crown too)
@@ -338,7 +357,14 @@ namespace BattleOfAges.RTS
                 return;
             }
 
-            if (!isShift) DeselectAll();
+            // A building: its panel. (Under a ghost being placed the placing has the mouse, and a kingdom's are not ours to order)
+            if (hit.collider != null && !isShift)
+            {
+                BuildingNode node = hit.collider.GetComponentInParent<BuildingNode>();
+                if (node != null && !BuildGhost.Is(node)) { SelectBuilding(node); return; }
+            }
+
+            if (!isShift) { DeselectAll(); selectedBuilding = null; }
         }
 
         /// <summary>A click on a unit: that one; Shift: in or out of those chosen; Ctrl or a double click: all of its kind in view.</summary>
@@ -503,6 +529,7 @@ namespace BattleOfAges.RTS
             if (unit != null && unit.TryGetComponent(out NpcResourceGatherer g) && g.IsInsideMine) return;
             if (unit != null && !selectedUnits.Contains(unit))
             {
+                selectedBuilding = null; // units or a building, not both
                 selectedUnits.Add(unit);
                 unit.SetSelected(true);
             }

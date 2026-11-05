@@ -245,7 +245,7 @@ namespace BattleOfAges.Building
         {
             MineNode mine = Nearest(fromPos, m =>
             {
-                if (!m.OreShort) return false;
+                if (!m.OreShort || !SettlementLabor.RoomFor(m)) return false;
                 int coming = 0;
                 foreach (NpcResourceGatherer w in WorkerRegistry.ActiveWorkers) if (w != null && w.AssignedMine == m) coming++;
                 return coming < GameBalance.MineAutoMiners && !m.IsFullWorkers;

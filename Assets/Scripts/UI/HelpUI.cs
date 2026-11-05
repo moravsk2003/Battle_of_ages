@@ -89,7 +89,7 @@ namespace BattleOfAges.UI
                    $"{Key(KeyAction.ChopTree)} — рубати дерево\n" +
                    $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — уміння класу героя,  {Key(KeyAction.UseFullHeal)} / {Key(KeyAction.UseLightning)} — одноразові артефакти\n" +
                    $"{Key(KeyAction.Inventory)} — інвентар,  {Key(KeyAction.Equipment)} — спорядження,  {Key(KeyAction.Hero)} — герой\n" +
-                   $"{Key(KeyAction.BuildMenu)} — будівництво,  {Key(KeyAction.WorkerCommandUI)} — розподіл робіт\n" +
+                   $"{Key(KeyAction.BuildMenu)} — будівництво,  {Key(KeyAction.WorkerCommandUI)} — розподіл людей\n" +
                    $"{Key(KeyAction.Alarm)} — тривога: усі люди до зброї\n" +
                    $"{Key(KeyAction.ToggleGameMode)} — мапа (вид зверху)\n\n" +
                    Head("На мапі") + "\n" +
@@ -103,6 +103,7 @@ namespace BattleOfAges.UI
                    $"{K("Середня кнопка")} — крутити камеру\n" +
                    $"{Key(KeyAction.IdleWorker)} — наступний робітник без діла,  {Key(KeyAction.AlertJump)} — до місця нападу\n" +
                    $"{K("Мінімапа")}: ЛКМ — камера туди, ПКМ — вибрані йдуть туди\n" +
+                   $"{K("ЛКМ по будівлі")} — її панель: люди, покращення, знести,  {Key(KeyAction.BuildMenu)} — зони й споруди,  {Key(KeyAction.WorkerCommandUI)} — розподіл людей\n" +
                    $"{K("Esc")} — зняти виділення, ще раз — назад до виду від першої особи\n\n" +
                    Head("Завжди") + "\n" +
                    "• Гра в мережі: хост відкриває гру в меню паузи, інші входять за його адресою з головного меню, версія гри в усіх має бути одна. {Key(KeyAction.PlayerList)} (утримувати) показує, хто в грі.\n" +

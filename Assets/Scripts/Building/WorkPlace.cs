@@ -20,6 +20,7 @@ namespace BattleOfAges.Building
 
         private readonly List<NpcResourceGatherer> workers = new List<NpcResourceGatherer>(4);
         public int WorkerCount => workers.Count;
+        public IReadOnlyList<NpcResourceGatherer> Workers => workers;
         public int Present { get; private set; }
         public abstract int Slots { get; }
         /// <summary>The stock is short: workers on their own come.</summary>
@@ -49,7 +50,7 @@ namespace BattleOfAges.Building
             float bestSqr = reach * reach;
             foreach (WorkPlace p in all)
             {
-                if (p == null || p.workers.Count >= p.Slots || !p.WantsHands) continue;
+                if (p == null || p.workers.Count >= p.Slots || !p.WantsHands || !SettlementLabor.RoomFor(p)) continue;
                 float d = (p.transform.position - from).sqrMagnitude;
                 if (d < bestSqr) { bestSqr = d; best = p; }
             }

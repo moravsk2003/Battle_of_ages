@@ -60,9 +60,16 @@ namespace BattleOfAges.Building
             }
         }
 
+        /// <summary>What is short for this building, in words.</summary>
+        private static string ShortOf(BuildingDefinition def) => $"На «{def.DisplayName}» треба {def.WoodCost} дерева й {def.OreCost} руди";
+
+        /// <summary>Why it cannot stand where the mouse is now (null: it can).</summary>
+        private string whyNot;
+
         private string MakeHint()
         {
             BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
+            if (whyNot != null) return $"{def.DisplayName}: тут не можна, {whyNot}\nZ / X — поворот  ·  ПКМ — скасувати";
             if (!WallSegment.IsWall(currentBuildingType)) return $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати";
             return $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
                  + (snapped ? $"прилипла, кут {usedWallTurn:+0;-0;0}°: Z / X — змінити" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
@@ -151,7 +158,7 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(type);
             if (!CanAfford(def))
             {
-                Debug.Log($"[Building] Недостатньо ресурсів для {def.DisplayName}!");
+                StrategyHud.Notify(ShortOf(def));
                 return;
             }
             if (!IsAllowed(type, out string why))
@@ -205,6 +212,8 @@ namespace BattleOfAges.Building
 
                 bool validLoc = level && CheckLocationValid(pos, rot, def);
                 bool affordable = CanAfford(def) && IsAllowed(currentBuildingType, out _);
+                string now = !level ? "надто круто" : World.Lakes.InWater(pos.x, pos.z, 3f) ? "вода" : !validLoc ? "зайнято" : !affordable ? "бракує ресурсів" : null;
+                if (now != whyNot) { whyNot = now; hintKey = long.MinValue; }
 
                 Color ghostColor = (validLoc && affordable)
                     ? new Color(0.2f, 0.9f, 0.4f, 0.45f)  // Green
@@ -377,13 +386,13 @@ namespace BattleOfAges.Building
             }
             if (!CheckLocationValid(buildPos, buildRot, def))
             {
-                Debug.Log($"[Building] Неможливо побудувати тут: занадто близько до іншої будівлі або об'єкта! Потрібен прохід для NPC.");
+                StrategyHud.Notify("Тут зайнято: навколо споруди потрібен прохід для людей");
                 return;
             }
 
             if (!CanAfford(def))
             {
-                Debug.Log($"[Building] Недостатньо ресурсів для {def.DisplayName}!");
+                StrategyHud.Notify(ShortOf(def));
                 CancelPlacement();
                 return;
             }

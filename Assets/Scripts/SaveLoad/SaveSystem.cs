@@ -146,6 +146,7 @@ namespace BattleOfAges.SaveLoad
             var d = new SaveData { SavedAtTicks = DateTime.UtcNow.Ticks, PlaySeconds = PlaySeconds, GameHours = WorldClock.GameHours, WorldSeed = World.WorldSettings.Seed, WorldSize = World.WorldSettings.Size, BanditNextRaid = AI.BanditRaids.NextRaidHour, BanditRaids = AI.BanditRaids.RaidCount };
 
             d.Zones = World.ZoneMap.Save();
+            d.LaborLimits = Building.SettlementLabor.Save();
             ResourceManager res = ResourceManager.Instance;
             if (res != null)
             {
@@ -321,6 +322,7 @@ namespace BattleOfAges.SaveLoad
             pending = null;
             AI.KingdomRealm.Clear(); // not the last campaign's heroes
             World.ZoneMap.Clear();
+            Building.SettlementLabor.Clear();
             newGamePending = true;
             World.WorldSettings.Set(setup.SeedOrRandom(), setup.Size); // a world of its own (§5.1)
             GameBalance.CampaignHeroes = setup.Heroes;
@@ -433,6 +435,7 @@ namespace BattleOfAges.SaveLoad
                 ResourceManager.Instance.Main.SetState(d.Wood, ore);
                 ResourceManager.Instance.Main.SetFood(d.Food >= 0f ? d.Food : GameBalance.FoodStart);
                 World.ZoneMap.Load(d.Zones);
+                Building.SettlementLabor.Load(d.LaborLimits);
             }
             Armory.Instance.Clear();
             foreach (Item i in d.Armory) Armory.Instance.Add(i);

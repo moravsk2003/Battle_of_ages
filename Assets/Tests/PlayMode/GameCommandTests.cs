@@ -129,6 +129,8 @@ namespace BattleOfAges.PlayModeTests
                 new UnitOrderCommand { Order = UnitOrderCommand.Kind.QueueMove, Units = new[] { 3 }, Point = Vector3.left },
                 new UnitOrderCommand { Order = UnitOrderCommand.Kind.Stop, Units = new[] { 3 } },
                 new SetDirectiveCommand { Units = new[] { 4 }, Directive = GatherDirective.Idle },
+                new LaborCommand { Order = LaborCommand.Kind.Remove, Job = LaborJob.Mining, Hall = 8, Building = 9 },
+                new DemolishCommand { Building = 11 },
                 new PaintZoneCommand { From = Vector3.one, To = Vector3.up, Radius = 4f, Zone = ZoneType.Mining },
                 new PlaceBuildingCommand { Type = BuildingType.Mine, Position = Vector3.right, Rotation = Quaternion.Euler(0f, 90f, 0f), WallTier = 2 },
                 new UpgradeHallCommand { Hall = 9 }, new UpgradeWallsCommand(), new ToggleAlarmCommand(),
