@@ -52,6 +52,7 @@ namespace BattleOfAges.Utils
             if (zones) yield return new WaitForSecondsRealtime(3f);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeknights") >= 0) yield return Knights(path);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokelabor") >= 0) yield return LaborWindows(path);
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokehelp") >= 0) yield return HelpTabs(path);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeworld") >= 0) yield return WorldWindows(path);
             if (effects) yield return Effects();
             if (map) { Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap); yield return new WaitForSecondsRealtime(1.5f); }
@@ -74,6 +75,21 @@ namespace BattleOfAges.Utils
                 yield return new WaitForSecondsRealtime(1.5f);
             }
             Application.Quit();
+        }
+
+        /// <summary>With "-smokehelp": every tab of the help (path + ".help0.png" and on).</summary>
+        private static IEnumerator HelpTabs(string path)
+        {
+            UI.HelpUI.Instance.Open();
+            for (int i = 0; i < UI.HelpUI.TabNames.Length; i++)
+            {
+                UI.HelpUI.Instance.ShowTab(i);
+                yield return new WaitForSecondsRealtime(0.5f);
+                Debug.Log($"[Smoke] help tab {i}: {UI.HelpUI.Instance.PageHeight:0} of {UI.HelpUI.PageRoom:0} high");
+                ScreenCapture.CaptureScreenshot(path + ".help" + i + ".png");
+                yield return new WaitForSecondsRealtime(0.8f);
+            }
+            UI.HelpUI.Instance.Close();
         }
 
         /// <summary>With "-smokelabor": on the map, the people's window, a building's panel, the units' panel and the building row.</summary>

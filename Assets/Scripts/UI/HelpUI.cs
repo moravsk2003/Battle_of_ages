@@ -5,9 +5,9 @@ using BattleOfAges.Managers;
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// The help window (F1): the controls of both views with the player's own key bindings, what the game has and what it
-    /// does not have yet (a player report: "the interface is unclear, it is unclear what there is"). Closes with F1, Esc
-    /// or the cross; the top bar's mode hint tells about it.
+    /// The help window (F1): what there is and how to do it, a tab per subject, with the player's own key bindings (a player report:
+    /// "the interface is unclear, it is unclear what there is"; then "the help is overloaded"). It opens on what the player is looking
+    /// at: the map's controls on the map. Closes with F1, Esc or the cross; the top bar's mode hint tells about it.
     /// </summary>
     public sealed class HelpUI : MonoBehaviour
     {
@@ -16,10 +16,13 @@ namespace BattleOfAges.UI
         public static HelpUI Instance => instance;
 
         private GameObject window;
-        private UnityEngine.UI.Text controls, features;
+        private UnityEngine.UI.Text page;
+        private UnityEngine.UI.Text[] tabs;
+        /// <summary>The tab on show.</summary>
+        public int CurrentTab { get; private set; }
         private bool open;
 
-        private static readonly Vector2 Size = new Vector2(1420f, 860f);
+        private static readonly Vector2 Size = new Vector2(1120f, 780f);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
@@ -41,8 +44,7 @@ namespace BattleOfAges.UI
         public void Open()
         {
             open = true;
-            controls.text = ControlsText();
-            features.text = FeaturesText();
+            ShowTab(GameContext.MapOpen ? 1 : 0);
             window.SetActive(true);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -80,62 +82,129 @@ namespace BattleOfAges.UI
         private static string K(string key) => "<color=#f5cc73><b>" + key + "</b></color>";
         private static string Head(string text) => "<size=22><color=#f5cc73><b>" + text + "</b></color></size>";
 
-        private static string ControlsText()
+        // ------------------------------------------------------------------ the tabs
+
+        /// <summary>The tabs' names, in order.</summary>
+        public static readonly string[] TabNames = { "Основи", "Мапа", "Будівництво", "Люди", "Бій і герой", "Світ", "Гра в мережі" };
+
+        /// <summary>A tab's text, with the player's own keys.</summary>
+        public static string TabText(int index)
         {
-            return Head("Від першої особи") + "\n" +
-                   $"{K("W A S D")} — рух,  {K("Пробіл")} — стрибок,  миша — огляд\n" +
-                   $"{K("ЛКМ")} — удар або постріл\n" +
-                   $"{Key(KeyAction.InteractGather)} — зібрати, відкрити скриню, верстак, шахту\n" +
-                   $"{Key(KeyAction.ChopTree)} — рубати дерево\n" +
-                   $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — уміння класу героя,  {Key(KeyAction.UseFullHeal)} / {Key(KeyAction.UseLightning)} — одноразові артефакти\n" +
-                   $"{Key(KeyAction.Inventory)} — інвентар,  {Key(KeyAction.Equipment)} — спорядження,  {Key(KeyAction.Hero)} — герой\n" +
-                   $"{Key(KeyAction.BuildMenu)} — будівництво,  {Key(KeyAction.WorkerCommandUI)} — розподіл людей\n" +
-                   $"{Key(KeyAction.Alarm)} — тривога: усі люди до зброї\n" +
-                   $"{Key(KeyAction.ToggleGameMode)} — мапа (вид зверху)\n\n" +
-                   Head("На мапі") + "\n" +
-                   $"{K("ЛКМ")} — вибрати людину, рамкою — кількох,  {K("Shift")} — додати або прибрати\n" +
-                   $"{K("Подвійний клік")} або {K("Ctrl+клік")} — усі такі ж на екрані,  {K("Ctrl+A")} — усі люди,  {Key(KeyAction.SelectFighters)} — усі бійці\n" +
-                   $"{K("Ctrl+1…0")} — запам'ятати групу,  {K("Shift+1…0")} — додати до неї,  {K("1…0")} — обрати, двічі — камера до неї,  {Key(KeyAction.CenterSelection)} — камера до обраних\n" +
-                   $"{K("ПКМ")} з вибраними — іти туди / бити ворога / працювати\n" +
-                   $"{K("Ctrl+ПКМ")} — іти й бити всіх по дорозі,  {K("Shift+ПКМ")} — ще одна точка шляху,  {Key(KeyAction.StopUnits)} — стій\n" +
-                   $"{K("ПКМ")} (тягнути) — рухати мапу,  {K("W A S D")} — рухати мапу\n" +
-                   $"{K("Колесо")} — наближення,  {K("Q / E")} — повернути,  {K("R / F")} — нахил\n" +
-                   $"{K("Середня кнопка")} — крутити камеру\n" +
-                   $"{Key(KeyAction.IdleWorker)} — наступний робітник без діла,  {Key(KeyAction.AlertJump)} — до місця нападу\n" +
-                   $"{K("Мінімапа")}: ЛКМ — камера туди, ПКМ — вибрані йдуть туди\n" +
-                   $"{K("ЛКМ по будівлі")} — її панель: люди, покращення, знести,  {Key(KeyAction.BuildMenu)} — зони й споруди,  {Key(KeyAction.WorkerCommandUI)} — розподіл людей\n" +
-                   $"{K("Esc")} — зняти виділення, ще раз — назад до виду від першої особи\n\n" +
-                   Head("Завжди") + "\n" +
-                   "• Гра в мережі: хост відкриває гру в меню паузи, інші входять за його адресою з головного меню, версія гри в усіх має бути одна. {Key(KeyAction.PlayerList)} (утримувати) показує, хто в грі.\n" +
-                   $"• {Key(KeyAction.WorldMap)} — мапа світу: рельєф і всі королівства, скільки до них і скільки в них людей.\n" +
-                   $"{K(HudTips.Key(BattleOfAges.InputSystem.KeyAction.AutoWalk))} — автоходьба,  {K("F1")} — ця довідка,  {K("F3")} — FPS,  {K("Esc / P")} — пауза (спершу закриває вікна)\n" +
-                   "Наведи курсор на будь-що — з'явиться підказка. Пауза → Налаштування: миша, зум, гучність, графіка, " +
-                   "масштаб інтерфейсу, екран, VSync, ліміт кадрів, клавіші, поради.";
+            switch (index)
+            {
+                case 0: return Basics();
+                case 1: return MapControls();
+                case 2: return Building();
+                case 3: return People();
+                case 4: return Fight();
+                case 5: return TheWorld();
+                default: return Network();
+            }
         }
 
-        private static string FeaturesText()
-        {
-            return Head("Що є в грі") + "\n" +
-                   $"• Збирай дерево й руду, неси в скриню. Люди з будинків працюють самі; {Key(KeyAction.WorkerCommandUI)} — хто що робить.\n" +
-                   $"• Будівлі ({Key(KeyAction.BuildMenu)}): ратуша (рівні I–V — більше людей), будинок, скриня, шахта (люди працюють усередині, носії везуть руду в скриню), верстак (зброя й броня I–V), стіни й ворота (руда на вибір — Tab, Z / X — поворот, сегмент прилипає до краю стіни; рівень стін — під Ратушею). ПКМ по стіні — юніти йдуть сходами на пости й б'ють звідти сильніше (лучники — далі); тривога шле туди лучників.\n" +
-                   $"• Герой ({Key(KeyAction.Hero)}): досвід за вбивства, рівні, очки сили й здоров'я; клас — танк, лучник, маг або ДД з уміннями на {Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)}.\n" +
-                   "• Люди і працюють, і б'ються: людина → воїн → лицар → генерал. Воїном стають у боях і зрідка від роботи, лицарем і генералом — лише в боях (удари, вбивства, пережиті бої). Зброя й броня — окремо, з верстака.\n" +
-                   $"• Спорядження ({Key(KeyAction.Equipment)}): виділи людей на мапі — клік по речі на складі дає по одній кожному; «Найкраще зі складу» — усім кращу броню. Кайло шахтарі беруть самі.\n" +
-                   "• Верстак: робітники біля нього (ПКМ по верстаку з виділеними) кують речі I–V; переплавка — 10 руди → 1 руда рівнем вище.\n" +
-                   $"• Зони (на мапі кнопка «Будівництво»: оберіть зону й тягніть ЛКМ; «Стерти» або Delete — гумка, ПКМ теж стирає, Esc — готово; золоте коло — межа поселення): житло прискорює приріст, поля дають їжу, ліс — лісопилки, ремесла — верстаки, рудня — шахти, торгівля — ринок (від ратуші II). Усе зводять робітники: без них будівництво стоїть.\n" +
-                   "• Нове поселення: від ратуші II поставте ще одну ратушу на нічиїй землі й пошліть туди робітників ПКМ. У кожного поселення свій склад і свої зони; угорі видно склад того, на яке ви дивитесь. Ринок шле каравани туди, де бракує; у вікні ринку можна послати й самому.\n" +
-                   "• Їжа: 1 на людину на день; без неї населення не росте, а люди по одному гинуть. Робітники «Авто» йдуть у поле, коли їжі менше ніж на 3 дні.\n" +
-                   "• На мапі під кожним кільце: сині — свої, червоні — бандити, інші кольори — королівства; ромб над головою — ранг.\n" +
-                   "• Сусіди: герої на своїх стоянках за кілька км, найближчі королі ростуть і ходять у набіги на тебе й один на одного; табори бандитів із луками й мечами; дикі звірі.\n" +
-                   "• Бандити приходять на поселення від першого дня: щоразу більша ватага, напис скаже, звідки. Тривога кличе людей до зброї.\n" +
-                   $"• Тривога ({Key(KeyAction.Alarm)}): люди кидають роботу й захищають дім; сама вмикається, коли ворог підходить до ратуші, і вимикається після бою.\n" +
-                   "• Смерть героя: міжцарів'я, частина людей тікає, новим героєм стає найсильніший.\n" +
-                   "• Збереження: Пауза → Зберегти / Завантажити.\n\n" +
-                   Head("Чого ще немає") + "\n" +
-                   "• Наказів на мапі світу: поки вона лише показує. Навчання — лише поради «Перші кроки».\n" +
-                   "• Ресурсів і будівництва в горах.\n" +
-                   "• Бігу на Shift: швидкість героя залежить від його сили й здоров'я.";
-        }
+        private static string Basics() =>
+            Head("Від першої особи") + "\n" +
+            $"{K("W A S D")} — рух,  {K("Пробіл")} — стрибок,  миша — огляд,  {K(HudTips.Key(KeyAction.AutoWalk))} — автоходьба\n" +
+            $"{K("ЛКМ")} — удар або постріл\n" +
+            $"{Key(KeyAction.InteractGather)} — зібрати, відкрити скриню, верстак, шахту,  {Key(KeyAction.ChopTree)} — рубати дерево\n" +
+            $"{Key(KeyAction.ToggleGameMode)} — мапа, вид згори\n\n" +
+            Head("Вікна") + "\n" +
+            $"{Key(KeyAction.Inventory)} — інвентар,  {Key(KeyAction.Equipment)} — спорядження,  {Key(KeyAction.Hero)} — герой\n" +
+            $"{Key(KeyAction.BuildMenu)} — будівництво,  {Key(KeyAction.WorkerCommandUI)} — розподіл людей,  {Key(KeyAction.WorldMap)} — мапа світу\n" +
+            $"{K("F1")} — ця довідка,  {K("F3")} — FPS,  {K("Esc / P")} — пауза (спершу закриває вікна)\n\n" +
+            Head("З чого почати") + "\n" +
+            "1. Збирайте дерево й руду, несіть у скриню. Люди теж працюють самі.\n" +
+            "2. Поставте ратушу: без неї населення не росте.\n" +
+            "3. Розмітьте поля, житло й рудню: робітники зведуть усе самі.\n" +
+            "4. Поради вгорі праворуч ведуть крок за кроком.\n\n" +
+            Head("Ще") + "\n" +
+            "• Наведіть курсор на будь-що, і з'явиться підказка.\n" +
+            "• Пауза → Зберегти / Завантажити, Налаштування: миша, гучність, графіка, клавіші, поради.";
+
+        private static string MapControls() =>
+            Head("Вибрати") + "\n" +
+            $"{K("ЛКМ")} — людину,  рамкою — кількох,  {K("Shift")} — додати або прибрати\n" +
+            $"{K("Подвійний клік")} або {K("Ctrl+клік")} — усіх такого рангу на екрані\n" +
+            $"{K("Ctrl+A")} — усіх людей,  {Key(KeyAction.SelectFighters)} — усіх бійців,  {Key(KeyAction.IdleWorker)} — наступного без діла\n" +
+            $"{K("Ctrl+1…0")} — запам'ятати групу,  {K("Shift+1…0")} — додати до неї,  {K("1…0")} — обрати, двічі — камера до неї\n" +
+            $"{K("Esc")} — зняти виділення, ще раз — назад до виду від першої особи\n\n" +
+            Head("Наказати") + "\n" +
+            $"{K("ПКМ")} — іти туди, бити ворога, працювати там, куди клацнули\n" +
+            $"{K("Ctrl+ПКМ")} — іти й бити всіх по дорозі,  {K("Shift+ПКМ")} — ще одна точка шляху\n" +
+            $"{Key(KeyAction.StopUnits)} — стій: кинути роботу й похід\n" +
+            $"{K("Мінімапа")}: ЛКМ — камера туди, ПКМ — обрані йдуть туди\n\n" +
+            Head("Камера") + "\n" +
+            $"{K("ПКМ")} (тягнути) або {K("W A S D")} — рухати,  {K("Колесо")} — наближення\n" +
+            $"{K("Q / E")} — повернути,  {K("R / F")} — нахил,  {K("Середня кнопка")} — крутити\n" +
+            $"{Key(KeyAction.CenterSelection)} — до обраних,  {Key(KeyAction.AlertJump)} — до місця нападу\n\n" +
+            Head("Позначки") + "\n" +
+            "• Кільце під юнітом: сині — свої, червоні — бандити, інші кольори — королівства. Ромб над головою — ранг.";
+
+        private static string Building() =>
+            Head("Зони: робітники будують самі") + "\n" +
+            $"{Key(KeyAction.BuildMenu)} — зони й споруди. Оберіть зону й тягніть {K("ЛКМ")} у межах золотого кола, {K("ПКМ")} стирає, {K("Esc")} — готово.\n" +
+            "• Житло прискорює приріст, поля дають їжу, ліс — лісопилки, ремесла — верстаки, рудня — шахти, торгівля — ринок (від ратуші II).\n" +
+            $"• «Стерти» або {K("Delete")} — гумка. На кнопках видно, скільки споруд стоїть зі скількох потрібних.\n\n" +
+            Head("Споруди: ставите самі") + "\n" +
+            $"«Споруди»: ратуша, скриня, стіни, ворота. {K("Z / X")} — поворот, {K("ЛКМ")} — поставити, {K("ПКМ")} — скасувати.\n" +
+            $"• Стіни: {K("Tab")} — руда, сегмент прилипає до краю стіни. Рівень стін — на панелі ратуші чи стіни.\n" +
+            "• Без робітників будівництво стоїть.\n\n" +
+            Head("Панель будівлі") + "\n" +
+            $"{K("ЛКМ")} по будівлі: здоров'я, люди, покращення, відкрити, знести. Снос повертає половину ціни, скасування ділянки — усе, що ще не збудовано.\n\n" +
+            Head("Нове поселення") + "\n" +
+            "Від ратуші II поставте ще одну ратушу на нічиїй землі й пошліть туди робітників. У кожного поселення свій склад і свої зони; угорі видно склад того, на яке ви дивитесь. Ринок шле каравани туди, де бракує.";
+
+        private static string People() =>
+            Head("Розподіл людей") + "\n" +
+            $"{Key(KeyAction.WorkerCommandUI)} — хто де працює: райони й робота, кожне поселення окремо.\n" +
+            "• «+» кличе найближчу вільну людину, «−» відпускає її. Район після цього сам більше не бере: межу знімає хрестик.\n" +
+            "• На панелі обраних: кнопки роботи. «Авто» — самі беруться за те, чого бракує.\n\n" +
+            Head("Ранги") + "\n" +
+            "Людина → воїн → лицар → генерал. Воїном стають у боях і зрідка від роботи, лицарем і генералом — лише в боях. Люди і працюють, і б'ються.\n\n" +
+            Head("Спорядження") + "\n" +
+            $"{Key(KeyAction.Equipment)}: виділіть людей на мапі, клік по речі на складі дає по одній кожному. «Найкраще зі складу» — усім кращу броню. Кайло шахтарі беруть самі.\n\n" +
+            Head("Верстак і шахта") + "\n" +
+            "• Верстак: робітники кують речі I–V, переплавка — 10 руди в 1 руду рівнем вище.\n" +
+            "• Шахта: люди копають усередині, носії несуть руду в скриню. Повна шахта стоїть.\n\n" +
+            Head("Їжа") + "\n" +
+            "1 на людину на день. Без неї населення не росте, а люди по одному гинуть. Робітники «Авто» йдуть у поле, коли їжі менше ніж на 3 дні.";
+
+        private static string Fight() =>
+            Head("Герой") + "\n" +
+            $"{Key(KeyAction.Hero)}: досвід за вбивства, рівні, очки сили й здоров'я. Клас: танк, лучник, маг або ДД.\n" +
+            $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — уміння класу,  {Key(KeyAction.UseFullHeal)} / {Key(KeyAction.UseLightning)} — одноразові артефакти\n\n" +
+            Head("Тривога") + "\n" +
+            $"{Key(KeyAction.Alarm)}: люди кидають роботу й захищають дім. Сама вмикається, коли ворог підходить до ратуші, і вимикається після бою.\n\n" +
+            Head("Стіни") + "\n" +
+            $"{K("ПКМ")} по стіні: юніти йдуть сходами на пости й б'ють звідти сильніше, лучники ще й далі. Тривога шле туди лучників.\n\n" +
+            Head("Смерть героя") + "\n" +
+            "Міжцарів'я: частина людей тікає, новим героєм стає найсильніший.";
+
+        private static string TheWorld() =>
+            Head("Мапа світу") + "\n" +
+            $"{Key(KeyAction.WorldMap)}: рельєф і всі королівства, скільки до них і скільки в них людей.\n\n" +
+            Head("Сусіди") + "\n" +
+            "• Герої на своїх стоянках за кілька кілометрів. Найближчі королі ростуть і ходять у набіги на вас і один на одного.\n" +
+            "• Табори бандитів із луками й мечами, дикі звірі.\n" +
+            "• Бандити приходять на поселення від першого дня: щоразу більша ватага, напис скаже, звідки.\n\n" +
+            Head("Чого ще немає") + "\n" +
+            "• Наказів на мапі світу: поки вона лише показує.\n" +
+            "• Ресурсів і будівництва в горах.\n" +
+            "• Бігу на Shift: швидкість героя залежить від його сили й здоров'я.";
+
+        private static string Network() =>
+            Head("Як зіграти разом") + "\n" +
+            "1. Хост починає гру, потім Пауза → «Відкрити гру в мережі» й каже іншим адресу.\n" +
+            "2. Інші: головне меню → «Приєднатися до гри», вводять адресу.\n" +
+            "3. Версія гри в усіх має бути одна.\n\n" +
+            Head("У грі") + "\n" +
+            $"{Key(KeyAction.PlayerList)} (утримувати) — хто в грі.\n" +
+            "• Зберігає гру хост. Гра гостя зберігається в нього й повертається при вході.\n" +
+            "• Усі гравці вороги, кожен зі своїм королівством.";
+
+        // ------------------------------------------------------------------ the window
+
+        private const float TextWidth = 1060f, TextHeight = 640f;
 
         private void Build()
         {
@@ -146,19 +215,40 @@ namespace BattleOfAges.UI
             PopIn.On(panel);
             UiTheme.PanelImage(panel);
 
-            RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(600f, 48f));
-            UiTheme.Divider(panel, -64f, 600f);
-            UiTheme.Label(head, "Text", "Довідка", 32, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
-            UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-16f, -14f), new Vector2(46f, 44f), Close, 28);
+            RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(600f, 44f));
+            UiTheme.Label(head, "Text", "Довідка", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-14f, -10f), new Vector2(44f, 42f), Close, 26);
 
-            RectTransform left = UiTheme.Rect(panel, "Controls", new Vector2(0f, 1f), new Vector2(34f, -80f), new Vector2(640f, 740f));
-            controls = UiTheme.Label(left, "Text", "", 18, TextAnchor.UpperLeft, UiTheme.Ink);
-            controls.lineSpacing = 1.15f;
-            controls.horizontalOverflow = HorizontalWrapMode.Wrap; // lines wrap in the column, never out of the window
-            RectTransform right = UiTheme.Rect(panel, "Features", new Vector2(1f, 1f), new Vector2(-34f, -80f), new Vector2(700f, 740f));
-            features = UiTheme.Label(right, "Text", "", 18, TextAnchor.UpperLeft, UiTheme.Ink);
-            features.lineSpacing = 1.15f;
-            features.horizontalOverflow = HorizontalWrapMode.Wrap;
+            const float gap = 6f;
+            float tabW = (TextWidth - gap * (TabNames.Length - 1)) / TabNames.Length, x = (Size.x - TextWidth) * 0.5f;
+            tabs = new UnityEngine.UI.Text[TabNames.Length];
+            for (int i = 0; i < TabNames.Length; i++)
+            {
+                int index = i;
+                UnityEngine.UI.Button tab = UiTheme.TextButton(panel, "Tab_" + TabNames[i], TabNames[i], new Vector2(0f, 1f), new Vector2(x, -60f), new Vector2(tabW, 42f), () => ShowTab(index), 16);
+                tabs[i] = tab.GetComponentInChildren<UnityEngine.UI.Text>();
+                x += tabW + gap;
+            }
+
+            RectTransform box = UiTheme.Rect(panel, "Text", new Vector2(0.5f, 1f), new Vector2(0f, -116f), new Vector2(TextWidth, TextHeight));
+            page = UiTheme.Label(box, "Text", "", 19, TextAnchor.UpperLeft, UiTheme.Ink);
+            page.lineSpacing = 1.12f;
+            page.supportRichText = true;
+            page.horizontalOverflow = HorizontalWrapMode.Wrap; // lines wrap in the column, never out of the window
+            page.verticalOverflow = VerticalWrapMode.Overflow;
         }
+
+        /// <summary>Shows this tab, with the player's keys as they are now.</summary>
+        public void ShowTab(int index)
+        {
+            CurrentTab = Mathf.Clamp(index, 0, TabNames.Length - 1);
+            page.text = TabText(CurrentTab);
+            for (int i = 0; i < tabs.Length; i++) tabs[i].color = i == CurrentTab ? UiTheme.Gold : UiTheme.Ink;
+        }
+
+        /// <summary>How high the tab on show is against the room for it (tests).</summary>
+        public float PageHeight => page.preferredHeight;
+        public string PageText => page.text;
+        public static float PageRoom => TextHeight;
     }
 }
