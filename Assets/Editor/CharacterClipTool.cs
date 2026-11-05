@@ -149,8 +149,9 @@ namespace BattleOfAges.EditorTools
             public readonly GameObject Model;
             public readonly float BladeSign; // along palm X: the two rigs differ, the blade leaves the fist on the thumb's side
             private readonly bool shield;
-            private readonly Transform torso, head, upperR, foreR, palmR, knucklesR, upperL, foreL, palmL;
+            private readonly Transform torso, head, headEnd, upperR, foreR, palmR, knucklesR, upperL, foreL, palmL;
             private float lastBowTurn;
+            private readonly float metre; // the FBX rig is not fitted to height here: its units per game metre
             private readonly float bowSign; // the bow's grip along the left palm's X column, the way GearMeshBuilder builds it
             private readonly Vector3 right, up, forward;
             private readonly Quaternion restTorso;
@@ -161,6 +162,7 @@ namespace BattleOfAges.EditorTools
                 shield = knight;
                 Transform Find(string name) => model.GetComponentsInChildren<Transform>(true).First(t => t.name == name);
                 torso = Find("Torso"); head = Find("Head");
+                headEnd = model.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Head_end") ?? head;
                 upperR = Find("UpperArm.R"); foreR = Find("LowerArm.R"); palmR = Find("Palm.R"); knucklesR = Find("MiddleHand.R");
                 upperL = Find("UpperArm.L"); foreL = Find("LowerArm.L"); palmL = Find("Palm.L");
 
@@ -170,6 +172,8 @@ namespace BattleOfAges.EditorTools
                 up = Vector3.ProjectOnPlane(Find("Neck").position - Find("Hips").position, right).normalized;
                 forward = Vector3.Cross(right, up);
                 restTorso = torso.rotation;
+                float feet = Mathf.Min(Find("Foot.L").position.y, Find("Foot.R").position.y);
+                metre = (headEnd.position.y - feet) / 1.75f; // head top to the ankles: a man of 1.8 m
                 BladeSign = knight ? -1f : Mathf.Sign(Vector3.Dot(palmR.right, Find("Thumb1.R").position - palmR.position));
                 // GearMeshBuilder: the grip along -X of the bind matrix (whose axes may be mirrored), turned to point forward
                 SkinnedMeshRenderer body = model.GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -248,8 +252,9 @@ namespace BattleOfAges.EditorTools
                 head.rotation = Quaternion.AngleAxis(-twist * 0.9f, up) * head.rotation; // eyes on the target
 
                 // The bow arm straight out at the target (the body's forward, not the turned chest's)
-                Aim(upperL, foreL, Vector3.Slerp(Chest(BowArmUpper), forward, aim));
-                Aim(foreL, palmL, Vector3.Slerp(Chest(BowArmFore), forward, aim));
+                Vector3 atTarget = (forward + up * 0.14f).normalized; // a little up: the grip level with the jaw, the arrow's line nearly flat
+                Aim(upperL, foreL, Vector3.Slerp(Chest(BowArmUpper), atTarget, aim));
+                Aim(foreL, palmL, Vector3.Slerp(Chest(BowArmFore), atTarget, aim));
                 Quaternion hanging = palmL.rotation;
                 palmL.rotation = Quaternion.FromToRotation(Column(palmL, 0) * bowSign, forward) * palmL.rotation;
                 // The limbs (across the grip and the palm's Z) upright, canted a little
@@ -264,7 +269,59 @@ namespace BattleOfAges.EditorTools
                 palmL.rotation = Quaternion.AngleAxis(turn, forward) * palmL.rotation;
                 palmL.rotation = Quaternion.Slerp(hanging, palmL.rotation, aim);
 
-                AimArm(upperR, foreR, palmR, Chest(Vector3.Slerp(a.Upper.normalized, b.Upper.normalized, s)), Chest(Vector3.Slerp(a.Fore.normalized, b.Fore.normalized, s)), t <= 0f);
+                Draw(t, aim);
+            }
+
+            /// <summary>
+            /// The drawing hand by where it must be, not by guessed bone directions: on the string by the bow, drawn along
+            /// the arrow's line (from the grip to the corner of the mouth) to the anchor at the jaw, loosed back along the
+            /// same line past the ear. The elbow lies behind on that line's extension, a little above the shoulder; the
+            /// fingers point along the string to the bow. Two-bone IK with that elbow, then AimArm (the elbow a hinge).
+            /// </summary>
+            private void Draw(float t, float aim)
+            {
+                Vector3 rest = palmR.position; // the clip's own hand (the idle), before this arm is touched
+                Vector3 right = Vector3.Cross(up, forward);
+                Vector3 grip = palmL.position;
+                float m = metre;
+                Vector3 shoulders = (upperL.position + upperR.position) * 0.5f;
+                Vector3 mouth = shoulders + up * (0.1f * m) + forward * (0.12f * m) + right * (0.05f * m); // the anchor: the right side of the jaw
+                Vector3 line = (grip - mouth).normalized; // the arrow, from the anchor to the bow
+                Vector3 nock = grip - line * (0.1f * m), loosed = mouth - line * (0.13f * m) + right * (0.05f * m) + up * (0.02f * m);
+
+                // Where the hand is: keys by time, smooth between
+                (float time, Vector3 at)[] path =
+                {
+                    (0f, rest), (0.15f, nock), (0.46f, mouth), (0.52f, loosed), (0.75f, loosed - line * (0.02f * m)), (ShootLength, rest)
+                };
+                int k = 1;
+                while (k < path.Length - 1 && path[k].time < t) k++;
+                float u = Mathf.InverseLerp(path[k - 1].time, path[k].time, t);
+                if (k != 4) u = Mathf.SmoothStep(0f, 1f, u); // the loose itself is a snap
+                Vector3 hand = Vector3.Lerp(path[k - 1].at, path[k].at, u);
+
+                // Where the elbow goes: down and out at rest, behind on the arrow's line and a little up when drawing
+                Vector3 pole = Vector3.Slerp((Vector3.down + right * 0.4f).normalized, (-line + right * 0.3f - up * 0.05f).normalized, aim); // drawing: behind, out, at the arrow's height
+                Vector3 shoulder = upperR.position;
+                float upperLen = Vector3.Distance(upperR.position, foreR.position), foreLen = Vector3.Distance(foreR.position, palmR.position);
+                Vector3 toHand = hand - shoulder;
+                float d = Mathf.Clamp(toHand.magnitude, Mathf.Abs(upperLen - foreLen) + 0.01f * m, upperLen + foreLen - 0.002f * m);
+                Vector3 along = toHand.normalized;
+                float x = (upperLen * upperLen - foreLen * foreLen + d * d) / (2f * d), h = Mathf.Sqrt(Mathf.Max(0f, upperLen * upperLen - x * x));
+                // Drawn, the forearm lies on the arrow's line: the elbow as near as it can be to the point a forearm's length behind the hand on it
+                Vector3 onLine = hand - line * foreLen - up * (0.09f * m); // a little under the line: the upper arm near level from a shoulder joint that sits low in these rigs
+                pole = Vector3.Slerp(pole, (onLine - (shoulder + along * x)).normalized, aim);
+                Vector3 bend = Vector3.ProjectOnPlane(pole, along);
+                bend = bend.sqrMagnitude > 1e-6f ? bend.normalized : Vector3.ProjectOnPlane(Vector3.down, along).normalized;
+                Vector3 elbow = shoulder + along * x + bend * h;
+                AimArm(upperR, foreR, palmR, elbow - shoulder, shoulder + along * d - elbow, t <= 0f);
+
+                // The fingers on the string, pointing to the bow
+                Vector3 fingers = knucklesR.position - palmR.position;
+                Vector3 want = Vector3.Slerp(fingers.normalized, line, aim);
+                palmR.rotation = Quaternion.FromToRotation(fingers, want) * palmR.rotation;
+                if (t > 0.3f && t < 0.5f && Mathf.Abs(t - 0.46f) < 0.02f)
+                    Debug.Log($"[Draw] {Model.name} t={t:F2} hand off the anchor {Vector3.Distance(palmR.position, mouth) / m * 100f:F1} cm, elbow above the shoulder {(foreR.position.y - shoulder.y) / m * 100f:F0} cm, mouth {(mouth - shoulder).magnitude / m * 100f:F0} cm from the shoulder, forearm off the arrow's line {Vector3.Angle(palmR.position - foreR.position, line):F0} deg");
             }
 
             private Vector3 lastHinge;

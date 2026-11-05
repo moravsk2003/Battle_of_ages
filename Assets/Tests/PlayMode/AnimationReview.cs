@@ -114,18 +114,35 @@ namespace BattleOfAges.PlayModeTests
                     Measure(report, clip, animator, skin, model.transform);
                     if (!shots) continue;
                     string clipDir = Path.Combine(dir, $"{role}_{clip.name}");
-                    var capture = new CaptureRenderer(clipDir, SheetFrames * 2, 30f, drawGrass: false);
-                    Vector3 middle = at + Vector3.up * 0.95f;
-                    Vector3 sideCam = middle + facing * Vector3.right * 4.6f + Vector3.up * 0.1f;
-                    Vector3 frontCam = middle + facing * new Vector3(-1.6f, 0.2f, 4.2f);
-                    bool loop = clip.isLooping;
-                    for (int view = 0; view < 2; view++)
-                        for (int i = 0; i < SheetFrames; i++)
+                    // CAPTURE_TIMES = "0.15,0.46" (seconds) instead of 8 even frames; CAPTURE_VIEWS = "side,front,top,back,right";
+                    // CAPTURE_CLOSE = 1 frames the upper body from 2 m
+                    var times = new List<float>();
+                    string timeList = Environment.GetEnvironmentVariable("CAPTURE_TIMES");
+                    if (!string.IsNullOrEmpty(timeList))
+                        foreach (string s in timeList.Split(',')) if (float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float tv)) times.Add(Mathf.Min(tv, clip.length));
+                    if (times.Count == 0)
+                        for (int i = 0; i < SheetFrames; i++) times.Add(clip.length * i / (clip.isLooping ? SheetFrames : SheetFrames - 1));
+                    string viewList = Environment.GetEnvironmentVariable("CAPTURE_VIEWS");
+                    string[] views = string.IsNullOrEmpty(viewList) ? new[] { "side", "front" } : viewList.Split(',');
+                    bool close = Environment.GetEnvironmentVariable("CAPTURE_CLOSE") == "1";
+                    Vector3 middle = at + Vector3.up * (close ? 1.35f : 0.95f);
+                    float d = close ? 2.2f : 4.6f;
+                    Vector3 CameraFor(string view) => view switch
+                    {
+                        "front" => middle + facing * new Vector3(-0.35f, 0.04f, 0.91f) * d,
+                        "back" => middle + facing * new Vector3(0.3f, 0.15f, -0.95f) * d,
+                        "top" => middle + facing * new Vector3(0.05f, 0.98f, -0.12f) * d, // from above: the arms against the arrow's line
+                        "right" => middle + facing * Vector3.left * d + Vector3.up * 0.05f,
+                        _ => middle + facing * Vector3.right * d + Vector3.up * 0.05f,
+                    };
+                    var capture = new CaptureRenderer(clipDir, times.Count * views.Length, 30f, drawGrass: false);
+                    for (int view = 0; view < views.Length; view++)
+                        for (int i = 0; i < times.Count; i++)
                         {
-                            float t = clip.length * i / (loop ? SheetFrames : SheetFrames - 1);
+                            float t = times[i];
                             clip.SampleAnimation(animator.gameObject, t);
                             yield return null; // skinned by the frame
-                            capture.Shoot(view * SheetFrames + i, $"{(view == 0 ? "side" : "front")}_{t:F2}s", view == 0 ? sideCam : frontCam, middle);
+                            capture.Shoot(view * times.Count + i, $"{views[view]}_{t:F2}s", CameraFor(views[view]), middle);
                         }
                     capture.Finish();
                     yield return null;
