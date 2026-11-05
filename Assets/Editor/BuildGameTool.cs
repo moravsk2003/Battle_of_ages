@@ -48,6 +48,7 @@ namespace BattleOfAges.EditorTools
             string dir = Environment.GetEnvironmentVariable("BUILD_DIR");
             if (string.IsNullOrEmpty(dir)) dir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", folder);
             Directory.CreateDirectory(dir);
+            BakeCreatureMeshesTool.WriteIndex(); // the player finds its baked creature meshes through this list
 
             var options = new BuildPlayerOptions
             {

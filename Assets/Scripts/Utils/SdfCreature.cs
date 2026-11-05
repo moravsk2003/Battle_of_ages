@@ -274,6 +274,7 @@ namespace BattleOfAges.Utils
             // The signature is part of the file name (Unity renames an asset's main object to its file name).
             var loadTimer = System.Diagnostics.Stopwatch.StartNew();
             Mesh baked = UnityEngine.Resources.Load<Mesh>(BakedFolder + "/" + meshName);
+            if (baked == null && !Application.isEditor) baked = LoadBakedByKey(cacheKey);
             if (loadTimer.ElapsedMilliseconds > 5) Debug.Log($"[Creatures] loaded {meshName} in {loadTimer.ElapsedMilliseconds} ms");
             if (baked != null)
             {
@@ -287,6 +288,32 @@ namespace BattleOfAges.Utils
             }
             Cache[cacheKey] = cached;
             return cached;
+        }
+
+        /// <summary>Name of the list of baked meshes the bake tool and the build write next to them.</summary>
+        public const string BakedIndex = "index";
+        private static string[] bakedNames;
+
+        /// <summary>
+        /// A player build finds its baked mesh by the model's key: IL2CPP rounds floats a little differently from the
+        /// editor's Mono, which is enough to change the signature, though the meshes were baked from this same code
+        /// (the build refreshes the list). The editor keeps the strict signature check that catches stale bakes.
+        /// </summary>
+        private static Mesh LoadBakedByKey(string cacheKey)
+        {
+            if (bakedNames == null)
+            {
+                var list = UnityEngine.Resources.Load<TextAsset>(BakedFolder + "/" + BakedIndex);
+                bakedNames = list != null ? list.text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries) : new string[0];
+            }
+            string prefix = "Sculpted_" + cacheKey + "_";
+            foreach (string name in bakedNames)
+            {
+                if (!name.StartsWith(prefix, StringComparison.Ordinal) || name.Length != prefix.Length + 8) continue; // the key, then only its signature
+                Mesh mesh = UnityEngine.Resources.Load<Mesh>(BakedFolder + "/" + name);
+                if (mesh != null) return mesh;
+            }
+            return null;
         }
 
         private SkinnedMeshRenderer CreateRenderer(string name, Cached cached)

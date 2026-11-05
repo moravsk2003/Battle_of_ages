@@ -46,7 +46,26 @@ namespace BattleOfAges.EditorTools
                 UnityEngine.Object.DestroyImmediate(temp);
             }
             SdfCreature.ClearCache();
+            WriteIndex();
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// Lists the baked meshes for a player build, which finds them by model key (its float rounding can change the
+        /// signature). Bake and every build write it.
+        /// </summary>
+        public static void WriteIndex()
+        {
+            string folder = "Assets/Resources/" + SdfCreature.BakedFolder;
+            if (!Directory.Exists(folder)) return;
+            var names = new System.Collections.Generic.List<string>();
+            foreach (string file in Directory.GetFiles(folder, "Sculpted_*.asset")) names.Add(Path.GetFileNameWithoutExtension(file));
+            names.Sort(StringComparer.Ordinal);
+            string path = $"{folder}/{SdfCreature.BakedIndex}.txt";
+            string text = string.Join("\n", names) + "\n";
+            if (File.Exists(path) && File.ReadAllText(path) == text) return;
+            File.WriteAllText(path, text);
+            AssetDatabase.ImportAsset(path);
         }
 
         private static void Save(Mesh mesh, string folder)
