@@ -241,6 +241,10 @@ namespace BattleOfAges.Utils
             }
         }
 
+        /// <summary>Hidden by its owner (a worker inside a mine): neither body is drawn. Not the same as its renderer being off,
+        /// which it also is far off (drawn on the GPU) or as a speck on the screen.</summary>
+        public bool Hidden => hidden;
+
         /// <summary>Hidden by its owner (a worker inside a mine): neither body is drawn.</summary>
         public void SetHidden(bool value)
         {

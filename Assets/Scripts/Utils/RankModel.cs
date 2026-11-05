@@ -56,9 +56,12 @@ namespace BattleOfAges.Utils
             fresh.transform.localRotation = old.localRotation;
             fresh.transform.localScale = old.localScale;
 
-            // Hidden (in a mine or a building) stays hidden
+            // Hidden (in a mine or a building) stays hidden. By its owner's word, not by a renderer that is off: the body is off
+            // too while it is drawn on the GPU far away or is a speck, and a unit promoted then stayed unseen for good (a tester
+            // was hit by one, seen only on the minimap)
+            GpuSkinnedCharacter was = old.GetComponentInChildren<GpuSkinnedCharacter>(true);
             Renderer shown = old.GetComponentInChildren<Renderer>(true);
-            bool hidden = shown != null && !shown.enabled;
+            bool hidden = was != null ? was.Hidden : shown != null && !shown.enabled;
             old.gameObject.SetActive(false);
             old.SetParent(null, false); // out of the unit now: the gear below must find the new body, not this one before the frame ends
             if (Application.isPlaying) Destroy(old.gameObject); else DestroyImmediate(old.gameObject);

@@ -60,10 +60,23 @@ namespace BattleOfAges.PlayModeTests
         {
             Make(HumanoidModelBuilder.HumanType.Villager);
             yield return null;
-            foreach (Renderer r in unit.GetComponentsInChildren<Renderer>(true)) r.enabled = false; // in a mine
+            foreach (Renderer r in unit.GetComponentsInChildren<Renderer>(true)) r.enabled = false; // in a mine, as a worker hides
+            unit.GetComponentInChildren<GpuSkinnedCharacter>(true).SetHidden(true);
             unit.GetComponent<UnitProgress>().Promote();
             yield return null;
             foreach (Renderer r in unit.GetComponentsInChildren<Renderer>(true)) Assert.IsFalse(r.enabled, "seen through the mine's roof");
+            Assert.IsTrue(unit.GetComponentInChildren<GpuSkinnedCharacter>(true).Hidden);
+            Object.Destroy(unit);
+            yield return null;
+
+            // Far off its body is off too (drawn on the GPU, or a speck): promoted then, it still shows when one comes near
+            Make(HumanoidModelBuilder.HumanType.Villager);
+            yield return null;
+            foreach (Renderer r in unit.GetComponentsInChildren<Renderer>(true)) if (r is SkinnedMeshRenderer) r.enabled = false;
+            unit.GetComponent<UnitProgress>().Promote();
+            yield return null;
+            // (its body itself may be off again by now: far from another test's camera, or a speck)
+            Assert.IsFalse(unit.GetComponentInChildren<GpuSkinnedCharacter>(true).Hidden, "not hidden: unseen, it hit a tester");
             Object.Destroy(unit);
             yield return null;
 
