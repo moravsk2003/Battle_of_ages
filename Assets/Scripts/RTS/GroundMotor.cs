@@ -55,18 +55,12 @@ namespace BattleOfAges.RTS
             step = AI.KingdomTown.Constrain(p, step, radius);
             step = World.Lakes.Constrain(p, step, radius); // nobody swims: along the shore instead
             step = World.SolidProps.Constrain(p, step, radius); // nobody walks into a tree or a rock: along its edge instead
+            // Not through a building: along its wall, round it when headed straight at it (along the world's axes only, one
+            // walking straight at a wall stood there for good)
+            step = Building.Footprints.Constrain(p, step, radius);
             if (step.sqrMagnitude < 1e-10f) return Vector3.zero;
             v = step / dt;
             Vector3 np = p + step;
-            // Not through a building: along the wall, or it stays
-            if (Building.Footprints.Inside(np, radius, out _))
-            {
-                Vector3 alongX = new Vector3(p.x + step.x, p.y, p.z), alongZ = new Vector3(p.x, p.y, p.z + step.z);
-                if (!Building.Footprints.Inside(alongX, radius, out _)) np = alongX;
-                else if (!Building.Footprints.Inside(alongZ, radius, out _)) np = alongZ;
-                else return Vector3.zero;
-                v = (np - p) / dt;
-            }
             float ground = RtsUnit.GetTerrainHeight(np);
             float run = v.magnitude * dt;
             if (ground - p.y > run * MaxClimb + 0.05f)

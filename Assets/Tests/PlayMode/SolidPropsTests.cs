@@ -30,9 +30,11 @@ namespace BattleOfAges.PlayModeTests
             {
                 if (go == null) continue;
                 SolidProps.Remove(go);
+                go.SetActive(false); // a mine leaves the footprints now, not at the frame's end
                 Object.Destroy(go);
             }
             spawned.Clear();
+            Footprints.Refresh();
             Time.timeScale = 1f;
         }
 
@@ -100,6 +102,46 @@ namespace BattleOfAges.PlayModeTests
                 at += SolidProps.Constrain(at, toGoal.normalized * 0.05f, 0.5f);
             }
             Assert.Less((at - (Far + new Vector3(-9f, 0f, 0f))).magnitude, 0.2f, "round the rock and on to where it was going");
+        }
+
+        /// <summary>
+        /// A tester's knight stood pressed into a mine's rock: the old square was narrower than the hill, and one walking
+        /// straight at a wall (along the world's axes only) stood there for good. From every side, turned or not, round it.
+        /// </summary>
+        [Test]
+        public void OneWalkingAtAMine_GoesRoundItsRock_FromEverySide()
+        {
+            GameObject mine = MineNode.CreateMinePrefab("Solid_Mine");
+            spawned.Add(mine);
+            const float radius = 0.4f;
+            foreach (float yaw in new[] { 0f, 37f, 90f })
+            {
+                mine.transform.SetPositionAndRotation(Far, Quaternion.Euler(0f, yaw, 0f));
+                Footprints.Refresh();
+                Assert.IsTrue(Footprints.Inside(mine.transform.TransformPoint(new Vector3(2.25f, 0f, -0.6f)), 0.05f, out _), "the hill's side is inside");
+                Assert.IsTrue(Footprints.Inside(mine.transform.TransformPoint(new Vector3(0f, 0f, -2.45f)), 0.05f, out _), "and its back");
+                Assert.IsFalse(Footprints.Inside(mine.GetComponent<MineNode>().GetOutputDepositPosition(), radius, out _), "ore is left where one can stand");
+                var body = new GameObject("Walker");
+                spawned.Add(body);
+                foreach (float angle in new[] { 0f, 0.5f, 1.5708f, 2.3f, 3.1416f, 4.0f, 4.7124f, 5.6f })
+                {
+                    Vector3 dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                    Vector3 at = Far + dir * 7f, goal = Far - dir * 7f + new Vector3(0f, 0f, 0.01f);
+                    at.y = RtsUnit.GetTerrainHeight(at);
+                    body.transform.position = at;
+                    for (int i = 0; i < 3000; i++)
+                    {
+                        Vector3 way = goal - body.transform.position;
+                        way.y = 0f;
+                        if (way.magnitude < 0.3f) break;
+                        GroundMotor.Move(body.transform, -1, way.normalized * 4.5f, radius, 0.02f);
+                        Assert.IsFalse(Footprints.Inside(body.transform.position, radius * 0.9f, out _), $"yaw {yaw}, from {angle} rad: into the rock at {body.transform.position - Far}");
+                    }
+                    Vector3 left = goal - body.transform.position;
+                    left.y = 0f;
+                    Assert.Less(left.magnitude, 0.5f, $"yaw {yaw}, from {angle} rad: it stood at {body.transform.position - Far}");
+                }
+            }
         }
 
         [Test]

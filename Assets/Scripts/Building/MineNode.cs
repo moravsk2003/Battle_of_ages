@@ -269,6 +269,12 @@ namespace BattleOfAges.Building
         /// <summary>
         /// Creates procedural 3D Ore Mine prefab (cave entrance, timber beams, mine cart, ore mound).
         /// </summary>
+        /// <summary>
+        /// The rock hill's foot (MineBuilder): ±2.35 m across, from 2.55 m behind to the adit's face 1.3 m in front. Its collider
+        /// and the footprint units walk round (Footprints) are both this; the old 4 m square was narrower than the rock.
+        /// </summary>
+        public const float HillHalfX = 2.35f, HillHalfZ = 1.925f, HillCenterZ = -0.625f;
+
         public static GameObject CreateMinePrefab(string name = "Mine")
         {
             GameObject root = new GameObject(name);
@@ -284,8 +290,8 @@ namespace BattleOfAges.Building
             MineBuilder.Attach(root.transform);
 
             BoxCollider col = root.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, 1.3f, -0.45f); // the hill; the track and the cart in front stay walkable
-            col.size = new Vector3(4.2f, 2.8f, 3.5f);
+            col.center = new Vector3(0f, 1.3f, HillCenterZ); // the hill; the track and the cart in front stay walkable
+            col.size = new Vector3(HillHalfX * 2f, 2.8f, HillHalfZ * 2f);
 
             // Clean child colliders
             foreach (var childCol in root.GetComponentsInChildren<Collider>())
