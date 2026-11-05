@@ -16,7 +16,8 @@ namespace BattleOfAges.PlayModeTests
     /// <summary>
     /// Review tool for the characters' clips (not a regular test): measures every clip of every role and shoots each as
     /// a sheet of 8 frames from the side and 8 from the front, so motion can be judged without watching it.
-    /// CAPTURE_ROLES = "Villager,KnightGuard" (HumanType names), CAPTURE_DIR = output folder, CAPTURE_NO_SHOTS = 1 only measures.
+    /// CAPTURE_ROLES = "Villager,KnightGuard" (HumanType names), CAPTURE_DIR = output folder, CAPTURE_NO_SHOTS = 1 only measures,
+    /// CAPTURE_SWORD = 1 arms them (a bare model has no weapon: units get theirs from Equipment).
     /// report.txt holds, per clip: the seam of a loop, the fastest joint and its jump over the joint's usual pace, how far
     /// the body sinks or floats, the speed the feet push the ground at against the speed the game plays it for, how far
     /// a foot slides sideways, the knees, the hands against the body, the head against the hips.
@@ -70,6 +71,7 @@ namespace BattleOfAges.PlayModeTests
                 if (!Enum.TryParse(roleName.Trim(), out HumanoidModelBuilder.HumanType role)) continue;
                 GameObject model = HumanoidModelBuilder.CreateHumanoidModel(role, "Review_" + role);
                 model.transform.SetPositionAndRotation(at, facing);
+                if (Environment.GetEnvironmentVariable("CAPTURE_SWORD") == "1") model.AddComponent<Crafting.Equipment>().Equip(new Crafting.Item(Crafting.ItemType.Sword, 4));
                 yield return null;
                 yield return null;
 
