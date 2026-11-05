@@ -15,7 +15,6 @@ namespace BattleOfAges.Utils
     /// </summary>
     public static class KnightModelBuilder
     {
-        private const string Key = "Knight";
         private const float NearCell = 0.013f, FarCell = 0.04f, NearScreenHeight = 0.25f, CullScreenHeight = 0.006f;
 
         private static readonly Color Surcoat = new Color(0.55f, 0.09f, 0.08f);
@@ -29,6 +28,26 @@ namespace BattleOfAges.Utils
         private static readonly Color Iron = new Color(0.33f, 0.33f, 0.35f);
         private static readonly Color ShieldField = new Color(0.60f, 0.10f, 0.09f);
         private static readonly Color Slit = new Color(0.03f, 0.03f, 0.035f);
+
+        /// <summary>What sets one armoured rank apart: the surcoat and shield colours, the trim, and the general's cape, crown and plume.</summary>
+        public sealed class Style
+        {
+            public string Key;
+            public Color Surcoat, Trim, Field;
+            public Color Cape, Plume; // clear: none
+            public bool Crown;
+        }
+
+        public static readonly Style KnightStyle = new Style { Key = "Knight", Surcoat = Surcoat, Trim = Gold, Field = ShieldField };
+
+        /// <summary>The general (§11.1): the knight's plate under a royal purple surcoat (his rank's colour on the map), a crimson cape, a gold crown round the helm and a crest of plumes, white at the root and red at the tips.</summary>
+        public static readonly Style GeneralStyle = new Style
+        {
+            Key = "General", Surcoat = new Color(0.30f, 0.09f, 0.40f), Trim = Gold, Field = new Color(0.33f, 0.10f, 0.45f),
+            Cape = new Color(0.46f, 0.06f, 0.07f), Plume = new Color(0.93f, 0.92f, 0.88f), Crown = true
+        };
+
+        private static Style style = KnightStyle; // the one being built (Paint reads it)
 
         // Surface = (CharacterSurface pattern, metallic, smoothness)
         private static readonly Vector3 ClothS = new Vector3(1f, 0f, 0.18f);
@@ -54,8 +73,10 @@ namespace BattleOfAges.Utils
         }
 
         /// <summary>Replaces the imported body of a freshly built (rest pose) knight rig; false if bones are missing.</summary>
-        public static bool Build(GameObject root, Transform model)
+        public static bool Build(GameObject root, Transform model, Style look = null)
         {
+            style = look ?? KnightStyle;
+            string Key = style.Key;
             var timer = System.Diagnostics.Stopwatch.StartNew();
             var sdf = new SdfCreature(root.transform)
             {
@@ -72,7 +93,7 @@ namespace BattleOfAges.Utils
                 Hands(sdf, rig);
                 Plate(sdf, rig);
                 skins = sdf.ApplyWithLod(Key, NearCell, FarCell, NearScreenHeight, CullScreenHeight, oneRenderer: true);
-                Debug.Log($"[Knight] declared and built in {timer.ElapsedMilliseconds} ms");
+                Debug.Log($"[{Key}] declared and built in {timer.ElapsedMilliseconds} ms");
             }
 
             // The imported body goes; the new skins live under the Animator so its culling sees them.
@@ -144,14 +165,14 @@ namespace BattleOfAges.Utils
 
             // ---- surcoat over the torso: chest, waist, hips; split skirt cut flat at the hem (paintable = cross)
             sdf.SurfaceBrush = ClothS;
-            sdf.Ellipsoid(r.Torso, new Vector3(0f, 1.065f, back + 0.005f), new Vector3(0.195f, 0.185f, 0.134f), Vector3.zero, Surcoat, 0.04f);
-            sdf.Ellipsoid(r.Abdomen, new Vector3(0f, 0.875f, back + 0.003f), new Vector3(0.182f, 0.16f, 0.124f), Vector3.zero, Surcoat, 0.04f);
-            sdf.Ellipsoid(r.Hips, new Vector3(0f, 0.70f, back), new Vector3(0.212f, 0.12f, 0.134f), Vector3.zero, Surcoat, 0.035f);
+            sdf.Ellipsoid(r.Torso, new Vector3(0f, 1.065f, back + 0.005f), new Vector3(0.195f, 0.185f, 0.134f), Vector3.zero, style.Surcoat, 0.04f);
+            sdf.Ellipsoid(r.Abdomen, new Vector3(0f, 0.875f, back + 0.003f), new Vector3(0.182f, 0.16f, 0.124f), Vector3.zero, style.Surcoat, 0.04f);
+            sdf.Ellipsoid(r.Hips, new Vector3(0f, 0.70f, back), new Vector3(0.212f, 0.12f, 0.134f), Vector3.zero, style.Surcoat, 0.035f);
             sdf.ClipBelow = 0.335f;
             for (int s = 0; s < 2; s++)
             {
                 float x = s == 0 ? -1f : 1f;
-                sdf.Cone(r.UpperLeg[s], new Vector3(x * 0.085f, 0.64f, back), new Vector3(x * 0.125f, 0.30f, back + 0.005f), 0.152f, 0.18f, Surcoat, 0.03f, new Vector3(1f, 1f, 0.8f));
+                sdf.Cone(r.UpperLeg[s], new Vector3(x * 0.085f, 0.64f, back), new Vector3(x * 0.125f, 0.30f, back + 0.005f), 0.152f, 0.18f, style.Surcoat, 0.03f, new Vector3(1f, 1f, 0.8f));
             }
             sdf.ClipBelow = null;
 
@@ -221,8 +242,8 @@ namespace BattleOfAges.Utils
                 float faces = Mathf.Max(Mathf.InverseLerp(0.0f, 0.05f, p.z), Mathf.InverseLerp(-0.07f, -0.12f, p.z));
                 float upright = Band(p.x, 0.04f) * Mathf.Clamp01((1.19f - p.y) / 0.004f) * Mathf.Clamp01((p.y - 0.40f) / 0.004f);
                 float arm = Band(p.y - 1.0f, 0.04f) * Band(p.x, 0.15f);
-                c = Color.Lerp(c, Gold, Mathf.Max(upright, arm) * faces);
-                c = Color.Lerp(c, Gold, Mathf.Clamp01((0.365f - p.y) / 0.004f) * Mathf.Clamp01((p.y - 0.343f) / 0.004f + 1f) * (n.y > -0.5f ? 1f : 0f));
+                c = Color.Lerp(c, style.Trim, Mathf.Max(upright, arm) * faces);
+                c = Color.Lerp(c, style.Trim, Mathf.Clamp01((0.365f - p.y) / 0.004f) * Mathf.Clamp01((p.y - 0.343f) / 0.004f + 1f) * (n.y > -0.5f ? 1f : 0f));
                 if (p.y < 0.64f)
                 {
                     float around = Mathf.Atan2(p.z + 0.02f, p.x);
@@ -253,6 +274,41 @@ namespace BattleOfAges.Utils
             sdf.RigidMesh(r.Palm[1], Sword(r.SwordFrame, true), Sword(r.SwordFrame, false));
             sdf.RigidMesh(r.LowerArm[0], Shield(r.ShieldFrame, true), Shield(r.ShieldFrame, false));
             sdf.RigidMesh(r.Hips, Buckle(new Vector3(0f, 0.757f, 0.113f)), null);
+            if (style.Cape.a > 0f) sdf.RigidMesh(r.Torso, Cape(true), Cape(false));
+        }
+
+        /// <summary>
+        /// A cape from under the mail tippet down the back to mid-thigh, flaring and falling in folds, clasped with gold at
+        /// the shoulders; rigid on the torso (short enough for the legs not to swing through it). Lined darker inside.
+        /// </summary>
+        private static MeshKit Cape(bool near)
+        {
+            var kit = new MeshKit();
+            int rows = near ? 14 : 4, cols = near ? 24 : 6;
+            const float Top = 1.27f, Bottom = 0.56f, T = 0.008f;
+            var outer = new Vector3[rows + 1, cols + 1];
+            var inner = new Vector3[rows + 1, cols + 1];
+            for (int i = 0; i <= rows; i++)
+            {
+                float t = i / (float)rows, y = Mathf.Lerp(Top, Bottom, t);
+                float half = Mathf.Lerp(0.2f, 0.31f, t), depth = Mathf.Lerp(0.07f, 0.13f, t), centre = Mathf.Lerp(-0.105f, -0.16f, t);
+                for (int j = 0; j <= cols; j++)
+                {
+                    float a = Mathf.Lerp(-1.25f, 1.25f, j / (float)cols);
+                    float fold = 1f + (near ? 0.05f * t * Mathf.Sin(a * 7f + 0.6f) : 0f);
+                    Vector3 p = new Vector3(Mathf.Sin(a) * half * fold, y, centre - Mathf.Cos(a) * depth * fold);
+                    Vector3 n = new Vector3(Mathf.Sin(a) * depth, 0f, -Mathf.Cos(a) * half).normalized;
+                    outer[i, j] = p + n * T;
+                    inner[i, j] = p - n * T;
+                }
+            }
+            Color cape = style.Cape, lining = style.Cape * 0.45f;
+            kit.Grid(outer, false, ClothS, (i, j) => cape * (0.92f + 0.12f * SdfCreature.Noise(outer[i, j] * 14f)) * (i == rows ? 0.8f : 1f), Vector3.back);
+            kit.Grid(inner, false, ClothS, (i, j) => lining, Vector3.forward);
+            if (near)
+                foreach (float x in new[] { -1f, 1f })
+                    kit.Dome(new Vector3(x * 0.17f, Top + 0.01f, -0.05f), new Vector3(x * 0.3f, 0.4f, 1f).normalized, 0.022f, style.Trim, BrassS);
+            return kit;
         }
 
         /// <summary>
@@ -307,7 +363,11 @@ namespace BattleOfAges.Utils
             // Dark cap inside the open bottom
             kit.Lathe(Matrix4x4.TRS(o + Vector3.up * 0.012f, Quaternion.identity, new Vector3(Rx * 0.97f, 1f, Rz * 0.97f)), new[] { V2(0f, 0f), V2(1f, 0f) }, near ? 24 : 8, DarkS, (i, a) => Slit);
 
-            if (!near) return kit;
+            if (!near)
+            {
+                if (style.Plume.a > 0f) Plume(kit, o + Vector3.up * (H - 0.01f), false);
+                return kit;
+            }
 
             Vector3 Surface(float a, float h, float lift)
             {
@@ -316,7 +376,16 @@ namespace BattleOfAges.Utils
             }
             // Brass upright down the keel (between the slits) and the brow band above them, rolled lower edge
             Strip(kit, h => Surface(-0.075f, h, 0.003f), h => Surface(0.075f, h, 0.003f), 0.02f, slitHi + 0.045f, 14, BrassS, Brass, Vector3.forward);
-            Strip(kit, a => Surface(a, slitHi + 0.006f, 0.003f), a => Surface(a, slitHi + 0.034f, 0.003f), -Mathf.PI, Mathf.PI, 72, BrassS, Brass, null);
+            Strip(kit, a => Surface(a, slitHi + 0.006f, 0.003f), a => Surface(a, slitHi + 0.034f, style.Crown ? 0.006f : 0.003f), -Mathf.PI, Mathf.PI, 72, BrassS, style.Crown ? style.Trim : Brass, null);
+            if (style.Crown)
+                for (int k = 0; k < 10; k++)
+                {
+                    // The crown's points stand on the brow band
+                    float a = -Mathf.PI + 2f * Mathf.PI * k / 10f;
+                    Vector3 p = Surface(a, slitHi + 0.05f, 0.007f), outward = (p - new Vector3(o.x, p.y, o.z)).normalized;
+                    kit.Box(Matrix4x4.TRS(p, Quaternion.LookRotation(outward, Vector3.up), Vector3.one), new Vector3(0.026f, 0.036f, 0.007f), 0.003f, BrassS, _ => style.Trim);
+                    kit.Dome(p + Vector3.up * 0.02f + outward * 0.004f, outward, 0.006f, k % 2 == 0 ? new Color(0.7f, 0.08f, 0.1f) : new Color(0.1f, 0.25f, 0.6f), BrassS);
+                }
             var lip = new Vector3[5, 64];
             for (int j = 0; j < 64; j++)
             {
@@ -342,10 +411,29 @@ namespace BattleOfAges.Utils
                     Vector3 p = Surface(a0 + d.x, 0.13f + d.y, -0.0005f);
                     kit.Dome(p, (p - new Vector3(o.x, p.y, o.z)).normalized, 0.0042f, Slit, DarkS);
                 }
+            if (style.Plume.a > 0f) Plume(kit, o + Vector3.up * (H - 0.01f), true);
             // Brass finial on the point
             kit.Lathe(Matrix4x4.TRS(o + Vector3.up * (H - 0.006f), Quaternion.identity, Vector3.one),
                       new[] { V2(0f, 0f), V2(0.012f, 0.002f), V2(0.01f, 0.012f), V2(0.006f, 0.02f), V2(0f, 0.023f) }, 16, BrassS, (i, a) => Brass);
             return kit;
+        }
+
+        /// <summary>A plume of feathers rising from the helm's point and sweeping back (the general seen from afar).</summary>
+        private static void Plume(MeshKit kit, Vector3 basePoint, bool near)
+        {
+            int n = near ? 15 : 5;
+            Color tip = new Color(0.62f, 0.06f, 0.08f);
+            for (int k = 0; k < n; k++)
+            {
+                float t = n == 1 ? 0f : k / (float)(n - 1);
+                float back = Mathf.Lerp(5f, 100f, t), side = (k % 3 - 1) * (near ? 9f : 0f);
+                Vector3 dir = Quaternion.Euler(-back, side, 0f) * Vector3.up; // up, then over towards the back
+                dir = new Vector3(dir.x, dir.y, -Mathf.Abs(dir.z));
+                float len = Mathf.Lerp(0.26f, 0.36f, Mathf.Sin(t * Mathf.PI));
+                Matrix4x4 m = Matrix4x4.TRS(basePoint + dir * (len * 0.5f), Quaternion.LookRotation(dir, Vector3.Cross(dir, Vector3.right)), Vector3.one);
+                // Broad feathers, white with red tips: a crest seen from the map
+                kit.Box(m, new Vector3(0.012f, near ? 0.075f : 0.1f, len), 0.004f, ClothS, p => Color.Lerp(style.Plume, tip, Mathf.Clamp01((p - basePoint).magnitude / len * 1.6f - 0.9f)));
+            }
         }
 
         /// <summary>Laminated shoulder cap over the top and outside of the shoulder (three lames and a rolled rim).</summary>
@@ -576,7 +664,7 @@ namespace BattleOfAges.Utils
                 bool rim = near && (v < Rim + 5e-6f || half - Mathf.Abs(uu) < Rim + 5e-6f || v > Hgt - 0.02f);
                 if (rim) return Iron * (0.95f + 0.1f * SdfCreature.Noise(new Vector3(uu, v, 0f) * 60f));
                 bool cross = Mathf.Abs(uu) < CrossHalf + 5e-6f || Mathf.Abs(v - Hgt * 0.36f) < CrossHalf + 5e-6f;
-                Color c = cross ? Gold : ShieldField;
+                Color c = cross ? style.Trim : style.Field;
                 return c * (0.9f + 0.14f * SdfCreature.Noise(new Vector3(uu, v, 0f) * 25f));
             }
 

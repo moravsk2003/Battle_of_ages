@@ -22,6 +22,7 @@ namespace BattleOfAges.EditorTools
             ("Deer", n => AnimalModelBuilder.CreateAnimalPrefab(AnimalType.Deer, n)),
             ("Rabbit", n => AnimalModelBuilder.CreateAnimalPrefab(AnimalType.Rabbit, n)),
             ("Knight", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.KnightGuard, n)),
+            ("General", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.General, n)),
         };
 
         [MenuItem("Battle of Ages/Bake Creature Meshes")]

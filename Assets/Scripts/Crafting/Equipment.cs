@@ -304,6 +304,9 @@ namespace BattleOfAges.Crafting
                     return new[] { I(ItemType.Sword, 1), I(ItemType.Armor, 1) };
                 case HumanoidModelBuilder.HumanType.Goblin:
                     return new[] { I(ItemType.Axe, 1) };
+                case HumanoidModelBuilder.HumanType.Soldier:
+                    return new[] { I(ItemType.Sword, 1), I(ItemType.Armor, 1) };
+                case HumanoidModelBuilder.HumanType.General:
                 case HumanoidModelBuilder.HumanType.Warlord:
                     return new[] { I(ItemType.Sword, 3), I(ItemType.Shield, 2), I(ItemType.Helmet, 2), I(ItemType.Armor, 2), I(ItemType.Boots, 1) };
                 default: // Villager

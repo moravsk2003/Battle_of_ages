@@ -6,6 +6,27 @@ namespace BattleOfAges.Combat
     /// <summary>The four unit ranks (docs/GAME_DESIGN.md §11.1); every unit both fights and works, the rank is only stats.</summary>
     public enum UnitRank { Person, Warrior, Knight, General }
 
+    /// <summary>The model a unit of each rank wears (one place: kingdoms, other players' units, the review shots).</summary>
+    public static class RankLooks
+    {
+        public static Utils.HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
+        {
+            UnitRank.Person => Utils.HumanoidModelBuilder.HumanType.Villager,
+            UnitRank.Warrior => Utils.HumanoidModelBuilder.HumanType.Soldier, // a kingdom's man in his gambeson, not one of the bandits
+            UnitRank.Knight => Utils.HumanoidModelBuilder.HumanType.KnightGuard,
+            _ => Utils.HumanoidModelBuilder.HumanType.General
+        };
+
+        /// <summary>The rank a model stands for (a unit built with it starts there).</summary>
+        public static UnitRank RankOf(Utils.HumanoidModelBuilder.HumanType type) => type switch
+        {
+            Utils.HumanoidModelBuilder.HumanType.Soldier => UnitRank.Warrior,
+            Utils.HumanoidModelBuilder.HumanType.KnightGuard => UnitRank.Knight,
+            Utils.HumanoidModelBuilder.HumanType.General => UnitRank.General,
+            _ => UnitRank.Person
+        };
+    }
+
     public static class UnitRanks
     {
         public static int Health(UnitRank rank, bool hero = false) => Scaled(GameBalance.RankHealth[(int)rank], hero);

@@ -457,13 +457,7 @@ namespace BattleOfAges.Net
             model.transform.SetParent(go.transform, false);
         }
 
-        private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
-        {
-            UnitRank.Person => HumanoidModelBuilder.HumanType.Villager,
-            UnitRank.Warrior => HumanoidModelBuilder.HumanType.Villager,
-            UnitRank.Knight => HumanoidModelBuilder.HumanType.KnightGuard,
-            _ => HumanoidModelBuilder.HumanType.Warlord
-        };
+        private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => RankLooks.ModelFor(rank);
 
         /// <summary>All of a player who has left.</summary>
         public void ForgetOwner(int who)

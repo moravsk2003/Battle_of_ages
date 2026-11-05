@@ -125,13 +125,7 @@ namespace BattleOfAges.AI
 
         private int warriorsMade;
 
-        private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => rank switch
-        {
-            UnitRank.Person => HumanoidModelBuilder.HumanType.Villager,
-            UnitRank.Warrior => HumanoidModelBuilder.HumanType.Villager, // a kingdom's man in its armour, not one of the bandits
-            UnitRank.Knight => HumanoidModelBuilder.HumanType.KnightGuard,
-            _ => HumanoidModelBuilder.HumanType.Warlord
-        };
+        private static HumanoidModelBuilder.HumanType ModelFor(UnitRank rank) => RankLooks.ModelFor(rank);
 
         /// <summary>A new unit of the kingdom at this place.</summary>
         public HostileMobAI AddSubject(UnitRank rank, Vector3 at, bool withModel = true)
@@ -153,6 +147,7 @@ namespace BattleOfAges.AI
             {
                 GameObject visual = HumanoidModelBuilder.CreateHumanoidModel(ModelFor(rank), "VisualModel");
                 visual.transform.SetParent(go.transform, false);
+                go.AddComponent<RankModel>(); // a promotion shows
             }
             UnitProgress p = go.GetComponent<UnitProgress>();
             if (p != null) p.Promoted += OnPromoted;

@@ -103,6 +103,7 @@ namespace BattleOfAges.RTS
                 // does; one stands by only when told to stand somewhere (RtsUnitCommander.MoveInFormation)
                 if (gatherer == null) gatherer = gameObject.AddComponent<NpcResourceGatherer>();
                 EnsureStartingKit();
+                if (GetComponent<Utils.RankModel>() == null) gameObject.AddComponent<Utils.RankModel>(); // a promotion shows
                 CentralEmpire.ApplyTo(gameObject); // the empire's units wear its gear and do not work
             }
         }
@@ -118,7 +119,7 @@ namespace BattleOfAges.RTS
                 : name.Contains("Knight") ? HumanoidModelBuilder.HumanType.KnightGuard : HumanoidModelBuilder.HumanType.Villager;
             if (GetComponent<Equipment>() == null) gameObject.AddComponent<Equipment>().LoadSlots(StartingKits.For(type));
             if (GetComponent<UnitProgress>() != null) return;
-            UnitProgress.Setup(gameObject, type == HumanoidModelBuilder.HumanType.KnightGuard ? UnitRank.Knight : UnitRank.Person);
+            UnitProgress.Setup(gameObject, RankLooks.RankOf(type));
             if (health != null) health.InitializeHealth(health.MaxHealth);
         }
 

@@ -15,7 +15,11 @@ namespace BattleOfAges.Utils
             Villager,
             Bandit,
             Goblin,
-            Warlord
+            Warlord,
+            /// <summary>The general rank (§11.1): the knight's sculpted plate in the general's colours, cape, crown and plume.</summary>
+            General,
+            /// <summary>The warrior rank on the villager rig: a padded gambeson instead of the peasant's shirt.</summary>
+            Soldier
         }
 
         public static GameObject CreateHumanoidModel(HumanType type, string name = "HumanoidModel")
@@ -23,8 +27,8 @@ namespace BattleOfAges.Utils
             // Prefer the rigged, animated FBX characters; fall back to the procedural primitive build.
             GameObject rigged = RiggedCharacterBuilder.TryCreate(type, name);
             if (rigged != null) return rigged;
-            if (type == HumanType.Bandit || type == HumanType.Goblin) type = HumanType.Villager;
-            else if (type == HumanType.Warlord) type = HumanType.KnightGuard;
+            if (type == HumanType.Bandit || type == HumanType.Goblin || type == HumanType.Soldier) type = HumanType.Villager;
+            else if (type == HumanType.Warlord || type == HumanType.General) type = HumanType.KnightGuard;
 
             GameObject root = new GameObject(name);
 

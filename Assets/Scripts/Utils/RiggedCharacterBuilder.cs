@@ -51,7 +51,8 @@ namespace BattleOfAges.Utils
             root.AddComponent<GpuSkinnedCharacter>(); // drawn on the GPU when small on screen (if its body allows it)
 
             // The knight guard has its own sculpted body and gear on this skeleton
-            if (type == HumanoidModelBuilder.HumanType.KnightGuard && KnightModelBuilder.Build(root, model.transform))
+            bool sculpted = type == HumanoidModelBuilder.HumanType.KnightGuard || type == HumanoidModelBuilder.HumanType.General;
+            if (sculpted && KnightModelBuilder.Build(root, model.transform, type == HumanoidModelBuilder.HumanType.General ? KnightModelBuilder.GeneralStyle : KnightModelBuilder.KnightStyle))
             {
                 // The Animator bound the imported body when it got its controller; with the sculpted skin unknown to
                 // it, CullUpdateTransforms saw nothing visible and never moved the bones (knights spawned in play
@@ -103,7 +104,8 @@ namespace BattleOfAges.Utils
         public static bool IsKnight(HumanoidModelBuilder.HumanType type) =>
             type == HumanoidModelBuilder.HumanType.HeroPlayer ||
             type == HumanoidModelBuilder.HumanType.KnightGuard ||
-            type == HumanoidModelBuilder.HumanType.Warlord;
+            type == HumanoidModelBuilder.HumanType.Warlord ||
+            type == HumanoidModelBuilder.HumanType.General;
 
         /// <summary>Scales the rig so the top of the head is at HeadTopHeight and moves the lowest bone to y = 0.</summary>
         public static void FitToHeight(Transform root, Transform model)
@@ -142,6 +144,8 @@ namespace BattleOfAges.Utils
                     return new Look { Primary = new Color(0.20f, 0.18f, 0.18f), Secondary = new Color(0.10f, 0.08f, 0.07f), Skin = new Color(0.75f, 0.58f, 0.46f), Metal = 0.7f };
                 case HumanoidModelBuilder.HumanType.Bandit:
                     return new Look { Primary = new Color(0.42f, 0.13f, 0.10f), Secondary = new Color(0.17f, 0.15f, 0.13f), Skin = new Color(0.80f, 0.60f, 0.46f), Hair = new Color(0.10f, 0.08f, 0.07f) };
+                case HumanoidModelBuilder.HumanType.Soldier: // padded linen gambeson, dark hose
+                    return new Look { Primary = new Color(0.64f, 0.56f, 0.40f), Secondary = new Color(0.24f, 0.18f, 0.13f), Skin = new Color(0.88f, 0.68f, 0.53f), Hair = new Color(0.22f, 0.15f, 0.10f) };
                 case HumanoidModelBuilder.HumanType.Goblin:
                     return new Look { Primary = new Color(0.33f, 0.24f, 0.15f), Secondary = new Color(0.24f, 0.19f, 0.13f), Skin = new Color(0.42f, 0.58f, 0.26f), Hair = new Color(0.15f, 0.22f, 0.10f) };
                 default: // Villager
@@ -376,6 +380,20 @@ namespace BattleOfAges.Utils
                         Part(PrimitiveType.Sphere, "Mantle", t, Vector3.zero, new Vector3(shoulders * 1.25f, 0.2f, 0.42f), fur);
                         Part(PrimitiveType.Sphere, "Collar", t, new Vector3(0f, 0.06f, -0.06f), new Vector3(shoulders * 0.7f, 0.2f, 0.3f), fur);
                     });
+                    break;
+                }
+                case HumanoidModelBuilder.HumanType.Soldier:
+                {
+                    // The gambeson's padded skirt front and back below the belt, and the belt itself
+                    Material padded = Cloth(new Color(0.58f, 0.50f, 0.36f));
+                    Material belt = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Leather, new Color(0.22f, 0.14f, 0.08f), 0f, 0.3f);
+                    Piece("GambesonSkirt", hips, axis + up * (waist - 0.14f), t =>
+                    {
+                        Part(PrimitiveType.Cube, "Front", t, fwd * 0.115f, new Vector3(shoulders * 0.56f, 0.26f, 0.035f), padded);
+                        Part(PrimitiveType.Cube, "Back", t, -fwd * 0.115f, new Vector3(shoulders * 0.56f, 0.26f, 0.035f), padded);
+                    });
+                    Piece("Belt", hips, axis + up * (waist + 0.01f), t =>
+                        Part(PrimitiveType.Cube, "Strap", t, Vector3.zero, new Vector3(shoulders * 0.6f, 0.05f, 0.255f), belt));
                     break;
                 }
                 case HumanoidModelBuilder.HumanType.Bandit:
