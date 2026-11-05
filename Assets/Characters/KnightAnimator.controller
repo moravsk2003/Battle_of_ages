@@ -291,7 +291,7 @@ BlendTree:
   m_Name: Locomotion
   m_Childs:
   - serializedVersion: 2
-    m_Motion: {fileID: 8734705249530881500, guid: 44829da1b7d4b7745b15e3350e5bd03e, type: 3}
+    m_Motion: {fileID: 7400000, guid: 2ef301f5fce1e834a9e4380a46db6329, type: 2}
     m_Threshold: 0
     m_Position: {x: 0, y: 0}
     m_TimeScale: 1
@@ -299,7 +299,7 @@ BlendTree:
     m_DirectBlendParameter: Blend
     m_Mirror: 0
   - serializedVersion: 2
-    m_Motion: {fileID: 924515358712686081, guid: 44829da1b7d4b7745b15e3350e5bd03e, type: 3}
+    m_Motion: {fileID: 7400000, guid: 90ec67e160323b349b879406a005a7a9, type: 2}
     m_Threshold: 1.4
     m_Position: {x: 0, y: 0}
     m_TimeScale: 1
@@ -307,7 +307,7 @@ BlendTree:
     m_DirectBlendParameter: Blend
     m_Mirror: 0
   - serializedVersion: 2
-    m_Motion: {fileID: 7626545373317100532, guid: 44829da1b7d4b7745b15e3350e5bd03e, type: 3}
+    m_Motion: {fileID: 7400000, guid: 00a2763a6aecda2478c1f3ab45c387ab, type: 2}
     m_Threshold: 4.2
     m_Position: {x: 0, y: 0}
     m_TimeScale: 1
