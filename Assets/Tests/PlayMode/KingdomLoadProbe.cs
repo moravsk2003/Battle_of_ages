@@ -115,7 +115,7 @@ namespace BattleOfAges.PlayModeTests
                 {
                     // Where the time goes at the last step: every script type on the units (and the kingdoms) off for a while
                     var byType = new Dictionary<Type, List<Behaviour>>();
-                    void Add(Behaviour b) { if (b == null || !b.enabled || b is GpuSkinnedCharacter || b is CharacterGear || b is Animator) return; // (drawing: switching it off upsets the scene) if (!byType.TryGetValue(b.GetType(), out var l)) byType[b.GetType()] = l = new List<Behaviour>(); l.Add(b); }
+                    void Add(Behaviour b) { if (b == null || !b.enabled || b is GpuSkinnedCharacter || b is CharacterGear || b is Animator) return; /* drawing: switching it off upsets the scene */ if (!byType.TryGetValue(b.GetType(), out var l)) byType[b.GetType()] = l = new List<Behaviour>(); l.Add(b); }
                     foreach (HostileMobAI m in UnityEngine.Object.FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None))
                         foreach (Behaviour b in m.GetComponentsInChildren<Behaviour>()) if (b is MonoBehaviour || b is Animator) Add(b);
                     foreach (NpcKingdom k in NpcKingdom.All) if (k != null) Add(k);
