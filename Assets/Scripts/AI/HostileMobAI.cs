@@ -233,10 +233,10 @@ namespace BattleOfAges.AI
         /// <summary>On a ladder or the wall: moved by the climb, not by the motor.</summary>
         public bool IsClimbing => climbing;
 
-        protected override void ExecuteMovement()
+        protected override void ExecuteMovement(float dt)
         {
             if (climbing) return;
-            base.ExecuteMovement();
+            base.ExecuteMovement(dt);
         }
 
         /// <summary>

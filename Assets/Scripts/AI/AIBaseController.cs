@@ -43,6 +43,18 @@ namespace BattleOfAges.AI
         private float tickTimer = 0f;
         private float currentTickInterval = 0.066f; // ~15 Hz default
 
+        /// <summary>
+        /// Movement LOD: beyond mediumDistance from the viewer a unit moves every 2nd frame, beyond distantDistance every 4th,
+        /// by the time gone since (its step longer, the same pace). Movement was most of an NPC's cost (~9 us a frame, idle or
+        /// not): fifty grown kingdoms real ran at 13 FPS (KingdomLoadProbe).
+        /// </summary>
+        public const int MidMoveStride = 2, FarMoveStride = 4;
+        private float moveClock;
+        private int moveSlot;
+        private static int viewerFrame = -1;
+        private static Vector3 viewerCamera;
+        private static bool hasViewerCamera;
+
         protected Vector3 destination;
         protected bool hasDestination = false;
 
@@ -119,6 +131,7 @@ namespace BattleOfAges.AI
 
         protected virtual void Start()
         {
+            moveSlot = Mathf.Abs(GetInstanceID()) % FarMoveStride; // the far ones spread over the frames
             // Movement is kinematic (GroundMotor), so there is no CharacterController.Move that could snap back to a stale
             // physics position; the old per-unit Physics.SyncTransforms() made spawning 1000 units quadratic.
             FindPlayerViewer();
@@ -168,10 +181,9 @@ namespace BattleOfAges.AI
                 FindPlayerViewer();
             }
 
-            // Calculate distance to player/camera for AI Throttling LOD
-            float distToViewer = (playerViewer != null)
-                ? Vector3.Distance(transform.position, playerViewer.position)
-                : 10f;
+            // Distance to the viewer for the AI LOD: the hero, or the camera over the ground (on the map it looks down from
+            // ~100 m, anywhere: units under it are near)
+            float distToViewer = ViewerDistance();
 
             if (distToViewer < closeDistance)
             {
@@ -203,8 +215,34 @@ namespace BattleOfAges.AI
                 }
             }
 
-            // Smooth physical movement execution (every frame)
-            ExecuteMovement();
+            // Physical movement: every frame near the viewer, every 2nd or 4th frame further off (each unit on its own frame)
+            int stride = distToViewer < mediumDistance ? 1 : distToViewer < distantDistance ? MidMoveStride : FarMoveStride;
+            moveClock += Time.deltaTime;
+            if (stride == 1 || (Time.frameCount + moveSlot) % stride == 0)
+            {
+                float dt = Mathf.Min(moveClock, 0.25f);
+                moveClock = 0f;
+                ExecuteMovement(dt);
+            }
+        }
+
+        private float ViewerDistance()
+        {
+            if (viewerFrame != Time.frameCount)
+            {
+                viewerFrame = Time.frameCount;
+                Camera cam = Utils.ViewCamera.Current;
+                hasViewerCamera = cam != null;
+                if (hasViewerCamera) viewerCamera = cam.transform.position;
+            }
+            Vector3 p = transform.position;
+            float d = playerViewer != null ? Vector3.Distance(p, playerViewer.position) : 10f;
+            if (hasViewerCamera)
+            {
+                float dx = p.x - viewerCamera.x, dz = p.z - viewerCamera.z;
+                d = Mathf.Min(d, Mathf.Sqrt(dx * dx + dz * dz));
+            }
+            return d;
         }
 
         public void SetMoveDestination(Vector3 targetPos)
@@ -219,15 +257,16 @@ namespace BattleOfAges.AI
             hasDestination = false;
         }
 
-        protected virtual void ExecuteMovement()
+        /// <summary>Moves the unit by the time gone since its last move (one frame near the viewer, a few further off).</summary>
+        protected virtual void ExecuteMovement(float dt)
         {
             float radius = characterController != null ? characterController.radius : 0.5f;
             if (!hasDestination)
             {
                 ResetStuckDetection();
                 // Idle: only get out of the way of overlapping neighbours; re-seat on the ground a few times a second.
-                GroundMotor.Move(transform, gridId, Vector3.zero, radius, Time.deltaTime, GridTeam == UnitSpatialGrid.TeamPlayer);
-                settleTimer -= Time.deltaTime;
+                GroundMotor.Move(transform, gridId, Vector3.zero, radius, dt, GridTeam == UnitSpatialGrid.TeamPlayer);
+                settleTimer -= dt;
                 if (settleTimer <= 0f) { settleTimer = 0.3f; GroundMotor.Settle(transform); }
                 return;
             }
@@ -243,17 +282,17 @@ namespace BattleOfAges.AI
             {
                 float remainingDistance = moveDir.magnitude;
                 moveDir.Normalize();
-                moveDir = SteerAroundObstacles(moveDir, remainingDistance);
-                moveDir = ApplyObstacleDetour(moveDir, currentPos);
+                moveDir = SteerAroundObstacles(moveDir, remainingDistance, dt);
+                moveDir = ApplyObstacleDetour(moveDir, currentPos, dt);
 
                 // Smooth rotation
                 if (moveDir.sqrMagnitude > 0.01f)
                 {
                     Quaternion targetRot = Quaternion.LookRotation(moveDir);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Mathf.Min(1f, rotationSpeed * dt));
                 }
 
-                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed * BattleFront.Factor(GridTeam, moveDir), radius, Time.deltaTime, GridTeam == UnitSpatialGrid.TeamPlayer);
+                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed * BattleFront.Factor(GridTeam, moveDir), radius, dt, GridTeam == UnitSpatialGrid.TeamPlayer);
             }
             else
             {
@@ -266,9 +305,9 @@ namespace BattleOfAges.AI
         /// picks the closest free direction (trying the side it turned to last time first, to avoid
         /// oscillating). If it is boxed in, it backs out. Re-evaluated ~10 times per second.
         /// </summary>
-        private Vector3 SteerAroundObstacles(Vector3 desiredDir, float remainingDistance)
+        private Vector3 SteerAroundObstacles(Vector3 desiredDir, float remainingDistance, float dt)
         {
-            steerTimer -= Time.deltaTime;
+            steerTimer -= dt;
             if (steerTimer > 0f && steerDir != Vector3.zero) return steerDir;
             steerTimer = avoidanceRecheckInterval;
 
@@ -346,11 +385,10 @@ namespace BattleOfAges.AI
         /// treated as unreachable and dropped, so the AI state picks a new one instead of the unit drifting
         /// further and further away.
         /// </summary>
-        private Vector3 ApplyObstacleDetour(Vector3 desiredDir, Vector3 currentPos)
+        private Vector3 ApplyObstacleDetour(Vector3 desiredDir, Vector3 currentPos, float dt)
         {
             const int maxDetoursPerDestination = 2;
 
-            float dt = Time.deltaTime;
             bool detouring = detourTimer > 0f;
             if (detouring) detourTimer -= dt;
 

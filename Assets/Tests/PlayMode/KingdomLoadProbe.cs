@@ -12,6 +12,7 @@ using UnityEngine.TestTools;
 using BattleOfAges.AI;
 using BattleOfAges.Combat;
 using BattleOfAges.SaveLoad;
+using BattleOfAges.Utils;
 using BattleOfAges.World;
 
 namespace BattleOfAges.PlayModeTests
@@ -109,6 +110,34 @@ namespace BattleOfAges.PlayModeTests
                     int buildings = BattleOfAges.Building.BuildingNode.Active.Count;
                     report.AppendLine($"| {NpcKingdom.All.Count} | {people} | {units} | {buildings} | {1000f / avg:0} | {avg:0.0} | {frames[(int)(c * 0.95f)]:0.0} | {frames[(int)(c * 0.99f)]:0.0} | {mainSum / c:0.0} | {scriptSum / c:0.0} | {animSum / c:0.0} | {physSum / c:0.0} | {gcSum / c:0} | {batchSum / c:0} | {triSum / c:0} | {settled:0} |");
                     Debug.Log($"[KingdomLoad] {NpcKingdom.All.Count} real: {1000f / avg:0} FPS, {people} people");
+                }
+                if (Environment.GetEnvironmentVariable("KINGDOM_ABLATE") == "1")
+                {
+                    // Where the time goes at the last step: every script type on the units (and the kingdoms) off for a while
+                    var byType = new Dictionary<Type, List<Behaviour>>();
+                    void Add(Behaviour b) { if (b == null || !b.enabled || b is GpuSkinnedCharacter || b is CharacterGear || b is Animator) return; // (drawing: switching it off upsets the scene) if (!byType.TryGetValue(b.GetType(), out var l)) byType[b.GetType()] = l = new List<Behaviour>(); l.Add(b); }
+                    foreach (HostileMobAI m in UnityEngine.Object.FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None))
+                        foreach (Behaviour b in m.GetComponentsInChildren<Behaviour>()) if (b is MonoBehaviour || b is Animator) Add(b);
+                    foreach (NpcKingdom k in NpcKingdom.All) if (k != null) Add(k);
+                    IEnumerator Measure(float seconds, List<float> into) { float e = Time.realtimeSinceStartup + seconds; while (Time.realtimeSinceStartup < e) { yield return null; into.Add(Time.unscaledDeltaTime * 1000f); } }
+                    report.AppendLine();
+                    report.AppendLine("Ablation at the last step (each script type off on every unit for 3 s; saved = base minus that, ms per frame):");
+                    report.AppendLine();
+                    report.AppendLine("| type | instances | base ms | off ms | saved ms | us per instance |");
+                    report.AppendLine("|---|---|---|---|---|---|");
+                    foreach (var pair in byType.OrderByDescending(p => p.Value.Count))
+                    {
+                        var before = new List<float>();
+                        yield return Measure(3f, before);
+                        foreach (Behaviour b in pair.Value) if (b != null) b.enabled = false;
+                        var off = new List<float>();
+                        yield return Measure(0.5f, new List<float>());
+                        yield return Measure(3f, off);
+                        foreach (Behaviour b in pair.Value) if (b != null) b.enabled = true;
+                        float baseMs = before.Average(), offMs = off.Average();
+                        report.AppendLine($"| {pair.Key.Name} | {pair.Value.Count} | {baseMs:0.0} | {offMs:0.0} | {baseMs - offMs:0.0} | {(baseMs - offMs) * 1000f / pair.Value.Count:0.0} |");
+                        Debug.Log($"[KingdomLoad] {pair.Key.Name}: {baseMs - offMs:0.0} ms");
+                    }
                 }
                 report.AppendLine();
                 report.AppendLine("main ms is the previous frame's (ProfilerRecorder.LastValue in a coroutine). Units: every HostileMobAI (kingdoms' people, camps).");
