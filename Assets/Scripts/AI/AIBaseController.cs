@@ -110,10 +110,52 @@ namespace BattleOfAges.AI
         {
             if (gridId < 0) gridId = UnitSpatialGrid.Register(this, Health, GridTeam, CharacterCtrl != null ? CharacterCtrl.radius : 0.5f);
             if (Combat != null) Combat.Team = GridTeam; // its bolts (an NPC mage) look for its enemies
+            CrowdSim.Add(this);
+        }
+
+        // ------------------------------------------------------------------ in the crowd (CrowdSim moves every unit in one job)
+
+        internal int crowdIndex = -1;
+        /// <summary>Its body drawn on the GPU far off: the crowd's job says when its size on screen or its pace changed.</summary>
+        internal Utils.GpuSkinnedCharacter crowdLook;
+        private bool needsRoute;
+        /// <summary>The job may move it: no road round a town's ring to follow, and nothing else moving it (a climb).</summary>
+        internal bool CrowdFast => !needsRoute && CrowdCanGlide;
+        protected virtual bool CrowdCanGlide => true;
+        /// <summary>It has something of its own to do every frame (an animal's legs): CrowdEveryFrame is called.</summary>
+        internal virtual bool CrowdWantsEveryFrame => false;
+        protected internal virtual void CrowdEveryFrame(float dt) { }
+        internal float CrowdSpeed => CurrentMoveSpeed;
+        internal float CrowdStop => stoppingDistance;
+        internal float CrowdTurn => rotationSpeed;
+        internal float CrowdClose => closeDistance;
+        internal float CrowdMid => mediumDistance;
+        internal float CrowdFar => distantDistance;
+        internal int CrowdTeam => GridTeam;
+        /// <summary>Its speed, its climb or its side changed: the crowd is told.</summary>
+        protected void CrowdChanged() => CrowdSim.Push(this);
+
+        internal void CrowdThink(float elapsed)
+        {
+            if (currentState != null) currentState.UpdateState(this, elapsed);
+            CrowdSim.Push(this);
+        }
+
+        internal void CrowdManagedMove(float dt)
+        {
+            ExecuteMovement(dt);
+            CrowdSim.Push(this);
+        }
+
+        internal void CrowdArrived()
+        {
+            hasDestination = false;
+            CrowdSim.Push(this);
         }
 
         protected virtual void OnDisable()
         {
+            CrowdSim.Remove(this);
             UnitSpatialGrid.Unregister(gridId);
             gridId = -1;
         }
@@ -127,6 +169,7 @@ namespace BattleOfAges.AI
                 gridId = UnitSpatialGrid.Register(this, Health, GridTeam, CharacterCtrl != null ? CharacterCtrl.radius : 0.5f);
             }
             if (Combat != null) Combat.Team = GridTeam;
+            CrowdSim.Refresh(this);
         }
 
         protected virtual void Start()
@@ -169,7 +212,17 @@ namespace BattleOfAges.AI
             }
         }
 
-        protected virtual void Update()
+        /// <summary>
+        /// The unit's frame by itself, as it was before CrowdSim: used where there is no endless world under it (a bare test
+        /// scene) or with CrowdSim.Enabled off. There is no Update here: ten thousand of them cost 10 ms a frame in calls alone.
+        /// </summary>
+        internal void ManagedUpdate()
+        {
+            ManagedFrame();
+            CrowdEveryFrame(Time.deltaTime);
+        }
+
+        private void ManagedFrame()
         {
             if (healthComponent != null && !healthComponent.IsAlive)
             {
@@ -250,11 +303,19 @@ namespace BattleOfAges.AI
             destination = targetPos;
             destination.y = RtsUnit.GetTerrainHeight(destination);
             hasDestination = true;
+            if (crowdIndex >= 0)
+            {
+                // A road round a town's ring is walked by the old code (KingdomTown.Route, asked every step)
+                Vector3 via = KingdomTown.Route(transform.position, destination);
+                needsRoute = via.x != destination.x || via.z != destination.z;
+                CrowdSim.Push(this);
+            }
         }
 
         public void StopMovement()
         {
             hasDestination = false;
+            if (crowdIndex >= 0) CrowdSim.Push(this);
         }
 
         /// <summary>Moves the unit by the time gone since its last move (one frame near the viewer, a few further off).</summary>
@@ -319,26 +380,30 @@ namespace BattleOfAges.AI
                 return steerDir;
             }
 
+            steerDir = SteerRound(desiredDir);
+            return steerDir;
+        }
+
+        /// <summary>The way ahead is blocked (the crowd's probe found it so): the direction to take instead.</summary>
+        internal Vector3 CrowdSteerBlocked(Vector3 desiredDir) => SteerRound(desiredDir);
+
+        /// <summary>The closest free direction to the blocked one, the side it turned to last time first; boxed in, it backs out.</summary>
+        private Vector3 SteerRound(Vector3 desiredDir)
+        {
             for (int i = 0; i < SteerAngles.Length; i++)
             {
                 Vector3 sameSide = Quaternion.Euler(0f, SteerAngles[i] * steerSide, 0f) * desiredDir;
-                if (IsPathClear(sameSide, avoidanceProbeDistance))
-                {
-                    steerDir = sameSide;
-                    return steerDir;
-                }
+                if (IsPathClear(sameSide, avoidanceProbeDistance)) return sameSide;
 
                 Vector3 otherSide = Quaternion.Euler(0f, -SteerAngles[i] * steerSide, 0f) * desiredDir;
                 if (IsPathClear(otherSide, avoidanceProbeDistance))
                 {
                     steerSide = -steerSide;
-                    steerDir = otherSide;
-                    return steerDir;
+                    return otherSide;
                 }
             }
 
-            steerDir = -desiredDir; // boxed in: back out
-            return steerDir;
+            return -desiredDir; // boxed in: back out
         }
 
         private bool IsPathClear(Vector3 dir, float distance)
@@ -359,23 +424,34 @@ namespace BattleOfAges.AI
             int count = Physics.CapsuleCastNonAlloc(bottom, top, radius, dir, probeHits, distance, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
             {
-                RaycastHit hit = probeHits[i];
-                if (hit.distance <= 0f) continue;                         // overlapping at start
-                if (hit.collider.transform.IsChildOf(transform)) continue; // own colliders
-                if (hit.collider is CharacterController) continue;         // other units push/slide on their own
-                if (IsTerrain(hit.collider) && hit.normal.y >= walkableNormalY) continue; // walkable ground or slope
-                return false;                                              // props (campfire, tents, trees...) always block
+                if (Blocks(probeHits[i], probeHits[i].collider, transform, walkableNormalY)) return false;
             }
             return true;
         }
 
+        /// <summary>What a probe ahead ran into stops the unit: not itself, other units or ground it can walk up; props always do.</summary>
+        internal static bool Blocks(RaycastHit hit, Collider c, Transform self, float walkableNormalY)
+        {
+            if (hit.distance <= 0f) return false;                 // overlapping at start
+            if (c is CharacterController) return false;           // other units push/slide on their own
+            if (c.transform.IsChildOf(self)) return false;        // own colliders
+            if (IsTerrain(c) && hit.normal.y >= walkableNormalY) return false; // walkable ground or slope
+            return true;                                          // props (campfire, tents, trees...) always block
+        }
+
+        private static readonly Dictionary<int, bool> terrainKnown = new Dictionary<int, bool>();
+
         private static bool IsTerrain(Collider c)
         {
             if (c is TerrainCollider) return true;
+            // Asked once per collider: the name is a new string each time, and GetComponent made a "missing" object in the
+            // editor for every miss (400 KB a frame with ten thousand units)
+            int id = c.GetInstanceID();
+            if (terrainKnown.TryGetValue(id, out bool known)) return known;
             GameObject go = c.gameObject;
-            return go.GetComponent<ProceduralBiomeChunk>() != null
-                   || go.name == "SteppeTerrain"
-                   || go.name == "Ground";
+            known = go.TryGetComponent(out ProceduralBiomeChunk _) || go.name == "SteppeTerrain" || go.name == "Ground";
+            terrainKnown[id] = known;
+            return known;
         }
 
         /// <summary>

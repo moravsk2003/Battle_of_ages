@@ -32,6 +32,7 @@ namespace BattleOfAges.World
         {
             cells.Clear();
             known.Clear();
+            AI.CrowdSim.PropsCleared();
             boulders.Clear();
             boulderGroup = null;
             nextBoulderLook = 0f;
@@ -40,6 +41,18 @@ namespace BattleOfAges.World
         public static int Count => known.Count;
 
         private static int Cell(float v) => Mathf.FloorToInt(v / CellSize);
+
+        /// <summary>The scene's boulders looked at now if it is time (the crowd's job asks no one: AI.CrowdSim calls this each frame).</summary>
+        public static void Touch() => LookAtBoulders();
+
+        /// <summary>Some prop may reach into this square of ground (by the cells it is listed in: a unit touching it could stand there).</summary>
+        public static bool AnyIn(float minX, float minZ, float maxX, float maxZ)
+        {
+            for (int x = Cell(minX); x <= Cell(maxX); x++)
+                for (int z = Cell(minZ); z <= Cell(maxZ); z++)
+                    if (cells.ContainsKey((x, z))) return true;
+            return false;
+        }
 
         /// <summary>This prop stands here now (again: wherever it stood before, it no longer does).</summary>
         public static void Set(Object key, Vector3 at, float radius)
@@ -53,6 +66,7 @@ namespace BattleOfAges.World
                 {
                     if (!cells.TryGetValue((x, z), out List<Circle> list)) cells[(x, z)] = list = new List<Circle>(2);
                     list.Add(c);
+                    AI.CrowdSim.PropAdded(x, z, c.X, c.Z, c.Radius);
                 }
         }
 
@@ -64,6 +78,7 @@ namespace BattleOfAges.World
             for (int x = Cell(c.X - reach); x <= Cell(c.X + reach); x++)
                 for (int z = Cell(c.Z - reach); z <= Cell(c.Z + reach); z++)
                 {
+                    AI.CrowdSim.PropRemoved(x, z, c.X, c.Z, c.Radius);
                     if (!cells.TryGetValue((x, z), out List<Circle> list)) continue;
                     for (int i = list.Count - 1; i >= 0; i--) if (list[i].Key == key) list.RemoveAt(i);
                     if (list.Count == 0) cells.Remove((x, z));

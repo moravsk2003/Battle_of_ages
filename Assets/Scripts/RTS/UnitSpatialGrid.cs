@@ -27,7 +27,7 @@ namespace BattleOfAges.RTS
         }
 
         private const float CellSize = 4f;
-        private const int TableSize = 4096; // power of two
+        private const int TableSize = 16384; // power of two (ten thousand units: a few to a bucket)
         private const int TableMask = TableSize - 1;
 
         private static Transform[] transforms = new Transform[256];
@@ -37,6 +37,19 @@ namespace BattleOfAges.RTS
         private static float[] radii = new float[256];
         private static Vector3[] positions = new Vector3[256];
         private static int[] next = new int[256];
+        private static bool[] fed = new bool[256];
+        private static byte[] alive = new byte[256];
+
+        // The crowd's jobs (AI.CrowdSim) read the grid as it was built this frame and write their units' new places into it
+        internal const float CellMetres = CellSize;
+        internal const int BucketMask = TableMask, Buckets = TableSize;
+        internal static Vector3[] PositionArray => positions;
+        internal static float[] RadiusArray => radii;
+        internal static int[] NextArray => next;
+        internal static int[] HeadArray => cellHead;
+        internal static byte[] AliveArray => alive;
+        /// <summary>This agent's place is written by the crowd's job each frame: the grid does not ask its transform.</summary>
+        internal static void SetFed(int id, bool value) { if (id >= 0 && id < capacity) { fed[id] = value; if (!value) builtFrame = -1; } }
         private static int[] freeList = new int[256];
         private static int freeCount, capacity; // ids in [0, capacity) are used or free
         private static readonly int[] cellHead = new int[TableSize];
@@ -65,6 +78,7 @@ namespace BattleOfAges.RTS
             teams[id] = team;
             radii[id] = radius;
             positions[id] = owner.transform.position;
+            fed[id] = false;
             builtFrame = -1;
             return id;
         }
@@ -72,7 +86,7 @@ namespace BattleOfAges.RTS
         public static void Unregister(int id)
         {
             if (id < 0 || id >= capacity || transforms[id] == null) return;
-            transforms[id] = null; owners[id] = null; healths[id] = null;
+            transforms[id] = null; owners[id] = null; healths[id] = null; fed[id] = false; alive[id] = 0;
             if (freeCount == freeList.Length) System.Array.Resize(ref freeList, freeList.Length * 2);
             freeList[freeCount++] = id;
             builtFrame = -1;
@@ -182,6 +196,30 @@ namespace BattleOfAges.RTS
         }
 
         /// <summary>
+        /// Living agents inside the square of this half side round the point into buffer (any team); returns the count. Cell by
+        /// cell, so no agent comes twice: the minimap's dots, among ten thousand units.
+        /// </summary>
+        public static int QueryBox(Vector3 centre, float half, int[] buffer)
+        {
+            EnsureBuilt();
+            int count = 0;
+            int x0 = Cell(centre.x - half), x1 = Cell(centre.x + half), z0 = Cell(centre.z - half), z1 = Cell(centre.z + half);
+            for (int cz = z0; cz <= z1; cz++)
+            for (int cx = x0; cx <= x1; cx++)
+            {
+                for (int id = cellHead[Hash(cx, cz)]; id >= 0; id = next[id])
+                {
+                    Vector3 p = positions[id];
+                    if (Cell(p.x) != cx || Cell(p.z) != cz || !IsAlive(id)) continue; // (another cell of the same bucket)
+                    if (Mathf.Abs(p.x - centre.x) > half || Mathf.Abs(p.z - centre.z) > half) continue;
+                    buffer[count++] = id;
+                    if (count == buffer.Length) return count;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
         /// Push-apart velocity for an agent overlapping its neighbours (crowd separation instead of capsule physics).
         /// </summary>
         public static Vector3 Separation(int selfId, Vector3 position, float radius, float strength)
@@ -218,9 +256,17 @@ namespace BattleOfAges.RTS
             for (int id = 0; id < capacity; id++)
             {
                 Transform t = transforms[id];
-                if (t == null) { next[id] = -1; continue; }
-                Vector3 p = t.position;
-                positions[id] = p;
+                if ((object)t == null) { next[id] = -1; alive[id] = 0; continue; }
+                Vector3 p;
+                if (fed[id]) p = positions[id]; // moved by the crowd's job, which wrote its place here
+                else
+                {
+                    if (t == null) { next[id] = -1; alive[id] = 0; continue; } // destroyed and never taken out
+                    p = t.position;
+                    positions[id] = p;
+                }
+                HealthComponent hp = healths[id];
+                alive[id] = (byte)((object)hp == null || hp.IsAlive ? 1 : 0);
                 int h = Hash(Cell(p.x), Cell(p.z));
                 next[id] = cellHead[h];
                 cellHead[h] = id;
@@ -240,6 +286,8 @@ namespace BattleOfAges.RTS
             System.Array.Resize(ref radii, n);
             System.Array.Resize(ref positions, n);
             System.Array.Resize(ref next, n);
+            System.Array.Resize(ref fed, n);
+            System.Array.Resize(ref alive, n);
         }
 
         /// <summary>Forget everything (scene reload): registered transforms of the old scene are gone.</summary>

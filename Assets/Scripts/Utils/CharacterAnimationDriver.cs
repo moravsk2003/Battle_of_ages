@@ -50,7 +50,28 @@ namespace BattleOfAges.Utils
         public float? SpeedOverride { get; set; }
 
         /// <summary>Horizontal speed the locomotion follows (also for GpuSkinnedCharacter while the Animator is off).</summary>
-        public float Speed => SpeedOverride ?? smoothedSpeed;
+        public float Speed => SpeedOverride ?? (asleep ? AI.CrowdSim.SpeedOf(mover) : smoothedSpeed);
+        private bool asleep;
+
+        private AI.AIBaseController mover;
+        /// <summary>
+        /// Drawn on the GPU far off (GpuSkinnedCharacter): a unit the crowd's job moves has its speed from there, and this
+        /// driver sleeps till the Animator is back (ten thousand of these Updates were 6 ms a frame).
+        /// </summary>
+        public void SetFar(bool far, bool dead)
+        {
+            if (mover == null) return;
+            if (far) { if (AI.CrowdSim.Moves(mover)) { asleep = true; enabled = false; } }
+            else if (asleep)
+            {
+                asleep = false;
+                if (dead) return;
+                lastPosition = transform.position;
+                measureClock = 0f;
+                smoothedSpeed = AI.CrowdSim.SpeedOf(mover);
+                enabled = true;
+            }
+        }
 
         /// <summary>The Animator is back on (GpuSkinnedCharacter drew it meanwhile): send it the current state.</summary>
         public void Resync(bool dead)
@@ -82,6 +103,7 @@ namespace BattleOfAges.Utils
             measureSlot = Random.Range(0, 4);
             combat = GetComponentInParent<CombatUnit>();
             health = GetComponentInParent<HealthComponent>();
+            mover = GetComponentInParent<AI.AIBaseController>();
             if (combat != null) combat.OnAttackStarted += HandleAttack;
             if (health != null) health.OnDeath += HandleDeath;
 

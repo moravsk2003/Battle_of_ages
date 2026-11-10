@@ -58,12 +58,12 @@ namespace BattleOfAges.AI
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() => towns.Clear();
+        private static void ResetStatics() { towns.Clear(); grid.Clear(); }
 
         /// <summary>A town holds this ground.</summary>
         public static bool Holds(float x, float z)
         {
-            foreach (KingdomTown t in towns)
+            foreach (KingdomTown t in At(x, z))
             {
                 if (t == null) continue;
                 float dx = x - t.centre.x, dz = z - t.centre.y, reach = WallRingRadius + 6f;
@@ -82,8 +82,8 @@ namespace BattleOfAges.AI
             return town;
         }
 
-        private void OnEnable() { if (!towns.Contains(this)) towns.Add(this); }
-        private void OnDisable() => towns.Remove(this);
+        private void OnEnable() { if (!towns.Contains(this)) towns.Add(this); EnterGrid(); }
+        private void OnDisable() { towns.Remove(this); LeaveGrid(); }
 
         private void OnDestroy()
         {
@@ -107,9 +107,80 @@ namespace BattleOfAges.AI
         /// </summary>
         public static Vector3 Route(Vector3 from, Vector3 to)
         {
-            for (int i = 0; i < towns.Count; i++)
-                if (towns[i] != null && towns[i].Walled && towns[i].RouteRound(from, to, out Vector3 via)) return via;
+            List<KingdomTown> near = Along(from, to);
+            for (int i = 0; i < near.Count; i++)
+                if (near[i] != null && near[i].Walled && near[i].RouteRound(from, to, out Vector3 via)) return via;
             return to;
+        }
+
+        // ------------------------------------------------------------------ which towns are near (a grid: every unit asks every frame)
+
+        private const float GridCell = 128f;
+        private static readonly Dictionary<long, List<KingdomTown>> grid = new Dictionary<long, List<KingdomTown>>();
+        private static readonly List<KingdomTown> none = new List<KingdomTown>(), gathered = new List<KingdomTown>();
+        private static int serials;
+        private int serial;
+        private bool inGrid;
+        private Vector2 gridCentre;
+
+        private static int Cell(float v) => Mathf.FloorToInt(v / GridCell);
+        private static long Key(int x, int z) => ((long)x << 32) ^ (uint)z;
+        /// <summary>How far from its hall a town matters to anyone walking: the ring, a unit's width and the way round it.</summary>
+        private static float Reach => WallRingRadius + 8f;
+
+        /// <summary>A town's ring (standing or not yet) runs within this margin of the point: walkers there are checked against it.</summary>
+        public static bool RingNear(float x, float z, float margin)
+        {
+            foreach (KingdomTown t in At(x, z))
+            {
+                if (t == null) continue;
+                float dx = x - t.centre.x, dz = z - t.centre.y;
+                if (Mathf.Abs(Mathf.Sqrt(dx * dx + dz * dz) - WallRingRadius) < margin) return true;
+            }
+            return false;
+        }
+
+        private void EnterGrid()
+        {
+            LeaveGrid();
+            if (plan[0] == null) return; // not planned yet: no place
+            CrowdSim.GroundChangedEverywhere();
+            serial = ++serials;
+            gridCentre = centre;
+            for (int x = Cell(centre.x - Reach); x <= Cell(centre.x + Reach); x++)
+                for (int z = Cell(centre.y - Reach); z <= Cell(centre.y + Reach); z++)
+                {
+                    if (!grid.TryGetValue(Key(x, z), out List<KingdomTown> list)) grid[Key(x, z)] = list = new List<KingdomTown>(2);
+                    list.Add(this);
+                }
+            inGrid = true;
+        }
+
+        private void LeaveGrid()
+        {
+            if (!inGrid) return;
+            inGrid = false;
+            for (int x = Cell(gridCentre.x - Reach); x <= Cell(gridCentre.x + Reach); x++)
+                for (int z = Cell(gridCentre.y - Reach); z <= Cell(gridCentre.y + Reach); z++)
+                    if (grid.TryGetValue(Key(x, z), out List<KingdomTown> list)) list.Remove(this);
+        }
+
+        /// <summary>The towns within reach of this point, in the order they were founded.</summary>
+        private static List<KingdomTown> At(float x, float z) => grid.TryGetValue(Key(Cell(x), Cell(z)), out List<KingdomTown> list) ? list : none;
+
+        /// <summary>The towns within reach of the straight road between two points, in the order they were founded.</summary>
+        private static List<KingdomTown> Along(Vector3 from, Vector3 to)
+        {
+            int x0 = Cell(Mathf.Min(from.x, to.x)), x1 = Cell(Mathf.Max(from.x, to.x)), z0 = Cell(Mathf.Min(from.z, to.z)), z1 = Cell(Mathf.Max(from.z, to.z));
+            if (x0 == x1 && z0 == z1) return At(from.x, from.z);
+            if ((x1 - x0 + 1) * (z1 - z0 + 1) > 256) return towns; // across the whole world: all of them
+            gathered.Clear();
+            for (int x = x0; x <= x1; x++)
+                for (int z = z0; z <= z1; z++)
+                    if (grid.TryGetValue(Key(x, z), out List<KingdomTown> list))
+                        foreach (KingdomTown t in list) if (!gathered.Contains(t)) gathered.Add(t);
+            if (gathered.Count > 1) gathered.Sort((a, b) => a.serial.CompareTo(b.serial));
+            return gathered;
         }
 
         private bool RouteRound(Vector3 from, Vector3 to, out Vector3 via)
@@ -159,9 +230,10 @@ namespace BattleOfAges.AI
         /// <summary>The step from p against the rings: one deeper into a standing wall slides along it, one out of it is free.</summary>
         public static Vector3 Constrain(Vector3 p, Vector3 step, float radius)
         {
-            for (int i = 0; i < towns.Count; i++)
+            List<KingdomTown> near = At(p.x, p.z);
+            for (int i = 0; i < near.Count; i++)
             {
-                KingdomTown t = towns[i];
+                KingdomTown t = near[i];
                 if (t == null || !t.Walled) continue;
                 Vector2 to = new Vector2(p.x + step.x - t.centre.x, p.z + step.z - t.centre.y);
                 float r = to.magnitude, room = WallBuilder.Thickness * 0.5f + radius;
@@ -254,6 +326,7 @@ namespace BattleOfAges.AI
             claimed.AddRange(taken);
             claimed.AddRange(plan[(int)Kind.Wall]);
             claimed.AddRange(plan[(int)Kind.Pier]);
+            if (towns.Contains(this)) EnterGrid();
 
             Vector3 RingPoint(float degrees, float radius)
             {
@@ -267,7 +340,7 @@ namespace BattleOfAges.AI
         private void Update()
         {
             if (kingdom == null) return;
-            int hall = kingdom.Economy.HallLevel, people = kingdom.Population;
+            int hall = kingdom.Economy.HallLevel, people = kingdom.PeopleListed;
             if (hall == lastHall && people == lastPeople && !Unfinished) return;
             lastHall = hall;
             lastPeople = people;

@@ -24,13 +24,30 @@ namespace BattleOfAges.Building
 
         private static int Cell(float v) => Mathf.FloorToInt(v / CellSize);
 
+        private static float lastSum = float.NaN;
+
+        /// <summary>Remade now if it is time (the crowd's job asks no one: AI.CrowdSim calls this each frame).</summary>
+        public static void Touch() { if (Time.unscaledTime >= nextRemake || nextRemake < 0f) Remake(); }
+
+        /// <summary>Some building's walls may reach into this square of ground (by the cells it is listed in).</summary>
+        public static bool AnyIn(float minX, float minZ, float maxX, float maxZ)
+        {
+            for (int x = Cell(minX); x <= Cell(maxX); x++)
+                for (int z = Cell(minZ); z <= Cell(maxZ); z++)
+                    if (cells.ContainsKey((x, z))) return true;
+            return false;
+        }
+
         private static void Remake()
         {
             nextRemake = Time.unscaledTime + RemakeEvery;
             cells.Clear();
+            float sum = 0f;
             foreach (BuildingNode b in BuildingNode.Active)
             {
                 if (b == null || !Solid(b.Type)) continue;
+                Vector3 where = b.transform.position;
+                sum += where.x * 0.7f + where.z * 1.3f + b.transform.eulerAngles.y * 0.01f + 17f;
                 float yaw = b.transform.eulerAngles.y * Mathf.Deg2Rad, cos = Mathf.Cos(yaw), sin = Mathf.Sin(yaw);
                 Vector3 p = b.transform.position;
                 float halfX, halfZ;
@@ -58,6 +75,7 @@ namespace BattleOfAges.Building
                         list.Add(rect);
                     }
             }
+            if (!sum.Equals(lastSum)) { lastSum = sum; AI.CrowdSim.GroundChangedEverywhere(); } // a building came, went or moved
         }
 
         private static void ToLocal(Rect r, float x, float z, out float lx, out float lz)

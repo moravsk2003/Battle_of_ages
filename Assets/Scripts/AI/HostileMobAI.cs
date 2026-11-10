@@ -86,7 +86,9 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>A raid marches at the pace of its slowest member (NpcKingdom): no faster than this.</summary>
-        public float SpeedCap { get; set; } = float.MaxValue;
+        public float SpeedCap { get => speedCap; set { if (speedCap == value) return; speedCap = value; CrowdChanged(); } }
+        private float speedCap = float.MaxValue;
+        protected override bool CrowdCanGlide => !climbing;
 
         protected override float CurrentMoveSpeed => Mathf.Min(SpeedCap, Combat != null ? Combat.MoveSpeed : moveSpeed);
 
@@ -322,6 +324,7 @@ namespace BattleOfAges.AI
         private System.Collections.IEnumerator Climb(Building.SiegeLadder l)
         {
             climbing = true;
+            CrowdChanged();
             StopMovement();
             Vector3[] path = { l.Foot, l.Top, l.Walk, l.Inside };
             float[] speed = { GameBalance.LadderClimbSpeed, 1.4f, 2.5f };
@@ -362,6 +365,7 @@ namespace BattleOfAges.AI
                 }
             }
             climbing = false;
+            CrowdChanged();
             ladder = null;
             wallInWay = false;
             nextSiegeCheck = Time.time + 0.5f;
@@ -374,6 +378,7 @@ namespace BattleOfAges.AI
             p.y = RtsUnit.GetTerrainHeight(p);
             transform.position = p;
             climbing = false;
+            CrowdChanged();
             ladder = null;
             wallInWay = false;
             nextSiegeCheck = Time.time + 0.5f;

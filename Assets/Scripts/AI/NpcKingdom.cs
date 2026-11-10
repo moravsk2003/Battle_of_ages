@@ -255,13 +255,36 @@ namespace BattleOfAges.AI
 
         // ------------------------------------------------------------------ the clock
 
-        private void Update() => Advance(WorldClock.HoursOf(Time.deltaTime), Time.deltaTime);
+        /// <summary>
+        /// A kingdom's own clock runs four times a second, over the time gone since (its people move and fight every frame on
+        /// their own): a hundred kingdoms counting their people and workers every frame took 13 ms of it (MassProbe).
+        /// </summary>
+        public const float ClockStep = 0.25f;
+        private float pendingHours, pendingSeconds = -1f;
+        private int workersCounted = -1;
+
+        private void Update()
+        {
+            if (pendingSeconds < 0f) pendingSeconds = Random.value * ClockStep; // the kingdoms out of step with each other
+            pendingHours += WorldClock.HoursOf(Time.deltaTime);
+            pendingSeconds += Time.deltaTime;
+            if (pendingSeconds < ClockStep) return;
+            float hours = pendingHours, seconds = pendingSeconds;
+            pendingHours = 0f;
+            pendingSeconds = 0f;
+            Advance(hours, seconds);
+        }
+
+        /// <summary>Its people as last counted (the fallen are taken off the list when its clock runs).</summary>
+        public int PeopleListed => subjects.Count;
 
         /// <summary>Runs the kingdom on for this much game time (tests call it directly).</summary>
         public void Advance(float hours, float seconds)
         {
             if (IsDefeated) return;
-            Prune();
+            // Counting the living and those at work: once a second, or on a turn asked for directly (a test, a long step)
+            bool count = seconds <= 0f || secondClock + seconds >= 1f || hours >= 0.05f || workersCounted < 0;
+            if (count) Prune();
             Age += hours;
 
             if (InInterregnum)
@@ -273,7 +296,8 @@ namespace BattleOfAges.AI
 
             if (!InInterregnum && King != null && King.Health.IsAlive) HeroAutoPilot.UseSkills(King.Combat, King.Health, King.CurrentCombatTarget);
 
-            int born = Economy.Tick(hours, IsEmpire ? 0 : Workers(), subjects.Count);
+            if (count) workersCounted = IsEmpire ? 0 : Workers();
+            int born = Economy.Tick(hours, workersCounted, subjects.Count);
             for (int i = 0; i < born; i++) AddSubject(UnitRank.Person, Spot());
 
             promotionClock += hours;

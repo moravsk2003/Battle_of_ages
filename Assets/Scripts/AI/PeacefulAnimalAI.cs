@@ -174,11 +174,8 @@ namespace BattleOfAges.AI
             return null;
         }
 
-        protected override void Update()
-        {
-            base.Update();
-            AnimateProceduralVisuals(Time.deltaTime);
-        }
+        internal override bool CrowdWantsEveryFrame => true;
+        protected internal override void CrowdEveryFrame(float dt) => AnimateProceduralVisuals(dt);
 
         /// <summary>Gait from the measured ground speed: phase advances one cycle per stride length.</summary>
         private void AnimateProceduralVisuals(float dt)

@@ -25,9 +25,9 @@ namespace BattleOfAges.UI
         private Camera cam;
         private RenderTexture texture;
         private Vector3 centre = new Vector3(1e9f, 0f, 0f);
-        private float redrawTimer, dotTimer, hostileTimer;
+        private float redrawTimer, dotTimer;
         private int placedFor = -1;
-        private HostileMobAI[] hostiles;
+        private readonly int[] nearUnits = new int[2048];
         private readonly List<Image> dotImages = new List<Image>();
         private readonly List<(Vector3 pos, float born, Image img)> pings = new List<(Vector3, float, Image)>();
 
@@ -161,14 +161,13 @@ namespace BattleOfAges.UI
                 bool sel = selected != null && Contains(selected, u);
                 Dot(used++, new Vector2(d.x, d.z) * Scale, sel ? new Color(1f, 0.95f, 0.6f) : new Color(0.35f, 0.62f, 1f), sel ? 7f : 5f);
             }
-            hostileTimer -= 0.15f;
-            if (hostileTimer <= 0f || hostiles == null) { hostileTimer = 1f; hostiles = FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None); }
-            foreach (HostileMobAI m in hostiles)
+            // The raiders and the kingdoms' people in the frame, from the unit grid (a search of the scene for them once a
+            // second and a look at each took 9 ms a frame with ten thousand about)
+            int near = UnitSpatialGrid.QueryBox(centre, HalfSize, nearUnits);
+            for (int i = 0; i < near && used < 500; i++)
             {
-                if (used >= 500) break;
-                if (m == null || m.Health == null || !m.Health.IsAlive) continue; // a body lies a while: no longer an enemy on the map
-                Vector3 d = m.transform.position - centre;
-                if (Mathf.Abs(d.x) > HalfSize || Mathf.Abs(d.z) > HalfSize) continue;
+                if (!(UnitSpatialGrid.Owner(nearUnits[i]) is HostileMobAI)) continue; // a body lies a while: no longer in the grid's living
+                Vector3 d = UnitSpatialGrid.Position(nearUnits[i]) - centre;
                 Dot(used++, new Vector2(d.x, d.z) * Scale, new Color(0.95f, 0.25f, 0.2f), 5f);
             }
             Dot(used++, new Vector2(me.x, me.z) * Scale, Color.white, 9f);

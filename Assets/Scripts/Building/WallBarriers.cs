@@ -286,6 +286,8 @@ namespace BattleOfAges.Building
         // ------------------------------------------------------------------ routing (own units)
 
         private static int version, graphVersion = -1;
+        /// <summary>Goes up whenever a wall or a pier came, went or moved.</summary>
+        public static int Version { get { Refresh(); return version; } }
         /// <summary>Waypoints: in front of and behind every gate (on its axis), and round the free ends of the walls.</summary>
         private static readonly List<Vector2> nodes = new List<Vector2>();
         /// <summary>The gate a waypoint lines up with (-1: a wall's end).</summary>

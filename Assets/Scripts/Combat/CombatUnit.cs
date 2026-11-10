@@ -200,6 +200,7 @@ namespace BattleOfAges.Combat
             if (!isPunching)
             {
                 isPunching = true;
+                enabled = true; // (its Update runs only through a swing)
                 AttacksStarted++;
                 OnAttackStarted?.Invoke();
                 punchProgress = 0f;
@@ -208,7 +209,9 @@ namespace BattleOfAges.Combat
 
         private void Update()
         {
-            // Procedural punch/swing animation for unit visual feedback
+            // Procedural punch/swing animation for unit visual feedback. Asleep between swings: ten thousand units' empty
+            // Updates were a millisecond or two a frame
+            if (!isPunching) { enabled = false; return; }
             if (isPunching)
             {
                 punchProgress += Time.deltaTime * 6f; // Fast punch forward and back

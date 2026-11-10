@@ -56,7 +56,7 @@ namespace BattleOfAges.Utils
         private MaterialPropertyBlock block;
         private GpuSkinBake bake;
         private Mesh sourceMesh;
-        private bool hidden, speck, failed;
+        private bool hidden, speck, failed, shown;
 
         private GpuSkinBake.Clip locoClip;
         private Vector4 loco, prev, swing = new Vector4(0, 0, 1, -1), fade;
@@ -64,6 +64,15 @@ namespace BattleOfAges.Utils
         private int index = -1;
 
         private bool started, ready, rejected;
+        private AI.AIBaseController mover;
+        private int passes;
+
+        /// <summary>The camera the characters are judged from now, how big a character of this height is at 1 m from it (or at any distance: ortho).</summary>
+        public static Camera Viewer => ViewerOverride != null ? ViewerOverride : ViewCamera.Current;
+        public static float ViewScale(Camera cam, out bool ortho) { ortho = cam.orthographic; return (ortho ? CharacterHeight / (2f * cam.orthographicSize) : CharacterHeight / (2f * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad))) * QualitySettings.lodBias; }
+
+        /// <summary>The crowd's job saw its size on screen or its pace change (AI.CrowdSim).</summary>
+        internal void CrowdLook(Camera cam) { if (index >= 0 && cam != null) Refresh(cam); }
 
         // Set up on the driver's first look, not here: builders still replace the body in this frame.
         private void Start()
@@ -84,6 +93,8 @@ namespace BattleOfAges.Utils
             driver = GetComponentInChildren<CharacterAnimationDriver>();
             combat = GetComponentInParent<CombatUnit>();
             health = GetComponentInParent<HealthComponent>();
+            mover = GetComponentInParent<AI.AIBaseController>();
+            if (mover != null) mover.crowdLook = this;
             if (combat != null) combat.OnAttackStarted += HandleAttack;
             if (health != null) health.OnDeath += HandleDeath;
             dead = health != null && !health.IsAlive;
@@ -145,7 +156,10 @@ namespace BattleOfAges.Utils
                 for (int i = 0; i < n; i++)
                 {
                     cursor = (cursor + 1) % Active.Count;
-                    Active[cursor].Refresh(cam);
+                    GpuSkinnedCharacter c = Active[cursor];
+                    // One the crowd's job moves is looked at when the job says so; here only once in a while (a new mesh, a new kit)
+                    if (c.ready && !ForceGpu && (object)c.mover != null && c.mover.crowdIndex >= 0 && AI.CrowdSim.Running && (++c.passes & 15) != 0) continue;
+                    c.Refresh(cam);
                 }
             }
         }
@@ -166,20 +180,30 @@ namespace BattleOfAges.Utils
 
             if (CurrentSource() != sourceMesh && !Build()) { SetFar(false); return; }
             speck = h < CullScreenHeight;
-            gpuRenderer.enabled = !hidden && !speck;
+            bool show = !hidden && !speck;
+            if (show != shown) { shown = show; gpuRenderer.enabled = show; }
             if (!dead) FollowLocomotion();
         }
 
+        // The view, asked of the camera once a frame and not once a character (six calls into the engine each, a quarter of
+        // ten thousand characters a frame)
+        private static int viewFrame = -1;
+        private static Camera viewCamera;
+        private static bool viewOrtho;
+        private static Vector3 viewEye;
+        private static float viewScale;
+
         private float ScreenHeight(Camera cam)
         {
-            float h;
-            if (cam.orthographic) h = CharacterHeight / (2f * cam.orthographicSize);
-            else
+            if (viewFrame != Time.frameCount || viewCamera != cam)
             {
-                float d = Mathf.Max(0.01f, Vector3.Distance(cam.transform.position, transform.position));
-                h = CharacterHeight / (2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad));
+                viewFrame = Time.frameCount;
+                viewCamera = cam;
+                viewOrtho = cam.orthographic;
+                viewEye = cam.transform.position;
+                viewScale = (viewOrtho ? CharacterHeight / (2f * cam.orthographicSize) : CharacterHeight / (2f * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad))) * QualitySettings.lodBias;
             }
-            return h * QualitySettings.lodBias;
+            return viewOrtho ? viewScale : viewScale / Mathf.Max(0.01f, Vector3.Distance(viewEye, transform.position));
         }
 
         // Knights draw their distant mesh; everyone else the body as it is (with its merged gear)
@@ -227,17 +251,18 @@ namespace BattleOfAges.Utils
                 if (footIK != null) footIK.enabled = false;
                 if (lod != null) lod.enabled = false;
                 body.enabled = false;
-                gpuRenderer.enabled = !hidden;
+                gpuRenderer.enabled = shown = !hidden;
+                if (driver != null) driver.SetFar(true, dead);
             }
             else
             {
                 IsFar = false;
-                if (gpuRenderer != null) gpuRenderer.enabled = false;
+                if (gpuRenderer != null) gpuRenderer.enabled = shown = false;
                 animator.enabled = true;
                 if (footIK != null) footIK.enabled = true;
                 body.enabled = !hidden;
                 if (lod != null) lod.enabled = true; // re-picks its mesh and hides specks
-                if (driver != null) driver.Resync(dead);
+                if (driver != null) { driver.SetFar(false, dead); driver.Resync(dead); }
             }
         }
 
@@ -250,8 +275,8 @@ namespace BattleOfAges.Utils
         {
             hidden = value;
             if (!ready) return;
-            if (IsFar) { body.enabled = false; if (gpuRenderer != null) gpuRenderer.enabled = !hidden && !speck; }
-            else { if (gpuRenderer != null) gpuRenderer.enabled = false; if (lod == null) body.enabled = !hidden; }
+            if (IsFar) { body.enabled = false; if (gpuRenderer != null) gpuRenderer.enabled = shown = !hidden && !speck; }
+            else { if (gpuRenderer != null) gpuRenderer.enabled = shown = false; if (lod == null) body.enabled = !hidden; }
         }
 
         private float Now => Time.timeSinceLevelLoad; // the shader's _Time.y

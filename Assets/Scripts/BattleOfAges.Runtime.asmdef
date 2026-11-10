@@ -8,7 +8,9 @@
         "Unity.RenderPipelines.Core.Runtime",
         "UnityEngine.UI",
         "Unity.Networking.Transport",
-        "Unity.Collections"
+        "Unity.Collections",
+        "Unity.Burst",
+        "Unity.Mathematics"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
