@@ -37,6 +37,8 @@ namespace BattleOfAges.PlayModeTests
             int[] steps = string.IsNullOrEmpty(stepsText) ? new[] { 1, 10, 20, 40, 50 } : stepsText.Split(',').Select(int.Parse).ToArray();
 
             LogAssert.ignoreFailingMessages = true;
+            bool crowdWas = CrowdSim.Enabled;
+            if (Environment.GetEnvironmentVariable("KINGDOM_CROWD") == "0") CrowdSim.Enabled = false; // the old way, one Update a unit, to compare
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
             int nearHome = GameBalance.RealKingdomsNearHome, byPlayers = GameBalance.RealKingdomsByPlayers;
@@ -65,8 +67,8 @@ namespace BattleOfAges.PlayModeTests
                 report.AppendLine($"People per kingdom: avg {grown.Average(s => s.Subjects.Count):0.0}, max {grown.Max(s => s.Subjects.Count)}; hall avg {grown.Average(s => s.Hall):0.0}, max {grown.Max(s => s.Hall)}; armies out {grown.Sum(s => s.Armies.Count)}.");
                 report.AppendLine($"Unity {Application.unityVersion}, {SystemInfo.processorType} ({SystemInfo.processorCount} threads), {SystemInfo.graphicsDeviceName}, render 1920x1080 each frame, the hero at the base.");
                 report.AppendLine();
-                report.AppendLine("| real kingdoms | their people | units in scene | buildings | avg FPS | avg ms | p95 ms | p99 ms | main ms | scripts ms | anim ms | physics ms | GC KB/frame | batches | tris (k) | settle s |");
-                report.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+                report.AppendLine("| real kingdoms | their people | units in scene | buildings | avg FPS | avg ms | p95 ms | p99 ms | main ms | scripts ms | anim ms | physics ms | GC KB/frame | batches | tris (k) | settle s | moved, % | walking m/s |");
+                report.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
 
                 ProfilerRecorder Rec(ProfilerCategory c, string n) { var r = ProfilerRecorder.StartNew(c, n, 15); recorders.Add(r); return r; }
                 ProfilerRecorder main = Rec(ProfilerCategory.Internal, "Main Thread"), scripts = Rec(ProfilerCategory.Scripts, "BehaviourUpdate"),
@@ -92,6 +94,11 @@ namespace BattleOfAges.PlayModeTests
                     }
                     float settled = Time.realtimeSinceStartup - settleStart;
 
+                    // Do they live: who moved over the window, and how fast those that did (a cheap crowd could be a still one)
+                    HostileMobAI[] mobs = UnityEngine.Object.FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None);
+                    var startAt = new Vector3[mobs.Length];
+                    for (int i = 0; i < mobs.Length; i++) startAt[i] = mobs[i].transform.position;
+                    float windowStart = Time.realtimeSinceStartup;
                     var frames = new List<float>();
                     double mainSum = 0, scriptSum = 0, animSum = 0, physSum = 0, gcSum = 0, batchSum = 0, triSum = 0;
                     float end = Time.realtimeSinceStartup + 8f;
@@ -107,8 +114,18 @@ namespace BattleOfAges.PlayModeTests
                     float avg = frames.Average();
                     int people = NpcKingdom.All.Sum(k => k != null ? k.Population : 0);
                     int units = UnityEngine.Object.FindObjectsByType<HostileMobAI>(FindObjectsSortMode.None).Length;
+                    int moved = 0, alive = 0;
+                    float pace = 0f, window = Time.realtimeSinceStartup - windowStart;
+                    for (int i = 0; i < mobs.Length; i++)
+                    {
+                        if (mobs[i] == null) continue;
+                        alive++;
+                        Vector3 d = mobs[i].transform.position - startAt[i];
+                        d.y = 0f;
+                        if (d.magnitude > 0.5f) { moved++; pace += d.magnitude / window; }
+                    }
                     int buildings = BattleOfAges.Building.BuildingNode.Active.Count;
-                    report.AppendLine($"| {NpcKingdom.All.Count} | {people} | {units} | {buildings} | {1000f / avg:0} | {avg:0.0} | {frames[(int)(c * 0.95f)]:0.0} | {frames[(int)(c * 0.99f)]:0.0} | {mainSum / c:0.0} | {scriptSum / c:0.0} | {animSum / c:0.0} | {physSum / c:0.0} | {gcSum / c:0} | {batchSum / c:0} | {triSum / c:0} | {settled:0} |");
+                    report.AppendLine($"| {NpcKingdom.All.Count} | {people} | {units} | {buildings} | {1000f / avg:0} | {avg:0.0} | {frames[(int)(c * 0.95f)]:0.0} | {frames[(int)(c * 0.99f)]:0.0} | {mainSum / c:0.0} | {scriptSum / c:0.0} | {animSum / c:0.0} | {physSum / c:0.0} | {gcSum / c:0} | {batchSum / c:0} | {triSum / c:0} | {settled:0} | {100f * moved / Mathf.Max(1, alive):0} | {(moved > 0 ? pace / moved : 0f):0.0} |");
                     Debug.Log($"[KingdomLoad] {NpcKingdom.All.Count} real: {1000f / avg:0} FPS, {people} people");
                 }
                 if (Environment.GetEnvironmentVariable("KINGDOM_ABLATE") == "1")
@@ -146,6 +163,7 @@ namespace BattleOfAges.PlayModeTests
             }
             finally
             {
+                CrowdSim.Enabled = crowdWas;
                 GameBalance.RealKingdomsNearHome = nearHome;
                 GameBalance.RealKingdomsByPlayers = byPlayers;
                 if (cam != null) cam.targetTexture = null;
