@@ -50,6 +50,7 @@ namespace BattleOfAges.Player
         private float recoil;
         private float swingTime = -1f;   // < 0: not swinging
         private bool posedManually;
+        private bool swingAtRest;
 
         // Bow: the left fist up to the aim (pivot offset and turn), the shot's timeline in seconds.
         private static readonly Vector3 BowAimOffset = new Vector3(0.27f, 0.27f, 0.04f);
@@ -73,6 +74,7 @@ namespace BattleOfAges.Player
             if (leftPivot != null) { leftRestPos = leftPivot.localPosition; leftRestRot = leftPivot.localRotation; }
             held = GetComponent<FpsViewmodelGear>();
             swordMarker = rightPivot != null ? rightPivot.Find("Sword") : null;
+            swingAtRest = false;
         }
 
         /// <summary>Can be invoked by a weapon script after an attack or a shot.</summary>
@@ -154,11 +156,14 @@ namespace BattleOfAges.Player
             if (rightPivot == null) return;
             if (t < 0f)
             {
+                if (swingAtRest) return;
+                swingAtRest = true;
                 rightPivot.localPosition = rightRestPos;
                 rightPivot.localRotation = rightRestRot;
                 if (leftPivot != null) { leftPivot.localPosition = leftRestPos; leftPivot.localRotation = leftRestRot; }
                 return;
             }
+            swingAtRest = false;
 
             Sample(t, out Vector3 euler, out Vector3 offset);
             rightPivot.localPosition = rightRestPos + offset;
@@ -179,6 +184,7 @@ namespace BattleOfAges.Player
         private void ApplyBow(float t)
         {
             if (rightPivot == null || leftPivot == null) return;
+            swingAtRest = false;
             float aim, draw, kick = 0f;
             bool arrow = true;
             if (t < 0f) { aim = 0f; draw = 0f; }

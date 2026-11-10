@@ -10,6 +10,7 @@ namespace BattleOfAges.World
     public sealed class LakeWater : MonoBehaviour
     {
         private const int Segments = 64;
+        private static LakeWater instance;
         private int builtSeed = int.MinValue;
         private float builtSize = -1f;
         private Material material;
@@ -23,15 +24,26 @@ namespace BattleOfAges.World
             if (FindFirstObjectByType<LakeWater>() != null) return;
             var go = new GameObject("LakeWater");
             DontDestroyOnLoad(go);
-            go.AddComponent<LakeWater>();
+            instance = go.AddComponent<LakeWater>();
+        }
+
+        private void Awake() => instance = this;
+        private void OnDestroy() { if (instance == this) instance = null; }
+
+        public static void NotifyWorldChanged()
+        {
+            if (instance != null) instance.enabled = true;
         }
 
         private void Update()
         {
-            if (builtSeed == WorldSettings.Seed && builtSize == WorldSettings.Size) return;
-            builtSeed = WorldSettings.Seed;
-            builtSize = WorldSettings.Size;
-            Rebuild();
+            if (builtSeed != WorldSettings.Seed || builtSize != WorldSettings.Size)
+            {
+                builtSeed = WorldSettings.Seed;
+                builtSize = WorldSettings.Size;
+                Rebuild();
+            }
+            enabled = false;
         }
 
         public void Rebuild()

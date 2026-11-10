@@ -20,7 +20,7 @@ namespace BattleOfAges.UI
 
         private RectTransform crosshair, hpFill, hpTrail, xpFill, abilityBar;
         private Text hpText, levelText;
-        private float trail = 1f, trailHold;
+        private float trail = 1f, trailHold, lastHpFill = -1f, lastHpTrail = -1f, lastXpFill = -1f;
         private Shown hpShown, levelShown;
         private readonly Shown[] abilitySeconds = new Shown[4], abilityKeys = new Shown[4];
         private readonly List<(RectTransform rt, Image icon, Image cooldown, Text seconds, Text key)> slots = new List<(RectTransform, Image, Image, Text, Text)>();
@@ -107,7 +107,8 @@ namespace BattleOfAges.UI
                 artifacts = health.GetComponent<HeroArtifacts>();
                 progress = health.GetComponent<HeroProgress>();
             }
-            crosshair.gameObject.SetActive(!Cursor.visible && Time.timeScale > 0f);
+            bool showCrosshair = !Cursor.visible && Time.timeScale > 0f;
+            if (crosshair.gameObject.activeSelf != showCrosshair) crosshair.gameObject.SetActive(showCrosshair);
             UpdateHealth();
             UpdateLevel();
             UpdateAbilities();
@@ -116,11 +117,19 @@ namespace BattleOfAges.UI
         private void UpdateHealth()
         {
             float f = health.MaxHealth > 0 ? Mathf.Clamp01(health.CurrentHealth / (float)health.MaxHealth) : 0f;
-            hpFill.sizeDelta = new Vector2(BarWidth * f, 20f);
+            if (Mathf.Abs(f - lastHpFill) > 1e-4f)
+            {
+                lastHpFill = f;
+                hpFill.sizeDelta = new Vector2(BarWidth * f, 20f);
+            }
             // the lost part stays pale for a moment, then drains (healing jumps it up at once)
             if (f >= trail) { trail = f; trailHold = 0f; }
             else if ((trailHold += Time.unscaledDeltaTime) > 0.45f) trail = Mathf.MoveTowards(trail, f, Time.unscaledDeltaTime * 0.6f);
-            hpTrail.sizeDelta = new Vector2(BarWidth * trail, 20f);
+            if (Mathf.Abs(trail - lastHpTrail) > 1e-4f)
+            {
+                lastHpTrail = trail;
+                hpTrail.sizeDelta = new Vector2(BarWidth * trail, 20f);
+            }
             if (hpShown.Changed(Shown.Key(health.CurrentHealth, health.MaxHealth))) hpText.text = $"{health.CurrentHealth} / {health.MaxHealth}";
         }
 
@@ -129,7 +138,11 @@ namespace BattleOfAges.UI
             if (progress == null) return;
             if (levelShown.Changed(progress.Level)) levelText.text = "Рів. " + progress.Level;
             float f = Mathf.Clamp01(progress.Xp / (float)Mathf.Max(1, progress.XpToNextLevel));
-            xpFill.sizeDelta = new Vector2(292f * f, 7f);
+            if (Mathf.Abs(f - lastXpFill) > 1e-4f)
+            {
+                lastXpFill = f;
+                xpFill.sizeDelta = new Vector2(292f * f, 7f);
+            }
         }
 
         /// <summary>Which slots show (a skill the class has, an artifact held), their icons, cooldown rings and keys.</summary>
@@ -144,24 +157,38 @@ namespace BattleOfAges.UI
                 if (i < 2)
                 {
                     on = skills != null && skills.HasActiveIn(i);
-                    if (on) { left = skills.CooldownLeftIn(i); total = Mathf.Max(0.01f, skills.CooldownOf(i)); s.icon.sprite = SkillIcon(skills.Class, i); }
+                    if (on)
+                    {
+                        left = skills.CooldownLeftIn(i);
+                        total = Mathf.Max(0.01f, skills.CooldownOf(i));
+                        Sprite sp = SkillIcon(skills.Class, i);
+                        if (s.icon.sprite != sp) s.icon.sprite = sp;
+                    }
                 }
                 else
                 {
                     ArtifactType a = i == 2 ? ArtifactType.FullHeal : ArtifactType.Lightning;
                     on = artifacts != null && artifacts.Has(a);
-                    if (on) s.icon.sprite = UiTheme.IconSprite(a == ArtifactType.FullHeal ? UiTheme.Icon.Heart : UiTheme.Icon.Bolt);
+                    if (on)
+                    {
+                        Sprite sp = UiTheme.IconSprite(a == ArtifactType.FullHeal ? UiTheme.Icon.Heart : UiTheme.Icon.Bolt);
+                        if (s.icon.sprite != sp) s.icon.sprite = sp;
+                    }
                 }
                 if (s.rt.gameObject.activeSelf != on) s.rt.gameObject.SetActive(on);
                 if (!on) continue;
-                s.rt.anchoredPosition = new Vector2(shown++ * 86f, 0f);
-                s.cooldown.fillAmount = left > 0f ? left / total : 0f;
+                Vector2 pos = new Vector2(shown++ * 86f, 0f);
+                if (s.rt.anchoredPosition != pos) s.rt.anchoredPosition = pos;
+                float fill = left > 0f ? left / total : 0f;
+                if (Mathf.Abs(s.cooldown.fillAmount - fill) > 1e-4f) s.cooldown.fillAmount = fill;
                 int secondsKey = left <= 0f ? -1 : left >= 60f ? 100000 + Mathf.CeilToInt(left / 60f) : Mathf.CeilToInt(left);
                 if (abilitySeconds[i].Changed(secondsKey)) s.seconds.text = secondsKey < 0 ? "" : secondsKey >= 100000 ? (secondsKey - 100000) + " хв" : secondsKey.ToString();
-                s.icon.color = left > 0f ? new Color(0.6f, 0.6f, 0.6f) : Color.white;
+                Color col = left > 0f ? new Color(0.6f, 0.6f, 0.6f) : Color.white;
+                if (s.icon.color != col) s.icon.color = col;
                 if (abilityKeys[i].Changed((long)InputSystem.KeybindsManager.GetKey(AbilityKeys[i]))) s.key.text = HudTips.Key(AbilityKeys[i]);
             }
-            abilityBar.sizeDelta = new Vector2(Mathf.Max(1, shown) * 86f - 14f, 72f);
+            Vector2 barSize = new Vector2(Mathf.Max(1, shown) * 86f - 14f, 72f);
+            if (abilityBar.sizeDelta != barSize) abilityBar.sizeDelta = barSize;
         }
 
         private static Sprite SkillIcon(HeroClass c, int slot)

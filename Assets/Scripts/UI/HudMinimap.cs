@@ -26,7 +26,7 @@ namespace BattleOfAges.UI
         private RenderTexture texture;
         private Vector3 centre = new Vector3(1e9f, 0f, 0f);
         private float redrawTimer, dotTimer;
-        private int placedFor = -1;
+        private int placedFor = -1, lastBuildingCount = -1;
         private readonly int[] nearUnits = new int[2048];
         private readonly List<Image> dotImages = new List<Image>();
         private readonly List<(Vector3 pos, float born, Image img)> pings = new List<(Vector3, float, Image)>();
@@ -42,6 +42,8 @@ namespace BattleOfAges.UI
         private void Build(RectTransform f)
         {
             frame = f;
+            frame.gameObject.AddComponent<Canvas>();
+            frame.gameObject.AddComponent<GraphicRaycaster>();
             UiTheme.PanelImage(frame);
             RectTransform view = UiTheme.Rect(frame, "View", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(Px, Px));
             view.gameObject.AddComponent<RectMask2D>();
@@ -127,9 +129,11 @@ namespace BattleOfAges.UI
             if (map && f.y < -0.1f) c += f * ((c.y - Ground(c)) / -f.y);
             c.y = 0f;
             redrawTimer -= Time.unscaledDeltaTime;
-            if ((c - centre).sqrMagnitude > 12f * 12f || redrawTimer <= 0f)
+            int bCount = Building.BuildingNode.Active.Count;
+            if ((c - centre).sqrMagnitude > 12f * 12f || (redrawTimer <= 0f && bCount != lastBuildingCount))
             {
                 redrawTimer = 5f;
+                lastBuildingCount = bCount;
                 centre = c;
                 cam.transform.SetPositionAndRotation(new Vector3(c.x, main.transform.position.y + 250f, c.z), Quaternion.Euler(90f, 0f, 0f));
                 bool fog = RenderSettings.fog;
@@ -142,8 +146,10 @@ namespace BattleOfAges.UI
             GameObject hero = GameContext.Player;
             Transform looks = map && hero != null ? hero.transform : main.transform;
             Vector3 me = looks.position - centre;
-            heading.anchoredPosition = new Vector2(me.x, me.z) * Scale;
-            heading.localEulerAngles = new Vector3(0f, 0f, -looks.eulerAngles.y);
+            Vector2 headPos = new Vector2(me.x, me.z) * Scale;
+            if ((heading.anchoredPosition - headPos).sqrMagnitude > 1e-4f) heading.anchoredPosition = headPos;
+            float headZ = -looks.eulerAngles.y;
+            if (Mathf.Abs(Mathf.DeltaAngle(heading.localEulerAngles.z, headZ)) > 0.05f) heading.localEulerAngles = new Vector3(0f, 0f, headZ);
             bool showHeading = !map || (hero != null && Mathf.Abs(me.x) < HalfSize && Mathf.Abs(me.z) < HalfSize);
             if (heading.gameObject.activeSelf != showHeading) heading.gameObject.SetActive(showHeading);
 
@@ -214,10 +220,12 @@ namespace BattleOfAges.UI
                 dotImages.Add(img);
             }
             Image dot = dotImages[i];
-            dot.enabled = true;
-            dot.color = color;
-            dot.rectTransform.anchoredPosition = pos;
-            dot.rectTransform.sizeDelta = new Vector2(size, size);
+            if (!dot.enabled) dot.enabled = true;
+            if (dot.color != color) dot.color = color;
+            RectTransform drt = dot.rectTransform;
+            if ((drt.anchoredPosition - pos).sqrMagnitude > 1e-4f) drt.anchoredPosition = pos;
+            Vector2 sz = new Vector2(size, size);
+            if (drt.sizeDelta != sz) drt.sizeDelta = sz;
         }
 
         // ------------------------------------------------------------------ pings and presses

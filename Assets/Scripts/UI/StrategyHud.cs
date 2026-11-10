@@ -133,8 +133,8 @@ namespace BattleOfAges.UI
         {
             if (root == null) return;
             bool map = GameContext.MapOpen;
-            fpGroup.gameObject.SetActive(!map);
-            rtsGroup.gameObject.SetActive(map);
+            if (fpGroup.gameObject.activeSelf != !map) fpGroup.gameObject.SetActive(!map);
+            if (rtsGroup.gameObject.activeSelf != map) rtsGroup.gameObject.SetActive(map);
             if (alarmBanner.gameObject.activeSelf != SettlementAlarm.Active) alarmBanner.gameObject.SetActive(SettlementAlarm.Active);
             UpdateTopBar(map);
             if (map)
@@ -172,8 +172,10 @@ namespace BattleOfAges.UI
             if (armyShown.Changed(army)) armyText.text = army.ToString();
             BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
             bool placing = map && placer != null && placer.IsPlacing;
-            modeText.text = placing ? placer.Hint : map ? "M — від першої особи  ·  N — світ  ·  F1 — довідка" : "M — мапа  ·  N — мапа світу  ·  F1 — довідка";
-            mode.sizeDelta = placing ? new Vector2(600f, 70f) : new Vector2(map ? 510f : 470f, 44f); // the placing hint takes two lines
+            string mText = placing ? placer.Hint : map ? "M — від першої особи  ·  N — світ  ·  F1 — довідка" : "M — мапа  ·  N — мапа світу  ·  F1 — довідка";
+            if (modeText.text != mText) modeText.text = mText;
+            Vector2 mSize = placing ? new Vector2(600f, 70f) : new Vector2(map ? 510f : 470f, 44f); // the placing hint takes two lines
+            if (mode.sizeDelta != mSize) mode.sizeDelta = mSize;
         }
 
         /// <summary>The ore summary as a number: the total and the three highest tiers in stock with their counts.</summary>

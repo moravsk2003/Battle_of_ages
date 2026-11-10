@@ -265,6 +265,7 @@ namespace BattleOfAges.AI
 
         private void Update()
         {
+            if ((object)Town != null) Town.Step();
             if (pendingSeconds < 0f) pendingSeconds = Random.value * ClockStep; // the kingdoms out of step with each other
             pendingHours += WorldClock.HoursOf(Time.deltaTime);
             pendingSeconds += Time.deltaTime;

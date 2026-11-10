@@ -190,6 +190,49 @@ namespace BattleOfAges.World
             scattered = true;
         }
 
+        private sealed class GridBuffers
+        {
+            public readonly Vector3[] Vertices;
+            public readonly Vector2[] Uvs;
+            public readonly Color[] Colors;
+            public readonly int[] Triangles;
+
+            public GridBuffers(int resolution)
+            {
+                int numVertices = (resolution + 1) * (resolution + 1);
+                Vertices = new Vector3[numVertices];
+                Uvs = new Vector2[numVertices];
+                Colors = new Color[numVertices];
+                Triangles = new int[resolution * resolution * 6];
+
+                for (int z = 0; z <= resolution; z++)
+                {
+                    for (int x = 0; x <= resolution; x++)
+                    {
+                        Uvs[z * (resolution + 1) + x] = new Vector2((float)x / resolution * 8f, (float)z / resolution * 8f);
+                    }
+                }
+
+                int triIndex = 0;
+                for (int z = 0; z < resolution; z++)
+                {
+                    for (int x = 0; x < resolution; x++)
+                    {
+                        int current = z * (resolution + 1) + x;
+                        int next = current + resolution + 1;
+                        Triangles[triIndex++] = current;
+                        Triangles[triIndex++] = next;
+                        Triangles[triIndex++] = current + 1;
+                        Triangles[triIndex++] = current + 1;
+                        Triangles[triIndex++] = next;
+                        Triangles[triIndex++] = next + 1;
+                    }
+                }
+            }
+        }
+
+        private static readonly Dictionary<int, GridBuffers> gridBufferCache = new Dictionary<int, GridBuffers>(4);
+
         private void BuildTerrain(Vector2Int coord, float size, int resolution, bool isLowLOD, Material steppeMat, Material forestMat, Material desertMat, Material snowMat)
         {
             EnsureComponents();
@@ -212,11 +255,14 @@ namespace BattleOfAges.World
                 sharedChunkMesh.Clear();
             }
 
-            int numVertices = (resolution + 1) * (resolution + 1);
-            Vector3[] vertices = new Vector3[numVertices];
-            Vector2[] uvs = new Vector2[numVertices];
-            Color[] colors = new Color[numVertices];
+            if (!gridBufferCache.TryGetValue(resolution, out GridBuffers buf))
+            {
+                buf = new GridBuffers(resolution);
+                gridBufferCache[resolution] = buf;
+            }
 
+            Vector3[] vertices = buf.Vertices;
+            Color[] colors = buf.Colors;
             float step = size / resolution;
 
             // Determine dominant biome of the chunk center
@@ -235,36 +281,14 @@ namespace BattleOfAges.World
 
                     float height = InfiniteWorldManager.GetSampledTerrainHeight(worldX, worldZ);
                     vertices[index] = new Vector3(x * step, height, z * step);
-                    uvs[index] = new Vector2((float)x / resolution * 8f, (float)z / resolution * 8f);
-
                     colors[index] = GetBlendedBiomeColor(worldX, worldZ, height);
                 }
             }
 
-            int[] triangles = new int[resolution * resolution * 6];
-            int triIndex = 0;
-
-            for (int z = 0; z < resolution; z++)
-            {
-                for (int x = 0; x < resolution; x++)
-                {
-                    int current = z * (resolution + 1) + x;
-                    int next = current + resolution + 1;
-
-                    triangles[triIndex++] = current;
-                    triangles[triIndex++] = next;
-                    triangles[triIndex++] = current + 1;
-
-                    triangles[triIndex++] = current + 1;
-                    triangles[triIndex++] = next;
-                    triangles[triIndex++] = next + 1;
-                }
-            }
-
             sharedChunkMesh.vertices = vertices;
-            sharedChunkMesh.uv = uvs;
+            sharedChunkMesh.uv = buf.Uvs;
             sharedChunkMesh.colors = colors;
-            sharedChunkMesh.triangles = triangles;
+            sharedChunkMesh.triangles = buf.Triangles;
             sharedChunkMesh.RecalculateNormals();
             sharedChunkMesh.RecalculateBounds();
 

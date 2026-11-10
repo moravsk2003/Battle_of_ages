@@ -264,10 +264,10 @@ namespace BattleOfAges.AI
         {
             if (Lakes.InWater(at.x, at.z, half + 1f) || (WorldSettings.Bounded && !WorldSettings.Inside(at, half + 10f))) return false;
             float low = float.MaxValue, high = float.MinValue;
-            foreach (float dx in new[] { -half, half })
-                foreach (float dz in new[] { -half, half })
+            for (int ix = -1; ix <= 1; ix += 2)
+                for (int iz = -1; iz <= 1; iz += 2)
                 {
-                    float h = InfiniteWorldManager.GetSampledTerrainHeight(at.x + dx, at.z + dz);
+                    float h = InfiniteWorldManager.GetSampledTerrainHeight(at.x + ix * half, at.z + iz * half);
                     low = Mathf.Min(low, h);
                     high = Mathf.Max(high, h);
                 }
@@ -337,7 +337,9 @@ namespace BattleOfAges.AI
             }
         }
 
-        private void Update()
+        private static readonly Kind[] AllKinds = { Kind.House, Kind.Field, Kind.Sawmill, Kind.Mine, Kind.Wall, Kind.Pier };
+
+        public void Step()
         {
             if (kingdom == null) return;
             int hall = kingdom.Economy.HallLevel, people = kingdom.PeopleListed;
@@ -345,8 +347,9 @@ namespace BattleOfAges.AI
             lastHall = hall;
             lastPeople = people;
             int budget = RaisedPerFrame;
-            foreach (Kind kind in new[] { Kind.House, Kind.Field, Kind.Sawmill, Kind.Mine, Kind.Wall, Kind.Pier })
+            for (int i = 0; i < AllKinds.Length; i++)
             {
+                Kind kind = AllKinds[i];
                 int want = Mathf.Min(Wanted(kind, hall, people), plan[(int)kind].Count);
                 while (raised[(int)kind] < want && budget > 0)
                 {
@@ -361,12 +364,13 @@ namespace BattleOfAges.AI
         private bool unfinished;
         private bool Unfinished => unfinished;
 
-        /// <summary>Puts one up at once (a test's way to see all of it; Update does a few a frame).</summary>
+        /// <summary>Puts one up at once (a test's way to see all of it; Step does a few a frame).</summary>
         public void RaiseAllNow()
         {
             int hall = kingdom.Economy.HallLevel, people = kingdom.Population;
-            foreach (Kind kind in new[] { Kind.House, Kind.Field, Kind.Sawmill, Kind.Mine, Kind.Wall, Kind.Pier })
+            for (int i = 0; i < AllKinds.Length; i++)
             {
+                Kind kind = AllKinds[i];
                 int want = Mathf.Min(Wanted(kind, hall, people), plan[(int)kind].Count);
                 while (raised[(int)kind] < want) { Raise(plan[(int)kind][raised[(int)kind]]); raised[(int)kind]++; }
             }

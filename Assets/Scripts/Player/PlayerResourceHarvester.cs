@@ -39,6 +39,12 @@ namespace BattleOfAges.Player
         private OrePebbleNode activePebbleTarget;
         private StorageChestNode activeChestTarget;
         private WorkbenchNode activeWorkbenchTarget;
+        private float searchTimer;
+        private Vector3 lastSearchPos = new Vector3(1e9f, 1e9f, 1e9f);
+        private Quaternion lastSearchRot = Quaternion.identity;
+        private bool promptHidden;
+        private string lastPrompt;
+        private long lastTreePromptKey = long.MinValue;
 
         private void Start()
         {
@@ -58,17 +64,51 @@ namespace BattleOfAges.Player
             }
         }
 
+        private void ShowPromptCached(string text)
+        {
+            if (resourceUI == null) return;
+            if (!promptHidden && lastPrompt == text) return;
+            promptHidden = false;
+            lastPrompt = text;
+            resourceUI.ShowTreePrompt(text);
+        }
+
+        private void HidePromptCached()
+        {
+            if (resourceUI == null || promptHidden) return;
+            promptHidden = true;
+            lastPrompt = null;
+            lastTreePromptKey = long.MinValue;
+            resourceUI.HideTreePrompt();
+        }
+
         private void Update()
         {
             EnsureCameraReference();
 
             if (GameWindows.BlockGameplay)
             {
-                if (resourceUI != null) resourceUI.HideTreePrompt();
+                HidePromptCached();
                 return;
             }
 
-            FindBestInteractionTarget();
+            searchTimer -= Time.unscaledDeltaTime;
+            Transform camTr = playerCamera != null ? playerCamera.transform : transform;
+            Vector3 curPos = camTr.position;
+            Quaternion curRot = camTr.rotation;
+            bool interacting = IsKeyEDown() || IsKeyFDown() || IsKeyEHeld() || IsKeyFHeld();
+            bool targetInvalid = (activeTreeTarget != null && (!activeTreeTarget.isActiveAndEnabled || activeTreeTarget.CurrentState == TreeState.Depleted)) ||
+                                 (activePebbleTarget != null && (!activePebbleTarget.isActiveAndEnabled || activePebbleTarget.IsPickedUp));
+
+            if (interacting || targetInvalid || searchTimer <= 0f ||
+                (curPos - lastSearchPos).sqrMagnitude > 0.0025f ||
+                Quaternion.Angle(curRot, lastSearchRot) > 0.25f)
+            {
+                searchTimer = 0.08f;
+                lastSearchPos = curPos;
+                lastSearchRot = curRot;
+                FindBestInteractionTarget();
+            }
 
             // Cancel branch gathering on previous tree if player moved away or changed target
             if (previousTreeTarget != null && previousTreeTarget != activeTreeTarget)
@@ -99,7 +139,7 @@ namespace BattleOfAges.Player
             }
             else
             {
-                if (resourceUI != null) resourceUI.HideTreePrompt();
+                HidePromptCached();
             }
         }
 
@@ -143,6 +183,8 @@ namespace BattleOfAges.Player
         /// </summary>
         private bool Consider(Collider col, float distance, ref float bestPebble, ref float bestTree, bool pebblesFirst)
         {
+            if (col is TerrainCollider || col is MeshCollider || col is CharacterController) return false;
+
             WorkbenchNode wb = col.GetComponentInParent<WorkbenchNode>();
             if (wb != null) { activeWorkbenchTarget = wb; return true; }
 
@@ -169,7 +211,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activeWorkbenchTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            resourceUI.ShowTreePrompt($"[Натисніть {keyEStr}] Відкрити верстак");
+            ShowPromptCached($"[Натисніть {keyEStr}] Відкрити верстак");
         }
 
         private void HandleWorkbenchInput()
@@ -190,7 +232,7 @@ namespace BattleOfAges.Player
         private void UpdateChestPromptUI()
         {
             if (resourceUI == null || activeChestTarget == null) return;
-            resourceUI.ShowTreePrompt($"[Натисніть {KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather))}] Відкрити скриню-склад");
+            ShowPromptCached($"[Натисніть {KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather))}] Відкрити скриню-склад");
         }
 
         private void HandleChestInput()
@@ -210,28 +252,39 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activeTreeTarget == null) return;
 
-            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            string keyFStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.ChopTree));
+            int branchPercent = activeTreeTarget.CurrentState == TreeState.WholeTree ? Mathf.RoundToInt(activeTreeTarget.BranchProgress * 100f) : 0;
+            int fellPercent = activeTreeTarget.CurrentState == TreeState.WholeTree ? Mathf.RoundToInt(activeTreeTarget.FellingProgress * 100f) : 0;
+            int axeLvl = EquippedAxeLevel;
+            KeyCode kE = KeybindsManager.GetKey(KeyAction.InteractGather);
+            KeyCode kF = KeybindsManager.GetKey(KeyAction.ChopTree);
+            long key = ((long)activeTreeTarget.CurrentState << 48) ^
+                       ((long)branchPercent << 36) ^
+                       ((long)fellPercent << 24) ^
+                       ((long)activeTreeTarget.WoodRemaining << 12) ^
+                       ((long)axeLvl << 8) ^
+                       ((long)kE << 4) ^ (long)kF;
+            if (!promptHidden && key == lastTreePromptKey) return;
+            lastTreePromptKey = key;
+
+            string keyEStr = KeybindsManager.GetKeyDisplayString(kE);
+            string keyFStr = KeybindsManager.GetKeyDisplayString(kF);
 
             if (activeTreeTarget.CurrentState == TreeState.WholeTree)
             {
-                int branchPercent = Mathf.RoundToInt(activeTreeTarget.BranchProgress * 100f);
-                int fellPercent = Mathf.RoundToInt(activeTreeTarget.FellingProgress * 100f);
-
                 string branchStr = (branchPercent > 0) ? $"[Утримуйте {keyEStr}] Збирання гілок ({branchPercent}%)" : $"[Утримуйте {keyEStr}] Збирати гілки (+1 деревина)";
                 string chopStr = (fellPercent > 0) ? $"[Утримуйте {keyFStr}] Рубати стовбур ({fellPercent}%)" : $"[Утримуйте {keyFStr}] Зрубати дерево (+4 деревини)";
 
-                if (EquippedAxeLevel > 0)
+                if (axeLvl > 0)
                 {
-                    chopStr += $" [Сокира {ItemTypeNames.Roman(EquippedAxeLevel)}]";
+                    chopStr += $" [Сокира {ItemTypeNames.Roman(axeLvl)}]";
                 }
 
-                resourceUI.ShowTreePrompt($"{branchStr}\n{chopStr}");
+                ShowPromptCached($"{branchStr}\n{chopStr}");
             }
             else if (activeTreeTarget.CurrentState == TreeState.WoodPile)
             {
-                string axeStr = (EquippedAxeLevel > 0) ? $" [Сокира {ItemTypeNames.Roman(EquippedAxeLevel)}]" : "";
-                resourceUI.ShowTreePrompt($"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} деревини){axeStr}");
+                string axeStr = (axeLvl > 0) ? $" [Сокира {ItemTypeNames.Roman(axeLvl)}]" : "";
+                ShowPromptCached($"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} деревини){axeStr}");
             }
         }
 
@@ -239,7 +292,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activePebbleTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            resourceUI.ShowTreePrompt($"[Натисніть {keyEStr}] Підібрати руду");
+            ShowPromptCached($"[Натисніть {keyEStr}] Підібрати руду");
         }
 
         private void HandleTreeHarvestInput()

@@ -89,6 +89,7 @@ namespace BattleOfAges.World
         public static bool Inside(Vector3 p, float radius, out Vector3 way)
         {
             way = Vector3.zero;
+            Resources.ResourceGrid.FlushPending();
             LookAtBoulders();
             if (!cells.TryGetValue((Cell(p.x), Cell(p.z)), out List<Circle> list)) return false;
             foreach (Circle c in list)
@@ -106,6 +107,7 @@ namespace BattleOfAges.World
         /// <summary>The step a unit may take: a step into a prop ends at its edge, keeping whatever of it goes along the edge.</summary>
         public static Vector3 Constrain(Vector3 p, Vector3 step, float radius)
         {
+            Resources.ResourceGrid.FlushPending();
             float x = p.x + step.x, z = p.z + step.z;
             if (!cells.TryGetValue((Cell(x), Cell(z)), out List<Circle> list)) return step;
             bool met = false;

@@ -21,6 +21,13 @@ namespace BattleOfAges.Utils
         private Vector3 lastWrittenHipsLocal, lastAnimatedHipsLocal;
         private bool hasWritten;
         private static readonly RaycastHit[] Hits = new RaycastHit[8];
+        private static Camera cachedMainCam;
+
+        private Vector2 lastFootXZL = new Vector2(1e9f, 1e9f), lastFootXZR = new Vector2(1e9f, 1e9f);
+        private float lastGroundPlaneL = 1e9f, lastGroundPlaneR = 1e9f;
+        private bool cachedHitL, cachedHitR;
+        private float cachedTargetL, cachedTargetR;
+        private Vector3 cachedNormalL = Vector3.up, cachedNormalR = Vector3.up;
 
         // LOD: feet are only solved for characters on screen and near the camera (2 raycasts per frame each).
         private const float IKDistance = 30f;
@@ -57,7 +64,8 @@ namespace BattleOfAges.Utils
             if (lodTimer <= 0f)
             {
                 lodTimer = 0.5f;
-                Transform viewer = LodViewerOverride != null ? LodViewerOverride : (Camera.main != null ? Camera.main.transform : null);
+                if (cachedMainCam == null || !cachedMainCam.isActiveAndEnabled) cachedMainCam = Camera.main;
+                Transform viewer = LodViewerOverride != null ? LodViewerOverride : (cachedMainCam != null ? cachedMainCam.transform : null);
                 lodActive = (LodViewerOverride != null || AnyVisible()) &&
                             (viewer == null || (viewer.position - transform.position).sqrMagnitude < IKDistance * IKDistance);
                 if (!lodActive) { offsetL = offsetR = hipOffset = 0f; hasWritten = false; }
@@ -75,20 +83,44 @@ namespace BattleOfAges.Utils
 
             float groundPlane = owner.position.y;
             float dt = Time.deltaTime;
-            bool hitL = GroundOffset(footL, groundPlane, out float targetL, out Vector3 normalL);
-            bool hitR = GroundOffset(footR, groundPlane, out float targetR, out Vector3 normalR);
+            bool hitL = GroundOffsetCached(footL, groundPlane, ref lastFootXZL, ref lastGroundPlaneL, ref cachedHitL, ref cachedTargetL, ref cachedNormalL, out float targetL, out Vector3 normalL);
+            bool hitR = GroundOffsetCached(footR, groundPlane, ref lastFootXZR, ref lastGroundPlaneR, ref cachedHitR, ref cachedTargetR, ref cachedNormalR, out float targetR, out Vector3 normalR);
             float k = 1f - Mathf.Exp(-smoothing * Mathf.Max(dt, 1e-4f));
             offsetL = Mathf.Lerp(offsetL, hitL ? targetL : 0f, k);
             offsetR = Mathf.Lerp(offsetR, hitR ? targetR : 0f, k);
             hipOffset = Mathf.Lerp(hipOffset, Mathf.Clamp(Mathf.Min(offsetL, offsetR, 0f), -maxHipDrop, 0f), k);
 
             hips.localPosition = lastAnimatedHipsLocal;
-            hips.position += Vector3.up * hipOffset;
+            if (Mathf.Abs(hipOffset) > 1e-4f) hips.position += Vector3.up * hipOffset;
             lastWrittenHipsLocal = hips.localPosition;
             hasWritten = true;
 
+            if (Mathf.Abs(offsetL) < 0.001f && Mathf.Abs(offsetR) < 0.001f && Mathf.Abs(hipOffset) < 0.001f &&
+                (!hitL || normalL.y > 0.999f) && (!hitR || normalR.y > 0.999f))
+            {
+                return;
+            }
+
             Solve(upperL, lowerL, footL, footL.position + Vector3.up * (offsetL - hipOffset), hitL ? normalL : Vector3.up);
             Solve(upperR, lowerR, footR, footR.position + Vector3.up * (offsetR - hipOffset), hitR ? normalR : Vector3.up);
+        }
+
+        private bool GroundOffsetCached(Transform foot, float groundPlane, ref Vector2 lastXZ, ref float lastPlane, ref bool cachedHit, ref float cachedTarget, ref Vector3 cachedNormal, out float offset, out Vector3 normal)
+        {
+            Vector3 fp = foot.position;
+            Vector2 xz = new Vector2(fp.x, fp.z);
+            if ((xz - lastXZ).sqrMagnitude < 0.000225f && Mathf.Abs(groundPlane - lastPlane) < 0.01f)
+            {
+                offset = cachedTarget;
+                normal = cachedNormal;
+                return cachedHit;
+            }
+            lastXZ = xz;
+            lastPlane = groundPlane;
+            cachedHit = GroundOffset(foot, groundPlane, out cachedTarget, out cachedNormal);
+            offset = cachedTarget;
+            normal = cachedNormal;
+            return cachedHit;
         }
 
         /// <summary>Height of the ground under the foot relative to the unit's ground plane.</summary>

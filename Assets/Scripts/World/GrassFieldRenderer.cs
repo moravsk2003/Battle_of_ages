@@ -35,8 +35,10 @@ namespace BattleOfAges.World
 
         private sealed class Batch
         {
-            public readonly Matrix4x4[] Items = new Matrix4x4[BatchSize];
-            public int Count;
+            public readonly List<Matrix4x4[]> Pages = new List<Matrix4x4[]>(16);
+            public int PageIndex;
+            public int CountInLastPage;
+            public int TotalCount;
             public Mesh Mesh;
         }
 
@@ -44,9 +46,22 @@ namespace BattleOfAges.World
         private readonly Batch near = new Batch(), far = new Batch(), flowers = new Batch();
         private readonly Dictionary<Vector2Int, Tile> tileCache = new Dictionary<Vector2Int, Tile>();
         private static GrassFieldRenderer current;
+        private Camera cachedMainCam, lastCam;
+        private Vector3 lastCamPos = new Vector3(1e9f, 1e9f, 1e9f);
+        private Quaternion lastCamRot = Quaternion.identity;
+        private float lastFov = -1f, lastAspect = -1f, lastDrawRadius = -1f, lastNearRadius = -1f;
+        private int lastStride = -1, cacheVersion = 1, lastCacheVersion = -1;
+        private bool lastHighAboveGround;
 
         /// <summary>The land changed (a field): tiles are made anew.</summary>
-        public static void ForgetTiles() { if (current != null) current.tileCache.Clear(); }
+        public static void ForgetTiles()
+        {
+            if (current != null)
+            {
+                current.tileCache.Clear();
+                current.cacheVersion++;
+            }
+        }
         private readonly List<Vector2Int> evictBuffer = new List<Vector2Int>();
         private readonly Plane[] frustum = new Plane[6];
         private static readonly int BiomeTintId = Shader.PropertyToID("_BiomeTint");
@@ -64,8 +79,9 @@ namespace BattleOfAges.World
 
         private void LateUpdate()
         {
-            Camera cam = Camera.main;
-            if (cam != null) Submit(cam.transform.position, cam);
+            if (cachedMainCam == null || !cachedMainCam.isActiveAndEnabled || !cachedMainCam.CompareTag("MainCamera"))
+                cachedMainCam = Camera.main;
+            if (cachedMainCam != null) Submit(cachedMainCam.transform.position, cachedMainCam);
         }
 
         /// <summary>Queues grass for one camera (e.g. a manually rendered screenshot camera) around its position.</summary>
@@ -78,8 +94,50 @@ namespace BattleOfAges.World
         {
             if (material == null) return;
 
+            var rp = new RenderParams(material)
+            {
+                camera = cam, // only the view: not the minimap, not the shadow maps (grass casts none)
+                shadowCastingMode = ShadowCastingMode.Off,
+                receiveShadows = true,
+                worldBounds = new Bounds(c, Vector3.one * (DrawRadius * 2f + 20f))
+            };
+
+            Quaternion camRot = cam.transform.rotation;
+            float fov = cam.fieldOfView, aspect = cam.aspect;
+            if (cam == lastCam &&
+                cacheVersion == lastCacheVersion &&
+                (c - lastCamPos).sqrMagnitude < 1e-4f &&
+                Quaternion.Angle(camRot, lastCamRot) < 0.02f &&
+                Mathf.Approximately(fov, lastFov) &&
+                Mathf.Approximately(aspect, lastAspect) &&
+                Mathf.Approximately(DrawRadius, lastDrawRadius) &&
+                Mathf.Approximately(NearRadius, lastNearRadius) &&
+                Stride == lastStride)
+            {
+                if (lastHighAboveGround) { LastDrawn = 0; return; }
+                Render(near, ref rp); Render(far, ref rp); Render(flowers, ref rp);
+                LastDrawn = near.TotalCount + far.TotalCount + flowers.TotalCount;
+                return;
+            }
+
+            lastCam = cam;
+            lastCacheVersion = cacheVersion;
+            lastCamPos = c;
+            lastCamRot = camRot;
+            lastFov = fov;
+            lastAspect = aspect;
+            lastDrawRadius = DrawRadius;
+            lastNearRadius = NearRadius;
+            lastStride = Stride;
+
             float groundHere = InfiniteWorldManager.GetSampledTerrainHeight(c.x, c.z);
-            if (c.y - groundHere > DrawRadius) return; // high above the ground: blades would be sub-pixel anyway
+            if (c.y - groundHere > DrawRadius) // high above the ground: blades would be sub-pixel anyway
+            {
+                lastHighAboveGround = true;
+                LastDrawn = 0;
+                return;
+            }
+            lastHighAboveGround = false;
 
             material.SetColor(BiomeTintId, ProceduralBiomeChunk.GetBlendedBiomeColor(c.x, c.z, groundHere));
             material.SetFloat(FadeStartId, DrawRadius * 0.72f);
@@ -88,13 +146,7 @@ namespace BattleOfAges.World
 
             int r = Mathf.CeilToInt(DrawRadius / TileSize);
             Vector2Int center = new Vector2Int(Mathf.FloorToInt(c.x / TileSize), Mathf.FloorToInt(c.z / TileSize));
-            var rp = new RenderParams(material)
-            {
-                camera = cam, // only the view: not the minimap, not the shadow maps (grass casts none)
-                shadowCastingMode = ShadowCastingMode.Off,
-                receiveShadows = true,
-                worldBounds = new Bounds(c, Vector3.one * (DrawRadius * 2f + 20f))
-            };
+            Reset(near); Reset(far); Reset(flowers);
 
             int drawn = 0;
             const float halfDiagonal = TileSize * 0.7072f;
@@ -115,12 +167,12 @@ namespace BattleOfAges.World
                     if (tile.Grass.Length == 0 || !GeometryUtility.TestPlanesAABB(frustum, tile.Bounds)) continue;
 
                     Batch into = dist < NearRadius ? near : far;
-                    for (int i = 0; i < tile.Grass.Length; i += Stride) { Add(into, tile.Grass[i], ref rp); drawn++; }
+                    for (int i = 0; i < tile.Grass.Length; i += Stride) { Add(into, in tile.Grass[i]); drawn++; }
                     if (dist < NearRadius + FlowerReach)
-                        for (int i = 0; i < tile.Flowers.Length; i++) { Add(flowers, tile.Flowers[i], ref rp); drawn++; }
+                        for (int i = 0; i < tile.Flowers.Length; i++) { Add(flowers, in tile.Flowers[i]); drawn++; }
                 }
             }
-            Flush(near, ref rp); Flush(far, ref rp); Flush(flowers, ref rp);
+            Render(near, ref rp); Render(far, ref rp); Render(flowers, ref rp);
             LastDrawn = drawn;
 
             if (tileCache.Count > (2 * r + 3) * (2 * r + 3))
@@ -134,16 +186,31 @@ namespace BattleOfAges.World
             }
         }
 
-        private static void Add(Batch b, Matrix4x4 m, ref RenderParams rp)
+        private static void Reset(Batch b)
         {
-            b.Items[b.Count++] = m;
-            if (b.Count == BatchSize) Flush(b, ref rp);
+            b.PageIndex = 0;
+            b.CountInLastPage = 0;
+            b.TotalCount = 0;
         }
 
-        private static void Flush(Batch b, ref RenderParams rp)
+        private static void Add(Batch b, in Matrix4x4 m)
         {
-            if (b.Count > 0) Graphics.RenderMeshInstanced(rp, b.Mesh, 0, b.Items, b.Count);
-            b.Count = 0;
+            if (b.PageIndex == b.Pages.Count) b.Pages.Add(new Matrix4x4[BatchSize]);
+            b.Pages[b.PageIndex][b.CountInLastPage++] = m;
+            b.TotalCount++;
+            if (b.CountInLastPage == BatchSize)
+            {
+                b.PageIndex++;
+                b.CountInLastPage = 0;
+            }
+        }
+
+        private static void Render(Batch b, ref RenderParams rp)
+        {
+            for (int p = 0; p < b.PageIndex; p++)
+                Graphics.RenderMeshInstanced(rp, b.Mesh, 0, b.Pages[p], BatchSize);
+            if (b.CountInLastPage > 0)
+                Graphics.RenderMeshInstanced(rp, b.Mesh, 0, b.Pages[b.PageIndex], b.CountInLastPage);
         }
 
         private static Tile BuildTile(Vector2Int key)

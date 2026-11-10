@@ -19,9 +19,14 @@ namespace BattleOfAges.World
 
         private static readonly Color Moon = new Color(0.62f, 0.72f, 1f), Sunset = new Color(1f, 0.58f, 0.34f);
         private static readonly Color NightFog = new Color(0.07f, 0.09f, 0.16f), NightZenith = new Color(0.02f, 0.03f, 0.08f), NightHorizon = new Color(0.08f, 0.1f, 0.18f);
+        private static readonly int ZenithColorId = Shader.PropertyToID("_ZenithColor");
+        private static readonly int HorizonColorId = Shader.PropertyToID("_HorizonColor");
+        private static readonly int SunColorId = Shader.PropertyToID("_SunColor");
+        private static readonly int CloudColorId = Shader.PropertyToID("_CloudColor");
+        private static readonly int CloudShadowColorId = Shader.PropertyToID("_CloudShadowColor");
 
         private Light sun;
-        private float baseIntensity, baseYaw;
+        private float baseIntensity, baseYaw, lastHour = -999f;
         private Color baseColor, baseSky, baseEquator, baseGround, baseFog;
         private Material sky;
         private Color skyZenith, skyHorizon, skySun, skyCloud, skyCloudShadow;
@@ -54,9 +59,17 @@ namespace BattleOfAges.World
         {
             if (!SaveLoad.SaveSystem.InGame) return;
             if (RenderSettings.sun == null) return;
-            if (RenderSettings.sun != sun) Capture(RenderSettings.sun);
+            if (RenderSettings.sun != sun)
+            {
+                Capture(RenderSettings.sun);
+                lastHour = -999f;
+            }
 
-            SunAt(WorldClock.HourOfDay, out Vector3 towards, out float elevation, out float day);
+            float hour = WorldClock.HourOfDay;
+            if (Mathf.Abs(Mathf.DeltaAngle(hour * 15f, lastHour * 15f)) < 0.05f) return;
+            lastHour = hour;
+
+            SunAt(hour, out Vector3 towards, out float elevation, out float day);
             bool moonUp = elevation < 0f;
             Vector3 from = moonUp ? -towards : towards;
             if (moonUp) { from.y = Mathf.Max(from.y, 0.5f); from.Normalize(); } // the moon rides high all night (a low one lit nothing)
@@ -78,11 +91,11 @@ namespace BattleOfAges.World
 
             if (sky != null)
             {
-                sky.SetColor("_ZenithColor", Color.Lerp(NightZenith, skyZenith, day));
-                sky.SetColor("_HorizonColor", Color.Lerp(NightHorizon, Color.Lerp(Sunset, skyHorizon, high), day));
-                sky.SetColor("_SunColor", Color.Lerp(Moon * 0.9f, skySun, day));
-                sky.SetColor("_CloudColor", Color.Lerp(new Color(0.2f, 0.23f, 0.32f), skyCloud, day));
-                sky.SetColor("_CloudShadowColor", Color.Lerp(new Color(0.06f, 0.07f, 0.12f), skyCloudShadow, day));
+                sky.SetColor(ZenithColorId, Color.Lerp(NightZenith, skyZenith, day));
+                sky.SetColor(HorizonColorId, Color.Lerp(NightHorizon, Color.Lerp(Sunset, skyHorizon, high), day));
+                sky.SetColor(SunColorId, Color.Lerp(Moon * 0.9f, skySun, day));
+                sky.SetColor(CloudColorId, Color.Lerp(new Color(0.2f, 0.23f, 0.32f), skyCloud, day));
+                sky.SetColor(CloudShadowColorId, Color.Lerp(new Color(0.06f, 0.07f, 0.12f), skyCloudShadow, day));
             }
         }
 
@@ -99,15 +112,15 @@ namespace BattleOfAges.World
             baseFog = RenderSettings.fogColor;
             sky = null;
             Material s = RenderSettings.skybox;
-            if (s != null && s.HasProperty("_ZenithColor"))
+            if (s != null && s.HasProperty(ZenithColorId))
             {
                 sky = new Material(s) { name = s.name + " (day and night)" };
                 RenderSettings.skybox = sky;
-                skyZenith = sky.GetColor("_ZenithColor");
-                skyHorizon = sky.GetColor("_HorizonColor");
-                skySun = sky.GetColor("_SunColor");
-                skyCloud = sky.GetColor("_CloudColor");
-                skyCloudShadow = sky.GetColor("_CloudShadowColor");
+                skyZenith = sky.GetColor(ZenithColorId);
+                skyHorizon = sky.GetColor(HorizonColorId);
+                skySun = sky.GetColor(SunColorId);
+                skyCloud = sky.GetColor(CloudColorId);
+                skyCloudShadow = sky.GetColor(CloudShadowColorId);
             }
         }
 

@@ -22,9 +22,10 @@ namespace BattleOfAges.Resources
 
         private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; StandSolid(); }
         private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; World.SolidProps.Remove(this); }
+        private void Start() => SyncPosition();
 
         // Moved after it was enabled (placed by a builder, or respawned): into its new cell
-        private void Update()
+        public void SyncPosition()
         {
             if (!transform.hasChanged) return;
             transform.hasChanged = false;
@@ -66,6 +67,7 @@ namespace BattleOfAges.Resources
             transform.position = newPos;
             TargetedBy = null;
             IsPickedUp = false;
+            SyncPosition();
             StandSolid();
 
             SetVisualsActive(true);

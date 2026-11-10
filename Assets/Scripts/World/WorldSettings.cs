@@ -34,6 +34,7 @@ namespace BattleOfAges.World
             Shift = ShiftOf(seed);
             InfiniteWorldManager.ResetHeightCaches();
             Lakes.Rebuild();
+            LakeWater.NotifyWorldChanged();
         }
 
         /// <summary>A seed for a new campaign (never 0, which is the old fixed world).</summary>

@@ -27,8 +27,8 @@ namespace BattleOfAges.UI
         private int frameIndex, hitchIndex;
 
         /// <summary>The meter is on screen (F3 switches it).</summary>
-        public bool Shown { get => panel.activeSelf; set { panel.SetActive(value); refreshTimer = RefreshInterval; } }
-        private float accumulated, worstMs, refreshTimer;
+        public bool Shown { get => panel.activeSelf; set { panel.SetActive(value); refreshTimer = RefreshInterval; graphTimer = 1f; } }
+        private float accumulated, worstMs, refreshTimer, graphTimer;
         private int accumulatedFrames;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -143,8 +143,13 @@ namespace BattleOfAges.UI
             Color32 c = ms <= 16.7f ? green : ms <= 33.3f ? yellow : red;
             for (int y = 0; y < GraphHeight; y++) column[y] = y < h ? c : (y == line60 || y == line30 ? guide : clear);
             graph.SetPixels32(x, 0, 1, GraphHeight, column);
-            graph.Apply(false);
-            graphImage.uvRect = new Rect((float)frameIndex / GraphFrames, 0f, 1f, 1f); // oldest column at the left edge
+            graphTimer += Time.unscaledDeltaTime;
+            if (graphTimer >= 0.033f)
+            {
+                graphTimer = 0f;
+                graph.Apply(false);
+                graphImage.uvRect = new Rect((float)frameIndex / GraphFrames, 0f, 1f, 1f); // oldest column at the left edge
+            }
         }
 
         private static string Grade(float fps) => fps >= 55f ? "#7CFC7C" : fps >= 30f ? "#FFD84A" : "#FF5050";

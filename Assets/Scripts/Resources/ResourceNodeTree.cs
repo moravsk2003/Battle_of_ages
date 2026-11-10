@@ -35,6 +35,7 @@ namespace BattleOfAges.Resources
         private Vector3 initialEuler;
         private float wobbleVelocity = 0f;
         private float wobbleAngle = 0f;
+        private Coroutine wobbleRoutine;
 
         /// <summary>Trunk radius at the ground: the stump of the felled tree is sized by it (SteppeTreeBuilder).</summary>
         public float StumpRadius { get; set; } = 0.42f;
@@ -63,6 +64,9 @@ namespace BattleOfAges.Resources
             felled.Remove(this);
             World.SolidProps.Remove(this);
             standsSolid = false; // (back in the pool: its next place says so again)
+            wobbleRoutine = null;
+            wobbleAngle = 0f;
+            wobbleVelocity = 0f;
         }
 
         private static readonly HashSet<ResourceNodeTree> felled = new HashSet<ResourceNodeTree>();
@@ -73,11 +77,12 @@ namespace BattleOfAges.Resources
         private static void ResetStatics() => felled.Clear();
 
         /// <summary>Moved after it was enabled (a builder makes it at the origin, then places it): into its new cell.</summary>
-        private void KeepGridCell()
+        public void SyncPosition()
         {
             if (!transform.hasChanged) return;
             transform.hasChanged = false;
             if (inGrid) gridCell = ResourceGrid.Move(this, gridCell);
+            if (standsSolid) ShowTrunk();
         }
 
         private void Awake()
@@ -86,11 +91,21 @@ namespace BattleOfAges.Resources
             initialEuler = transform.localEulerAngles;
         }
 
-        private void Update()
+        private void Start() => SyncPosition();
+
+        public void ApplyHitImpulse(float strength = 3.5f)
         {
-            KeepGridCell();
-            // Smooth spring damping for tree wobble reaction on hit
-            if (Mathf.Abs(wobbleAngle) > 0.01f || Mathf.Abs(wobbleVelocity) > 0.01f)
+            SyncPosition();
+            wobbleVelocity += UnityEngine.Random.Range(strength * 0.7f, strength * 1.3f);
+            if (wobbleRoutine == null && isActiveAndEnabled)
+            {
+                wobbleRoutine = StartCoroutine(WobbleRoutine());
+            }
+        }
+
+        private System.Collections.IEnumerator WobbleRoutine()
+        {
+            while (Mathf.Abs(wobbleAngle) > 0.01f || Mathf.Abs(wobbleVelocity) > 0.01f)
             {
                 float springForce = -wobbleAngle * 45f;
                 float dampingForce = -wobbleVelocity * 8f;
@@ -98,12 +113,13 @@ namespace BattleOfAges.Resources
                 wobbleAngle += wobbleVelocity * Time.deltaTime;
 
                 transform.localRotation = Quaternion.Euler(initialEuler.x + wobbleAngle, initialEuler.y, initialEuler.z);
+                yield return null;
             }
-        }
 
-        public void ApplyHitImpulse(float strength = 3.5f)
-        {
-            wobbleVelocity += UnityEngine.Random.Range(strength * 0.7f, strength * 1.3f);
+            wobbleAngle = 0f;
+            wobbleVelocity = 0f;
+            transform.localRotation = Quaternion.Euler(initialEuler);
+            wobbleRoutine = null;
         }
 
         public bool GatherBranchesProgress(float deltaTime)
@@ -264,6 +280,7 @@ namespace BattleOfAges.Resources
         public void StandSolid()
         {
             standsSolid = true;
+            SyncPosition();
             ShowTrunk();
         }
 
@@ -331,6 +348,7 @@ namespace BattleOfAges.Resources
                 capsule.radius = 0.45f;
                 capsule.height = 3.4f;
             }
+            SyncPosition();
             ShowTrunk();
         }
     }

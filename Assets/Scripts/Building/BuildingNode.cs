@@ -195,18 +195,24 @@ namespace BattleOfAges.Building
                 indRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 indRenderer.receiveShadows = false;
 
-                if (cachedUnlitShader == null)
+                if (sharedSelectionMaterial == null)
                 {
-                    cachedUnlitShader = Shader.Find("Sprites/Default")
-                        ?? Shader.Find("Universal Render Pipeline/Unlit")
-                        ?? Shader.Find("Unlit/Transparent");
+                    if (cachedUnlitShader == null)
+                    {
+                        cachedUnlitShader = Shader.Find("Sprites/Default")
+                            ?? Shader.Find("Universal Render Pipeline/Unlit")
+                            ?? Shader.Find("Unlit/Transparent");
+                    }
+
+                    sharedSelectionMaterial = new Material(cachedUnlitShader)
+                    {
+                        color = new Color(0.2f, 0.85f, 1.0f, 0.85f),
+                        renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay
+                    };
+                    sharedSelectionMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
                 }
 
-                Material indMat = new Material(cachedUnlitShader);
-                indMat.color = new Color(0.2f, 0.85f, 1.0f, 0.85f);
-                indMat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
-                indMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay;
-                indRenderer.material = indMat;
+                indRenderer.sharedMaterial = sharedSelectionMaterial;
             }
 
             indicator.SetActive(false);
@@ -214,6 +220,8 @@ namespace BattleOfAges.Building
 
             return npcObj;
         }
+
+        private static Material sharedSelectionMaterial;
 
         public static GameObject CreateWorkerHousePrefab(string name = "WorkerHouse")
         {

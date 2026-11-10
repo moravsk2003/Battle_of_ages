@@ -252,7 +252,7 @@ namespace BattleOfAges.RTS
             int frame = Time.frameCount;
             if (builtFrame == frame) return;
             builtFrame = frame;
-            for (int i = 0; i < TableSize; i++) cellHead[i] = -1;
+            System.Array.Fill(cellHead, -1);
             for (int id = 0; id < capacity; id++)
             {
                 Transform t = transforms[id];

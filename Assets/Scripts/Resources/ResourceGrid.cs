@@ -15,6 +15,8 @@ namespace BattleOfAges.Resources
 
         private static readonly Dictionary<Vector2Int, List<ResourceNodeTree>> trees = new Dictionary<Vector2Int, List<ResourceNodeTree>>();
         private static readonly Dictionary<Vector2Int, List<OrePebbleNode>> pebbles = new Dictionary<Vector2Int, List<OrePebbleNode>>();
+        private static readonly List<ResourceNodeTree> pendingTrees = new List<ResourceNodeTree>(64);
+        private static readonly List<OrePebbleNode> pendingPebbles = new List<OrePebbleNode>(64);
 
         public static int TreeCount { get; private set; }
         public static int PebbleCount { get; private set; }
@@ -24,15 +26,39 @@ namespace BattleOfAges.Resources
         {
             trees.Clear();
             pebbles.Clear();
+            pendingTrees.Clear();
+            pendingPebbles.Clear();
             TreeCount = PebbleCount = 0;
         }
 
         public static Vector2Int CellOf(Vector3 p) => new Vector2Int(Mathf.FloorToInt(p.x / CellSize), Mathf.FloorToInt(p.z / CellSize));
 
-        public static Vector2Int Add(ResourceNodeTree t) { TreeCount++; return Add(trees, t, t.transform.position); }
+        public static Vector2Int Add(ResourceNodeTree t) { TreeCount++; pendingTrees.Add(t); return Add(trees, t, t.transform.position); }
         public static void Remove(ResourceNodeTree t, Vector2Int cell) { if (Remove(trees, t, cell)) TreeCount--; }
-        public static Vector2Int Add(OrePebbleNode p) { PebbleCount++; return Add(pebbles, p, p.transform.position); }
+        public static Vector2Int Add(OrePebbleNode p) { PebbleCount++; pendingPebbles.Add(p); return Add(pebbles, p, p.transform.position); }
         public static void Remove(OrePebbleNode p, Vector2Int cell) { if (Remove(pebbles, p, cell)) PebbleCount--; }
+
+        public static void FlushPending()
+        {
+            if (pendingTrees.Count > 0)
+            {
+                for (int i = 0; i < pendingTrees.Count; i++)
+                {
+                    ResourceNodeTree t = pendingTrees[i];
+                    if (t != null && t.isActiveAndEnabled) t.SyncPosition();
+                }
+                pendingTrees.Clear();
+            }
+            if (pendingPebbles.Count > 0)
+            {
+                for (int i = 0; i < pendingPebbles.Count; i++)
+                {
+                    OrePebbleNode p = pendingPebbles[i];
+                    if (p != null && p.isActiveAndEnabled) p.SyncPosition();
+                }
+                pendingPebbles.Clear();
+            }
+        }
 
         /// <summary>A node that moved: from its old cell into the one it is in now (nothing to do if it is the same).</summary>
         public static Vector2Int Move(ResourceNodeTree t, Vector2Int from) => Move(trees, t, from, t.transform.position);
@@ -59,8 +85,16 @@ namespace BattleOfAges.Resources
             return map.TryGetValue(cell, out List<T> list) && list.Remove(node);
         }
 
-        public static List<ResourceNodeTree> TreesIn(Vector2Int cell) => trees.TryGetValue(cell, out List<ResourceNodeTree> l) ? l : null;
-        public static List<OrePebbleNode> PebblesIn(Vector2Int cell) => pebbles.TryGetValue(cell, out List<OrePebbleNode> l) ? l : null;
+        public static List<ResourceNodeTree> TreesIn(Vector2Int cell)
+        {
+            if (pendingTrees.Count > 0) FlushPending();
+            return trees.TryGetValue(cell, out List<ResourceNodeTree> l) ? l : null;
+        }
+        public static List<OrePebbleNode> PebblesIn(Vector2Int cell)
+        {
+            if (pendingPebbles.Count > 0) FlushPending();
+            return pebbles.TryGetValue(cell, out List<OrePebbleNode> l) ? l : null;
+        }
 
         /// <summary>
         /// The cells of ring k round the centre cell (k = 0: the centre itself), appended to into. Everything in ring k

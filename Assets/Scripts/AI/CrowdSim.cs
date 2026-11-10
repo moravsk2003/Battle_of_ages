@@ -439,6 +439,7 @@ namespace BattleOfAges.AI
         {
             UnitSpatialGrid.EnsureCurrent();
             Vector3[] p = UnitSpatialGrid.PositionArray;
+            int cap = UnitSpatialGrid.Capacity;
             if (!gridPos.IsCreated || gridPos.Length != p.Length)
             {
                 if (gridPos.IsCreated) { gridPos.Dispose(); gridRadius.Dispose(); gridNext.Dispose(); gridAlive.Dispose(); }
@@ -448,10 +449,13 @@ namespace BattleOfAges.AI
                 gridAlive = new NativeArray<byte>(p.Length, Allocator.Persistent);
             }
             if (!gridHead.IsCreated) gridHead = new NativeArray<int>(UnitSpatialGrid.Buckets, Allocator.Persistent);
-            gridPos.CopyFrom(p);
-            gridRadius.CopyFrom(UnitSpatialGrid.RadiusArray);
-            gridNext.CopyFrom(UnitSpatialGrid.NextArray);
-            gridAlive.CopyFrom(UnitSpatialGrid.AliveArray);
+            if (cap > 0)
+            {
+                NativeArray<Vector3>.Copy(p, 0, gridPos, 0, cap);
+                NativeArray<float>.Copy(UnitSpatialGrid.RadiusArray, 0, gridRadius, 0, cap);
+                NativeArray<int>.Copy(UnitSpatialGrid.NextArray, 0, gridNext, 0, cap);
+                NativeArray<byte>.Copy(UnitSpatialGrid.AliveArray, 0, gridAlive, 0, cap);
+            }
             gridHead.CopyFrom(UnitSpatialGrid.HeadArray);
         }
 
@@ -480,7 +484,8 @@ namespace BattleOfAges.AI
                 WalkerSeparation = GameBalance.WalkerSeparation, StandingSeparation = GameBalance.StandingSeparation, BattlePull = GameBalance.BattlePull
             };
             job.Schedule(transforms).Complete();
-            gridPos.CopyTo(UnitSpatialGrid.PositionArray);
+            int gridCap = UnitSpatialGrid.Capacity;
+            if (gridCap > 0) NativeArray<Vector3>.Copy(gridPos, 0, UnitSpatialGrid.PositionArray, 0, gridCap);
             if (fresh.Count > 0)
             {
                 foreach (AIBaseController a in fresh) if (a != null && a.crowdIndex >= 0) UnitSpatialGrid.SetFed(a.GridId, true);

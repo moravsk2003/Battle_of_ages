@@ -79,13 +79,19 @@ namespace BattleOfAges.Building
 
         private void Update()
         {
-            workers.RemoveAll(w => w == null);
+            for (int i = workers.Count - 1; i >= 0; i--)
+                if (workers[i] == null) workers.RemoveAt(i);
             int present = 0;
-            foreach (NpcResourceGatherer w in workers)
+            int slots = Mathf.Max(1, Slots);
+            Vector3 center = transform.position;
+            for (int i = 0; i < workers.Count; i++)
             {
-                Vector3 off = w.transform.position - SpotFor(w);
-                off.y = 0f;
-                if (off.sqrMagnitude <= Reach * Reach) present++;
+                NpcResourceGatherer w = workers[i];
+                float a = i * Mathf.PI * 2f / slots + 0.4f;
+                Vector3 wp = w.transform.position;
+                float dx = wp.x - (center.x + Mathf.Cos(a) * SpotRadius);
+                float dz = wp.z - (center.z + Mathf.Sin(a) * SpotRadius);
+                if (dx * dx + dz * dz <= Reach * Reach) present++;
             }
             Present = present;
             if (present > 0) Yield(present, WorldClock.HoursOf(Time.deltaTime));

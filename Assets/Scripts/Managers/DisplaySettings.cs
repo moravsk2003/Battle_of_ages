@@ -13,7 +13,7 @@ namespace BattleOfAges.Managers
     public static class DisplaySettings
     {
         public static readonly int[] ScalePercents = { 80, 90, 100, 110, 120, 130, 140 };
-        public static readonly int[] FrameCaps = { 0, 30, 60, 120, 144, 240 }; // 0: no cap
+        public static readonly int[] FrameCaps = { 0, 30, 60, 120, 144, 240, 360, 500 }; // 0: no cap
 
         private const string ScaleKey = "Settings_UiScale", FullKey = "Settings_FullScreen", VsyncKey = "Settings_VSync", CapKey = "Settings_FrameCap", ResKey = "Settings_Resolution";
 

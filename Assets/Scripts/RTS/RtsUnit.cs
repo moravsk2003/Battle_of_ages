@@ -96,6 +96,8 @@ namespace BattleOfAges.RTS
         {
             SnapToTerrain();
             lastPos = transform.position;
+            combatUnit = GetComponent<CombatUnit>();
+            combatUnitChecked = true;
             gatherer = GetComponent<NpcResourceGatherer>();
             if (!isPlayerControlled)
             {
@@ -123,6 +125,8 @@ namespace BattleOfAges.RTS
             if (health != null) health.InitializeHealth(health.MaxHealth);
         }
 
+        private static Material sharedSelectionMaterial;
+
         private void SetupSelectionIndicatorVisuals()
         {
             if (selectionIndicator == null)
@@ -142,14 +146,18 @@ namespace BattleOfAges.RTS
                 mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 mr.receiveShadows = false;
 
-                Shader unlitShader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Transparent");
-                Material mat = new Material(unlitShader);
-                mat.color = new Color(0.2f, 0.85f, 1.0f, 0.85f);
-                
-                mat.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
-                mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay;
-                
-                mr.material = mat;
+                if (sharedSelectionMaterial == null)
+                {
+                    Shader unlitShader = Shader.Find("Sprites/Default") ?? Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Transparent");
+                    sharedSelectionMaterial = new Material(unlitShader)
+                    {
+                        color = new Color(0.2f, 0.85f, 1.0f, 0.85f),
+                        renderQueue = (int)UnityEngine.Rendering.RenderQueue.Overlay
+                    };
+                    sharedSelectionMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+                }
+
+                mr.sharedMaterial = sharedSelectionMaterial;
             }
         }
 
@@ -171,6 +179,7 @@ namespace BattleOfAges.RTS
 
         private HealthComponent attackTarget;
         private CombatUnit combatUnit;
+        private bool combatUnitChecked;
 
         /// <summary>
         /// Attack this target. ordered: the player's order — the unit follows it anywhere. Otherwise (a
@@ -371,7 +380,7 @@ namespace BattleOfAges.RTS
         private void Update()
         {
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
-            if (combatUnit == null) combatUnit = GetComponent<CombatUnit>();
+            if (!combatUnitChecked) { combatUnit = GetComponent<CombatUnit>(); combatUnitChecked = true; }
             if (wallState == WallState.ToStairs && FlatDistance(transform.position, wallPath[0]) < 1.2f) { wallState = WallState.Climbing; wallLeg = 0; hasTarget = false; }
             if (wallState >= WallState.Climbing) { UpdateOnWall(); return; }
 
@@ -651,11 +660,12 @@ namespace BattleOfAges.RTS
             if (hit.collider is CharacterController) return false; // other units: crowd separation handles them
             if (hit.collider.gameObject == gameObject || hit.transform.root == transform) return false;
 
-            string name = hit.collider.gameObject.name;
-            if (name.Contains("SteppeTerrain") || name.Contains("Ground") || name.Contains("Chunk") || name.Contains("Terrain") || name.Contains("SelectionIndicator")) return false;
             // Only the chunk's own ground mesh is terrain; trees and rocks parented to a chunk are obstacles
             // (with kinematic movement nothing else stops a unit from walking through them).
             if (hit.collider is TerrainCollider || hit.collider.GetComponent<ProceduralBiomeChunk>() != null) return false;
+
+            string name = hit.collider.gameObject.name;
+            if (name.Contains("SteppeTerrain") || name.Contains("Ground") || name.Contains("Chunk") || name.Contains("Terrain") || name.Contains("SelectionIndicator")) return false;
             return true;
         }
 

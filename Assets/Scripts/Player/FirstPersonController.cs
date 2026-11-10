@@ -36,13 +36,17 @@ namespace BattleOfAges.Player
 
         private CharacterController characterController;
         private Vector3 velocity;
+        private Vector3 lastMovedPos = new Vector3(1e9f, 1e9f, 1e9f);
         private float pitch = 0.0f;
         private bool isGrounded;
         private bool isControlEnabled = true;
+        private bool combatChecked;
 
         private void Awake()
         {
             characterController = GetComponent<CharacterController>();
+            combat = GetComponent<CombatUnit>();
+            combatChecked = true;
             EnsureCameraTransform();
         }
 
@@ -124,18 +128,26 @@ namespace BattleOfAges.Player
                 move.Normalize();
             }
 
-            if (combat == null) combat = GetComponent<CombatUnit>();
+            if (!combatChecked) { combat = GetComponent<CombatUnit>(); combatChecked = true; }
             float speed = combat != null ? combat.MoveSpeed : moveSpeed; // CharacterSpeed formula (hero modifier 5)
-            speed *= BattleFront.Factor(RTS.UnitSpatialGrid.TeamPlayer, move); // the pull of a battle
-            characterController.Move(move * speed * Time.deltaTime);
+            bool jumping = input && UniversalInput.IsJumpPressed() && isGrounded;
+            if (isGrounded && move.sqrMagnitude == 0f && !jumping && (transform.position - lastMovedPos).sqrMagnitude < 1e-4f)
+            {
+                return;
+            }
 
-            if (input && UniversalInput.IsJumpPressed() && isGrounded)
+            if (move.sqrMagnitude > 0f)
+            {
+                speed *= BattleFront.Factor(RTS.UnitSpatialGrid.TeamPlayer, move); // the pull of a battle
+            }
+
+            if (jumping)
             {
                 velocity.y = Mathf.Sqrt(jumpHeight * -2.0f * gravity);
             }
 
             velocity.y += gravity * Time.deltaTime;
-            characterController.Move(velocity * Time.deltaTime);
+            characterController.Move((move * speed + velocity) * Time.deltaTime);
 
             // Not past the mountains round a bounded world
             Vector3 p = transform.position, inside = World.WorldSettings.ClampInside(p);
@@ -146,13 +158,15 @@ namespace BattleOfAges.Player
                 Vector3 outward = new Vector3(p.x - lake.Center.x, 0f, p.z - lake.Center.y).normalized;
                 characterController.Move(outward * Mathf.Max(0.05f, speed * Time.deltaTime));
             }
+            lastMovedPos = transform.position;
         }
 
         private void HandleMouseLook()
         {
-            EnsureCameraTransform();
-
             Vector2 mouseDelta = UniversalInput.GetMouseDelta();
+            if (mouseDelta.sqrMagnitude == 0f) return;
+
+            EnsureCameraTransform();
             
             float currentSens = (SettingsManager.Instance != null) ? SettingsManager.Instance.FpsSensitivity : mouseSensitivity;
             float mouseX = mouseDelta.x * currentSens * LookScale;
@@ -166,7 +180,10 @@ namespace BattleOfAges.Player
                 cameraTransform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
             }
 
-            transform.Rotate(Vector3.up * mouseX);
+            if (Mathf.Abs(mouseX) > 0f)
+            {
+                transform.Rotate(Vector3.up * mouseX);
+            }
         }
 
         /// <summary>The view's tilt up or down, degrees (a save keeps it).</summary>
