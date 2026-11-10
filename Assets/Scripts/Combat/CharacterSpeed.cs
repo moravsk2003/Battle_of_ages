@@ -4,7 +4,7 @@ namespace BattleOfAges.Combat
 {
     /// <summary>
     /// Movement speed of every character (player, workers, knights, raiders; not wildlife), docs/GAME_DESIGN.md §11.1:
-    /// speed = Global x SpeedModifier x sqrt(body / 2 + 0.5) + 2.5, body = (Strength + HP / 20) / 2. SpeedModifier is a
+    /// speed = Global x SpeedModifier x sqrt(body / 2 + 0.5) + 3, body = (Strength + HP / 20) / 2. SpeedModifier is a
     /// per-character characteristic (person 7, warrior / knight / general 6, hero 5, see UnitRanks); Strength and HP are the
     /// body's own (CombatUnit.SpeedStrength / SpeedHealth: before the weapon and armour, so better gear does not change the
     /// speed). Every rank has 10 HP per strength point: its body is 0.75 of its strength.
@@ -31,7 +31,10 @@ namespace BattleOfAges.Combat
         /// <summary>A body with the usual 10 HP per strength point (every rank's base).</summary>
         public static float Of(float modifier, float strength) => Of(modifier, strength, strength * RankHealthPerStrength);
 
+        /// <summary>Cached default speed for characters without a CombatUnit (moving like a person).</summary>
+        public static float DefaultSpeed => Of(DefaultModifier, DefaultStrength);
+
         public static float Of(CombatUnit combat) =>
-            combat != null ? Of(combat.SpeedModifier, combat.SpeedStrength, combat.SpeedHealth) : Of(DefaultModifier, DefaultStrength);
+            combat != null ? combat.BaseMoveSpeed : DefaultSpeed;
     }
 }

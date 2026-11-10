@@ -24,13 +24,13 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(strength * 2, UnitRanks.Strength(rank, hero: true), "A hero has twice the strength of its rank.");
         }
 
-        [TestCase(UnitRank.Person, false, 4.46f)]
-        [TestCase(UnitRank.Warrior, false, 4.62f)]
-        [TestCase(UnitRank.Knight, false, 5.59f)]
-        [TestCase(UnitRank.General, false, 7.21f)]
-        [TestCase(UnitRank.Person, true, 4.27f)]
-        [TestCase(UnitRank.General, true, 7.98f)]
-        public void Speed_IsGlobalTimesModifierTimesSqrtOfHalfBodyPlusHalf_PlusTwoAndAHalf(UnitRank rank, bool hero, float expected)
+        [TestCase(UnitRank.Person, false, 5.35f)]
+        [TestCase(UnitRank.Warrior, false, 5.55f)]
+        [TestCase(UnitRank.Knight, false, 6.71f)]
+        [TestCase(UnitRank.General, false, 8.66f)]
+        [TestCase(UnitRank.Person, true, 5.12f)]
+        [TestCase(UnitRank.General, true, 9.58f)]
+        public void Speed_IsGlobalTimesModifierTimesSqrtOfHalfBodyPlusHalf_PlusThree(UnitRank rank, bool hero, float expected)
         {
             float speed = CharacterSpeed.Of(UnitRanks.SpeedModifier(rank, hero), UnitRanks.Strength(rank, hero));
             Assert.AreEqual(expected, speed, 0.01f);
@@ -60,6 +60,28 @@ namespace BattleOfAges.Tests
                 Assert.AreEqual(10f, combat.Strength, 1e-4f);
                 Assert.AreEqual(20, combat.AttackDamage, "A level 5 sword doubles the strength.");
                 Assert.AreEqual(GameBalance.SpeedModifierSoldier, combat.SpeedModifier);
+                Assert.AreEqual(6.71f, combat.MoveSpeed, 0.02f);
+            }
+            finally { Object.DestroyImmediate(unit); }
+        }
+
+        [Test]
+        public void UnitPromotion_UpdatesCachedMoveSpeed()
+        {
+            var unit = new GameObject("PromotingUnit", typeof(HealthComponent), typeof(CombatUnit), typeof(Equipment));
+            try
+            {
+                CombatUnit combat = unit.GetComponent<CombatUnit>();
+                UnitProgress progress = UnitProgress.Setup(unit, UnitRank.Person);
+                Assert.AreEqual(5.35f, combat.MoveSpeed, 0.02f, "Person base speed.");
+
+                progress.Promote();
+                Assert.AreEqual(UnitRank.Warrior, progress.Rank);
+                Assert.AreEqual(5.55f, combat.MoveSpeed, 0.02f, "Promoted to warrior: faster speed.");
+
+                progress.Promote();
+                Assert.AreEqual(UnitRank.Knight, progress.Rank);
+                Assert.AreEqual(6.71f, combat.MoveSpeed, 0.02f, "Promoted to knight: faster speed.");
             }
             finally { Object.DestroyImmediate(unit); }
         }

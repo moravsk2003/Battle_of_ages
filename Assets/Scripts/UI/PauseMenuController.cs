@@ -399,10 +399,11 @@ namespace BattleOfAges.UI
         /// <summary>A category: its button along the top and its page under them.</summary>
         private RectTransform SettingsTab(RectTransform win, string title, int index)
         {
-            const float w = 184f, gap = 8f;
+            // the tabs stand wholly above the page (they used to dip 16 px under it and the page cut their labels)
+            const float w = 184f, gap = 10f;
             float x = (index - (SettingsTabCount - 1) * 0.5f) * (w + gap);
-            Image tab = UiTheme.TextButton(win, "Tab_" + title, title, new Vector2(0.5f, 1f), new Vector2(x, -94f), new Vector2(w, 46f), () => ShowSettingsTab(index), 20).GetComponent<Image>();
-            RectTransform page = Section(win, "Page_" + title, title, Vector2.zero, Vector2.one, new Vector2(28f, 96f), new Vector2(-28f, -124f));
+            Image tab = UiTheme.TextButton(win, "Tab_" + title, title, new Vector2(0.5f, 1f), new Vector2(x, -80f), new Vector2(w, 42f), () => ShowSettingsTab(index), 19).GetComponent<Image>();
+            RectTransform page = Section(win, "Page_" + title, Vector2.zero, Vector2.one, new Vector2(28f, 96f), new Vector2(-28f, -132f));
             settingsTabs.Add((page.gameObject, tab));
             return page;
         }
@@ -413,17 +414,24 @@ namespace BattleOfAges.UI
             activeRebindAction = null;
             for (int i = 0; i < settingsTabs.Count; i++)
             {
-                settingsTabs[i].page.SetActive(i == index);
-                settingsTabs[i].tab.color = i == index ? Color.white : new Color(0.72f, 0.72f, 0.72f);
+                bool open = i == index;
+                settingsTabs[i].page.SetActive(open);
+                settingsTabs[i].tab.color = open ? Color.white : new Color(0.62f, 0.6f, 0.58f);
+                Text label = settingsTabs[i].tab.GetComponentInChildren<Text>();
+                if (label != null) label.color = open ? UiTheme.Gold : UiTheme.InkDim;
             }
-            if (resetKeysButton != null) resetKeysButton.SetActive(index == 3);
+            bool keys = index == 3;
+            if (resetKeysButton != null) resetKeysButton.SetActive(keys);
+            // Back alone stands in the middle; beside the key reset it moves left
+            if (closeSettingsButton != null && closeSettingsButton.transform.parent == settingsTabs[0].page.transform.parent)
+                ((RectTransform)closeSettingsButton.transform).anchoredPosition = new Vector2(keys ? -145f : 0f, 24f);
         }
 
-        private static RectTransform Section(RectTransform win, string name, string title, Vector2 min, Vector2 max, Vector2 offMin, Vector2 offMax)
+        /// <summary>A category's page: a sunk box (its name is on the tab above, not repeated inside).</summary>
+        private static RectTransform Section(RectTransform win, string name, Vector2 min, Vector2 max, Vector2 offMin, Vector2 offMax)
         {
             RectTransform s = UiTheme.Child(win, name, min, max, offMin, offMax);
             UiTheme.PanelImage(s, UiTheme.SlotSprite);
-            UiTheme.Label(UiTheme.Child(s, "Heading", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -40f), new Vector2(-18f, -6f)), "Text", title, 20, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             return s;
         }
 
@@ -432,7 +440,7 @@ namespace BattleOfAges.UI
         {
             if (slider == null) return;
             const float h = 92f;
-            RectTransform r = UiTheme.Child(section, "Row_" + slider.name, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f - h * (index + 1)), new Vector2(-22f, -52f - h * index));
+            RectTransform r = UiTheme.Child(section, "Row_" + slider.name, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -16f - h * (index + 1)), new Vector2(-22f, -16f - h * index));
             UiTheme.Label(UiTheme.Child(r, "Name", new Vector2(0f, 0.5f), new Vector2(0.75f, 1f), Vector2.zero, Vector2.zero), "Text", title, 19, TextAnchor.MiddleLeft);
             Text value = UiTheme.Label(UiTheme.Child(r, "Value", new Vector2(0.75f, 0.5f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero), "Text", format(slider.value), 19, TextAnchor.MiddleRight, UiTheme.Gold, FontStyle.Bold);
             slider.onValueChanged.AddListener(v => value.text = format(v));
@@ -460,7 +468,7 @@ namespace BattleOfAges.UI
         /// <summary>A list of rows scrolling under the heading; returns where the rows go.</summary>
         private static Transform ScrollList(RectTransform section)
         {
-            RectTransform scrollRect = UiTheme.Child(section, "ScrollView", Vector2.zero, Vector2.one, new Vector2(14f, 14f), new Vector2(-14f, -48f));
+            RectTransform scrollRect = UiTheme.Child(section, "ScrollView", Vector2.zero, Vector2.one, new Vector2(14f, 14f), new Vector2(-14f, -14f));
             ScrollRect scroll = scrollRect.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;
             scroll.vertical = true;
@@ -469,14 +477,34 @@ namespace BattleOfAges.UI
 
             RectTransform viewportRect = UiTheme.Child(scrollRect, "Viewport", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             viewportRect.gameObject.AddComponent<RectMask2D>();
+            // an invisible backdrop: the wheel and a drag work between the rows too, not only over them
+            viewportRect.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
             scroll.viewport = viewportRect;
+
+            // a visible bar on the right; hidden (and the rows widen) when everything fits
+            RectTransform barRect = UiTheme.Child(scrollRect, "Scrollbar", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-12f, 0f), Vector2.zero);
+            Image track = UiTheme.PanelImage(barRect, UiTheme.BarSprite, new Color(0.03f, 0.025f, 0.02f, 0.95f));
+            Scrollbar bar = barRect.gameObject.AddComponent<Scrollbar>();
+            RectTransform slide = UiTheme.Child(barRect, "Sliding Area", Vector2.zero, Vector2.one, new Vector2(1f, 1f), new Vector2(-1f, -1f));
+            RectTransform handle = UiTheme.Child(slide, "Handle", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Image handleImg = UiTheme.PanelImage(handle, UiTheme.BarSprite, UiTheme.Rim);
+            bar.handleRect = handle;
+            bar.targetGraphic = handleImg;
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            ColorBlock cb = bar.colors;
+            cb.highlightedColor = new Color(1.25f, 1.2f, 1.1f); cb.pressedColor = new Color(0.8f, 0.75f, 0.7f); cb.colorMultiplier = 1.25f;
+            bar.colors = cb;
+            track.raycastTarget = true;
+            scroll.verticalScrollbar = bar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+            scroll.verticalScrollbarSpacing = 6f;
 
             RectTransform contentRect = UiTheme.Child(viewportRect, "Content", new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             contentRect.pivot = new Vector2(0.5f, 1f);
             VerticalLayoutGroup layout = contentRect.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 6f;
+            layout.spacing = 8f;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true; // rows take their LayoutElement height (without it they stayed 100 px tall)
             layout.childForceExpandHeight = false;
             layout.padding = new RectOffset(4, 4, 4, 4);
             contentRect.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -522,12 +550,12 @@ namespace BattleOfAges.UI
             var row = new GameObject(name, typeof(RectTransform));
             row.transform.SetParent(parent, false);
             LayoutElement element = row.AddComponent<LayoutElement>();
-            element.minHeight = element.preferredHeight = 46f;
+            element.minHeight = element.preferredHeight = 48f;
             var rt = (RectTransform)row.transform;
             UiTheme.PanelImage(rt, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
 
             UiTheme.Label(UiTheme.Child(rt, "Label", new Vector2(0f, 0f), new Vector2(0.62f, 1f), new Vector2(14f, 0f), Vector2.zero), "Text", label, 17, TextAnchor.MiddleLeft);
-            Button btn = UiTheme.TextButton(rt, "KeyBtn", "", new Vector2(1f, 0.5f), new Vector2(-6f, 0f), new Vector2(150f, 36f), onClick, 17);
+            Button btn = UiTheme.TextButton(rt, "KeyBtn", "", new Vector2(1f, 0.5f), new Vector2(-6f, 0f), new Vector2(180f, 36f), onClick, 17);
             return btn.GetComponentInChildren<Text>();
         }
 

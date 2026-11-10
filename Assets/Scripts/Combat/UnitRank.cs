@@ -53,7 +53,7 @@ namespace BattleOfAges.Combat
             if (gear != null) { gear.SetBaseStats(Health(rank, hero), Strength(rank, hero), cooldown, range); return; }
             HealthComponent health = unit.GetComponent<HealthComponent>();
             if (health != null) health.InitializeHealth(Health(rank, hero));
-            if (combat != null) { combat.Strength = Strength(rank, hero); combat.InitializeCombatStats(Strength(rank, hero), cooldown, range); }
+            if (combat != null) { combat.Strength = Strength(rank, hero); combat.InitializeCombatStats(Strength(rank, hero), cooldown, range); combat.RecalculateSpeed(); }
         }
     }
 }

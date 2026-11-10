@@ -227,6 +227,7 @@ namespace BattleOfAges.Crafting
                 combat.FiresBolts = caster && HasStaff;
                 combat.NeedsStaff = caster && !HasStaff;
                 combat.InitializeCombatStats(Damage, Cooldown, Range);
+                combat.RecalculateSpeed();
             }
             CharacterGear gear = GetComponentInChildren<CharacterGear>(true);
             if (gear != null) gear.Show(this);

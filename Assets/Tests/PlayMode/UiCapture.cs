@@ -149,8 +149,18 @@ namespace BattleOfAges.PlayModeTests
                 ("rts_alert", () => { modes?.SetGameMode(GameMode.RtsMap); return Wait(0.6f); }),
                 ("pause", () => { SettlementAlarm.StandDown(); modes?.SetGameMode(GameMode.FirstPerson); PauseMenuController.Instance?.PauseGame(); return Wait(0.3f); }),
                 ("settings", () => { PauseMenuController.Instance?.OpenSettings(); return Wait(0.3f); }),
+                ("settings_graphics", () => { PauseMenuController.Instance?.ShowSettingsTab(2); return Wait(0.2f); }),
+                ("settings_keys", () => { PauseMenuController.Instance?.ShowSettingsTab(3); return Wait(0.2f); }),
+                ("settings_keys_end", () => // scrolled to the bottom of the list
+                {
+                    if (PauseMenuController.Instance != null)
+                        foreach (UnityEngine.UI.ScrollRect s in PauseMenuController.Instance.GetComponentsInChildren<UnityEngine.UI.ScrollRect>())
+                            s.verticalNormalizedPosition = 0f;
+                    return Wait(0.2f);
+                }),
                 ("help", () =>
                 {
+                    PauseMenuController.Instance?.ShowSettingsTab(0);
                     PauseMenuController.Instance?.CloseSettings();
                     PauseMenuController.Instance?.ResumeGame();
                     HelpUI.Instance?.Open();

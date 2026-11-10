@@ -26,18 +26,32 @@ namespace BattleOfAges.Combat
 
         [SerializeField] private float strength;
         /// <summary>Strength characteristic: the damage before the weapon (Equipment sets it; without gear = AttackDamage).</summary>
-        public float Strength { get => strength > 0f ? strength : attackDamage; set => strength = value; }
+        public float Strength { get => strength > 0f ? strength : attackDamage; set { strength = value; RecalculateSpeed(); } }
         private float speedStrength;
         /// <summary>Strength the run speed follows (the mage: a fixed share of its rank, not its spell power).</summary>
-        public float SpeedStrength { get => speedStrength > 0f ? speedStrength : Strength; set => speedStrength = value; }
+        public float SpeedStrength { get => speedStrength > 0f ? speedStrength : Strength; set { speedStrength = value; RecalculateSpeed(); } }
         private float speedHealth;
         /// <summary>HP the run speed follows: the body's, without armour (Equipment sets it; without gear 10 per strength point).</summary>
-        public float SpeedHealth { get => speedHealth > 0f ? speedHealth : SpeedStrength * CharacterSpeed.RankHealthPerStrength; set => speedHealth = value; }
+        public float SpeedHealth { get => speedHealth > 0f ? speedHealth : SpeedStrength * CharacterSpeed.RankHealthPerStrength; set { speedHealth = value; RecalculateSpeed(); } }
         [SerializeField] private float speedModifier = CharacterSpeed.DefaultModifier;
         /// <summary>Speed characteristic (person 7, soldiers 6, hero 5; see UnitRanks, CharacterSpeed).</summary>
-        public float SpeedModifier { get => speedModifier; set => speedModifier = value; }
-        /// <summary>Global x SpeedModifier x sqrt(body), body from strength and HP (CharacterSpeed).</summary>
-        public float MoveSpeed => CharacterSpeed.Of(this) * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor;
+        public float SpeedModifier { get => speedModifier; set { speedModifier = value; RecalculateSpeed(); } }
+
+        private float baseMoveSpeed;
+        /// <summary>Cached base speed from stats without temporary combat modifiers.</summary>
+        public float BaseMoveSpeed => baseMoveSpeed > 0f ? baseMoveSpeed : RecalculateSpeed();
+
+        /// <summary>Forces recalculation of the cached base speed.</summary>
+        public float RecalculateSpeed()
+        {
+            baseMoveSpeed = CharacterSpeed.Of(SpeedModifier, SpeedStrength, SpeedHealth);
+            return baseMoveSpeed;
+        }
+
+        /// <summary>Global x SpeedModifier x sqrt(body), body from strength and HP; cached base speed with active combat modifiers.</summary>
+        public float MoveSpeed => (Time.time < boostUntil || Time.time < recoveryUntil)
+            ? BaseMoveSpeed * (Time.time < boostUntil ? boostFactor : 1f) * RecoveryFactor
+            : BaseMoveSpeed;
 
         private float boostFactor = 1f, boostUntil = float.NegativeInfinity;
         /// <summary>Runs this many times faster for a while (the DD's Dash).</summary>
@@ -61,6 +75,7 @@ namespace BattleOfAges.Combat
         private void Awake()
         {
             originalLocalPos = transform.localPosition;
+            RecalculateSpeed();
         }
 
         // Every fighter heals naturally on the world clock (builders may add the HealthComponent after this one: Start retries)
