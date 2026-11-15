@@ -291,8 +291,9 @@ namespace BattleOfAges.Net
                     {
                         Vector3 off = body.transform.position - me2.transform.position;
                         off.y = 0f;
-                        if (off.magnitude < 6f) { body.Health.TakeDamage(40); blows++; }
+                        if (off.magnitude < 6f) { body.Health.LastAttacker = me2.GetComponent<CombatUnit>(); body.Health.TakeDamage(40); blows++; }
                     });
+                    if (blows > 0) now.StrikeShownBuilding(15, me2.GetComponent<CombatUnit>()); // and the guest's house at home
                 }
                 if (Time.realtimeSinceStartup < nextRow) continue;
                 nextRow = Time.realtimeSinceStartup + 5f;
@@ -301,12 +302,19 @@ namespace BattleOfAges.Net
                 string other = "not seen";
                 if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 otherAt, out int share)) other = $"at {otherAt.x:0},{otherAt.z:0} health {share}";
                 report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, number {(s != null ? s.Number : -1)}, in the game [{(s != null ? string.Join(",", s.Players) : "")}], on the world map {WorldMapData.Now().Count} kingdoms {(s != null ? s.PlayersOnMap().Count : 0)} players, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count} bots {Bots()}, " +
-                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)}, trees told {SaveLoad.WorldPersistence.Capture().Trees.Count}, others' zones {World.ZoneMap.ForeignCount}, guests {GuestBook.All.Count} save {(GuestBook.All.Count > 0 ? GuestBook.All[0].Save.Length : 0)}, life claims {(s != null ? s.LifeClaimCount : -1)}, clock {WorldClock.GameHours:0.00}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
+                                  $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, struck by another player {StruckByAnother()}, kills credited {NetSession.KillsCredited}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)} the first at {(s != null ? s.StrikeShownBuilding(0, null) : "-")}, trees told {SaveLoad.WorldPersistence.Capture().Trees.Count}, others' zones {World.ZoneMap.ForeignCount}, guests {GuestBook.All.Count} save {(GuestBook.All.Count > 0 ? GuestBook.All[0].Save.Length : 0)}, life claims {(s != null ? s.LifeClaimCount : -1)}, clock {WorldClock.GameHours:0.00}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
             }
             Directory.CreateDirectory(Path.GetDirectoryName(log));
             File.WriteAllText(log, report.ToString());
             NetSession.Stop();
             Application.Quit(0);
+        }
+
+        /// <summary>This hero was last struck by another player's unit, and knows whose (its body here).</summary>
+        private static bool StruckByAnother()
+        {
+            HealthComponent me = Managers.GameContext.PlayerHealth;
+            return me != null && me.LastAttacker != null && me.LastAttacker.GetComponent<RemoteBody>() != null;
         }
 
         /// <summary>Absent players' kingdoms kept by bots (GuestBot): far and real.</summary>

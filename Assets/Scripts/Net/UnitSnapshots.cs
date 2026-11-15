@@ -256,6 +256,8 @@ namespace BattleOfAges.Net
         public int Owner;
         public int Id;
         public bool IsBuilding;
+        /// <summary>A building its owner cannot lose (a house, a bot's): blows reach the owner, but its bar here stays whole.</summary>
+        public bool Unbreakable;
         public HealthComponent Health { get; private set; }
 
         public void Setup(int owner, int id, bool building, int health)
@@ -270,8 +272,9 @@ namespace BattleOfAges.Net
 
         private void OnHit(int damage)
         {
-            NetSession.Current?.SendHit(Owner, Id, IsBuilding, damage);
-            if (Health.CurrentHealth < 1) Health.SetCurrentHealth(1); // its owner decides when it falls
+            NetSession.Current?.SendHit(Owner, Id, IsBuilding, damage, Health.LastAttacker);
+            if (Unbreakable) Health.SetCurrentHealth(Health.MaxHealth);
+            else if (Health.CurrentHealth < 1) Health.SetCurrentHealth(1); // its owner decides when it falls
         }
 
         private void OnDestroy() { if (Health != null) Health.OnTakeDamage -= OnHit; }
@@ -508,6 +511,9 @@ namespace BattleOfAges.Net
             }
             bodies.Clear();
         }
+
+        /// <summary>The body here of another player's unit (null: not shown here).</summary>
+        public RemoteBody BodyOf(int owner, ushort id) => bodies.TryGetValue(Key(owner, id), out Body b) ? b.Mark : null;
 
         /// <summary>What is known of a unit now (tests).</summary>
         public bool TryGet(int owner, ushort id, out Vector3 at, out int healthShare)

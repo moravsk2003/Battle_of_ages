@@ -65,6 +65,8 @@ namespace BattleOfAges.Net
         public Vector3 Position;
         public float Yaw;
         public bool Gone;
+        /// <summary>Its owner's count of its health (0: not told; a building of a save before this: full).</summary>
+        public int Health, MaxHealth;
     }
 
     /// <summary>
@@ -80,7 +82,7 @@ namespace BattleOfAges.Net
     {
         public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
                           TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12,
-                          RefusedMessage = 13, RosterMessage = 14, WorldMapMessage = 15, LobbyMessage = 16, LobbyChoiceMessage = 17;
+                          RefusedMessage = 13, RosterMessage = 14, WorldMapMessage = 15, LobbyMessage = 16, LobbyChoiceMessage = 17, KillMessage = 18;
         /// <summary>How often a guest's game goes to its host, and the host's clock to its guests.</summary>
         public static float GuestSaveSeconds = 60f;
         private const float ClockSeconds = 5f, WorldSeconds = 1f;
@@ -523,6 +525,7 @@ namespace BattleOfAges.Net
                 return;
             }
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
+            if (data[0] == KillMessage) { RouteKill(data, length); return; }
             if (data[0] >= HelloMessage && data[0] <= LobbyChoiceMessage) { ReceiveWorld(peer, data, length); return; }
             if (data[0] == BuildingMessage)
             {
@@ -842,14 +845,17 @@ namespace BattleOfAges.Net
 
         // ------------------------------------------------------------------ blows across
 
-        private const int HitBytes = 8;
+        /// <summary>A row: owner, building, id (4), damage (2), and who struck: its owner and its unit (2; NoAttacker: none known).</summary>
+        private const int HitBytes = 11;
+        public const ushort NoAttacker = 65534;
         private byte[] hitBatch = new byte[3 + HitBytes * 256];
         private int hitsWaiting;
 
         /// <summary>A blow on a body here: it goes to the one who owns what it stands for, in the next batch.</summary>
-        public void SendHit(int owner, int id, bool building, int damage)
+        public void SendHit(int owner, int id, bool building, int damage, CombatUnit attacker = null)
         {
             if (link == null || damage <= 0) return;
+            ushort by = IdOf(attacker);
             int at = 3 + hitsWaiting * HitBytes;
             if (at + HitBytes > hitBatch.Length) { FlushHits(); at = 3; }
             hitBatch[at] = (byte)owner;
@@ -857,7 +863,17 @@ namespace BattleOfAges.Net
             hitBatch[at + 2] = (byte)id; hitBatch[at + 3] = (byte)(id >> 8); hitBatch[at + 4] = (byte)(id >> 16); hitBatch[at + 5] = (byte)(id >> 24);
             int d = Mathf.Min(damage, 65535);
             hitBatch[at + 6] = (byte)d; hitBatch[at + 7] = (byte)(d >> 8);
+            hitBatch[at + 8] = (byte)playerId; hitBatch[at + 9] = (byte)by; hitBatch[at + 10] = (byte)(by >> 8);
             hitsWaiting++;
+        }
+
+        /// <summary>This machine's unit as the others know it (its hero, or its number in the snapshots: its grid id).</summary>
+        private static ushort IdOf(CombatUnit unit)
+        {
+            if (unit == null || unit.GetComponent<RemoteBody>() != null) return NoAttacker;
+            if (unit.gameObject == Managers.GameContext.Player) return UnitSnapshotWriter.HeroId;
+            AI.AIBaseController ai = unit.GetComponent<AI.AIBaseController>();
+            return ai != null && ai.GridId >= 0 && ai.GridId < NoAttacker ? (ushort)ai.GridId : NoAttacker;
         }
 
         private void FlushHits()
@@ -907,12 +923,59 @@ namespace BattleOfAges.Net
             bool building = b[at + 1] != 0;
             int id = b[at + 2] | b[at + 3] << 8 | b[at + 4] << 16 | b[at + 5] << 24;
             int damage = b[at + 6] | b[at + 7] << 8;
+            int byOwner = b[at + 8];
+            ushort by = (ushort)(b[at + 9] | b[at + 10] << 8);
             HealthComponent target;
             if (building) target = WorldEntity.Find<HealthComponent>(id);
             else if (id == UnitSnapshotWriter.HeroId) target = Managers.GameContext.PlayerHealth;
             else target = id >= 0 && id < UnitSpatialGrid.Capacity && UnitSpatialGrid.IsAlive(id) ? UnitSpatialGrid.Health(id) : null;
-            if (target != null && target.IsAlive) target.TakeDamage(damage);
+            if (target == null || !target.IsAlive) return;
+            // Whoever struck, as its body here: the one struck turns on it (HostileMobAI, workers), and a kill is its own
+            RemoteBody striker = by != NoAttacker ? remote.BodyOf(byOwner, by) : null;
+            if (striker != null)
+            {
+                CombatUnit as_ = striker.GetComponent<CombatUnit>();
+                if (as_ == null) as_ = striker.gameObject.AddComponent<CombatUnit>();
+                target.LastAttacker = as_;
+            }
+            target.TakeDamage(damage);
+            if (!target.IsAlive && by != NoAttacker) SendKill(byOwner, by, HeroProgress.KillXp(target.gameObject));
         }
+
+        // ------------------------------------------------------------------ kills across: experience to whoever struck
+
+        /// <summary>Tells a player that its unit killed one of this machine's: it gains the battle and hero experience a kill gives.</summary>
+        private void SendKill(int owner, ushort unit, int heroXp)
+        {
+            int xp = Mathf.Clamp(heroXp, 0, 65535);
+            var message = new byte[] { KillMessage, (byte)owner, (byte)unit, (byte)(unit >> 8), (byte)xp, (byte)(xp >> 8) };
+            if (link.IsHost) RouteKill(message, message.Length);
+            else link.Send(0, NetChannel.Reliable, message, message.Length);
+        }
+
+        private void RouteKill(byte[] data, int length)
+        {
+            if (length < 6) return;
+            int owner = data[1];
+            if (owner == playerId) { ApplyKill((ushort)(data[2] | data[3] << 8), data[4] | data[5] << 8); return; }
+            if (link.IsHost) link.Send(owner, NetChannel.Reliable, data, length);
+        }
+
+        private static void ApplyKill(ushort unit, int heroXp)
+        {
+            GameObject who = null;
+            if (unit == UnitSnapshotWriter.HeroId) who = Managers.GameContext.Player;
+            else if (unit < UnitSpatialGrid.Capacity && UnitSpatialGrid.IsAlive(unit) && UnitSpatialGrid.Owner(unit) != null) who = UnitSpatialGrid.Owner(unit).gameObject;
+            if (who == null || who.GetComponent<RemoteBody>() != null) return;
+            UnitProgress progress = who.GetComponent<UnitProgress>();
+            if (progress != null) progress.OnKill();
+            HeroProgress hero = who.GetComponent<HeroProgress>();
+            if (hero != null) hero.AddXp(heroXp);
+            KillsCredited++;
+        }
+
+        /// <summary>Kills of others' units credited here (NetDemo, tests).</summary>
+        public static int KillsCredited;
 
         // ------------------------------------------------------------------ buildings across
 
@@ -935,8 +998,20 @@ namespace BattleOfAges.Net
                 if (node == null || BuildGhost.Is(node)) continue;
                 int id = WorldEntity.IdOf(node).Value;
                 seenBuildings.Add(id);
-                if (sentBuildings.ContainsKey(id)) continue;
-                var b = new NetBuilding { Owner = playerId, Id = id, Type = (int)node.Type, Position = node.transform.position, Yaw = node.transform.eulerAngles.y };
+                HealthComponent hp = node.GetComponent<HealthComponent>();
+                int health = hp != null ? hp.CurrentHealth : 0, max = hp != null ? hp.MaxHealth : 0;
+                if (sentBuildings.TryGetValue(id, out NetBuilding sent))
+                {
+                    // Its health to the others when it has changed by a step (2% of it), or come back whole, or its hall grown
+                    if (hp != null && (max != sent.MaxHealth || Mathf.Abs(health - sent.Health) >= Mathf.Max(1, max / 50) || (health == max && sent.Health != max)))
+                    {
+                        sent.Health = health;
+                        sent.MaxHealth = max;
+                        Broadcast(sent);
+                    }
+                    continue;
+                }
+                var b = new NetBuilding { Owner = playerId, Id = id, Type = (int)node.Type, Position = node.transform.position, Yaw = node.transform.eulerAngles.y, Health = health, MaxHealth = max };
                 sentBuildings[id] = b;
                 Broadcast(b);
             }
@@ -977,7 +1052,32 @@ namespace BattleOfAges.Net
                 shownBuildings.Remove(known);
                 return;
             }
-            if (known == null) shownBuildings[b] = ShowBuilding(b);
+            if (known == null) { shownBuildings[b] = ShowBuilding(b); known = b; }
+            else { known.Health = b.Health; known.MaxHealth = b.MaxHealth; }
+            ShowHealth(shownBuildings[known], known);
+        }
+
+        /// <summary>The first of others' buildings shown here, struck by this unit (NetDemo); its health as shown, "-" if none.</summary>
+        public string StrikeShownBuilding(int damage, CombatUnit by)
+        {
+            foreach (KeyValuePair<NetBuilding, GameObject> kv in shownBuildings)
+            {
+                RemoteBody body = kv.Value != null ? kv.Value.GetComponent<RemoteBody>() : null;
+                if (body == null || body.Owner >= GuestBot.BotOwnerFirst || kv.Key.MaxHealth <= 0) continue;
+                if (damage > 0) { body.Health.LastAttacker = by; body.Health.TakeDamage(damage); }
+                return $"{body.Health.CurrentHealth}/{body.Health.MaxHealth} (its owner says {kv.Key.Health}/{kv.Key.MaxHealth})";
+            }
+            return "-";
+        }
+
+        /// <summary>A building of another's here shows the health its owner counts (the bar goes down as it is struck).</summary>
+        private static void ShowHealth(GameObject shown, NetBuilding b)
+        {
+            RemoteBody body = shown != null ? shown.GetComponent<RemoteBody>() : null;
+            if (body == null || body.Health == null) return;
+            body.Unbreakable = b.MaxHealth <= 0;
+            if (b.MaxHealth > 0 && body.Health.MaxHealth != b.MaxHealth) body.Health.InitializeHealth(b.MaxHealth);
+            if (b.Health > 0) body.Health.SetCurrentHealth(b.Health);
         }
 
         // ------------------------------------------------------------------ guests as targets (far kings march on them too)
@@ -1039,6 +1139,7 @@ namespace BattleOfAges.Net
                 if (!string.IsNullOrEmpty(b.SceneKey)) continue; // (the scene's own: everyone has them)
                 var view = new NetBuilding { Owner = GuestBot.BuildingOwner(guest.Number), Id = i, Type = b.Type, Position = b.Position, Yaw = b.Yaw };
                 shownBuildings[view] = ShowBuilding(view);
+                ShowHealth(shownBuildings[view], view); // (unbreakable: its player is away)
                 shown.Add(view); // (not told to those here: they still show the guest's own; newcomers get them in SendWelcome)
             }
             botBuildings[guest.Token] = shown;
