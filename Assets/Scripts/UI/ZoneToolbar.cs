@@ -96,7 +96,7 @@ namespace BattleOfAges.UI
                 c.a = 1f;
                 img.color = c;
                 img.raycastTarget = false;
-                Tooltip.Set(zoneButtons[i].gameObject, () => TipText.Title(ZoneMap.Name(type), UiTheme.Gold) + "\n" + ZoneMap.Description(type));
+                Tooltip.Set(zoneButtons[i].gameObject, () => TipText.Title(ZoneMap.Name(type), UiTheme.Gold) + "\n" + ZoneMap.Description(type) + "\n" + CostText(type));
                 x += Step;
             }
             Button buildings = UiTheme.TextButton(zonesRect, "Buildings", "Споруди", new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(ButtonW, RowH), OpenBuildings, 16);
@@ -265,6 +265,18 @@ namespace BattleOfAges.UI
             if (label != null) label.color = on ? UiTheme.Gold : UiTheme.Ink;
         }
 
+        /// <summary>What each building of the zone costs and how many cells call for one: «Будинок»: 2 дерева, 1 руди · одна на 4 кл.</summary>
+        public static string CostText(ZoneType zone)
+        {
+            if (zone == ZoneType.None) return "";
+            BuildingDefinition def = BuildingData.GetDefinition(ZoneGrower.BuildingOf(zone));
+            int per = ZoneGrower.CellsPerBuilding(zone);
+            string tier = def.OreTierRequired > 0 ? " " + Crafting.ItemTypeNames.Roman(def.OreTierRequired) + "+" : "";
+            string ore = def.OreCost > 0 ? Loc.Pick($", {def.OreCost} руди{tier}", $", {def.OreCost} ore{tier}") : "";
+            return Loc.Pick($"<color=#F5CC73>«{def.DisplayName}»: {def.WoodCost} дерева{ore} · одна на {per} кл.</color>",
+                            $"<color=#F5CC73>{def.DisplayName}: {def.WoodCost} wood{ore} · one per {per} cells</color>");
+        }
+
         /// <summary>What the brush in hand does, what is marked and what comes next.</summary>
         public static string StatusText()
         {
@@ -273,7 +285,7 @@ namespace BattleOfAges.UI
             if (zone == ZoneType.None) return "";
             TownHall hall = TownHall.Viewed;
             ZoneGrower.Progress(zone, hall, out int cells, out int wanted, out int have, out int sites);
-            string head = $"<b>{ZoneMap.Description(zone)}</b>\n";
+            string head = $"<b>{ZoneMap.Description(zone)}</b>  {CostText(zone)}\n";
             if (cells == 0) return head + Loc.Pick("Тягніть ЛКМ по землі в межах золотого кола, ПКМ стирає. Робітники зведуть споруди самі.", "Drag LMB inside the golden circle, RMB erases. Workers will construct buildings automatically.");
 
             BuildingDefinition def = BuildingData.GetDefinition(ZoneGrower.BuildingOf(zone));
