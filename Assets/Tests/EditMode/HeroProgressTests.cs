@@ -46,13 +46,13 @@ namespace BattleOfAges.Tests
             hero.AddXp(100 + 200);
             CombatUnit combat = heroObj.GetComponent<CombatUnit>();
             HealthComponent hp = heroObj.GetComponent<HealthComponent>();
-            Assert.AreEqual(8f, combat.Strength, 1e-4f, "Hero warrior: x2 of strength 4.");
-            Assert.AreEqual(80, hp.MaxHealth);
+            Assert.AreEqual(8f + 2f, combat.Strength, 1e-4f, "Hero warrior: x2 of strength 4, and +1 for each of its two levels.");
+            Assert.AreEqual(80 + 20, hp.MaxHealth, "and +10 HP for each");
 
             Assert.IsTrue(hero.SpendOnStrength());
-            Assert.AreEqual(13f, combat.Strength, 1e-4f, "+5 strength.");
+            Assert.AreEqual(15f, combat.Strength, 1e-4f, "+5 strength.");
             Assert.IsTrue(hero.SpendOnHealth());
-            Assert.AreEqual(130, hp.MaxHealth, "+50 HP.");
+            Assert.AreEqual(150, hp.MaxHealth, "+50 HP.");
             Assert.IsFalse(hero.SpendOnHealth(), "No points left.");
         }
 
@@ -75,6 +75,30 @@ namespace BattleOfAges.Tests
                 Assert.AreEqual(50 * 11, HeroProgress.KillXp(victim), "A level 10 hero general: 50 x (1 + 10).");
             }
             finally { Object.DestroyImmediate(victim); }
+        }
+
+        [Test]
+        public void EveryLevel_GivesTenHpAndOneStrength_ByItself()
+        {
+            HealthComponent hp = heroObj.GetComponent<HealthComponent>();
+            CombatUnit combat = heroObj.GetComponent<CombatUnit>();
+            int health = hp.MaxHealth;
+            float strength = combat.Strength;
+            hero.AddXp(100);
+            Assert.AreEqual(health + GameBalance.HeroHealthPerLevel, hp.MaxHealth, "a level's own health, no point spent");
+            Assert.AreEqual(strength + GameBalance.HeroStrengthPerLevel, combat.Strength, 1e-4f, "and its strength");
+            Assert.AreEqual(1, hero.AttributePoints, "the point to spend is still there");
+        }
+
+        [Test]
+        public void GoingBack_IsHalfAsFast_AsideFourFifths_AheadAndAsideNineTenths()
+        {
+            Assert.AreEqual(1f, CharacterSpeed.DirectionFactor(Vector3.forward, Vector3.forward), 1e-4f);
+            Assert.AreEqual(0.9f, CharacterSpeed.DirectionFactor(Vector3.forward, new Vector3(1f, 0f, 1f)), 1e-4f);
+            Assert.AreEqual(0.8f, CharacterSpeed.DirectionFactor(Vector3.forward, Vector3.right), 1e-4f);
+            Assert.AreEqual(0.65f, CharacterSpeed.DirectionFactor(Vector3.forward, new Vector3(-1f, 0f, -1f)), 1e-4f);
+            Assert.AreEqual(0.5f, CharacterSpeed.DirectionFactor(Vector3.forward, Vector3.back), 1e-4f);
+            Assert.AreEqual(1f, CharacterSpeed.DirectionFactor(Vector3.forward, Vector3.zero), 1e-4f, "standing: nothing to slow");
         }
     }
 }

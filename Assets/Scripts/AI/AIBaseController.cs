@@ -353,7 +353,7 @@ namespace BattleOfAges.AI
                     transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Mathf.Min(1f, rotationSpeed * dt));
                 }
 
-                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed * BattleFront.Factor(GridTeam, moveDir), radius, dt, GridTeam == UnitSpatialGrid.TeamPlayer);
+                GroundMotor.Move(transform, gridId, moveDir * CurrentMoveSpeed * BattleFront.Factor(GridTeam, moveDir) * CharacterSpeed.DirectionFactor(transform.forward, moveDir), radius, dt, GridTeam == UnitSpatialGrid.TeamPlayer);
             }
             else
             {

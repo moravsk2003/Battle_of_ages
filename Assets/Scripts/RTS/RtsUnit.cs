@@ -530,7 +530,8 @@ namespace BattleOfAges.RTS
                 }
 
                 // 3. Movement: the hero uses CharacterController physics, units the kinematic ground motor
-                float speed = MoveSpeed * BattleFront.Factor(UnitSpatialGrid.TeamPlayer, moveDir); // the pull of a battle
+                float speed = MoveSpeed * BattleFront.Factor(UnitSpatialGrid.TeamPlayer, moveDir) // the pull of a battle
+                            * CharacterSpeed.DirectionFactor(transform.forward, moveDir); // turning about: slow till it faces the way
                 Vector3 moveVelocity = moveDir * speed;
                 moveVelocity.y = -9.81f;
 

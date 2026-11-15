@@ -31,6 +31,11 @@ namespace BattleOfAges.Combat
 
         /// <summary>Raised after any change (XP, level, points).</summary>
         public event Action<HeroProgress> Changed;
+        /// <summary>Raised when the hero has gone up one level or more (UI.LevelUpBanner).</summary>
+        public static event Action<HeroProgress> LeveledUp;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetLevelUpListeners() => LeveledUp = null;
 
         private CombatUnit combat;
 
@@ -79,8 +84,10 @@ namespace BattleOfAges.Combat
                 skillPoints++;
                 leveled = true;
             }
+            if (leveled) ApplyStats(); // a level's own health and strength (it changed nothing by itself before)
             if (leveled && (combat == null || combat.Team == RTS.UnitSpatialGrid.TeamPlayer))
                 UI.GameSound.Play2D(UI.GameSound.Kind.LevelUp);
+            if (leveled) LeveledUp?.Invoke(this);
             Changed?.Invoke(this);
         }
 
@@ -155,7 +162,10 @@ namespace BattleOfAges.Combat
             return true;
         }
 
-        /// <summary>Base stats of the hero's rank (x2) plus the spent attribute points, gear on top; the same share of HP.</summary>
+        /// <summary>
+        /// Base stats of the hero's rank (x2), what its levels give by themselves (HeroHealthPerLevel, HeroStrengthPerLevel for
+        /// each past the first) and the spent attribute points, gear on top; the same share of HP.
+        /// </summary>
         public void ApplyStats()
         {
             UnitProgress rank = GetComponent<UnitProgress>();
@@ -164,8 +174,9 @@ namespace BattleOfAges.Combat
             HealthComponent health = GetComponent<HealthComponent>();
             if (health != null) health.IgnoreEveryNthHit = HeroClassRules.IgnoredHitEvery(heroClass);
             float share = health != null && health.MaxHealth > 0 ? (float)health.CurrentHealth / health.MaxHealth : 1f;
-            int hp = UnitRanks.Health(rank.Rank, hero: true) + healthPoints * GameBalance.HealthPerPoint;
-            int strength = UnitRanks.Strength(rank.Rank, hero: true) + strengthPoints * GameBalance.StrengthPerPoint;
+            int grown = Mathf.Max(0, level - 1);
+            int hp = UnitRanks.Health(rank.Rank, hero: true) + healthPoints * GameBalance.HealthPerPoint + grown * GameBalance.HeroHealthPerLevel;
+            int strength = UnitRanks.Strength(rank.Rank, hero: true) + strengthPoints * GameBalance.StrengthPerPoint + grown * GameBalance.HeroStrengthPerLevel;
             gear.SetBaseStats(hp, strength, gear.BaseCooldown, gear.BaseRange);
             if (health != null && health.IsAlive) health.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(share * health.MaxHealth)));
         }

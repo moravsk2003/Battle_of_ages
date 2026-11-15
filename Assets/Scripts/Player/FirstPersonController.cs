@@ -141,6 +141,7 @@ namespace BattleOfAges.Player
             if (move.sqrMagnitude > 0f)
             {
                 speed *= BattleFront.Factor(RTS.UnitSpatialGrid.TeamPlayer, move); // the pull of a battle
+                speed *= CharacterSpeed.DirectionFactor(transform.forward, move); // back half as fast, aside 80%
             }
 
             if (jumping)

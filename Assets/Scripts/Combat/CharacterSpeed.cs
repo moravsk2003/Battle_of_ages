@@ -1,3 +1,4 @@
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace BattleOfAges.Combat
@@ -36,5 +37,27 @@ namespace BattleOfAges.Combat
 
         public static float Of(CombatUnit combat) =>
             combat != null ? combat.BaseMoveSpeed : DefaultSpeed;
+
+        /// <summary>
+        /// How fast one goes for where it faces (the author's word, 2026-11-15): straight ahead whole, ahead and aside 90%,
+        /// aside 80%, back and aside 65%, straight back half. From the cosine of the angle between facing and going; between
+        /// those the speed runs evenly with the angle. Plain arithmetic: the Burst crowd job calls it too.
+        /// </summary>
+        public static float DirectionFactor(float cosine)
+        {
+            float degrees = math.degrees(math.acos(math.clamp(cosine, -1f, 1f)));
+            if (degrees <= 45f) return math.lerp(1f, 0.9f, degrees / 45f);
+            if (degrees <= 90f) return math.lerp(0.9f, 0.8f, (degrees - 45f) / 45f);
+            if (degrees <= 135f) return math.lerp(0.8f, 0.65f, (degrees - 90f) / 45f);
+            return math.lerp(0.65f, 0.5f, (degrees - 135f) / 45f);
+        }
+
+        /// <summary>DirectionFactor for a body facing forward and going along dir (flat; standing still: whole).</summary>
+        public static float DirectionFactor(Vector3 forward, Vector3 dir)
+        {
+            forward.y = 0f; dir.y = 0f;
+            if (forward.sqrMagnitude < 1e-6f || dir.sqrMagnitude < 1e-6f) return 1f;
+            return DirectionFactor(Vector3.Dot(forward.normalized, dir.normalized));
+        }
     }
 }

@@ -741,7 +741,11 @@ namespace BattleOfAges.AI
                         float pull = 1f;
                         float3 flat = new float3(dir.x, 0f, dir.z);
                         if (b.Team >= 0 && b.Team < Fronts.Length && math.lengthsq(flat) > 1e-6f) pull = 1f + BattlePull * math.dot(math.normalize(flat), Fronts[b.Team]);
-                        wish = dir * m.Speed * pull;
+                        // Facing the way whole, back half as fast (CharacterSpeed.DirectionFactor): one turning about is slow till it faces it
+                        float3 ahead = math.mul(t.rotation, new float3(0f, 0f, 1f));
+                        ahead.y = 0f;
+                        float lead = math.lengthsq(ahead) > 1e-6f && math.lengthsq(flat) > 1e-6f ? math.dot(math.normalize(ahead), math.normalize(flat)) : 1f;
+                        wish = dir * m.Speed * pull * CharacterSpeed.DirectionFactor(lead);
                         walking = true;
                     }
                     else arrived = true;

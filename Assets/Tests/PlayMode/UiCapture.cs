@@ -166,6 +166,28 @@ namespace BattleOfAges.PlayModeTests
                     HelpUI.Instance?.Open();
                     return Wait(0.3f);
                 }),
+                ("base_compass", () => // far from home, facing away a little: the mark slides along the top towards the base
+                {
+                    HelpUI.Instance?.Close();
+                    GameObject player = GameObject.Find("Player");
+                    BattleOfAges.Building.TownHall hall = BattleOfAges.Building.TownHall.Current;
+                    if (player != null && hall != null)
+                    {
+                        CharacterController cc = player.GetComponent<CharacterController>();
+                        if (cc != null) cc.enabled = false;
+                        Vector3 at = hall.transform.position + new Vector3(140f, 2f, 0f);
+                        at.y = RTS.RtsUnit.GetTerrainHeight(at) + 1f;
+                        player.transform.SetPositionAndRotation(at, Quaternion.LookRotation(new Vector3(-1f, 0f, 0.6f)));
+                        if (cc != null) cc.enabled = true;
+                    }
+                    return Wait(0.6f);
+                }),
+                ("level_up", () =>
+                {
+                    Combat.HeroProgress hero = Managers.GameContext.Player != null ? Managers.GameContext.Player.GetComponent<Combat.HeroProgress>() : null;
+                    if (hero != null) hero.AddXp(hero.XpToNextLevel);
+                    return Wait(0.5f);
+                }),
             };
 
             var picked = new List<int>();

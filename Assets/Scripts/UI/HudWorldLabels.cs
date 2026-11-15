@@ -133,7 +133,15 @@ namespace BattleOfAges.UI
                 string hands = s.PresentBuilders == 0
                     ? Loc.Pick("<color=#DB5242>немає робітників</color>  <size=11>ПКМ виділеними — послати</size>", "<color=#DB5242>no workers</color>  <size=11>RMB selected — send</size>")
                     : Loc.Pick($"<color=#F5CC73>{s.PresentBuilders}</color> працюють", $"<color=#F5CC73>{s.PresentBuilders}</color> working");
-                text.text = $"{s.DisplayName} {Mathf.FloorToInt(s.Progress * 100f)}%  ·  {hands}";
+                string said = $"{s.DisplayName} {Mathf.FloorToInt(s.Progress * 100f)}%  ·  {hands}";
+                if (text.text != said)
+                {
+                    text.text = said;
+                    // As wide as what it says (it was 420 wide for the longest, a broad empty band round a short line)
+                    float wide = Mathf.Clamp(text.GetPreferredValues(said, 1000f, 28f).x + 30f, 120f, 460f);
+                    plate.sizeDelta = new Vector2(wide, plate.sizeDelta.y);
+                    ((RectTransform)text.transform.parent).sizeDelta = new Vector2(wide - 20f, 28f);
+                }
             }
             for (int i = used; i < sitePlates.Count; i++) if (sitePlates[i].plate.gameObject.activeSelf) sitePlates[i].plate.gameObject.SetActive(false);
             UpdatePlaces(cam, map);
@@ -165,7 +173,9 @@ namespace BattleOfAges.UI
                 {
                     if (b == null || BuildGhost.Is(b) || !b.TryGetComponent(out HealthComponent hp) || !hp.IsAlive) continue;
                     bool plentiful = b.Type == BuildingType.Field || b.Type == BuildingType.CastleWall || b.Type == BuildingType.WallStairs || b.Type == BuildingType.WallGate;
-                    used = HealthPlate(used, cam, map, hp, plentiful, BuildingData.GetDefinition(b.Type).Size.y + 0.8f);
+                    // A site's health goes under its plate, not over it (both hung at nearly the same height)
+                    float below = b.TryGetComponent(out ConstructionSite _) ? SitePlateHeight + 4f : 0f;
+                    used = HealthPlate(used, cam, map, hp, plentiful, BuildingData.GetDefinition(b.Type).Size.y + 0.8f, below);
                 }
                 foreach (AI.NpcKingdom k in AI.NpcKingdom.All)
                     if (k != null && k.Hall != null && k.Hall.IsAlive && k.Economy.HallLevel > 0) used = HealthPlate(used, cam, map, k.Hall, false, 6.5f);
@@ -173,7 +183,9 @@ namespace BattleOfAges.UI
             for (int i = used; i < healthPlates.Count; i++) if (healthPlates[i].plate.gameObject.activeSelf) healthPlates[i].plate.gameObject.SetActive(false);
         }
 
-        private int HealthPlate(int used, Camera cam, bool map, HealthComponent hp, bool plentiful, float height)
+        private const float SitePlateHeight = 32f;
+
+        private int HealthPlate(int used, Camera cam, bool map, HealthComponent hp, bool plentiful, float height, float below = 0f)
         {
             Vector3 at = hp.transform.position + Vector3.up * height;
             float distance = Vector3.Distance(cam.transform.position, at);
@@ -192,7 +204,7 @@ namespace BattleOfAges.UI
             }
             var (plate, text) = healthPlates[used];
             if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
-            plate.anchoredPosition = local;
+            plate.anchoredPosition = local - new Vector2(0f, below);
             text.color = hp.CurrentHealth * 3 < hp.MaxHealth ? UiTheme.Bad : UiTheme.Ink;
             text.text = $"HP {hp.CurrentHealth}/{hp.MaxHealth}";
             return used + 1;

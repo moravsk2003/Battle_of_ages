@@ -46,6 +46,8 @@ namespace BattleOfAges.Combat
 
         /// <summary>Going from level n to n + 1 costs this x n XP.</summary>
         public static int HeroXpPerLevel = 100;
+        /// <summary>What every level past the first gives a hero by itself, on top of the points to spend (the author's word, 2026-11-15).</summary>
+        public static int HeroHealthPerLevel = 10, HeroStrengthPerLevel = 1;
         /// <summary>What one attribute point buys: strength or HP (10 HP : 1 strength, like every rank's base).</summary>
         public static int StrengthPerPoint = 5, HealthPerPoint = 50;
         /// <summary>Unranked beasts give 1 XP per this much of their max HP.</summary>

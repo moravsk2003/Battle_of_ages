@@ -134,9 +134,9 @@ namespace BattleOfAges.Tests
             Assert.Greater(afterHp, start, "+50 HP: faster.");
             Assert.IsTrue(hero.SpendOnStrength());
             float afterBoth = combat.MoveSpeed;
-            // body = (strength + HP / 20) / 2: +50 HP adds 1.25, +5 strength 2.5
-            Assert.AreEqual(0.3f * 5f * Mathf.Sqrt((50f + 550f / 20f) / 2f / 2f + 0.5f) + 3f, afterHp, 1e-3f);
-            Assert.AreEqual(0.3f * 5f * Mathf.Sqrt((55f + 550f / 20f) / 2f / 2f + 0.5f) + 3f, afterBoth, 1e-3f);
+            // body = (strength + HP / 20) / 2: +50 HP adds 1.25, +5 strength 2.5 (two levels gave +2 strength and +20 HP by themselves)
+            Assert.AreEqual(0.3f * 5f * Mathf.Sqrt((52f + 570f / 20f) / 2f / 2f + 0.5f) + 3f, afterHp, 1e-3f);
+            Assert.AreEqual(0.3f * 5f * Mathf.Sqrt((57f + 570f / 20f) / 2f / 2f + 0.5f) + 3f, afterBoth, 1e-3f);
 
             gear.Equip(new Item(ItemType.Armor, 5));
             Assert.AreEqual(afterBoth, combat.MoveSpeed, 1e-4f, "Armour HP does not make anyone faster.");
