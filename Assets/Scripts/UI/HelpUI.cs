@@ -111,7 +111,7 @@ namespace BattleOfAges.UI
             Head("Вікна") + "\n" +
             $"{Key(KeyAction.Inventory)} — інвентар,  {Key(KeyAction.Equipment)} — спорядження,  {Key(KeyAction.Hero)} — герой\n" +
             $"{Key(KeyAction.BuildMenu)} — будівництво,  {Key(KeyAction.WorkerCommandUI)} — розподіл людей,  {Key(KeyAction.WorldMap)} — мапа світу\n" +
-            $"{K("F1")} — ця довідка,  {K("F3")} — FPS,  {K("Esc / P")} — пауза (спершу закриває вікна)\n\n" +
+            $"{K("F1")} — ця довідка,  {K("F3")} — FPS,  {K("F8")} — редактор для перевірок,  {K("Esc / P")} — пауза (спершу закриває вікна)\n\n" +
             Head("З чого почати") + "\n" +
             "1. Збирайте дерево й руду, несіть у скриню. Люди теж працюють самі.\n" +
             "2. Поставте ратушу: без неї населення не росте.\n" +
