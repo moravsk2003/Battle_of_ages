@@ -243,10 +243,13 @@ namespace BattleOfAges.UI
             RectTransform iconRect = UiTheme.Child(rect, "Icon", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(9f, 9f), new Vector2(65f, -9f));
             UiTheme.PanelImage(iconRect, UiTheme.SlotSprite).raycastTarget = false;
             UiTheme.Icon icon = def.Type == BuildingType.Mine ? UiTheme.Icon.Ore
-                              : def.Type == BuildingType.StorageChest ? UiTheme.Icon.Wood
+                              : def.Type == BuildingType.StorageChest ? UiTheme.Icon.Chest
                               : def.Type == BuildingType.Workbench ? UiTheme.Icon.Hammer
                               : WallSegment.IsWall(def.Type) ? UiTheme.Icon.Wall
-                              : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
+                              : def.Type == BuildingType.TownHall ? UiTheme.Icon.Crown
+                              : def.Type == BuildingType.WorkerHouse ? UiTheme.Icon.House
+                              : def.Type == BuildingType.Field ? UiTheme.Icon.Food
+                              : def.Type == BuildingType.Sawmill ? UiTheme.Icon.Wood : UiTheme.Icon.Worker;
             UiTheme.IconImage(iconRect, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
             TMP_Text name = UiTheme.Label(UiTheme.Child(rect, "Name", new Vector2(0f, 0.5f), new Vector2(0.55f, 1f), new Vector2(78f, 0f), new Vector2(0f, -4f)), "NameText", def.DisplayName, 19, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
@@ -271,7 +274,7 @@ namespace BattleOfAges.UI
             ResourceManager rm = ResourceManager.Instance;
             bool wall = WallSegment.IsWall(type);
             int wood = rm != null ? rm.WoodCount : 0;
-            int ore = rm == null ? 0 : wall ? rm.GetOreCountAtLeast(0) : rm.GetOreTierCount(def.OreTierRequired);
+            int ore = rm == null ? 0 : wall ? rm.GetOreCountAtLeast(0) : rm.GetOreCountAtLeast(def.OreTierRequired);
             string Have(int have, int need) => have >= need
                 ? TipText.Good(Loc.Pick($"є {have}", $"have {have}"))
                 : TipText.Bad(Loc.Pick($"є {have}", $"have {have}"));
@@ -287,7 +290,9 @@ namespace BattleOfAges.UI
                 ? Loc.Pick($"\nМіцність {def.MaxHealth} на звичайній руді, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% за кожен рівень руди", $"\nHP {def.MaxHealth} on common ore, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% per ore tier")
                 : Loc.Pick($"\nМіцність {def.MaxHealth}", $"\nHP {def.MaxHealth}"));
             if (def.NpcSpawnCount > 0)
-                sb.Append(Loc.Pick($"\nДає {def.NpcSpawnCount} робітника (потрібне місце в населенні)", $"\nGrants {def.NpcSpawnCount} worker (requires population cap)"));
+                sb.Append(Loc.Pick(
+                    $"\nДає +{def.NpcSpawnCount} робітника (в межах ліміту ратуші); у кампанії +{Combat.GameBalance.HouseBirthsPerHour:0.#} народжень/год",
+                    $"\nGrants +{def.NpcSpawnCount} worker (within Town Hall cap); +{Combat.GameBalance.HouseBirthsPerHour:0.#} births/h in campaigns"));
             sb.Append("\n").Append(TipText.Dim(wall
                 ? Loc.Pick("Z / X — повернути, Tab — руда, ЛКМ — поставити, ПКМ — скасувати", "Z / X — rotate, Tab — ore tier, LMB — place, RMB — cancel")
                 : Loc.Pick("Z / X — повернути, ЛКМ — поставити, ПКМ — скасувати", "Z / X — rotate, LMB — place, RMB — cancel")));

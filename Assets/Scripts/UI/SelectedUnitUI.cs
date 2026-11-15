@@ -103,7 +103,8 @@ namespace BattleOfAges.UI
             UnitProgress progress = unit.IsHero ? null : unit.GetComponent<UnitProgress>();
             int xp = progress != null ? progress.BattleXp : 0;
             int langBit = Loc.En ? 1 : 0;
-            if (singleHead.Changed(Shown.Key(unit.GetInstanceID(), (int)rank * 2 + langBit, xp)))
+            int heroKey = unit.IsHero ? HeroPortraitKey(unit) : 0;
+            if (singleHead.Changed(Shown.Key(unit.GetInstanceID(), (int)rank * 2 + langBit, xp, heroKey)))
             {
                 int need = UnitProgress.XpToPromote(rank);
                 titleText.richText = true;
@@ -151,7 +152,7 @@ namespace BattleOfAges.UI
             titleText.color = UiTheme.Gold;
 
             int hash = count * 2 + (Loc.En ? 1 : 0);
-            foreach (RtsUnit u in selected) hash = hash * 31 + (u != null ? u.GetInstanceID() : 0);
+            foreach (RtsUnit u in selected) hash = hash * 31 + (u != null ? u.GetInstanceID() + (u.IsHero ? HeroPortraitKey(u) * 97 : 0) : 0);
             int shown = Mathf.Min(count, CardColumns * CardRows);
             if (hash != shownHash)
             {
@@ -230,9 +231,29 @@ namespace BattleOfAges.UI
 
         private static Color HealthColor(float f) => f > 0.5f ? new Color(0.36f, 0.72f, 0.30f) : f > 0.25f ? new Color(0.86f, 0.66f, 0.22f) : new Color(0.82f, 0.22f, 0.18f);
 
+        private static int HeroPortraitKey(RtsUnit u)
+        {
+            if (u == null || !u.IsHero) return 0;
+            Equipment gear = u.GetComponent<Equipment>();
+            HeroProgress hp = u.GetComponent<HeroProgress>();
+            int w = gear != null && !gear[EquipSlot.Weapon].IsEmpty ? ((int)gear[EquipSlot.Weapon].Type + 1) * 16 + gear[EquipSlot.Weapon].Level : 0;
+            int c = hp != null ? (int)hp.Class : 0;
+            return w * 8 + c + 1;
+        }
+
         private static void SetPortrait(Image img, RtsUnit u, UnitRank rank)
         {
-            if (u != null && u.IsHero) img.sprite = UiTheme.ItemSprite(ItemType.Sword, 5);
+            if (u != null && u.IsHero)
+            {
+                Equipment gear = u.GetComponent<Equipment>();
+                HeroProgress hp = u.GetComponent<HeroProgress>();
+                ItemType weapon = gear != null && !gear[EquipSlot.Weapon].IsEmpty ? gear[EquipSlot.Weapon].Type
+                                : hp != null && hp.Class == HeroClass.Archer ? ItemType.Bow
+                                : hp != null && hp.Class == HeroClass.Mage ? ItemType.Staff
+                                : hp != null && hp.Class == HeroClass.Tank ? ItemType.Shield : ItemType.Sword;
+                int lvl = gear != null && !gear[EquipSlot.Weapon].IsEmpty ? Mathf.Clamp(gear[EquipSlot.Weapon].Level, 1, 5) : 5;
+                img.sprite = UiTheme.ItemSprite(weapon, lvl);
+            }
             else if (rank == UnitRank.General) img.sprite = UiTheme.ItemSprite(ItemType.Helmet, 5);
             else if (rank == UnitRank.Knight) img.sprite = UiTheme.ItemSprite(ItemType.Helmet, 3);
             else if (rank == UnitRank.Warrior) img.sprite = UiTheme.IconSprite(UiTheme.Icon.Army);
@@ -289,7 +310,7 @@ namespace BattleOfAges.UI
                 case GatherDirective.WoodGatherBranchesOnly: return Loc.Pick("Збір гілок", "Gather branches");
                 case GatherDirective.WoodChopTreesOnly: return Loc.Pick("Рубання дерев", "Chop trees");
                 case GatherDirective.OrePebblesOnly: return Loc.Pick("Збір камінчиків", "Pick up ore");
-                case GatherDirective.HaulOreFromMineToChest: return Loc.Pick("Шахта", "Mine");
+                case GatherDirective.HaulOreFromMineToChest: return Loc.Pick("Носить руду з шахти", "Hauls ore from the mine");
                 case GatherDirective.Idle: return Loc.Pick("Чекає наказу", "Awaiting orders");
                 default: return Loc.Pick("Самостійно", "Autonomous");
             }
@@ -388,7 +409,7 @@ namespace BattleOfAges.UI
             overflowText = UiTheme.Label(more, "Text", "", 18, TextAnchor.MiddleLeft, UiTheme.InkDim, FontStyle.Bold);
 
             // Orders
-            RectTransform orders = UiTheme.Rect(rect, "DirectivesBar", new Vector2(1f, 0.5f), new Vector2(-24f, -4f), new Vector2(600f, 88f));
+            RectTransform orders = UiTheme.Rect(rect, "DirectivesBar", new Vector2(1f, 0.5f), new Vector2(-24f, -4f), new Vector2(650f, 88f));
             HorizontalLayoutGroup layout = orders.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 10f;
             layout.childControlWidth = layout.childControlHeight = true;
@@ -400,19 +421,22 @@ namespace BattleOfAges.UI
             CreateDirectiveButton(orders, UiTheme.Icon.Hammer, "Рубати", GatherDirective.WoodChopTreesOnly,
                 "Рубати дерева", "Chop trees",
                 "Валять дерева на дрова: більше деревини, ліс рідшає. Сокира рубає швидше (I — ×1,25); найкращу зі складу беруть самі.",
-                "Fell trees for timber: more wood, forest thins out. Axes chop faster (I — ×1.25); workers take the best one from the armory.");
-            CreateDirectiveButton(orders, UiTheme.Icon.Ore, "Руда", GatherDirective.OrePebblesOnly,
-                "Збирати руду", "Gather ore",
+                "Fell trees for timber: more wood, forest thins out. Axes chop faster (I — ×1.25); workers take the best one from the armory.",
+                UiTheme.ItemSprite(ItemType.Axe, 2));
+            CreateDirectiveButton(orders, UiTheme.Icon.Ore, "Камінці", GatherDirective.OrePebblesOnly,
+                "Збирати камінці руди", "Gather ore pebbles",
                 "Підбирають камінці руди з землі й несуть у скриню.",
                 "Pick up ore pebbles from the ground and carry them to the chest.");
-            CreateDirectiveButton(orders, UiTheme.Icon.House, "Шахта", GatherDirective.HaulOreFromMineToChest,
-                "Носити з шахти", "Haul from mine",
-                "Носять видобуту руду з шахти в скриню. Щоб працювати в шахті — ПКМ по шахті.",
-                "Haul mined ore from the mine to the chest. To work inside a mine — RMB on the mine.");
+            CreateDirectiveButton(orders, UiTheme.Icon.House, "Носій", GatherDirective.HaulOreFromMineToChest,
+                "Носити руду з шахти", "Haul ore from the mine",
+                "Носять уже видобуту руду з шахти в скриню; самі не копають. Щоб копати в шахті — ПКМ по шахті.",
+                "Carry ore already mined from the mine to the chest; they do not dig. To dig inside a mine — RMB on the mine.",
+                UiTheme.ItemSprite(ItemType.Pickaxe, 2));
             CreateDirectiveButton(orders, UiTheme.Icon.Worker, "Авто", GatherDirective.Auto,
                 "Самостійно", "Autonomous",
                 "Самі беруться за роботу, якої бракує: поки дерева менше, ніж на наступну ратушу, більшість іде по дерево, решта носить руду з шахти; потім навпаки.",
                 "Automatically take on needed tasks: while wood is short for the next Town Hall upgrade, most gather wood while the rest haul ore from the mine.");
+            CreateDistrictsButton(orders);
             CreateGearButton(orders);
             CreateStopButton(orders);
 
@@ -433,6 +457,22 @@ namespace BattleOfAges.UI
                    "\n" + TipText.Dim(Loc.Pick("Клік — лише цей, Shift+клік — прибрати з обраних", "Click — select only this, Shift+click — remove from selection"));
         }
 
+        /// <summary>To the districts: fields, sawmills, benches, markets that want hands (else any with a free place).</summary>
+        private void CreateDistrictsButton(Transform parent)
+        {
+            var go = new GameObject("DistrictsBtn", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite);
+            Button btn = UiTheme.AddButton(go);
+            btn.onClick.AddListener(() => { if (commander != null) commander.OrderDistricts(); });
+            UiTheme.IconImage(go.transform, UiTheme.Icon.Food, new Vector2(0.5f, 1f), new Vector2(0f, -8f), 38f);
+            RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
+            TMP_Text t = UiTheme.Label(txt, "Text", "Райони", 16, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            Tooltip.Set(go, () => TipText.Title(Loc.Pick("У райони", "To the districts"), UiTheme.Gold)
+                + Loc.Pick("\nНа поля, лісопилки, верстаки й ринки районів: спершу туди, де бракує рук, інакше — на найближче вільне місце. Там і лишаються, поки не дасте іншого наказу.",
+                           "\nTo the districts' fields, sawmills, benches and markets: first where hands are short, else the nearest free place. They stay until given another order."));
+        }
+
         private void CreateStopButton(Transform parent)
         {
             var go = new GameObject("StopBtn", typeof(RectTransform));
@@ -440,9 +480,11 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage((RectTransform)go.transform, UiTheme.ButtonSprite, new Color(1f, 0.78f, 0.72f));
             Button btn = UiTheme.AddButton(go);
             btn.onClick.AddListener(() => { if (commander != null) commander.OrderStop(); });
-            UiTheme.IconImage(go.transform, UiTheme.Icon.Army, new Vector2(0.5f, 1f), new Vector2(0f, -8f), 38f);
+            RectTransform ic = UiTheme.Rect(go.transform, "Icon", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(38f, 38f));
+            Image ii = ic.gameObject.AddComponent<Image>();
+            ii.sprite = UiTheme.ItemSprite(ItemType.Shield, 2); ii.preserveAspect = true; ii.raycastTarget = false;
             RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
-            UiTheme.Label(txt, "Text", "Стій", 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            UiTheme.Label(txt, "Text", "Стій", 16, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
             Tooltip.Set(go, () => TipText.Title(Loc.Pick("Стій", "Stop"), UiTheme.Gold)
                 + Loc.Pick("\nКидають роботу й похід, стоять на місці. Ворога поруч однаково б'ють.  ", "\nDrop work and movement, hold position. Still fight nearby enemies.  ")
                 + TipText.Key(HudTips.Key(KeyAction.StopUnits)));
@@ -463,13 +505,13 @@ namespace BattleOfAges.UI
             Image img = icon.gameObject.AddComponent<Image>();
             img.sprite = UiTheme.ItemSprite(ItemType.Helmet, 3); img.preserveAspect = true; img.raycastTarget = false;
             RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
-            UiTheme.Label(txt, "Text", "Спорядж.", 16, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Label(txt, "Text", "Спорядж.", 14, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             Tooltip.Set(go, () => TipText.Title(Loc.Pick("Спорядження", "Equipment"), UiTheme.Gold)
                 + Loc.Pick("\nЗброя й броня обраних зі спільного складу.  ", "\nWeapons and armor for selected units from the shared armory.  ")
                 + TipText.Key(HudTips.Key(KeyAction.Equipment)));
         }
 
-        private void CreateDirectiveButton(Transform parent, UiTheme.Icon icon, string label, GatherDirective directive, string titleUk, string titleEn, string tipUk, string tipEn)
+        private void CreateDirectiveButton(Transform parent, UiTheme.Icon icon, string label, GatherDirective directive, string titleUk, string titleEn, string tipUk, string tipEn, Sprite spriteOverride = null)
         {
             var go = new GameObject("DirectiveBtn", typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -480,9 +522,18 @@ namespace BattleOfAges.UI
             cb.colorMultiplier = 1.25f;
             btn.colors = cb;
             btn.onClick.AddListener(() => IssueDirectiveToSelected(directive));
-            UiTheme.IconImage(go.transform, icon, new Vector2(0.5f, 1f), new Vector2(0f, -8f), 38f);
+            if (spriteOverride != null)
+            {
+                RectTransform ic = UiTheme.Rect(go.transform, "Icon", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(38f, 38f));
+                Image ii = ic.gameObject.AddComponent<Image>();
+                ii.sprite = spriteOverride; ii.preserveAspect = true; ii.raycastTarget = false;
+            }
+            else
+            {
+                UiTheme.IconImage(go.transform, icon, new Vector2(0.5f, 1f), new Vector2(0f, -8f), 38f);
+            }
             RectTransform txt = UiTheme.Rect(go.transform, "Label", new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(120f, 26f));
-            UiTheme.Label(txt, "Text", label, 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            UiTheme.Label(txt, "Text", label, 16, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
             Tooltip.Set(go, () => TipText.Title(Loc.Pick(titleUk, titleEn), UiTheme.Gold) + "\n" + Loc.Pick(tipUk, tipEn) + "\n" + TipText.Dim(Loc.Pick($"Зараз так працюють: {WorkerRegistry.GetDirectiveWorkerCount(directive)}", $"Currently assigned: {WorkerRegistry.GetDirectiveWorkerCount(directive)}")));
         }
     }

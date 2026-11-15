@@ -24,7 +24,7 @@ namespace BattleOfAges.UI
         public static readonly Color Good = new Color(0.45f, 0.78f, 0.38f);
         public static readonly Color Bad = new Color(0.86f, 0.32f, 0.26f);
 
-        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall, Fire, Bolt, Clock, Bell, Food }
+        public enum Icon { Wood, Ore, Worker, Army, Heart, Hammer, House, Wall, Fire, Bolt, Clock, Bell, Food, Chest, Crown, Meteor }
 
         private static Font font;
         private static Sprite panel, button, bar, slot, round;
@@ -468,6 +468,41 @@ namespace BattleOfAges.UI
                     bool course = Mathf.Repeat((p.y + 0.78f) * 4f, 1f) < 0.12f || Mathf.Repeat(p.x * 2.5f + (Mathf.Repeat((p.y + 0.78f) * 2f, 1f) < 0.5f ? 0.5f : 0f), 1f) < 0.07f;
                     Layer(wall, course ? new Color(0.52f, 0.50f, 0.46f) : new Color(0.76f, 0.73f, 0.66f));
                     Layer(Mathf.Min(Box(p - new Vector2(0f, -0.58f), new Vector2(0.22f, 0.2f)), (p - new Vector2(0f, -0.38f)).magnitude - 0.22f), new Color(0.30f, 0.20f, 0.11f));
+                    break;
+                }
+                case Icon.Chest:
+                {
+                    float body = Box(p - new Vector2(0f, -0.24f), new Vector2(0.74f, 0.40f));
+                    float lid = Poly(p, new[] { new Vector2(-0.78f, 0.18f), new Vector2(0.78f, 0.18f), new Vector2(0.62f, 0.64f), new Vector2(-0.62f, 0.64f) });
+                    Layer(body, new Color(0.52f, 0.32f, 0.15f));
+                    Layer(lid, new Color(0.66f, 0.42f, 0.20f));
+                    float band = Box(p - new Vector2(0f, 0.16f), new Vector2(0.78f, 0.07f));
+                    float straps = Mathf.Min(Box(p - new Vector2(-0.42f, 0.0f), new Vector2(0.07f, 0.58f)), Box(p - new Vector2(0.42f, 0.0f), new Vector2(0.07f, 0.58f)));
+                    Layer(Mathf.Min(band, straps), new Color(0.74f, 0.56f, 0.26f));
+                    Layer(Box(p - new Vector2(0f, 0.10f), new Vector2(0.14f, 0.17f)), Gold);
+                    break;
+                }
+                case Icon.Crown:
+                {
+                    float baseBand = Box(p - new Vector2(0f, -0.46f), new Vector2(0.72f, 0.20f));
+                    float leftPeak = Poly(p, new[] { new Vector2(-0.72f, -0.28f), new Vector2(-0.20f, -0.28f), new Vector2(-0.66f, 0.54f) });
+                    float midPeak = Poly(p, new[] { new Vector2(-0.34f, -0.28f), new Vector2(0.34f, -0.28f), new Vector2(0f, 0.74f) });
+                    float rightPeak = Poly(p, new[] { new Vector2(0.20f, -0.28f), new Vector2(0.72f, -0.28f), new Vector2(0.66f, 0.54f) });
+                    float crown = Mathf.Min(Mathf.Min(baseBand, leftPeak), Mathf.Min(midPeak, rightPeak));
+                    Layer(crown, Color.Lerp(new Color(0.78f, 0.58f, 0.20f), Gold, Mathf.Clamp01((p.y + 0.6f) * 0.8f)));
+                    Layer((p - new Vector2(0f, -0.45f)).magnitude - 0.13f, new Color(0.84f, 0.18f, 0.16f));
+                    break;
+                }
+                case Icon.Meteor:
+                {
+                    float outer = Mathf.Min((p - new Vector2(-0.35f, -0.35f)).magnitude - 0.50f,
+                        Poly(p, new[] { new Vector2(-0.65f, -0.05f), new Vector2(-0.05f, -0.65f), new Vector2(0.86f, 0.86f) }));
+                    Layer(outer, new Color(0.92f, 0.34f, 0.10f));
+                    float inner = Mathf.Min((p - new Vector2(-0.35f, -0.35f)).magnitude - 0.38f,
+                        Poly(p, new[] { new Vector2(-0.55f, -0.15f), new Vector2(-0.15f, -0.55f), new Vector2(0.68f, 0.68f) }));
+                    Layer(inner, new Color(1f, 0.78f, 0.28f));
+                    float rock = (p - new Vector2(-0.36f, -0.36f)).magnitude - 0.28f;
+                    Layer(rock, p.x + p.y > -0.72f ? new Color(0.56f, 0.34f, 0.24f) : new Color(0.34f, 0.22f, 0.18f));
                     break;
                 }
             }

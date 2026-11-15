@@ -6,6 +6,7 @@ using BattleOfAges.Combat;
 using BattleOfAges.Crafting;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
+using BattleOfAges.RTS;
 using BattleOfAges.SaveLoad;
 using BattleOfAges.UI;
 using TMPro;
@@ -153,6 +154,99 @@ namespace BattleOfAges.Tests
             finally
             {
                 Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void PickaxeDescription_MentionsSurfacePebbleBonusFromLevelThree()
+        {
+            var p2 = new Item(ItemType.Pickaxe, 2);
+            var p3 = new Item(ItemType.Pickaxe, 3);
+            Loc.Set(Loc.Lang.Uk, save: false);
+            Assert.IsFalse(ItemTypeNames.Describe(p2).Contains("камінці"));
+            StringAssert.Contains("×2", ItemTypeNames.Describe(p3));
+            StringAssert.Contains("камінці", ItemTypeNames.Describe(p3));
+
+            Loc.Set(Loc.Lang.En, save: false);
+            Assert.IsFalse(ItemTypeNames.Describe(p2).Contains("pebbles"));
+            StringAssert.Contains("×2", ItemTypeNames.Describe(p3));
+            StringAssert.Contains("pebbles", ItemTypeNames.Describe(p3));
+        }
+
+        [Test]
+        public void ArcherDescription_MentionsMeleePenaltyWithoutBow()
+        {
+            Loc.Set(Loc.Lang.Uk, save: false);
+            StringAssert.Contains("вдвічі повільніше", HeroClassRules.Description(HeroClass.Archer));
+
+            Loc.Set(Loc.Lang.En, save: false);
+            StringAssert.Contains("twice as slowly", HeroClassRules.Description(HeroClass.Archer));
+        }
+
+        [Test]
+        public void HeroSkills_ActiveDescription_CoversAllClassesAndSlots()
+        {
+            foreach (HeroClass cls in new[] { HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd })
+            {
+                var h = new GameObject("HeroProbe_" + cls, typeof(HealthComponent), typeof(CombatUnit), typeof(Equipment));
+                try
+                {
+                    h.GetComponent<HealthComponent>().InitializeHealth(500);
+                    h.GetComponent<CombatUnit>().InitializeCombatStats(10, 2f, 3f);
+                    UnitProgress.Setup(h, UnitRank.General, hero: true);
+                    HeroProgress hp = h.AddComponent<HeroProgress>();
+                    HeroSkills hs = h.AddComponent<HeroSkills>();
+                    hp.AddXp(100 * (1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9));
+                    Assert.IsTrue(hp.ChooseClass(cls));
+
+                    if (cls == HeroClass.Tank)
+                    {
+                        Assert.IsTrue(hs.LearnRegenStart());
+                        Assert.IsTrue(hs.LearnRegenMax());
+                        Assert.IsTrue(hs.LearnHeal());
+                    }
+                    else if (cls == HeroClass.Archer)
+                    {
+                        Assert.IsTrue(hs.LearnLongShot());
+                        Assert.IsTrue(hs.LearnPierce());
+                    }
+                    else if (cls == HeroClass.Mage)
+                    {
+                        Assert.IsTrue(hs.LearnFireFan());
+                        Assert.IsTrue(hs.LearnMeteor());
+                    }
+                    else if (cls == HeroClass.Dd)
+                    {
+                        Assert.IsTrue(hs.LearnDash());
+                        Assert.IsTrue(hs.LearnCriticalHit());
+                    }
+
+                    foreach (Loc.Lang lang in new[] { Loc.Lang.Uk, Loc.Lang.En })
+                    {
+                        Loc.Set(lang, save: false);
+                        string cdWord = lang == Loc.Lang.Uk ? "Перезарядка" : "Cooldown";
+                        Assert.IsTrue(hs.HasActiveIn(0));
+                        string d0 = hs.ActiveDescription(0);
+                        Assert.IsFalse(string.IsNullOrEmpty(d0));
+                        StringAssert.Contains(cdWord, d0);
+                        if (cls == HeroClass.Mage || cls == HeroClass.Dd)
+                        {
+                            Assert.IsTrue(hs.HasActiveIn(1));
+                            string d1 = hs.ActiveDescription(1);
+                            Assert.IsFalse(string.IsNullOrEmpty(d1));
+                            StringAssert.Contains(cdWord, d1);
+                        }
+                        else
+                        {
+                            Assert.IsFalse(hs.HasActiveIn(1));
+                            Assert.IsNull(hs.ActiveDescription(1));
+                        }
+                    }
+                }
+                finally
+                {
+                    Object.DestroyImmediate(h);
+                }
             }
         }
     }

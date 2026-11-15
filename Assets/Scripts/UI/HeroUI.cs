@@ -142,12 +142,14 @@ namespace BattleOfAges.UI
                 $"Тип: {RankName(rank != null ? rank.Rank : UnitRank.General)}   Клас: {HeroClassRules.Name(hero.Class)}\n" +
                 $"HP: {(hp != null ? hp.CurrentHealth : 0)} / {(hp != null ? hp.MaxHealth : 0)}   (вкладено: {hero.HealthPoints} × 50)\n" +
                 $"Сила: {(combat != null ? combat.Strength : 0f):0}   (вкладено: {hero.StrengthPoints} × 5)\n" +
-                $"Шкода: {(combat != null ? combat.AttackDamage : 0)}   Швидкість: {(combat != null ? combat.MoveSpeed : 0f):0.0} м/с",
+                $"Шкода: {(combat != null ? combat.AttackDamage : 0)}   Швидкість: {(combat != null ? combat.MoveSpeed : 0f):0.0} м/с\n" +
+                $"<size=14><color=#B8A88E>Кожен рівень після 1-го додає +{GameBalance.HeroHealthPerLevel} HP і +{GameBalance.HeroStrengthPerLevel} сили</color></size>",
                 $"XP: {hero.Xp} / {hero.XpToNextLevel}\n" +
                 $"Rank: {RankName(rank != null ? rank.Rank : UnitRank.General)}   Class: {HeroClassRules.Name(hero.Class)}\n" +
                 $"HP: {(hp != null ? hp.CurrentHealth : 0)} / {(hp != null ? hp.MaxHealth : 0)}   (invested: {hero.HealthPoints} × 50)\n" +
                 $"Strength: {(combat != null ? combat.Strength : 0f):0}   (invested: {hero.StrengthPoints} × 5)\n" +
-                $"Damage: {(combat != null ? combat.AttackDamage : 0)}   Speed: {(combat != null ? combat.MoveSpeed : 0f):0.0} m/s");
+                $"Damage: {(combat != null ? combat.AttackDamage : 0)}   Speed: {(combat != null ? combat.MoveSpeed : 0f):0.0} m/s\n" +
+                $"<size=14><color=#B8A88E>Each level after 1st grants +{GameBalance.HeroHealthPerLevel} HP and +{GameBalance.HeroStrengthPerLevel} strength</color></size>");
             points.text = Loc.Pick(
                 $"Очки характеристик: {hero.AttributePoints}     Очки навиків: {hero.SkillPoints}",
                 $"Attribute Points: {hero.AttributePoints}     Skill Points: {hero.SkillPoints}");
@@ -158,13 +160,15 @@ namespace BattleOfAges.UI
         }
 
 
-        /// <summary>The class skills that can be learnt now, one button each (docs/GAME_DESIGN.md §8.1).</summary>
+        /// <summary>The class skills (both available and already learned/locked so tooltips stay readable; docs/GAME_DESIGN.md §8.1).</summary>
         private void RefreshSkills()
         {
             HeroSkills s = hero.GetComponent<HeroSkills>();
             int used = 0;
             if (s != null)
             {
+                string keyQ = HudTips.Key(KeyAction.Ability);
+                string keyR = HudTips.Key(KeyAction.Ability2);
                 switch (hero.Class)
                 {
                     case HeroClass.Tank:
@@ -173,30 +177,57 @@ namespace BattleOfAges.UI
                         else
                         {
                             SkillButton(ref used, Loc.Pick($"Реген +1% макс ({s.RegenMaxShare * 100f:0}%)", $"Regen +1% Max ({s.RegenMaxShare * 100f:0}%)"), "RegenMax",
-                                Loc.Pick("Краще для тих, кого добивають до низу.", "Better when dropping low in HP."));
+                                Loc.Pick($"Краще для тих, кого добивають до низу. Зараз: +{s.RegenMaxShare * 100f:0}% макс. HP/год.", $"Better when dropping low in HP. Current: +{s.RegenMaxShare * 100f:0}% max HP/h."));
                             SkillButton(ref used, Loc.Pick($"Реген +2% пот. ({s.RegenCurrentShare * 100f:0}%)", $"Regen +2% Cur ({s.RegenCurrentShare * 100f:0}%)"), "RegenCurrent",
-                                Loc.Pick("Краще для тих, хто тримається вище половини HP.", "Better when staying above half HP."));
+                                Loc.Pick($"Краще для тих, хто тримається вище половини HP. Зараз: +{s.RegenCurrentShare * 100f:0}% пот. HP/год.", $"Better when staying above half HP. Current: +{s.RegenCurrentShare * 100f:0}% cur HP/h."));
                         }
-                        if (s.HealLevel < GameBalance.HealMaxLevel && s.CanLearnHeal) SkillButton(ref used, Loc.Pick($"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", $"Heal {s.HealLevel + 1}/{GameBalance.HealMaxLevel}"), "Heal",
-                            Loc.Pick("Уміння Q: миттєво лікує частку макс. HP (5% і +4% за очко, до 25%).", "Skill Q: instantly heals a share of max HP (5% + 4% per point, up to 25%)."));
+                        bool healMax = s.HealLevel >= GameBalance.HealMaxLevel;
+                        SkillButton(ref used,
+                            healMax ? Loc.Pick($"Відхіл {s.HealLevel}/{GameBalance.HealMaxLevel} (макс.)", $"Heal {s.HealLevel}/{GameBalance.HealMaxLevel} (max)") : Loc.Pick($"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", $"Heal {s.HealLevel + 1}/{GameBalance.HealMaxLevel}"),
+                            "Heal",
+                            Loc.Pick($"Уміння {keyQ}: миттєво лікує частку макс. HP (5% і +4% за очко, до 25%). Зараз: {Mathf.RoundToInt(s.HealShare * 100f)}%. Перезарядка {GameBalance.HealCooldown / 60f:0} хв.", $"Skill {keyQ}: instantly heals a share of max HP (5% + 4% per point, up to 25%). Current: {Mathf.RoundToInt(s.HealShare * 100f)}%. Cooldown {GameBalance.HealCooldown / 60f:0} min."),
+                            learned: healMax,
+                            lockedReason: !s.CanLearnHeal ? Loc.Pick("Спочатку вивчіть Регенерацію і вкладіть 1 очко в її гілку", "Requires Regeneration and 1 upgrade point in its branch") : null);
                         break;
                     case HeroClass.Archer:
-                        if (!s.LongShot) SkillButton(ref used, Loc.Pick($"Далекий постріл ({GameBalance.LongShotCost})", $"Long Shot ({GameBalance.LongShotCost})"), "LongShot",
-                            Loc.Pick("Пасивно: +5% дальності стрільби.", "Passive: +5% shooting range."));
-                        else if (!s.PiercingArrow) SkillButton(ref used, Loc.Pick("Пробивна стріла (1)", "Piercing Arrow (1)"), "Pierce",
-                            Loc.Pick("Уміння Q: наступна стріла б'є на 200% і летить наскрізь.", "Skill Q: next arrow deals 200% damage and pierces through."));
+                        SkillButton(ref used,
+                            s.LongShot ? Loc.Pick("Далекий постріл (вивч.)", "Long Shot (learned)") : Loc.Pick($"Далекий постріл ({GameBalance.LongShotCost})", $"Long Shot ({GameBalance.LongShotCost})"),
+                            "LongShot",
+                            Loc.Pick($"Пасивно: +{Mathf.RoundToInt(GameBalance.LongShotRangeBonus * 100f)}% дальності стрільби.", $"Passive: +{Mathf.RoundToInt(GameBalance.LongShotRangeBonus * 100f)}% shooting range."),
+                            learned: s.LongShot, cost: GameBalance.LongShotCost);
+                        SkillButton(ref used,
+                            s.PiercingArrow ? Loc.Pick("Пробивна стріла (вивч.)", "Piercing Arrow (learned)") : Loc.Pick("Пробивна стріла (1)", "Piercing Arrow (1)"),
+                            "Pierce",
+                            Loc.Pick($"Уміння {keyQ}: наступна стріла б'є на 200% і летить наскрізь (100% і 50%). Перезарядка {GameBalance.PierceCooldown:0} с.", $"Skill {keyQ}: next arrow deals 200% damage and pierces through (100% and 50%). Cooldown {GameBalance.PierceCooldown:0}s."),
+                            learned: s.PiercingArrow,
+                            lockedReason: !s.LongShot ? Loc.Pick("Спочатку вивчіть Далекий постріл", "Requires Long Shot first") : null);
                         break;
                     case HeroClass.Mage:
-                        if (!s.FireFan) SkillButton(ref used, Loc.Pick("Вогняне віяло (1)", "Fire Fan (1)"), "FireFan",
-                            Loc.Pick("Уміння Q: віяло вогню по зоні перед собою, крізь броню.", "Skill Q: cone of fire ahead, ignoring armor."));
-                        else if (!s.Meteor) SkillButton(ref used, Loc.Pick("Метеор (1)", "Meteor (1)"), "Meteor",
-                            Loc.Pick("Уміння R: метеор на найближчого ворога, 5× шкода мага в радіусі 2,5 м.", "Skill R: drops a meteor on the nearest enemy for 5× mage damage in 2.5 m radius."));
+                        SkillButton(ref used,
+                            s.FireFan ? Loc.Pick("Вогняне віяло (вивч.)", "Fire Fan (learned)") : Loc.Pick("Вогняне віяло (1)", "Fire Fan (1)"),
+                            "FireFan",
+                            Loc.Pick($"Уміння {keyQ}: віяло вогню ({GameBalance.FireFanAngle:0}°) перед собою — 60% шкоди мага (до 30% на краю), крізь броню. Перезарядка {GameBalance.FireFanCooldown:0} с.", $"Skill {keyQ}: {GameBalance.FireFanAngle:0}° cone of fire ahead — 60% mage damage (down to 30% at edge), ignores armor. Cooldown {GameBalance.FireFanCooldown:0}s."),
+                            learned: s.FireFan);
+                        SkillButton(ref used,
+                            s.Meteor ? Loc.Pick("Метеор (вивч.)", "Meteor (learned)") : Loc.Pick("Метеор (1)", "Meteor (1)"),
+                            "Meteor",
+                            Loc.Pick($"Уміння {keyR}: метеор на найближчого ворога через 1 с, 5× шкода мага в радіусі 2,5 м, крізь броню. Перезарядка {GameBalance.MeteorCooldown:0} с.", $"Skill {keyR}: drops a meteor on the nearest enemy after 1s for 5× mage damage in 2.5 m radius, ignores armor. Cooldown {GameBalance.MeteorCooldown:0}s."),
+                            learned: s.Meteor,
+                            lockedReason: !s.FireFan ? Loc.Pick("Спочатку вивчіть Вогняне віяло", "Requires Fire Fan first") : null);
                         break;
                     case HeroClass.Dd:
-                        if (s.DashLevel < GameBalance.DashMaxLevel) SkillButton(ref used, Loc.Pick($"Ривок ×{s.DashFactor + 1f:0}", $"Dash ×{s.DashFactor + 1f:0}"), "Dash",
-                            Loc.Pick("Уміння Q: на 1 с біг у кілька разів швидший; перезарядка 20 с.", "Skill Q: multiply movement speed for 1 s; 20 s cooldown."));
-                        if (s.DashLevel > 0 && !s.CriticalHit) SkillButton(ref used, Loc.Pick("Критичний удар (1)", "Critical Strike (1)"), "CriticalHit",
-                            Loc.Pick("Уміння R: наступний удар подвійний; перезарядка 40 с.", "Skill R: next hit deals double damage; 40 s cooldown."));
+                        bool dashMax = s.DashLevel >= GameBalance.DashMaxLevel;
+                        SkillButton(ref used,
+                            dashMax ? Loc.Pick($"Ривок ×{s.DashFactor:0} (макс.)", $"Dash ×{s.DashFactor:0} (max)") : Loc.Pick($"Ривок ×{s.DashFactor + 1f:0} ({s.DashLevel}/{GameBalance.DashMaxLevel})", $"Dash ×{s.DashFactor + 1f:0} ({s.DashLevel}/{GameBalance.DashMaxLevel})"),
+                            "Dash",
+                            Loc.Pick($"Уміння {keyQ}: на {GameBalance.DashSeconds:0.#} с прискорює біг до ×{GameBalance.DashMaxLevel + 1} (зараз ×{s.DashFactor:0}); перезарядка {GameBalance.DashCooldown:0} с.", $"Skill {keyQ}: boosts run speed for {GameBalance.DashSeconds:0.#}s up to ×{GameBalance.DashMaxLevel + 1} (current ×{s.DashFactor:0}); {GameBalance.DashCooldown:0}s cooldown."),
+                            learned: dashMax);
+                        SkillButton(ref used,
+                            s.CriticalHit ? Loc.Pick("Критичний удар (вивч.)", "Critical Strike (learned)") : Loc.Pick("Критичний удар (1)", "Critical Strike (1)"),
+                            "CriticalHit",
+                            Loc.Pick($"Уміння {keyR}: наступний удар завдає ×{GameBalance.CritMultiplier:0} шкоди; перезарядка {GameBalance.CritCooldown:0} с.", $"Skill {keyR}: next hit deals ×{GameBalance.CritMultiplier:0} damage; {GameBalance.CritCooldown:0}s cooldown."),
+                            learned: s.CriticalHit,
+                            lockedReason: s.DashLevel <= 0 ? Loc.Pick("Спочатку вивчіть Ривок", "Requires Dash first") : null);
                         break;
                 }
             }
@@ -207,14 +238,19 @@ namespace BattleOfAges.UI
         private static void Hero(HeroCommand.Act what, int value = 0, string skill = null) =>
             CommandBus.Submit(new HeroCommand { What = what, Value = value, Skill = skill });
 
-        private void SkillButton(ref int index, string label, string skill, string tip)
+        private void SkillButton(ref int index, string label, string skill, string tip, bool learned = false, int cost = 1, string lockedReason = null)
         {
             if (index >= skillButtons.Length) return;
             Button b = skillButtons[index++];
-            Tooltip.Set(b.gameObject, () => TipText.Title(label, UiTheme.Gold) + "\n" + tip + "\n" + TipText.Dim(hero != null && hero.SkillPoints > 0 ? Loc.Pick("Клік — вивчити за очко навику", "Click — learn for 1 skill point") : Loc.Pick("Немає очок навику: вони даються з рівнем", "No skill points: gained on level up")));
+            Tooltip.Set(b.gameObject, () => TipText.Title(label, UiTheme.Gold) + "\n" + tip + "\n" +
+                (learned ? TipText.Good(Loc.Pick("Вивчено", "Learned"))
+                : lockedReason != null ? TipText.Dim(lockedReason)
+                : TipText.Dim(hero != null && hero.SkillPoints >= cost
+                    ? Loc.Pick($"Клік — вивчити за {cost} очк. навику", $"Click — learn for {cost} skill point(s)")
+                    : Loc.Pick($"Потрібно очок навику: {cost} (даються з рівнем)", $"Requires {cost} skill point(s) (gained on level up)"))));
             b.gameObject.SetActive(true);
             b.GetComponentInChildren<TMP_Text>().text = label;
-            b.interactable = hero.SkillPoints > 0;
+            b.interactable = !learned && lockedReason == null && hero != null && hero.SkillPoints >= cost;
             b.onClick.RemoveAllListeners();
             b.onClick.AddListener(() => Hero(HeroCommand.Act.LearnSkill, 0, skill));
         }
@@ -300,12 +336,27 @@ namespace BattleOfAges.UI
                 () => Hero(HeroCommand.Act.Strength), 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
                 () => Hero(HeroCommand.Act.Health), 22);
-            Tooltip.Set(strengthButton.gameObject, () => TipText.Title(Loc.Pick("+5 сили", "+5 Strength"), UiTheme.Gold)
-                + Loc.Pick("\nСила — шкода удару; сила разом зі здоров'ям — швидкість бігу.", "\nStrength increases hit damage; combined with health, it increases run speed.")
-                + "\n" + TipText.Dim(Loc.Pick("За очко характеристик; очки даються з рівнем.", "Costs 1 attribute point; earned on level up.")));
-            Tooltip.Set(healthButton.gameObject, () => TipText.Title("+50 HP", UiTheme.Gold)
-                + Loc.Pick("\nДо найбільшого здоров'я героя; разом із силою — швидкість бігу.", "\nIncreases hero max health; combined with strength, increases run speed.")
-                + "\n" + TipText.Dim(Loc.Pick("За очко характеристик; очки даються з рівнем.", "Costs 1 attribute point; earned on level up.")));
+            Tooltip.Set(strengthButton.gameObject, () =>
+            {
+                bool mage = hero != null && hero.Class == HeroClass.Mage;
+                bool archer = hero != null && hero.Class == HeroClass.Archer;
+                return TipText.Title(Loc.Pick("+5 сили", "+5 Strength"), UiTheme.Gold)
+                    + (mage
+                        ? Loc.Pick("\nДля мага сила підвищує шкоду заклять і куль (на швидкість бігу й дальність мага не впливає).", "\nFor a mage, strength increases spell and bolt damage (does not affect mage run speed or range).")
+                        : archer
+                            ? Loc.Pick("\nСила підвищує шкоду ударів, швидкість бігу та дальність стрільби з лука.", "\nStrength increases hit damage, run speed, and bow range.")
+                            : Loc.Pick("\nСила — шкода удару; разом зі здоров'ям — швидкість бігу.", "\nStrength increases hit damage; combined with health, it increases run speed."))
+                    + "\n" + TipText.Dim(Loc.Pick($"За 1 очко характеристик (дається з рівнем; кожен рівень сам дає +{GameBalance.HeroStrengthPerLevel} сили і +{GameBalance.HeroHealthPerLevel} HP).", $"Costs 1 attribute point (earned on level up; each level also grants +{GameBalance.HeroStrengthPerLevel} strength and +{GameBalance.HeroHealthPerLevel} HP)."));
+            });
+            Tooltip.Set(healthButton.gameObject, () =>
+            {
+                bool mage = hero != null && hero.Class == HeroClass.Mage;
+                return TipText.Title("+50 HP", UiTheme.Gold)
+                    + (mage
+                        ? Loc.Pick("\nДодає +50 до макс. здоров'я героя (на швидкість бігу мага не впливає).", "\nIncreases hero max health by +50 (does not affect mage run speed).")
+                        : Loc.Pick("\nДо найбільшого здоров'я героя; разом із силою — швидкість бігу.", "\nIncreases hero max health; combined with strength, increases run speed."))
+                    + "\n" + TipText.Dim(Loc.Pick($"За 1 очко характеристик (дається з рівнем; кожен рівень сам дає +{GameBalance.HeroHealthPerLevel} HP і +{GameBalance.HeroStrengthPerLevel} сили).", $"Costs 1 attribute point (earned on level up; each level also grants +{GameBalance.HeroHealthPerLevel} HP and +{GameBalance.HeroStrengthPerLevel} strength)."));
+            });
             // Artifacts: the starting pick (once), one-shots and shards
             RectTransform art = UiTheme.Rect(panel, "Artifacts", new Vector2(0.5f, 0f), new Vector2(0f, 262f), new Vector2(500f, 62f));
             artifactText = UiTheme.Label(art, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
@@ -323,12 +374,20 @@ namespace BattleOfAges.UI
             Tooltip.Set(useLightning.gameObject, () => TipText.Title(Artifacts.Name(ArtifactType.Lightning), UiTheme.Gold) + "\n" + Artifacts.Description(ArtifactType.Lightning));
             combine = UiTheme.TextButton(panel, "Combine", "Об'єднати осколки", new Vector2(0f, 0f), new Vector2(350f, 206f), new Vector2(180f, 44f),
                 () => Hero(HeroCommand.Act.CombineShards), 15);
+            Tooltip.Set(combine.gameObject, () => TipText.Title(Loc.Pick("Об'єднати осколки", "Combine Shards"), UiTheme.Gold)
+                + Loc.Pick("\nКує цілий артефакт із 2 осколків (шанс 50/50 отримати один із двох видів осколків).", "\nForges a complete artifact from 2 shards (50/50 chance between the two shard types).")
+                + "\n" + TipText.Bad(Loc.Pick("Увага: другий світозмінний артефакт (зброя ×5, броня 80%, вампіризм або мудрість) миттєво вб'є героя!", "Warning: a second world-changing artifact (weapon ×5, 80% armor, vampirism, or wisdom) will instantly kill the hero!")));
 
             // Class skills share the row with the class picker (shown once the class is chosen)
             for (int i = 0; i < skillButtons.Length; i++)
             {
                 skillButtons[i] = UiTheme.TextButton(panel, "Skill" + i, "", new Vector2(0f, 0f), new Vector2(20f + i * 130f, 150f), new Vector2(124f, 46f), null, 14);
-                LocText.Detach(skillButtons[i].GetComponentInChildren<TMP_Text>());
+                TMP_Text st = skillButtons[i].GetComponentInChildren<TMP_Text>();
+                LocText.Detach(st);
+                st.textWrappingMode = TextWrappingModes.Normal;
+                st.enableAutoSizing = true;
+                st.fontSizeMin = 10;
+                st.fontSizeMax = 14;
             }
 
             // The class is picked once (docs/GAME_DESIGN.md §8.1)

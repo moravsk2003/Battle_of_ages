@@ -199,7 +199,7 @@ namespace BattleOfAges.UI
             switch (c)
             {
                 case HeroClass.Tank: return UiTheme.IconSprite(UiTheme.Icon.Heart);
-                case HeroClass.Mage: return UiTheme.IconSprite(UiTheme.Icon.Fire);
+                case HeroClass.Mage: return UiTheme.IconSprite(slot == 0 ? UiTheme.Icon.Fire : UiTheme.Icon.Meteor);
                 case HeroClass.Archer: return UiTheme.ItemSprite(ItemType.Bow, 4);
                 default: return slot == 0 ? UiTheme.ItemSprite(ItemType.Boots, 4) : UiTheme.ItemSprite(ItemType.Sword, 4);
             }
@@ -212,8 +212,8 @@ namespace BattleOfAges.UI
                 if (skills == null) return null;
                 float left = skills.CooldownLeftIn(i);
                 return TipText.Title(skills.ActiveName(i), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i]))
-                       + "\n" + (left > 0f ? TipText.Dim(Loc.Pick($"Перезарядка ще {left:0} с", $"Cooldown: {left:0}s remaining")) : TipText.Good(Loc.Pick("Готове", "Ready")))
-                       + "\n" + TipText.Dim(Loc.Pick($"Перезарядка {skills.CooldownOf(i):0} с. Опис — у вікні героя ", $"Cooldown {skills.CooldownOf(i):0}s. Details in Hero window ")) + TipText.Key(HudTips.Key(InputKey.Hero));
+                       + "\n" + skills.ActiveDescription(i)
+                       + "\n" + (left > 0f ? TipText.Dim(Loc.Pick($"Перезарядка ще {left:0} с", $"Cooldown: {left:0}s remaining")) : TipText.Good(Loc.Pick("Готове до дії", "Ready")));
             }
             ArtifactType a = i == 2 ? ArtifactType.FullHeal : ArtifactType.Lightning;
             return TipText.Title(Artifacts.Name(a), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i])) + "\n" + Artifacts.Description(a) + "\n" + TipText.Dim(Loc.Pick("Одноразовий: після використання зникає", "Single-use: consumed on activation"));

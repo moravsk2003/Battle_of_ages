@@ -256,7 +256,7 @@ namespace BattleOfAges.UI
                 int n = commander != null ? DevTools.GiveToEnemy(commander.SelectedUnits) : 0;
                 return n > 0
                     ? Loc.Pick($"До ворога перейшло: {n}", $"Switched to enemy: {n}")
-                    : Loc.Pick("Спершу оберіть своїх на мапі (M)", "First select allies on the map (M)");
+                    : Loc.Pick($"Спершу оберіть своїх на мапі ({HudTips.Key(KeyAction.ToggleGameMode)})", $"First select allies on the map ({HudTips.Key(KeyAction.ToggleGameMode)})");
             });
             Row(panel, ref y, "Найближчий ворог → мій", () =>
                 GameContext.Player != null && DevTools.TakeNearestEnemy(GameContext.Player.transform.position, 40f)

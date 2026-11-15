@@ -52,7 +52,7 @@ namespace BattleOfAges.UI
         private void OnNewHero(HeroSuccession s)
         {
             banner.SetActive(false);
-            StrategyHud.Notify(Loc.Pick("Новий герой узяв владу. Оберіть клас (H)", "A new hero has taken command. Choose a class (H)"));
+            StrategyHud.Notify(Loc.Pick($"Новий герой узяв владу. Оберіть клас ({HudTips.Key(BattleOfAges.InputSystem.KeyAction.Hero)})", $"A new hero has taken command. Choose a class ({HudTips.Key(BattleOfAges.InputSystem.KeyAction.Hero)})"));
         }
 
         private void OnGameOver(HeroSuccession s)

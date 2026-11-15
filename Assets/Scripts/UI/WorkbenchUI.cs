@@ -44,6 +44,7 @@ namespace BattleOfAges.UI
         private int smeltTier;
         private TMP_Text smeltTierText, smeltInfoText;
         private Button smeltTen, smeltAll;
+        private Button callButton, releaseButton, armoryButton;
 
         private void Awake()
         {
@@ -57,12 +58,14 @@ namespace BattleOfAges.UI
         {
             Armory.Changed += RefreshStore;
             Loc.Changed += OnLanguageChanged;
+            KeybindsManager.OnKeybindsChanged += RefreshStore;
         }
 
         private void OnDisable()
         {
             Armory.Changed -= RefreshStore;
             Loc.Changed -= OnLanguageChanged;
+            KeybindsManager.OnKeybindsChanged -= RefreshStore;
         }
 
         private void OnLanguageChanged()
@@ -182,8 +185,12 @@ namespace BattleOfAges.UI
                 LocText.Detach(label);
                 label.textWrappingMode = TextWrappingModes.Normal;
                 string id = task.TaskId;
-                UiTheme.TextButton(row, "Cancel", "×", new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(34f, 32f), () => { bench.CancelTask(id); RefreshAll(); }, 20)
-                       .GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
+                Button cancelBtn = UiTheme.TextButton(row, "Cancel", "×", new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(34f, 32f), () => { bench.CancelTask(id); RefreshAll(); }, 20);
+                cancelBtn.GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
+                Tooltip.Set(cancelBtn.gameObject, () =>
+                    TipText.Title(Loc.Pick("Скасувати замовлення", "Cancel Order"), UiTheme.Gold)
+                    + "\n" + Loc.Pick("Повертає 100% витраченого дерева та руди назад у скриню поселення.",
+                                      "Refunds 100% of spent wood and ore back to the settlement chest."));
             }
             if (q.Count > 8)
             {
@@ -210,9 +217,9 @@ namespace BattleOfAges.UI
                 $"руда {CraftingTask.Tier(smeltTier)}  →  руда {CraftingTask.Tier(smeltTier + 1)}",
                 $"ore {CraftingTask.Tier(smeltTier)}  →  ore {CraftingTask.Tier(smeltTier + 1)}");
             smeltInfoText.text = Loc.Pick(
-                $"{ratio} шт. → 1 шт., {Combat.GameBalance.SmeltSecondsPerPiece:0.#} с за шматок\n"
+                $"{ratio} шт. + {Combat.GameBalance.SmeltWood(smeltTier + 1)} дерева → 1 шт., {Combat.GameBalance.SmeltSecondsPerPiece:0.#} с за шматок\n"
                 + $"на складі цієї руди: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — вийде {can}" : ""),
-                $"{ratio} pcs → 1 pc, {Combat.GameBalance.SmeltSecondsPerPiece:0.#} s per piece\n"
+                $"{ratio} pcs + {Combat.GameBalance.SmeltWood(smeltTier + 1)} wood → 1 pc, {Combat.GameBalance.SmeltSecondsPerPiece:0.#} s per piece\n"
                 + $"this ore in stock: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — yields {can}" : ""));
             smeltTen.interactable = bench != null && can >= 1;
             smeltAll.interactable = bench != null && can >= 2;
@@ -246,13 +253,21 @@ namespace BattleOfAges.UI
 
         private void RefreshStore()
         {
-            if (storeText == null) return;
-            int n = Armory.Instance.Items.Count;
-            storeText.text = n == 0
-                ? Loc.Pick("На складі поки порожньо", "Armory is currently empty")
-                : Loc.Pick(
-                    $"На складі: <color=#F5CC73>{n}</color> {(n % 10 == 1 && n % 100 != 11 ? "річ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "речі" : "речей")}",
-                    $"In armory: <color=#F5CC73>{n}</color> {(n == 1 ? "item" : "items")}");
+            if (storeText != null)
+            {
+                int n = Armory.Instance.Items.Count;
+                storeText.text = n == 0
+                    ? Loc.Pick("На складі поки порожньо", "Armory is currently empty")
+                    : Loc.Pick(
+                        $"На складі: <color=#F5CC73>{n}</color> {(n % 10 == 1 && n % 100 != 11 ? "річ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "речі" : "речей")}",
+                        $"In armory: <color=#F5CC73>{n}</color> {(n == 1 ? "item" : "items")}");
+            }
+            if (armoryButton != null)
+            {
+                TMP_Text btnTxt = armoryButton.GetComponentInChildren<TMP_Text>();
+                if (btnTxt != null)
+                    btnTxt.text = Loc.Pick($"Склад і спорядження  [{HudTips.Key(KeyAction.Equipment)}]", $"Armory & Equipment  [{HudTips.Key(KeyAction.Equipment)}]");
+            }
         }
 
         // ------------------------------------------------------------------ actions
@@ -312,8 +327,17 @@ namespace BattleOfAges.UI
             workersText = UiTheme.Label(wt, "Text", "", 19, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(workersText);
             workersText.richText = true;
-            UiTheme.TextButton(wbar, "Call", "+ Покликати", new Vector2(0f, 0.5f), new Vector2(470f, 0f), new Vector2(150f, 40f), CallWorker, 17);
-            UiTheme.TextButton(wbar, "Release", "− Відпустити", new Vector2(0f, 0.5f), new Vector2(628f, 0f), new Vector2(150f, 40f), ReleaseWorker, 17);
+            callButton = UiTheme.TextButton(wbar, "Call", "+ Покликати", new Vector2(0f, 0.5f), new Vector2(470f, 0f), new Vector2(150f, 40f), CallWorker, 17);
+            Tooltip.Set(callButton.gameObject, () =>
+                TipText.Title(Loc.Pick("Покликати робітника", "Call Worker"), UiTheme.Gold)
+                + "\n" + Loc.Pick(
+                    $"Кличе вільного чи найближчого робітника до верстака (до {CraftingQueue.MAX_WORKERS}).\nШвидкість кування: ×{CraftingQueue.CalculateSpeedMultiplier(1):0.##} / ×{CraftingQueue.CalculateSpeedMultiplier(2):0.##} / ×{CraftingQueue.CalculateSpeedMultiplier(3):0.##} / ×{CraftingQueue.CalculateSpeedMultiplier(4):0.##}.",
+                    $"Calls a free or nearby worker to the workbench (up to {CraftingQueue.MAX_WORKERS}).\nCrafting speed: ×{CraftingQueue.CalculateSpeedMultiplier(1):0.##} / ×{CraftingQueue.CalculateSpeedMultiplier(2):0.##} / ×{CraftingQueue.CalculateSpeedMultiplier(3):0.##} / ×{CraftingQueue.CalculateSpeedMultiplier(4):0.##}."));
+            releaseButton = UiTheme.TextButton(wbar, "Release", "− Відпустити", new Vector2(0f, 0.5f), new Vector2(628f, 0f), new Vector2(150f, 40f), ReleaseWorker, 17);
+            Tooltip.Set(releaseButton.gameObject, () =>
+                TipText.Title(Loc.Pick("Відпустити робітника", "Release Worker"), UiTheme.Gold)
+                + "\n" + Loc.Pick("Звільняє одного робітника з верстака назад до попередніх справ.",
+                                  "Releases one worker from the workbench back to their previous duties."));
             RectTransform warn = UiTheme.Rect(panel, "Warning", new Vector2(0f, 1f), new Vector2(24f, -112f), new Vector2(800f, 26f));
             warningText = UiTheme.Label(warn, "Text", "Без робітника верстак стоїть — покличте когось", 16, TextAnchor.MiddleLeft, UiTheme.Bad);
 
@@ -360,8 +384,10 @@ namespace BattleOfAges.UI
             smeltInfoText.richText = true;
             smeltInfoText.textWrappingMode = TextWrappingModes.Normal;
             smeltTen = UiTheme.TextButton(smelt, "One", $"Переплавити {Combat.GameBalance.SmeltRatio}", new Vector2(0f, 0f), new Vector2(14f, 12f), new Vector2(170f, 42f), () => Smelt(false), 16);
+            Tooltip.Set(smeltTen.gameObject, SmeltTip);
             smeltAll = UiTheme.TextButton(smelt, "All", "Усе", new Vector2(1f, 0f), new Vector2(-14f, 12f), new Vector2(170f, 42f), () => Smelt(true), 16);
             LocText.Detach(smeltAll.GetComponentInChildren<TMP_Text>());
+            Tooltip.Set(smeltAll.gameObject, SmeltTip);
 
             RectTransform store = UiTheme.Rect(side, "Store", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(380f, 112f));
             UiTheme.PanelImage(store, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.9f));
@@ -369,7 +395,12 @@ namespace BattleOfAges.UI
             storeText = UiTheme.Label(stt, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
             LocText.Detach(storeText);
             storeText.richText = true;
-            UiTheme.TextButton(store, "Armory", "Склад і спорядження  [C]", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(330f, 48f), OpenArmory, 18);
+            armoryButton = UiTheme.TextButton(store, "Armory", Loc.Pick($"Склад і спорядження  [{HudTips.Key(KeyAction.Equipment)}]", $"Armory & Equipment  [{HudTips.Key(KeyAction.Equipment)}]"), new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(330f, 48f), OpenArmory, 18);
+            LocText.Detach(armoryButton.GetComponentInChildren<TMP_Text>());
+            Tooltip.Set(armoryButton.gameObject, () =>
+                TipText.Title(Loc.Pick("Склад і спорядження", "Armory & Equipment"), UiTheme.Gold)
+                + "\n" + Loc.Pick($"Готові речі потрапляють на склад — там їх можна надягти на героя чи солдатів ({TipText.Key(HudTips.Key(KeyAction.Equipment))}).",
+                                  $"Crafted items go to the armory, where you can equip them on your hero or units ({TipText.Key(HudTips.Key(KeyAction.Equipment))})."));
         }
 
         private void Card(RectTransform parent, ItemType type, int index)

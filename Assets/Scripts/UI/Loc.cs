@@ -310,6 +310,9 @@ namespace BattleOfAges.UI
             { "Рубати", "Chop" },
             { "Руда", "Ore" },
             { "Шахта", "Mine" },
+            { "Камінці", "Pebbles" },
+            { "Носій", "Haul" },
+            { "Райони", "Districts" },
             { "Авто", "Auto" },
             { "Скасувати", "Cancel" },
             { "Склад порожній — речі виготовляє верстак,\nтрофеї падають з переможених ворогів", "Armory is empty — craft items at the workbench\nor loot trophies from defeated enemies" },
@@ -409,6 +412,10 @@ namespace BattleOfAges.UI
             { "Озерний край", "Lakeland" },
             { "Північна застава", "North Outpost" },
             { "Сонячний схил", "Sun Slope" },
+            { "Артефакт не знімається", "Artifact cannot be unequipped" },
+            { "Цей слот тримає артефакт", "This slot holds an artifact" },
+            { "Їжа", "Food" },
+            { "Провізія", "Provisions" },
         };
 
         private static readonly (Regex regex, string replace)[] PatternRules =

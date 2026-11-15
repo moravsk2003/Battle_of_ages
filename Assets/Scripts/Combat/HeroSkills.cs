@@ -154,6 +154,40 @@ namespace BattleOfAges.Combat
             }
         }
 
+        /// <summary>Full description of the active skill in the slot (0: Q, 1: R) with current level and numbers, or null.</summary>
+        public string ActiveDescription(int slot)
+        {
+            if (!HasActiveIn(slot)) return null;
+            switch (Class)
+            {
+                case HeroClass.Tank:
+                    return UI.Loc.Pick(
+                        $"Миттєво відновлює {Mathf.RoundToInt(HealShare * 100f)}% макс. HP (рівень {healLevel}/{GameBalance.HealMaxLevel}). Перезарядка {GameBalance.HealCooldown / 60f:0} хв.",
+                        $"Instantly restores {Mathf.RoundToInt(HealShare * 100f)}% max HP (level {healLevel}/{GameBalance.HealMaxLevel}). Cooldown {GameBalance.HealCooldown / 60f:0} min.");
+                case HeroClass.Mage:
+                    return slot == 0
+                        ? UI.Loc.Pick(
+                            $"Віяло вогню ({GameBalance.FireFanAngle:0}° перед собою): {Mathf.RoundToInt(GameBalance.FireFanDamageShare * 100f)}% шкоди мага поблизу (до {Mathf.RoundToInt(GameBalance.FireFanDamageShare * GameBalance.FireFanEdgeDamage * 100f)}% на краю дальності), крізь броню. Перезарядка {GameBalance.FireFanCooldown:0} с.",
+                            $"Cone of fire ({GameBalance.FireFanAngle:0}° ahead): {Mathf.RoundToInt(GameBalance.FireFanDamageShare * 100f)}% mage damage up close (down to {Mathf.RoundToInt(GameBalance.FireFanDamageShare * GameBalance.FireFanEdgeDamage * 100f)}% at max range), ignores armor. Cooldown {GameBalance.FireFanCooldown:0}s.")
+                        : UI.Loc.Pick(
+                            $"За {GameBalance.MeteorDelay:0.#} с обрушує метеор на найближчого ворога в дальності: {GameBalance.MeteorDamageFactor:0.#}× шкоди мага всім у радіусі {GameBalance.MeteorRadius:0.#} м, крізь броню. Перезарядка {GameBalance.MeteorCooldown:0} с.",
+                            $"Drops a meteor on the nearest enemy in range after {GameBalance.MeteorDelay:0.#}s: {GameBalance.MeteorDamageFactor:0.#}× mage damage in a {GameBalance.MeteorRadius:0.#} m radius, ignores armor. Cooldown {GameBalance.MeteorCooldown:0}s.");
+                case HeroClass.Archer:
+                    return UI.Loc.Pick(
+                        $"Наступна стріла завдає {Mathf.RoundToInt(GameBalance.PierceShotMultiplier * 100f)}% шкоди й прошиває ворогів позаду (100% і 50% шкоди). Перезарядка {GameBalance.PierceCooldown:0} с.",
+                        $"Next arrow deals {Mathf.RoundToInt(GameBalance.PierceShotMultiplier * 100f)}% damage and pierces enemies behind (100% and 50% damage). Cooldown {GameBalance.PierceCooldown:0}s.");
+                case HeroClass.Dd:
+                    return slot == 0
+                        ? UI.Loc.Pick(
+                            $"На {GameBalance.DashSeconds:0.#} с прискорює біг у ×{DashFactor:0} разів (рівень {dashLevel}/{GameBalance.DashMaxLevel}). Перезарядка {GameBalance.DashCooldown:0} с.",
+                            $"Multiplies run speed by ×{DashFactor:0} for {GameBalance.DashSeconds:0.#}s (level {dashLevel}/{GameBalance.DashMaxLevel}). Cooldown {GameBalance.DashCooldown:0}s.")
+                        : UI.Loc.Pick(
+                            $"Наступний удар завдає ×{GameBalance.CritMultiplier:0} шкоди. Перезарядка {GameBalance.CritCooldown:0} с.",
+                            $"Next hit deals ×{GameBalance.CritMultiplier:0} damage. Cooldown {GameBalance.CritCooldown:0}s.");
+                default: return null;
+            }
+        }
+
         /// <summary>Uses the class's first active skill (Q).</summary>
         public bool UseActive(Vector3 forward) => UseActive(0, forward);
 

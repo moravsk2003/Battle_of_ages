@@ -21,8 +21,11 @@ namespace BattleOfAges.UI
         private Transform contentTransform;
         private GameObject emptyPlaceholderObj;
 
-        private TMP_Text woodQuantityText;
+        private TMP_Text woodQuantityText, woodBadgeText, woodNameLabel;
         private GameObject woodSlotObj;
+        private GameObject foodSlotObj;
+        private TMP_Text foodQuantityText, foodBadgeText, foodNameLabel;
+        private int lastFoodCount = -1;
 
         private readonly Dictionary<int, TMP_Text> oreQuantityTextMap = new Dictionary<int, TMP_Text>();
         private readonly Dictionary<int, TMP_Text> oreBadgeTextMap = new Dictionary<int, TMP_Text>();
@@ -81,6 +84,10 @@ namespace BattleOfAges.UI
         private void OnLanguageChanged()
         {
             UpdateHeaderText();
+            if (woodBadgeText != null) woodBadgeText.text = Loc.Pick("Дерево", "Wood");
+            if (woodNameLabel != null) woodNameLabel.text = Loc.Pick("Колоди", "Logs");
+            if (foodBadgeText != null) foodBadgeText.text = Loc.Pick("Їжа", "Food");
+            if (foodNameLabel != null) foodNameLabel.text = Loc.Pick("Провізія", "Provisions");
             foreach (var kv in oreBadgeTextMap)
                 if (kv.Value != null) kv.Value.text = Loc.Pick($"Рів. {kv.Key}", $"Lvl {kv.Key}");
             foreach (var kv in oreNameTextMap)
@@ -106,6 +113,12 @@ namespace BattleOfAges.UI
                 {
                     CloseInventory();
                     return;
+                }
+
+                if (ResourceManager.Instance != null)
+                {
+                    int fc = ResourceManager.FoodRules ? ResourceManager.Instance.FoodCount : -1;
+                    if (fc != lastFoodCount) RefreshInventoryDisplay();
                 }
             }
             else
@@ -184,7 +197,19 @@ namespace BattleOfAges.UI
                 woodQuantityText.text = $"x{woodCount}";
             }
 
-            int activeItemsCount = (woodCount > 0) ? 1 : 0;
+            int foodCount = ResourceManager.FoodRules ? ResourceManager.Instance.FoodCount : -1;
+            lastFoodCount = foodCount;
+            bool showFood = ResourceManager.FoodRules && foodCount > 0;
+            if (foodSlotObj != null)
+            {
+                foodSlotObj.SetActive(showFood);
+            }
+            if (foodQuantityText != null)
+            {
+                foodQuantityText.text = $"x{Mathf.Max(0, foodCount)}";
+            }
+
+            int activeItemsCount = (woodCount > 0 ? 1 : 0) + (showFood ? 1 : 0);
 
             for (int i = 0; i < OreTierHelper.MAX_TIERS; i++)
             {
@@ -256,6 +281,7 @@ namespace BattleOfAges.UI
                 LocText.Detach(qtyTxt);
 
                 UiTheme.RestyleTree(slotObj.transform); // a row made after the window: themed now
+                Tooltip.Set(slotObj, () => OreSlotTip(tierLevel));
                 oreSlotObjMap[tierLevel] = slotObj;
                 oreBadgeTextMap[tierLevel] = bTxt;
                 oreNameTextMap[tierLevel] = nameTxt;
@@ -271,6 +297,18 @@ namespace BattleOfAges.UI
             {
                 qtyText.text = $"x{count}";
             }
+        }
+
+        private static string OreSlotTip(int tierLevel)
+        {
+            ResourceManager rm = ResourceManager.Instance;
+            int count = rm != null ? rm.GetOreTierCount(tierLevel) : 0;
+            string roman = tierLevel == 0 ? "0" : Crafting.ItemTypeNames.Roman(tierLevel);
+            string tierName = OreTierHelper.GetTierName(tierLevel);
+            return TipText.Title(Loc.Pick($"{tierName} (ранг {roman})", $"{tierName} (tier {roman})"), OreTierHelper.GetTierColor(tierLevel))
+                + "\n" + Loc.Pick(
+                    $"У запасах: {count}. Іде на кування спорядження, будівництво, покращення ратуші й стін та на переплавку ({Combat.GameBalance.SmeltRatio} → 1 вищого рангу).",
+                    $"In stock: {count}. Used for crafting gear, building, upgrading the Town Hall and walls, and smelting ({Combat.GameBalance.SmeltRatio} → 1 higher tier).");
         }
 
         private void BuildInventoryUI()
@@ -309,7 +347,7 @@ namespace BattleOfAges.UI
             Image headerBg = headerObj.AddComponent<Image>();
             headerBg.color = new Color(0.08f, 0.13f, 0.22f, 0.98f);
 
-            RectTransform titleRect = UiTheme.Child(headerObj.transform, "TitleText", Vector2.zero, Vector2.one, new Vector2(25f, 0), new Vector2(-25f, 0));
+            RectTransform titleRect = UiTheme.Child(headerObj.transform, "TitleText", Vector2.zero, Vector2.one, new Vector2(25f, 0), new Vector2(-75f, 0));
             GameObject titleObj = titleRect.gameObject;
 
             titleText = titleObj.AddComponent<TextMeshProUGUI>();
@@ -319,6 +357,10 @@ namespace BattleOfAges.UI
             titleText.alignment = UiTheme.Align(TextAnchor.MiddleLeft);
             titleText.color = new Color(0.3f, 0.9f, 1.0f);
             UpdateHeaderText();
+
+            Button closeBtn = UiTheme.TextButton(headerRect, "Close", "×", new Vector2(1f, 0.5f), new Vector2(-18f, 0f), new Vector2(44f, 44f), CloseInventory, 22);
+            closeBtn.GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
+            Tooltip.Set(closeBtn.gameObject, () => Loc.Pick("Закрити інвентар", "Close inventory"));
 
             RectTransform scrollRect = UiTheme.Child(inventoryPanelObj.transform, "ScrollView", Vector2.zero, Vector2.one, new Vector2(20f, 20f), new Vector2(-20f, -85f));
             GameObject scrollObj = scrollRect.gameObject;
@@ -375,12 +417,14 @@ namespace BattleOfAges.UI
             RectTransform wBTxtRect = UiTheme.Child(woodBadge.transform, "BadgeText", Vector2.zero, Vector2.one);
             GameObject wBadgeTxtObj = wBTxtRect.gameObject;
 
-            TMP_Text wBTxt = UiTheme.PlainText(wBadgeTxtObj, defaultFont, 17, TextAnchor.MiddleCenter, new Color(1.0f, 0.92f, 0.55f), "Дерево", style: FontStyle.Bold);
+            woodBadgeText = UiTheme.PlainText(wBadgeTxtObj, defaultFont, 17, TextAnchor.MiddleCenter, new Color(1.0f, 0.92f, 0.55f), Loc.Pick("Дерево", "Wood"), style: FontStyle.Bold);
+            LocText.Detach(woodBadgeText);
 
             RectTransform wNameRect = UiTheme.Child(woodSlotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
             GameObject wNameObj = wNameRect.gameObject;
 
-            TMP_Text woodNameText = UiTheme.PlainText(wNameObj, defaultFont, 20, TextAnchor.MiddleLeft, new Color(0.98f, 0.88f, 0.45f), "Колоди", style: FontStyle.Bold);
+            woodNameLabel = UiTheme.PlainText(wNameObj, defaultFont, 20, TextAnchor.MiddleLeft, new Color(0.98f, 0.88f, 0.45f), Loc.Pick("Колоди", "Logs"), style: FontStyle.Bold);
+            LocText.Detach(woodNameLabel);
 
             RectTransform wQtyRect = UiTheme.Child(woodSlotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
             GameObject wQtyObj = wQtyRect.gameObject;
@@ -395,6 +439,49 @@ namespace BattleOfAges.UI
             woodQuantityText.alignment = UiTheme.Align(TextAnchor.MiddleRight);
             woodQuantityText.color = new Color(0.3f, 0.95f, 0.95f);
             woodQuantityText.text = "x0";
+            Tooltip.Set(woodSlotObj, HudTips.Wood);
+
+            foodSlotObj = new GameObject("FoodSlot", typeof(RectTransform));
+            foodSlotObj.transform.SetParent(contentObj.transform, false);
+            RectTransform foodSlotRect = foodSlotObj.GetComponent<RectTransform>();
+            foodSlotRect.sizeDelta = new Vector2(740f, 54f);
+
+            Image foodBg = foodSlotObj.AddComponent<Image>();
+            foodBg.color = new Color(0.10f, 0.16f, 0.08f, 0.95f);
+
+            RectTransform fBadgeRect = UiTheme.Child(foodSlotObj.transform, "Badge", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(10f, 8f), new Vector2(100f, -8f));
+            GameObject foodBadge = fBadgeRect.gameObject;
+
+            Image fBadgeBg = foodBadge.AddComponent<Image>();
+            fBadgeBg.color = new Color(0.28f, 0.52f, 0.20f, 0.95f);
+
+            RectTransform fBTxtRect = UiTheme.Child(foodBadge.transform, "BadgeText", Vector2.zero, Vector2.one);
+            GameObject fBadgeTxtObj = fBTxtRect.gameObject;
+
+            foodBadgeText = UiTheme.PlainText(fBadgeTxtObj, defaultFont, 17, TextAnchor.MiddleCenter, new Color(0.75f, 1.0f, 0.65f), Loc.Pick("Їжа", "Food"), style: FontStyle.Bold);
+            LocText.Detach(foodBadgeText);
+
+            RectTransform fNameRect = UiTheme.Child(foodSlotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
+            GameObject fNameObj = fNameRect.gameObject;
+
+            foodNameLabel = UiTheme.PlainText(fNameObj, defaultFont, 20, TextAnchor.MiddleLeft, new Color(0.78f, 0.98f, 0.62f), Loc.Pick("Провізія", "Provisions"), style: FontStyle.Bold);
+            LocText.Detach(foodNameLabel);
+
+            RectTransform fQtyRect = UiTheme.Child(foodSlotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
+            GameObject fQtyObj = fQtyRect.gameObject;
+            fQtyRect.pivot = new Vector2(1f, 0.5f);
+            fQtyRect.offsetMin = new Vector2(-110f, 0f);
+            fQtyRect.offsetMax = new Vector2(-15f, 0f);
+
+            foodQuantityText = fQtyObj.AddComponent<TextMeshProUGUI>();
+            foodQuantityText.font = UiTheme.TmpFont;
+            foodQuantityText.fontSize = 22;
+            foodQuantityText.fontStyle = UiTheme.Style(FontStyle.Bold);
+            foodQuantityText.alignment = UiTheme.Align(TextAnchor.MiddleRight);
+            foodQuantityText.color = new Color(0.65f, 0.98f, 0.55f);
+            foodQuantityText.text = "x0";
+            Tooltip.Set(foodSlotObj, HudTips.Food);
+            foodSlotObj.SetActive(false);
 
             emptyPlaceholderObj = new GameObject("EmptyPlaceholder", typeof(RectTransform));
             emptyPlaceholderObj.transform.SetParent(contentObj.transform, false);

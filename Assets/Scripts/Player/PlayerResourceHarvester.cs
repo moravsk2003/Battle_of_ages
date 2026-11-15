@@ -300,7 +300,11 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activePebbleTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            ShowPromptCached(UI.Loc.Pick($"[Натисніть {keyEStr}] Підібрати руду", $"[Press {keyEStr}] Pick up ore"));
+            int pickLvl = EquippedPickaxeLevel;
+            string pickStr = pickLvl >= 3
+                ? UI.Loc.Pick($" (+2, кайло {ItemTypeNames.Roman(pickLvl)})", $" (+2, pickaxe {ItemTypeNames.Roman(pickLvl)})")
+                : "";
+            ShowPromptCached(UI.Loc.Pick($"[Натисніть {keyEStr}] Підібрати руду{pickStr}", $"[Press {keyEStr}] Pick up ore{pickStr}"));
         }
 
         private void HandleTreeHarvestInput()

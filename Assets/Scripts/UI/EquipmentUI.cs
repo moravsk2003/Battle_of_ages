@@ -186,7 +186,7 @@ namespace BattleOfAges.UI
 
         private void OnSlotClicked(EquipSlot slot)
         {
-            if (Target != null && Target.IsLocked(slot)) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify("Артефакт не знімається"); return; }
+            if (Target != null && Target.IsLocked(slot)) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify(Loc.Pick("Артефакт не знімається", "Artifact cannot be unequipped")); return; }
             Net.CommandBus.Submit(new Net.EquipCommand { Units = new[] { Net.WorldEntity.IdOf(Target).Value }, TakeOff = true, Slot = slot });
             GameSound.Play2D(GameSound.Kind.EquipGear);
             Refresh();
@@ -203,7 +203,7 @@ namespace BattleOfAges.UI
                 Refresh();
                 return;
             }
-            if (Target != null && Target.IsLocked(item.Slot)) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify("Цей слот тримає артефакт"); return; }
+            if (Target != null && Target.IsLocked(item.Slot)) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify(Loc.Pick("Цей слот тримає артефакт", "This slot holds an artifact")); return; }
             Net.CommandBus.Submit(new Net.EquipCommand { Units = new[] { Net.WorldEntity.IdOf(Target).Value }, Item = item.Type, Level = item.Level });
             GameSound.Play2D(GameSound.Kind.EquipGear);
             Refresh();
@@ -252,7 +252,7 @@ namespace BattleOfAges.UI
             hint.text = (toAll && targets.Count > 1
                 ? Loc.Pick("Клік по речі — по одній кожному обраному", "Click an item — one to each selected unit")
                 : Loc.Pick("Клік по речі — надягти", "Click an item — equip"))
-                + Loc.Pick("  ·  клік по слоту — зняти на склад  ·  [C] закрити", "  ·  click a slot — store in armory  ·  [C] close");
+                + Loc.Pick($"  ·  клік по слоту — зняти на склад  ·  [{HudTips.Key(KeyAction.Equipment)}] закрити", $"  ·  click a slot — store in armory  ·  [{HudTips.Key(KeyAction.Equipment)}] close");
 
             foreach (EquipSlot s in ItemTypeNames.Slots)
             {
@@ -462,7 +462,7 @@ namespace BattleOfAges.UI
             emptyStore = UiTheme.Label(empty, "Text", "Склад порожній — речі виготовляє верстак,\nтрофеї падають з переможених ворогів", 19, TextAnchor.MiddleCenter, UiTheme.InkDim);
 
             RectTransform hintRt = UiTheme.Rect(store, "Hint", new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(654f, 30f));
-            hint = UiTheme.Label(hintRt, "Text", "Клік по речі — надягти  ·  клік по слоту — зняти на склад  ·  [C] закрити", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            hint = UiTheme.Label(hintRt, "Text", Loc.Pick($"Клік по речі — надягти  ·  клік по слоту — зняти на склад  ·  [{HudTips.Key(KeyAction.Equipment)}] закрити", $"Click an item — equip  ·  click a slot — store in armory  ·  [{HudTips.Key(KeyAction.Equipment)}] close"), 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             LocText.Detach(hint);
 
             // Tooltip

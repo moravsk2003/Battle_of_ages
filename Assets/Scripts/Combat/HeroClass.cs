@@ -41,7 +41,7 @@ namespace BattleOfAges.Combat
                 switch (c)
                 {
                     case HeroClass.Tank: return "+20% HP; ignores every 10th hit. Skills: Regeneration, Instant Heal.";
-                    case HeroClass.Archer: return "−20% HP; with a bow ×2 strength (damage & run speed), range from speed (min 12 m). Skills: Long Shot, Piercing Arrow.";
+                    case HeroClass.Archer: return "−20% HP; with a bow ×2 strength (damage & run speed), range from speed (min 12 m); attacks twice as slowly without a bow. Skills: Long Shot, Piercing Arrow.";
                     case HeroClass.Mage: return "With a staff: 5 homing bolts at 20% damage each, pierces armor, never misses; cannot attack without a staff. Skills: Fire Fan, Meteor.";
                     case HeroClass.Dd: return "Attacks twice as fast. Skills: Dash, Critical Hit.";
                     default: return "";
@@ -50,7 +50,7 @@ namespace BattleOfAges.Combat
             switch (c)
             {
                 case HeroClass.Tank: return "+20% HP; кожен 10-й удар по ньому не проходить. Навики: регенерація, миттєвий відхіл.";
-                case HeroClass.Archer: return "−20% HP; з луком сила ×2 (шкода і біг), дальність від швидкості, не менше 12 м. Навики: далекий постріл, пробивна стріла.";
+                case HeroClass.Archer: return "−20% HP; з луком сила ×2 (шкода і біг), дальність від швидкості, не менше 12 м; без лука б'є вдвічі повільніше. Навики: далекий постріл, пробивна стріла.";
                 case HeroClass.Mage: return "З посохом: 5 самонавідних куль по 20% шкоди, крізь броню, без промахів; без посоха не атакує. Навики: вогняне віяло, метеор.";
                 case HeroClass.Dd: return "Б'є вдвічі частіше. Навики: ривок, критичний удар.";
                 default: return "";

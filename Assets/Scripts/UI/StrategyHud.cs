@@ -124,8 +124,9 @@ namespace BattleOfAges.UI
 
             idleButton = UiTheme.TextButton(rtsGroup, "IdleWorkers", "", new Vector2(0f, 0f), new Vector2(x, above + 54f), new Vector2(w, 46f), SelectNextIdle, 16);
             idleText = idleButton.GetComponentInChildren<TMP_Text>();
-            Tooltip.Set(idleButton.gameObject, () => TipText.Title("Робітники без діла", UiTheme.Gold)
-                + "\nМають роботу, але не знаходять, що робити (немає дерев, руди, скрині поруч)." + "\n" + TipText.Dim("Клік — наступний: виділити й показати  ") + TipText.Key(HudTips.Key(InputKey.IdleWorker)));
+            Tooltip.Set(idleButton.gameObject, () => TipText.Title(Loc.Pick("Робітники без діла", "Idle Workers"), UiTheme.Gold)
+                + "\n" + Loc.Pick("Мають роботу, але не знаходять, що робити (немає дерев, руди, скрині поруч).", "Assigned to work, but cannot find anything to do nearby (no trees, ore, or chest).")
+                + "\n" + TipText.Dim(Loc.Pick("Клік — наступний: виділити й показати  ", "Click — next: select and focus  ")) + TipText.Key(HudTips.Key(InputKey.IdleWorker)));
         }
 
         // ------------------------------------------------------------------ update
@@ -173,7 +174,9 @@ namespace BattleOfAges.UI
             if (armyShown.Changed(army)) armyText.text = army.ToString();
             BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
             bool placing = map && placer != null && placer.IsPlacing;
-            string mText = placing ? Loc.Tr(placer.Hint) : map ? Loc.Pick("M — від першої особи  ·  N — світ  ·  F1 — довідка", "M — first person  ·  N — world  ·  F1 — help") : Loc.Pick("M — мапа  ·  N — мапа світу  ·  F1 — довідка", "M — map  ·  N — world map  ·  F1 — help");
+            string mText = placing ? Loc.Tr(placer.Hint) : map
+                ? Loc.Pick($"{HudTips.Key(InputKey.ToggleGameMode)} — від першої особи  ·  {HudTips.Key(InputKey.WorldMap)} — світ  ·  F1 — довідка", $"{HudTips.Key(InputKey.ToggleGameMode)} — first person  ·  {HudTips.Key(InputKey.WorldMap)} — world  ·  F1 — help")
+                : Loc.Pick($"{HudTips.Key(InputKey.ToggleGameMode)} — мапа  ·  {HudTips.Key(InputKey.WorldMap)} — мапа світу  ·  F1 — довідка", $"{HudTips.Key(InputKey.ToggleGameMode)} — map  ·  {HudTips.Key(InputKey.WorldMap)} — world map  ·  F1 — help");
             if (modeText.text != mText) modeText.text = mText;
             Vector2 mSize = placing ? new Vector2(600f, 70f) : new Vector2(map ? 510f : 470f, 44f); // the placing hint takes two lines
             if (mode.sizeDelta != mSize) mode.sizeDelta = mSize;

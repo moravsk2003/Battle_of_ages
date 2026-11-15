@@ -5,8 +5,10 @@ using BattleOfAges.Building;
 using BattleOfAges.Combat;
 using BattleOfAges.Crafting;
 using BattleOfAges.Managers;
+using BattleOfAges.Resources;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using BattleOfAges.World;
 using TMPro;
 
 namespace BattleOfAges.UI
@@ -321,6 +323,10 @@ namespace BattleOfAges.UI
             LocText.Detach(text);
             text.richText = true;
             Button b = UiTheme.TextButton(rt, "Release", "Вивести", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(84f, 38f), () => mine.ReleaseOneWorker(), 15);
+            Tooltip.Set(b.gameObject, () =>
+                TipText.Title(Loc.Pick("Вивести робітника", "Release Worker"), UiTheme.Gold)
+                + "\n" + Loc.Pick("Виводить одного гірника з шахти на поверхню для інших завдань.",
+                                  "Sends one miner back out of the mine for other tasks."));
             return (rt, text, b);
         }
 
@@ -375,12 +381,14 @@ namespace BattleOfAges.UI
         {
             hallLabel = UiTheme.Rect(layer, "HallLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(400f, 60f));
             hallLabel.pivot = new Vector2(0.5f, 0f);
-            UiTheme.PanelImage(hallLabel, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f)).raycastTarget = false;
+            UiTheme.PanelImage(hallLabel, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f));
+            Tooltip.Set(hallLabel.gameObject, HallTip);
             RectTransform tr = UiTheme.Rect(hallLabel, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 52f));
             hallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(hallText);
             hallText.richText = true;
             hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Viewed != null) Net.CommandBus.Submit(new Net.UpgradeHallCommand { Hall = Net.WorldEntity.IdOf(TownHall.Viewed).Value }); }, 13);
+            Tooltip.Set(hallButton.gameObject, HallUpgradeTip);
             hallButtonText = hallButton.GetComponentInChildren<TMP_Text>();
             LocText.Detach(hallButtonText);
             hallButtonText.richText = true;
@@ -397,12 +405,14 @@ namespace BattleOfAges.UI
                 if (!show) return;
                 wallRow = UiTheme.Rect(hallLabel, "WallRow", new Vector2(0.5f, 0f), new Vector2(0f, -4f), new Vector2(400f, 56f));
                 wallRow.pivot = new Vector2(0.5f, 1f);
-                UiTheme.PanelImage(wallRow, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f)).raycastTarget = false;
+                UiTheme.PanelImage(wallRow, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f));
+                Tooltip.Set(wallRow.gameObject, WallTip);
                 RectTransform tr = UiTheme.Rect(wallRow, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
                 wallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
                 LocText.Detach(wallText);
                 wallText.richText = true;
                 wallButton = UiTheme.TextButton(wallRow, "UpgradeWalls", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 44f), () => Net.CommandBus.Submit(new Net.UpgradeWallsCommand()), 13);
+                Tooltip.Set(wallButton.gameObject, WallUpgradeTip);
                 wallButtonText = wallButton.GetComponentInChildren<TMP_Text>();
                 LocText.Detach(wallButtonText);
                 wallButtonText.richText = true;
@@ -425,6 +435,101 @@ namespace BattleOfAges.UI
                     $"Стіни до {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>",
                     $"Walls to {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} wood  ·  {ore} ore {ItemTypeNames.Roman(tier)}+</size>");
             wallButton.interactable = Fortifications.CanUpgrade(out _);
+        }
+
+        private static string HallTip()
+        {
+            TownHall hall = TownHall.Viewed;
+            if (hall == null) return "";
+            string name = TownHall.All.Count > 1 ? Loc.Tr(hall.Title) : Loc.Pick("Ратуша", "Town Hall");
+            HealthComponent hp = hall.GetComponent<HealthComponent>();
+            int curHp = hp != null ? hp.CurrentHealth : GameBalance.TownHallHealth[hall.Level];
+            int maxHp = hp != null && hp.MaxHealth > 0 ? hp.MaxHealth : GameBalance.TownHallHealth[hall.Level];
+            int reach = Mathf.RoundToInt(ZoneMap.Reach(hall));
+
+            string s = TipText.Title($"{name} {ItemTypeNames.Roman(hall.Level)}", UiTheme.Gold)
+                + "\n" + Loc.Pick($"Населення: {hall.People}/{hall.Cap}  ·  міцність {curHp}/{maxHp}",
+                                  $"Population: {hall.People}/{hall.Cap}  ·  health {curHp}/{maxHp}")
+                + "\n" + Loc.Pick($"Радіус зон поселення: {reach} м",
+                                  $"Settlement zone radius: {reach} m");
+            if (WorldSettings.Bounded)
+                s += "\n" + Loc.Pick($"Приріст: +{TownHall.GrowthPerHour(hall.People, hall):0.##} народж./год (поки є їжа та місця)",
+                                     $"Births: +{TownHall.GrowthPerHour(hall.People, hall):0.##}/h (while food & cap allow)");
+            if (hall.Level < 2)
+                s += "\n" + TipText.Dim(Loc.Pick("З рівня II відкриваються торгівля (Ринок і зона торгівлі) та заснування нових поселень.",
+                                                 "Level II unlocks Trade (Market & Trade zone) and founding new settlements."));
+            else if (hall.Level < 4)
+                s += "\n" + TipText.Dim(Loc.Pick("З рівня IV будинки поселення стають кам'яними.",
+                                                 "Level IV upgrades settlement houses to stone."));
+            if (hall.Level >= TownHall.MaxLevel)
+                s += "\n" + TipText.Good(Loc.Pick("Найвищий рівень ратуші.", "Maximum Town Hall level."));
+            return s;
+        }
+
+        private static string HallUpgradeTip()
+        {
+            TownHall hall = TownHall.Viewed;
+            if (hall == null || hall.Level >= TownHall.MaxLevel) return "";
+            int next = hall.Level + 1;
+            TownHall.UpgradeCost(next, out int wood, out int ore, out int tier);
+            SettlementStock rm = hall.Stock;
+            int haveWood = rm != null ? rm.WoodCount : 0;
+            int haveOre = rm != null ? rm.GetOreCountAtLeast(tier) : 0;
+            int curReach = Mathf.RoundToInt(ZoneMap.Reach(hall));
+            int nextReach = Mathf.RoundToInt(GameBalance.ZoneReachBase * (1f + 0.6f * (next - 1)));
+
+            string s = TipText.Title(Loc.Pick($"Покращити до {ItemTypeNames.Roman(next)}", $"Upgrade to {ItemTypeNames.Roman(next)}"), UiTheme.Gold)
+                + "\n" + Loc.Pick(
+                    $"Ліміт людей: {hall.Cap} → {TownHall.CapForLevel(next)}  ·  HP: {GameBalance.TownHallHealth[hall.Level]} → {GameBalance.TownHallHealth[next]}\nРадіус зон: {curReach} → {nextReach} м",
+                    $"Pop. cap: {hall.Cap} → {TownHall.CapForLevel(next)}  ·  HP: {GameBalance.TownHallHealth[hall.Level]} → {GameBalance.TownHallHealth[next]}\nZone radius: {curReach} → {nextReach} m");
+            if (next == 2)
+                s += "\n" + TipText.Good(Loc.Pick("Відкриває торгівлю (Ринок, зона торгівлі) та нові поселення.",
+                                                  "Unlocks Trade (Market, Trade zone) and founding settlements."));
+            else if (next == 4)
+                s += "\n" + TipText.Good(Loc.Pick("Переводить будинки поселення в кам'яну епоху.",
+                                                  "Upgrades settlement houses to stone."));
+
+            string woodLine = Loc.Pick($"Дерево: {haveWood}/{wood}", $"Wood: {haveWood}/{wood}");
+            string oreLine = Loc.Pick($"Руда {ItemTypeNames.Roman(tier)}+: {haveOre}/{ore}", $"Ore {ItemTypeNames.Roman(tier)}+: {haveOre}/{ore}");
+            s += "\n" + (haveWood >= wood ? TipText.Good(woodLine) : TipText.Bad(woodLine))
+               + "  ·  " + (haveOre >= ore ? TipText.Good(oreLine) : TipText.Bad(oreLine));
+            return s;
+        }
+
+        private static string WallTip()
+        {
+            int level = Fortifications.Level;
+            int dmgPct = Mathf.RoundToInt(Fortifications.DamageBonus * 100f);
+            int rngPct = Mathf.RoundToInt(GameBalance.WallRangeBonus * 100f);
+            int tierPct = Mathf.RoundToInt(GameBalance.WallHealthPerOreTier * 100f);
+            return TipText.Title(Loc.Pick($"Укріплення стін {ItemTypeNames.Roman(level)}", $"Wall Fortifications {ItemTypeNames.Roman(level)}"), UiTheme.Gold)
+                + "\n" + Loc.Pick(
+                    $"Шкода бійців на стінах: +{dmgPct}%  ·  дальність стріл і заклять: +{rngPct}%.\nМіцність кожного сегмента: +{tierPct}% за ранг руди, з якої він збудований.",
+                    $"Damage from walls: +{dmgPct}%  ·  bow & spell range: +{rngPct}%.\nSegment HP: +{tierPct}% per tier of ore used to build it.")
+                + "\n" + TipText.Dim(Loc.Pick(
+                    $"Пробити стіну напряму можуть вороги із силою {GameBalance.WallBreachStrength:0}+ (слабші лізуть драбинами). Покращення діє на всі стіни одразу.",
+                    $"Only enemies with {GameBalance.WallBreachStrength:0}+ strength breach walls directly (weaker ones climb ladders). Upgrades apply to all walls."));
+        }
+
+        private static string WallUpgradeTip()
+        {
+            int level = Fortifications.Level;
+            if (level >= Fortifications.MaxLevel) return "";
+            int next = level + 1;
+            Fortifications.UpgradeCost(next, out int wood, out int ore, out int tier);
+            ResourceManager rm = ResourceManager.Instance;
+            int haveWood = rm != null ? rm.WoodCount : 0;
+            int haveOre = rm != null ? rm.GetOreCountAtLeast(tier) : 0;
+            int curPct = Mathf.RoundToInt(GameBalance.WallLevelDamageBonus[level] * 100f);
+            int nextPct = Mathf.RoundToInt(GameBalance.WallLevelDamageBonus[next] * 100f);
+
+            string woodLine = Loc.Pick($"Дерево: {haveWood}/{wood}", $"Wood: {haveWood}/{wood}");
+            string oreLine = Loc.Pick($"Руда {ItemTypeNames.Roman(tier)}+: {haveOre}/{ore}", $"Ore {ItemTypeNames.Roman(tier)}+: {haveOre}/{ore}");
+            return TipText.Title(Loc.Pick($"Покращити стіни до {ItemTypeNames.Roman(next)}", $"Upgrade Walls to {ItemTypeNames.Roman(next)}"), UiTheme.Gold)
+                + "\n" + Loc.Pick($"Бонус шкоди зі стін: +{curPct}% → +{nextPct}% (для всіх сегментів).",
+                                  $"Wall damage bonus: +{curPct}% → +{nextPct}% (for all segments).")
+                + "\n" + (haveWood >= wood ? TipText.Good(woodLine) : TipText.Bad(woodLine))
+                + "  ·  " + (haveOre >= ore ? TipText.Good(oreLine) : TipText.Bad(oreLine));
         }
 
         // ------------------------------------------------------------------ unit bars
