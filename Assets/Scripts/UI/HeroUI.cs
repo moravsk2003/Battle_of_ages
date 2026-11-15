@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using BattleOfAges.Combat;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
+using BattleOfAges.Net;
 using BattleOfAges.Player;
 
 namespace BattleOfAges.UI
@@ -134,32 +135,36 @@ namespace BattleOfAges.UI
                 switch (hero.Class)
                 {
                     case HeroClass.Tank:
-                        if (!s.RegenStart) SkillButton(ref used, "Регенерація (1)", s.LearnRegenStart, "Старт гілки: +1% макс. і +2% поточного HP за хвилину, і в бою.");
+                        if (!s.RegenStart) SkillButton(ref used, "Регенерація (1)", "RegenStart", "Старт гілки: +1% макс. і +2% поточного HP за хвилину, і в бою.");
                         else
                         {
-                            SkillButton(ref used, $"Реген +1% макс ({s.RegenMaxShare * 100f:0}%)", s.LearnRegenMax, "Краще для тих, кого добивають до низу.");
-                            SkillButton(ref used, $"Реген +2% пот. ({s.RegenCurrentShare * 100f:0}%)", s.LearnRegenCurrent, "Краще для тих, хто тримається вище половини HP.");
+                            SkillButton(ref used, $"Реген +1% макс ({s.RegenMaxShare * 100f:0}%)", "RegenMax", "Краще для тих, кого добивають до низу.");
+                            SkillButton(ref used, $"Реген +2% пот. ({s.RegenCurrentShare * 100f:0}%)", "RegenCurrent", "Краще для тих, хто тримається вище половини HP.");
                         }
-                        if (s.HealLevel < GameBalance.HealMaxLevel && s.CanLearnHeal) SkillButton(ref used, $"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", s.LearnHeal, "Уміння Q: миттєво лікує частку макс. HP (5% і +4% за очко, до 25%).");
+                        if (s.HealLevel < GameBalance.HealMaxLevel && s.CanLearnHeal) SkillButton(ref used, $"Відхіл {s.HealLevel + 1}/{GameBalance.HealMaxLevel}", "Heal", "Уміння Q: миттєво лікує частку макс. HP (5% і +4% за очко, до 25%).");
                         break;
                     case HeroClass.Archer:
-                        if (!s.LongShot) SkillButton(ref used, $"Далекий постріл ({GameBalance.LongShotCost})", s.LearnLongShot, "Пасивно: +5% дальності стрільби.");
-                        else if (!s.PiercingArrow) SkillButton(ref used, "Пробивна стріла (1)", s.LearnPierce, "Уміння Q: наступна стріла б'є на 200% і летить наскрізь.");
+                        if (!s.LongShot) SkillButton(ref used, $"Далекий постріл ({GameBalance.LongShotCost})", "LongShot", "Пасивно: +5% дальності стрільби.");
+                        else if (!s.PiercingArrow) SkillButton(ref used, "Пробивна стріла (1)", "Pierce", "Уміння Q: наступна стріла б'є на 200% і летить наскрізь.");
                         break;
                     case HeroClass.Mage:
-                        if (!s.FireFan) SkillButton(ref used, "Вогняне віяло (1)", s.LearnFireFan, "Уміння Q: віяло вогню по зоні перед собою, крізь броню.");
-                        else if (!s.Meteor) SkillButton(ref used, "Метеор (1)", s.LearnMeteor, "Уміння R: метеор на найближчого ворога, 5× шкода мага в радіусі 2,5 м.");
+                        if (!s.FireFan) SkillButton(ref used, "Вогняне віяло (1)", "FireFan", "Уміння Q: віяло вогню по зоні перед собою, крізь броню.");
+                        else if (!s.Meteor) SkillButton(ref used, "Метеор (1)", "Meteor", "Уміння R: метеор на найближчого ворога, 5× шкода мага в радіусі 2,5 м.");
                         break;
                     case HeroClass.Dd:
-                        if (s.DashLevel < GameBalance.DashMaxLevel) SkillButton(ref used, $"Ривок ×{s.DashFactor + 1f:0}", s.LearnDash, "Уміння Q: на 1 с біг у кілька разів швидший; перезарядка 20 с.");
-                        if (s.DashLevel > 0 && !s.CriticalHit) SkillButton(ref used, "Критичний удар (1)", s.LearnCriticalHit, "Уміння R: наступний удар подвійний; перезарядка 40 с.");
+                        if (s.DashLevel < GameBalance.DashMaxLevel) SkillButton(ref used, $"Ривок ×{s.DashFactor + 1f:0}", "Dash", "Уміння Q: на 1 с біг у кілька разів швидший; перезарядка 20 с.");
+                        if (s.DashLevel > 0 && !s.CriticalHit) SkillButton(ref used, "Критичний удар (1)", "CriticalHit", "Уміння R: наступний удар подвійний; перезарядка 40 с.");
                         break;
                 }
             }
             for (int i = used; i < skillButtons.Length; i++) skillButtons[i].gameObject.SetActive(false);
         }
 
-        private void SkillButton(ref int index, string label, System.Func<bool> learn, string tip)
+        /// <summary>What the player does with its hero goes as an order (Net.HeroCommand).</summary>
+        private static void Hero(HeroCommand.Act what, int value = 0, string skill = null) =>
+            CommandBus.Submit(new HeroCommand { What = what, Value = value, Skill = skill });
+
+        private void SkillButton(ref int index, string label, string skill, string tip)
         {
             if (index >= skillButtons.Length) return;
             Button b = skillButtons[index++];
@@ -168,7 +173,7 @@ namespace BattleOfAges.UI
             b.GetComponentInChildren<Text>().text = label;
             b.interactable = hero.SkillPoints > 0;
             b.onClick.RemoveAllListeners();
-            b.onClick.AddListener(() => learn());
+            b.onClick.AddListener(() => Hero(HeroCommand.Act.LearnSkill, 0, skill));
         }
 
         /// <summary>Artifacts (docs/GAME_DESIGN.md §9): the starting pick, what is held, one-shots, shards.</summary>
@@ -242,9 +247,9 @@ namespace BattleOfAges.UI
             points = UiTheme.Label(pts, "Text", "", 19, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
 
             strengthButton = UiTheme.TextButton(panel, "Strength", "+5 сили", new Vector2(0.5f, 0f), new Vector2(-130f, 28f), new Vector2(230f, 54f),
-                () => { if (hero != null) hero.SpendOnStrength(); }, 22);
+                () => Hero(HeroCommand.Act.Strength), 22);
             healthButton = UiTheme.TextButton(panel, "Health", "+50 HP", new Vector2(0.5f, 0f), new Vector2(130f, 28f), new Vector2(230f, 54f),
-                () => { if (hero != null) hero.SpendOnHealth(); }, 22);
+                () => Hero(HeroCommand.Act.Health), 22);
             Tooltip.Set(strengthButton.gameObject, () => TipText.Title("+5 сили", UiTheme.Gold) + "\nСила — шкода удару; сила разом зі здоров'ям — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
             Tooltip.Set(healthButton.gameObject, () => TipText.Title("+50 HP", UiTheme.Gold) + "\nДо найбільшого здоров'я героя; разом із силою — швидкість бігу." + "\n" + TipText.Dim("За очко характеристик; очки даються з рівнем."));
             // Artifacts: the starting pick (once), one-shots and shards
@@ -254,15 +259,15 @@ namespace BattleOfAges.UI
             pickPrev = UiTheme.TextButton(panel, "PickPrev", "‹", new Vector2(0f, 0f), new Vector2(30f, 206f), new Vector2(50f, 44f), () => StepPick(-1), 26);
             pickNext = UiTheme.TextButton(panel, "PickNext", "›", new Vector2(0f, 0f), new Vector2(90f, 206f), new Vector2(50f, 44f), () => StepPick(1), 26);
             pickTake = UiTheme.TextButton(panel, "PickTake", "Взяти", new Vector2(0f, 0f), new Vector2(150f, 206f), new Vector2(140f, 44f),
-                () => { if (bag != null) bag.ChooseStart(Artifacts.All[pickIndex]); }, 19);
+                () => Hero(HeroCommand.Act.ChooseArtifact, (int)Artifacts.All[pickIndex]), 19);
             useHeal = UiTheme.TextButton(panel, "UseHeal", "Зцілитися", new Vector2(0f, 0f), new Vector2(30f, 206f), new Vector2(150f, 44f),
-                () => { if (bag != null) bag.Use(ArtifactType.FullHeal); }, 17);
+                () => Hero(HeroCommand.Act.UseArtifact, (int)ArtifactType.FullHeal), 17);
             Tooltip.Set(useHeal.gameObject, () => TipText.Title(Artifacts.Name(ArtifactType.FullHeal), UiTheme.Gold) + "\n" + Artifacts.Description(ArtifactType.FullHeal));
             useLightning = UiTheme.TextButton(panel, "UseLightning", "Блискавка", new Vector2(0f, 0f), new Vector2(190f, 206f), new Vector2(150f, 44f),
-                () => { if (bag != null) bag.Use(ArtifactType.Lightning); }, 17);
+                () => Hero(HeroCommand.Act.UseArtifact, (int)ArtifactType.Lightning), 17);
             Tooltip.Set(useLightning.gameObject, () => TipText.Title(Artifacts.Name(ArtifactType.Lightning), UiTheme.Gold) + "\n" + Artifacts.Description(ArtifactType.Lightning));
             combine = UiTheme.TextButton(panel, "Combine", "Об'єднати осколки", new Vector2(0f, 0f), new Vector2(350f, 206f), new Vector2(180f, 44f),
-                () => { if (bag != null) bag.CombineShards(); }, 15);
+                () => Hero(HeroCommand.Act.CombineShards), 15);
 
             // Class skills share the row with the class picker (shown once the class is chosen)
             for (int i = 0; i < skillButtons.Length; i++)
@@ -276,11 +281,7 @@ namespace BattleOfAges.UI
             {
                 HeroClass c = classes[i];
                 Button cb = UiTheme.TextButton(pick, "Class" + c, HeroClassRules.Name(c), new Vector2(0f, 0.5f), new Vector2(10f + i * 128f, 0f), new Vector2(120f, 46f),
-                    () =>
-                    {
-                        if (hero == null || !hero.ChooseClass(c)) return;
-                        Crafting.StartingKits.GiveClassWeapon(hero.GetComponent<Crafting.Equipment>(), c);
-                    }, 19);
+                    () => Hero(HeroCommand.Act.ChooseClass, (int)c), 19);
                 Tooltip.Set(cb.gameObject, () => TipText.Title(HeroClassRules.Name(c), UiTheme.Gold) + "\n" + HeroClassRules.Description(c) + "\n" + TipText.Dim("Клас обирається один раз."));
             }
 

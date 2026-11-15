@@ -119,6 +119,43 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(ZoneType.None, ZoneMap.At(at), "and gone");
         }
 
+        /// <summary>The hero window's choices are orders too (M8 step 1): a point, a class, a skill reach this machine's hero.</summary>
+        [Test]
+        public void TheHerosChoices_GoAsOrders_ToThisMachinesHero()
+        {
+            var hero = new GameObject("Player", typeof(Combat.HealthComponent), typeof(Combat.CombatUnit));
+            Combat.HeroProgress progress = hero.AddComponent<Combat.HeroProgress>();
+            hero.AddComponent<Combat.HeroSkills>();
+            Managers.GameContext.RegisterPlayer(hero);
+            try
+            {
+                progress.AddXp(Combat.HeroProgress.XpForLevelUp(1) + Combat.HeroProgress.XpForLevelUp(2));
+                int points = progress.AttributePoints;
+                Assert.Greater(points, 0, "levels give points");
+                var strength = new HeroCommand { What = HeroCommand.Act.Strength };
+                CommandBus.Run(CommandCodec.Decode(CommandCodec.Encode(strength)));
+                Assert.AreEqual(points - 1, progress.AttributePoints, "a point spent");
+
+                var cls = new HeroCommand { What = HeroCommand.Act.ChooseClass, Value = (int)Combat.HeroClass.Dd };
+                CommandBus.Run(cls);
+                Assert.IsTrue(cls.Done);
+                Assert.AreEqual(Combat.HeroClass.Dd, progress.Class);
+                var again = new HeroCommand { What = HeroCommand.Act.ChooseClass, Value = (int)Combat.HeroClass.Mage };
+                CommandBus.Run(again);
+                Assert.IsFalse(again.Done, "the class is chosen once");
+
+                var dash = new HeroCommand { What = HeroCommand.Act.LearnSkill, Skill = "Dash" };
+                CommandBus.Run(dash);
+                Assert.IsTrue(dash.Done);
+                Assert.AreEqual(1, hero.GetComponent<Combat.HeroSkills>().DashLevel);
+            }
+            finally
+            {
+                Managers.GameContext.RegisterPlayer(null);
+                Object.DestroyImmediate(hero);
+            }
+        }
+
         [Test]
         public void EveryKindOfCommand_ComesThroughTheCodec()
         {
@@ -138,7 +175,9 @@ namespace BattleOfAges.PlayModeTests
                 new CraftCommand { Bench = 3, Item = ItemType.Bow, Level = 2 },
                 new SmeltCommand { Bench = 3, Tier = 1, Count = 4 },
                 new BenchWorkerCommand { Bench = 3, Call = true },
-                new EquipCommand { Units = new[] { 5 }, Item = ItemType.Helmet, Level = 2 }
+                new EquipCommand { Units = new[] { 5 }, Item = ItemType.Helmet, Level = 2 },
+                new HeroCommand { What = HeroCommand.Act.LearnSkill, Skill = "Dash" },
+                new HeroCommand { What = HeroCommand.Act.ChooseClass, Value = (int)Combat.HeroClass.Mage }
             };
             foreach (GameCommand c in all)
             {

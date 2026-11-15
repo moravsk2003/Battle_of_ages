@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using BattleOfAges.Building;
+using BattleOfAges.Combat;
 using BattleOfAges.Crafting;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
@@ -107,7 +108,7 @@ namespace BattleOfAges.Net
             typeof(UnitOrderCommand), typeof(SetDirectiveCommand), typeof(PaintZoneCommand), typeof(PlaceBuildingCommand),
             typeof(UpgradeHallCommand), typeof(UpgradeWallsCommand), typeof(ToggleAlarmCommand), typeof(TradeCommand),
             typeof(CraftCommand), typeof(SmeltCommand), typeof(BenchWorkerCommand), typeof(EquipCommand),
-            typeof(LaborCommand), typeof(DemolishCommand)
+            typeof(LaborCommand), typeof(DemolishCommand), typeof(HeroCommand)
         };
 
         public static string Encode(GameCommand c) => Array.IndexOf(Types, c.GetType()) + "|" + JsonUtility.ToJson(c);
@@ -121,6 +122,51 @@ namespace BattleOfAges.Net
     }
 
     // ------------------------------------------------------------------ units
+
+    // ------------------------------------------------------------------ the hero (M8 step 1: its choices as orders too)
+
+    /// <summary>
+    /// What the player does with its hero in the hero window: a point into strength or HP, its class, a skill, its starting
+    /// artifact, an artifact used, shards put together. It acts on the hero of the machine that runs it (each player runs its
+    /// own, §14.2); a dedicated server would look the issuer's hero up instead.
+    /// </summary>
+    [Serializable]
+    public sealed class HeroCommand : GameCommand
+    {
+        public enum Act { Strength, Health, ChooseClass, LearnSkill, ChooseArtifact, UseArtifact, CombineShards }
+        public Act What;
+        /// <summary>The class or the artifact (HeroClass, ArtifactType).</summary>
+        public int Value;
+        /// <summary>The skill (HeroSkills.Learn).</summary>
+        public string Skill;
+
+        /// <summary>Whether it did anything (false: no points, already chosen, ...).</summary>
+        [NonSerialized] public bool Done;
+
+        public override void Execute()
+        {
+            GameObject hero = Managers.GameContext.Player;
+            if (hero == null) return;
+            HeroProgress progress = hero.GetComponent<HeroProgress>();
+            HeroArtifacts bag = hero.GetComponent<HeroArtifacts>();
+            switch (What)
+            {
+                case Act.Strength: Done = progress != null && progress.SpendOnStrength(); break;
+                case Act.Health: Done = progress != null && progress.SpendOnHealth(); break;
+                case Act.ChooseClass:
+                    Done = progress != null && progress.ChooseClass((HeroClass)Value);
+                    if (Done) StartingKits.GiveClassWeapon(hero.GetComponent<Equipment>(), (HeroClass)Value);
+                    break;
+                case Act.LearnSkill:
+                    HeroSkills skills = hero.GetComponent<HeroSkills>();
+                    Done = skills != null && skills.Learn(Skill);
+                    break;
+                case Act.ChooseArtifact: Done = bag != null && bag.ChooseStart((ArtifactType)Value); break;
+                case Act.UseArtifact: Done = bag != null && bag.Use((ArtifactType)Value); break;
+                case Act.CombineShards: Done = bag != null && bag.CombineShards(); break;
+            }
+        }
+    }
 
     /// <summary>A right-click: these units are sent at something or somewhere.</summary>
     [Serializable]

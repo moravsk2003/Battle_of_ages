@@ -54,6 +54,25 @@ namespace BattleOfAges.Combat
         /// <summary>The tank's Instant heal needs the start of Regeneration and a point in one of its branches.</summary>
         public bool CanLearnHeal => regenStart && regenMaxPoints + regenCurrentPoints > 0;
 
+        /// <summary>A skill by its name (Net.HeroCommand): "RegenStart", "Heal", "LongShot", ... as the Learn methods are called.</summary>
+        public bool Learn(string skill)
+        {
+            switch (skill)
+            {
+                case "RegenStart": return LearnRegenStart();
+                case "RegenMax": return LearnRegenMax();
+                case "RegenCurrent": return LearnRegenCurrent();
+                case "Heal": return LearnHeal();
+                case "LongShot": return LearnLongShot();
+                case "Pierce": return LearnPierce();
+                case "FireFan": return LearnFireFan();
+                case "Meteor": return LearnMeteor();
+                case "Dash": return LearnDash();
+                case "CriticalHit": return LearnCriticalHit();
+                default: return false;
+            }
+        }
+
         public bool LearnRegenStart() => Class == HeroClass.Tank && !regenStart && Pay(1) && Set(() => regenStart = true);
         public bool LearnRegenMax() => Class == HeroClass.Tank && regenStart && Pay(1) && Set(() => regenMaxPoints++);
         public bool LearnRegenCurrent() => Class == HeroClass.Tank && regenStart && Pay(1) && Set(() => regenCurrentPoints++);
