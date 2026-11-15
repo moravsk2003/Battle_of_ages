@@ -44,7 +44,7 @@ namespace BattleOfAges.UI
         {
             ("Build a Storage Chest", () => $"{ToBuild()} \"Storage Chest\", LMB to place. Auto workers build it themselves and haul wood and ore into it.", () => StorageChestNode.ActiveChests.Count > 0),
             ("Gather 20 Wood", () => $"Yourself: {K(KeyAction.ChopTree)} near a tree. Or on the map: select workers and RMB a tree.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
-            ("Mark a Mining Zone", () => $"{ToZones()} \"Mining\", drag LMB to paint. Workers build a mine and work there when ore is needed; RMB it for permanent miners, or set haulers to Mine / Auto.", () => MineNode.ActiveMines.Count > 0),
+            ("Mark a Mining Zone", () => $"{ToZones()} \"Mining\", drag LMB to paint. Workers build a mine and work there when ore is needed; RMB it for permanent miners, or set haulers to Haul / Auto.", () => MineNode.ActiveMines.Count > 0),
             ("Mark Farm Fields", () => $"{ToZones()} \"Fields\". Food is consumed daily; when low, free villagers farm automatically. Or select workers and RMB a field.", () => Has(BuildingType.Field)),
             ("Craft Your First Item", () => $"Workbench: on the map, select a worker and RMB the workbench; LMB it to open, pick a recipe → \"Craft\". Add benches via the \"Crafts\" zone.", () => Armory.Instance.Items.Count > 0),
             ("Equip a Worker", () => $"On the map, select workers, {K(KeyAction.Equipment)} for Equipment: click a weapon or armor piece in the armory to issue one to each. Knight & General ranks come from combat.", () => ArmedVillager()),
@@ -58,7 +58,7 @@ namespace BattleOfAges.UI
         {
             ("Build a Storage Chest", () => $"{ToBuild()} \"Storage Chest\", LMB to place. Workers bring wood and ore into chests.", () => StorageChestNode.ActiveChests.Count > 0),
             ("Gather 20 Wood", () => $"Yourself: {K(KeyAction.ChopTree)} near a tree to chop, {K(KeyAction.InteractGather)} to pick branches. Or on the map: select workers and RMB a tree.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
-            ("Build a Mine", () => $"{ToBuild()} \"Mine\". Select workers (LMB or box) and RMB the mine to work inside. Set others to \"Mine\" or \"Auto\" to haul ore to chests.", () => MineNode.ActiveMines.Count > 0),
+            ("Build a Mine", () => $"{ToBuild()} \"Mine\". Select workers (LMB or box) and RMB the mine to work inside. Set others to \"Haul\" or \"Auto\" to haul ore to chests.", () => MineNode.ActiveMines.Count > 0),
             ("Build a Workbench", () => $"{ToBuild()} \"Workbench\". A worker crafts weapons and armor here for everyone.", () => WorkbenchNode.Instance != null),
             ("Craft Your First Item", () => $"On the map: select a worker, RMB the workbench to assign; LMB the workbench to open, pick a recipe → \"Craft\". (In first person: {K(KeyAction.InteractGather)} near it.)", () => Armory.Instance.Items.Count > 0),
             ("Equip a Worker", () => $"On the map, select workers, {K(KeyAction.Equipment)} for Equipment: click a sword or armor in the armory to issue one to each. Knight & General ranks come from combat.", () => ArmedVillager()),
@@ -72,7 +72,7 @@ namespace BattleOfAges.UI
         {
             ("Збудуйте скриню-склад", () => $"{ToBuild()} «Скриня-склад», ЛКМ — поставити. Робітники «Авто» самі її збудують; у скриню вони зносять дерево й руду.", () => StorageChestNode.ActiveChests.Count > 0),
             ("Назбирайте 20 деревини", () => $"Самі: {K(KeyAction.ChopTree)} біля дерева. Або на мапі: виділіть робітників і ПКМ по дереву.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
-            ("Розмітьте рудню", () => $"{ToZones()} «Рудня», ЛКМ малює зону. Робітники зведуть шахту й самі підуть туди, коли бракуватиме руди; ПКМ по ній — шахтарі, які лишаться там, носії — наказ «Шахта» або «Авто».", () => MineNode.ActiveMines.Count > 0),
+            ("Розмітьте рудню", () => $"{ToZones()} «Рудня», ЛКМ малює зону. Робітники зведуть шахту й самі підуть туди, коли бракуватиме руди; ПКМ по ній — шахтарі, які лишаться там, носії — наказ «Носій» або «Авто».", () => MineNode.ActiveMines.Count > 0),
             ("Розмітьте поля", () => $"{ToZones()} «Поля». Їжа витрачається щодня; коли її мало, вільні люди самі стають у поле. Або виділіть людей і ПКМ по полю: стоятимуть там, доки не пошлете деінде.", () => Has(BuildingType.Field)),
             ("Викуйте першу річ", () => $"Верстак: на мапі виділіть робітника, ПКМ по верстаку; ЛКМ по ньому — вікно, рецепт → «Виготовити». Ще верстаки — зона «Ремесла».", () => Armory.Instance.Items.Count > 0),
             ("Озбройте робітника", () => $"На мапі виділіть людей, {K(KeyAction.Equipment)} — спорядження: клік по мечу чи броні на складі дає по одній кожному. Вище за воїна (лицар, генерал) піднімають лише бої.", () => ArmedVillager()),
@@ -86,7 +86,7 @@ namespace BattleOfAges.UI
         {
             ("Збудуйте скриню-склад", () => $"{ToBuild()} «Скриня», ЛКМ — поставити. У скриню робітники зносять дерево й руду.", () => StorageChestNode.ActiveChests.Count > 0),
             ("Назбирайте 20 деревини", () => $"Самі: {K(KeyAction.ChopTree)} біля дерева — рубати, {K(KeyAction.InteractGather)} — підняти гілку. Або на мапі: виділіть робітників і ПКМ по дереву.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
-            ("Збудуйте шахту", () => $"{ToBuild()} «Шахта». Виділіть робітників (ЛКМ або рамкою) і ПКМ по шахті — копатимуть усередині. Носять руду в скриню інші: наказ «Шахта» або «Авто».", () => MineNode.ActiveMines.Count > 0),
+            ("Збудуйте шахту", () => $"{ToBuild()} «Шахта». Виділіть робітників (ЛКМ або рамкою) і ПКМ по шахті — копатимуть усередині. Носять руду в скриню інші: наказ «Носій» або «Авто».", () => MineNode.ActiveMines.Count > 0),
             ("Збудуйте верстак", () => $"{ToBuild()} «Верстак». На ньому робітник кує зброю й броню для всіх.", () => WorkbenchNode.Instance != null),
             ("Викуйте першу річ", () => $"На мапі: виділіть робітника, ПКМ по верстаку — він стане до роботи; ЛКМ по верстаку — вікно, рецепт → «Виготовити». (Від першої особи — {K(KeyAction.InteractGather)} біля верстака.)", () => Armory.Instance.Items.Count > 0),
             ("Озбройте робітника", () => $"На мапі виділіть людей, {K(KeyAction.Equipment)} — спорядження: клік по мечу чи броні на складі дає по одній кожному. Вище за воїна (лицар, генерал) піднімають лише бої.", () => ArmedVillager()),
