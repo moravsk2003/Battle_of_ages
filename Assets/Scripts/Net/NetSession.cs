@@ -980,6 +980,45 @@ namespace BattleOfAges.Net
             if (known == null) shownBuildings[b] = ShowBuilding(b);
         }
 
+        // ------------------------------------------------------------------ guests as targets (far kings march on them too)
+
+        /// <summary>The host: each guest in the game, by its number, and where its base is (its hall as shown here, else its hero).</summary>
+        public List<(int Number, Vector3 At)> GuestBases()
+        {
+            var bases = new List<(int Number, Vector3 At)>();
+            if (link == null || !link.IsHost || !basePlaced) return bases;
+            foreach (KeyValuePair<int, GuestRecord> g in guestOf)
+            {
+                HealthComponent target = BaseOf(g.Key);
+                if (target != null) bases.Add((g.Value.Number, target.transform.position));
+            }
+            return bases;
+        }
+
+        /// <summary>The host: what a raid on this guest goes for here (its hall's body, else its hero's); null if it is not in the game.</summary>
+        public HealthComponent GuestTarget(int number)
+        {
+            if (link == null || !link.IsHost) return null;
+            foreach (KeyValuePair<int, GuestRecord> g in guestOf) if (g.Value.Number == number) return BaseOf(g.Key);
+            return null;
+        }
+
+        /// <summary>The guest's number behind this connection (0: none).</summary>
+        public int NumberOfPeer(int peer) => guestOf.TryGetValue(peer, out GuestRecord g) ? g.Number : 0;
+
+        private HealthComponent BaseOf(int peer)
+        {
+            foreach (KeyValuePair<NetBuilding, GameObject> kv in shownBuildings)
+                if (kv.Key.Owner == peer && kv.Key.Type == (int)BuildingType.TownHall && kv.Value != null)
+                {
+                    RemoteBody body = kv.Value.GetComponent<RemoteBody>();
+                    if (body != null && body.Health != null && body.Health.IsAlive) return body.Health;
+                }
+            HealthComponent hero = null;
+            remote.ForEachHero(b => { if (b.Owner == peer && b.Health != null && b.Health.IsAlive) hero = b.Health; });
+            return hero;
+        }
+
         // ------------------------------------------------------------------ an absent player's kingdom (§14.4)
 
         /// <summary>The bots' shown buildings, by their player's token.</summary>

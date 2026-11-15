@@ -205,6 +205,33 @@ namespace BattleOfAges.Tests
             Assert.Less((other.Armies[0].Position - player.Position).magnitude, GameBalance.KingdomGuardRadius + 400f, "at the door");
         }
 
+        /// <summary>In a game with others a far king weighs every guest's base as the host's (KNOWN_ISSUES №43), and one at a time.</summary>
+        [Test]
+        public void AFarKing_GoesForAGuest_TheNearestItCanBeat_AndHomeIfTheGuestLeaves()
+        {
+            KingdomState king = Kingdom("На гостя", new Vector3(0f, 0f, 3000f), 3, 40);
+            var world = new List<KingdomState> { king };
+            var host = new FarWorld.PlayerTarget { Position = new Vector3(0f, 0f, -6000f), Guards = 1f };
+            var strongGuest = new FarWorld.PlayerTarget { Number = 1, Position = new Vector3(0f, 0f, 1500f), Guards = FarWorld.Power(king, king.Subjects, true) };
+            var weakGuest = new FarWorld.PlayerTarget { Number = 2, Position = new Vector3(0f, 0f, 0f), Guards = 1f };
+            var guests = new List<FarWorld.PlayerTarget> { strongGuest, weakGuest };
+            Assert.IsTrue(FarWorld.ConsiderRaid(king, world, host, guests));
+            ArmyState army = king.Armies[0];
+            Assert.IsTrue(army.TargetsPlayer);
+            Assert.AreEqual(2, army.TargetPlayer, "the nearest it can beat: not the strong guest, nor the host further off");
+
+            // Another king leaves that guest to it
+            KingdomState second = Kingdom("Другий", new Vector3(0f, 0f, 3100f), 3, 40);
+            var seenBySecond = new List<KingdomState> { king, second }; // (the first's world stays its own: else the second's raid on it calls it home)
+            Assert.IsTrue(FarWorld.ConsiderRaid(second, seenBySecond, host, new List<FarWorld.PlayerTarget> { weakGuest }));
+            Assert.AreNotEqual(2, second.Armies[0].TargetPlayer, "not the guest already marched on");
+
+            for (int h = 0; h < 5; h++) FarWorld.Hour(king, world, 1f, rng, null, host, null, guests);
+            Assert.Less(army.Position.z, 3000f, "on its way to the guest");
+            FarWorld.Hour(king, world, 1f, rng, null, host, null, new List<FarWorld.PlayerTarget>());
+            Assert.IsTrue(army.Returning, "the guest has left: home");
+        }
+
         [Test]
         public void AnArmyOnTheRoad_MarchesOn_ThoughItsTargetIsRealNow()
         {

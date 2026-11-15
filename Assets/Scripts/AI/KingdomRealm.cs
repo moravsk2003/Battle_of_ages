@@ -178,6 +178,7 @@ namespace BattleOfAges.AI
                 hourClock = 0f;
                 tickCursor = 0;
             }
+            guestBases = null; // (looked up once a frame, when a far king needs them)
             TickFar();
             foreach (NpcKingdom k in NpcKingdom.All) if (k != null && k.Arriving > 0) k.ArriveMore(ArrivalsPerFrame);
             syncClock -= Time.deltaTime;
@@ -200,11 +201,43 @@ namespace BattleOfAges.AI
                 float hours = s.PendingHours;
                 s.PendingHours = 0f;
                 Advance(s, hours);
-                FarWorld.Hour(s, far, hours, new System.Random(KingdomTown.Seed(s.Name) ^ Mathf.FloorToInt(s.Age * 7f)), home, PlayerAs(s), RealHome);
+                FarWorld.Hour(s, far, hours, new System.Random(KingdomTown.Seed(s.Name) ^ Mathf.FloorToInt(s.Age * 7f)), home, PlayerAs(s), RealHome, GuestsAs(s));
             }
         }
 
         private static readonly int[] guardBuffer = new int[256];
+        private static List<(int Number, Vector3 At)> guestBases;
+
+        /// <summary>In a game with others, on the host: each guest's base as this far king weighs it (none elsewhere).</summary>
+        private static List<FarWorld.PlayerTarget> GuestsAs(KingdomState s)
+        {
+            if (!Net.NetSession.IsHost) return null;
+            if (guestBases == null) guestBases = Net.NetSession.Current.GuestBases();
+            if (guestBases.Count == 0) return null;
+            var targets = new List<FarWorld.PlayerTarget>(guestBases.Count);
+            foreach ((int number, Vector3 at) in guestBases)
+            {
+                var guards = new List<HealthComponent>();
+                int n = RTS.UnitSpatialGrid.QueryEnemies(at, GameBalance.KingdomGuardRadius, s.Team, guardBuffer);
+                for (int i = 0; i < n; i++)
+                {
+                    HealthComponent h = RTS.UnitSpatialGrid.Health(guardBuffer[i]);
+                    if (h != null && h.IsAlive) guards.Add(h);
+                }
+                targets.Add(new FarWorld.PlayerTarget { Number = number, Position = at, Guards = NpcKingdom.PowerOf(guards) });
+            }
+            return targets;
+        }
+
+        /// <summary>Where this player's base is: 0 the host's own, else a guest's (null: it has left).</summary>
+        private static Vector3? BaseOfPlayer(int number, Vector3 home)
+        {
+            if (number == 0) return home;
+            if (!Net.NetSession.IsHost) return null;
+            if (guestBases == null) guestBases = Net.NetSession.Current.GuestBases();
+            foreach ((int n, Vector3 at) in guestBases) if (n == number) return at;
+            return null;
+        }
 
         /// <summary>The player's settlement as this far king weighs it; none while the player has no hall and no hero (the same terms as RaidTargets).</summary>
         private static FarWorld.PlayerTarget? PlayerAs(KingdomState s)
@@ -236,7 +269,8 @@ namespace BattleOfAges.AI
             foreach (ArmyState a in s.Armies)
             {
                 if (AnyPlayerWithin(a.Position, GameBalance.MaterializeRadius)) return true;
-                if (a.TargetsPlayer && Flat(a.Position, home) < GameBalance.MaterializeRadius) return true;
+                Vector3? whose = a.TargetsPlayer ? BaseOfPlayer(a.TargetPlayer, home) : null;
+                if (whose.HasValue && Flat(a.Position, whose.Value) < GameBalance.MaterializeRadius) return true;
                 if (a.Returning || a.TargetsPlayer) continue;
                 Vector3? real = RealHome(a.TargetKingdomId);
                 if (real.HasValue && Flat(a.Position, real.Value) < GameBalance.ArmyMeetsRealRadius) return true;

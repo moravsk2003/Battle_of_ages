@@ -503,6 +503,9 @@ namespace BattleOfAges.AI
             raidSize = party.Count;
             raidTarget = target;
             raidAtPlayer = target.GetComponent<TownHall>() != null || target.gameObject == Managers.GameContext.Player;
+            Net.RemoteBody guest = target.GetComponent<Net.RemoteBody>();
+            raidPlayer = 0;
+            if (guest != null && Net.NetSession.IsHost) { raidPlayer = Net.NetSession.Current.NumberOfPeer(guest.Owner); raidAtPlayer = raidPlayer > 0; }
             foreach (HostileMobAI m in raiders) m.OrderAttack(target);
             RaidStarted?.Invoke(this, target);
             StrategyHud.Notify($"{KingdomName} іде в набіг{Whom(target)}: {raidSize} бійців!");
@@ -512,7 +515,8 @@ namespace BattleOfAges.AI
         private void ResolveRaidTarget()
         {
             HealthComponent target = null;
-            if (raidAtPlayer)
+            if (raidAtPlayer && raidPlayer > 0) target = Net.NetSession.IsHost ? Net.NetSession.Current.GuestTarget(raidPlayer) : null; // a guest's base
+            else if (raidAtPlayer)
             {
                 TownHall hall = TownHall.Current;
                 HealthComponent h = hall != null ? hall.GetComponent<HealthComponent>() : null;
@@ -528,7 +532,7 @@ namespace BattleOfAges.AI
             if (target == null || !target.IsAlive) { raidAtPlayer = false; EndRaid(retreat: false); return; }
             raidTarget = target;
             foreach (HostileMobAI m in raiders) if (m != null) m.OrderAttack(target);
-            if (raidAtPlayer) StrategyHud.Notify($"{KingdomName} іде в набіг на вас: {raidSize} бійців!");
+            if (raidAtPlayer && raidPlayer == 0) StrategyHud.Notify($"{KingdomName} іде в набіг на вас: {raidSize} бійців!");
         }
 
         /// <summary>Who a raid goes at, for the message: the same words looked as if every raid were coming for the player.</summary>
@@ -793,7 +797,7 @@ namespace BattleOfAges.AI
         /// <summary>The raid under way as data: who, where they have got to, at whom.</summary>
         private SaveLoad.ArmyState RaidAsArmy()
         {
-            var army = new SaveLoad.ArmyState { StartCount = raidSize, WithHero = King != null && raiders.Contains(King), TargetKingdomId = RaidTargetId, TargetsPlayer = raidAtPlayer };
+            var army = new SaveLoad.ArmyState { StartCount = raidSize, WithHero = King != null && raiders.Contains(King), TargetKingdomId = RaidTargetId, TargetsPlayer = raidAtPlayer, TargetPlayer = raidAtPlayer ? raidPlayer : 0 };
             Vector3 sum = Vector3.zero;
             int n = 0;
             foreach (HostileMobAI m in raiders)
@@ -858,6 +862,8 @@ namespace BattleOfAges.AI
         /// <summary>A raid that turned real: the kingdom it goes for, until that one is there too; whether it goes for the player; whether it is on its way home.</summary>
         private SaveLoad.WorldId raidPending;
         private bool raidAtPlayer, armyReturning;
+        /// <summary>Whose base a raid at a player goes for: 0 this machine's player, else a guest's number.</summary>
+        private int raidPlayer;
         /// <summary>The numbers of its state (SaveLoad.KingdomState): they stay through turning far and real.</summary>
         private (SaveLoad.WorldId Id, SaveLoad.WorldId Hero, SaveLoad.WorldId Settlement, SaveLoad.WorldId Garrison) stateIds;
 
@@ -872,6 +878,7 @@ namespace BattleOfAges.AI
             for (int i = 1; i < s.Armies.Count; i++) s.Subjects.AddRange(s.Armies[i].Units); // (one at a time so far)
             armyReturning = army.Returning;
             raidAtPlayer = army.TargetsPlayer && !army.Returning;
+            raidPlayer = raidAtPlayer ? army.TargetPlayer : 0;
             raidPending = army.Returning ? default : army.TargetKingdomId;
             raidSize = army.StartCount > 0 ? army.StartCount : army.Units.Count;
             foreach (SaveLoad.UnitState u in army.Units)
