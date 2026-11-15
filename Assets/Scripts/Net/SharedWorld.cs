@@ -50,6 +50,16 @@ namespace BattleOfAges.Net
         public int Number;
         /// <summary>Its whole save as text (empty: it has not saved yet).</summary>
         public string Save = "";
+        /// <summary>The name it goes by (empty: "Гравець N").</summary>
+        public string Name = "";
+        /// <summary>What it chose in the lobby for its first hero (HeroClass, ArtifactType), kept till it has a save.</summary>
+        public int Class;
+        public bool HasArtifact;
+        public int Artifact;
+        /// <summary>Ready in the lobby (not kept).</summary>
+        [NonSerialized] public bool Ready;
+        /// <summary>Its hero in a few words, read from its save (null: not read yet).</summary>
+        [NonSerialized] public string Hero;
     }
 
     /// <summary>The host's book of guests: saved with its game, so a guest comes back to its kingdom whenever it comes back.</summary>
@@ -69,6 +79,15 @@ namespace BattleOfAges.Net
             records.Clear();
             if (saved != null) records.AddRange(saved);
         }
+
+        /// <summary>The guest with this token, or null if it has not been here.</summary>
+        public static GuestRecord Find(string token)
+        {
+            foreach (GuestRecord r in records) if (r.Token == token) return r;
+            return null;
+        }
+
+        public static void Remove(string token) => records.RemoveAll(r => r.Token == token);
 
         /// <summary>The guest with this token, written in if it is new.</summary>
         public static GuestRecord Of(string token)

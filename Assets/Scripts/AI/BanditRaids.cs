@@ -108,6 +108,7 @@ namespace BattleOfAges.AI
             }
             int side = Mathf.RoundToInt(Mathf.Repeat(Mathf.Atan2(at.z - home.z, at.x - home.x), Mathf.PI * 2f) / (Mathf.PI * 0.5f)) % 4;
             StrategyHud.Notify($"Бандити йдуть на поселення: {size}, {Sides[side]}!");
+            GameSound.Play2D(GameSound.Kind.RaiderHorn);
             UiSound.Play(UiSound.Kind.Alert);
         }
 

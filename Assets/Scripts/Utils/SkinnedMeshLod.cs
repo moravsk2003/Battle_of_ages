@@ -25,7 +25,17 @@ namespace BattleOfAges.Utils
         private static int cursor;
         private static Driver driver;
         private int index = -1;
-        private bool near;
+        private bool near, hidden;
+
+        public bool Hidden => hidden;
+
+        public void SetHidden(bool value)
+        {
+            if (hidden == value) return;
+            hidden = value;
+            if (hidden) { if (Target != null) Target.enabled = false; }
+            else Refresh(Viewer());
+        }
 
         private void OnEnable()
         {
@@ -94,7 +104,7 @@ namespace BattleOfAges.Utils
                 near = wantNear;
                 SetMesh(Target, near ? Near : Far);
             }
-            bool show = h >= CullScreenHeight;
+            bool show = !hidden && h >= CullScreenHeight;
             if (Target.enabled != show) Target.enabled = show;
         }
 

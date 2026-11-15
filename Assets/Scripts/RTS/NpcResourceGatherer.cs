@@ -322,6 +322,12 @@ namespace BattleOfAges.RTS
             if (mine == null || !mine.AssignWorker(this)) return;
             assignedMine = mine;
             currentState = GathererState.WorkingInsideMine;
+            if (rtsUnit != null)
+            {
+                Managers.GameContext.Commander?.Deselect(rtsUnit);
+                rtsUnit.SetSelected(false);
+                rtsUnit.StopHere();
+            }
             SetRenderersActive(false);
         }
 
@@ -649,7 +655,7 @@ namespace BattleOfAges.RTS
                     {
                         Managers.GameContext.Commander?.Deselect(rtsUnit);
                         rtsUnit.SetSelected(false);
-                        rtsUnit.IssueMoveCommand(transform.position);
+                        rtsUnit.StopHere();
                     }
                     SetRenderersActive(false);
                 }
@@ -670,8 +676,10 @@ namespace BattleOfAges.RTS
             Renderer[] renderers = GetComponentsInChildren<Renderer>();
             for (int i = 0; i < renderers.Length; i++)
             {
-                if (renderers[i] != null) renderers[i].enabled = active;
+                if (renderers[i] != null && renderers[i].gameObject.name != "SelectionIndicator") renderers[i].enabled = active;
             }
+            SkinnedMeshLod lod = GetComponentInChildren<SkinnedMeshLod>();
+            if (lod != null) lod.SetHidden(!active);
             GpuSkinnedCharacter gpu = GetComponentInChildren<GpuSkinnedCharacter>();
             if (gpu != null) gpu.SetHidden(!active); // only one of its two bodies is drawn
         }

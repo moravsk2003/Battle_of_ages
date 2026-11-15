@@ -25,20 +25,24 @@ namespace BattleOfAges.UI
 
         private static readonly HeroClass[] Classes = { HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
 
-        public static CampaignSetupUI Build(RectTransform root, Action back)
+        /// <summary>A network game's campaign: its world only, the heroes are chosen in the lobby (§14.4); null: one's own game.</summary>
+        private Action<CampaignSetup> toLobby;
+
+        /// <param name="toLobby">Given: the screen of a network game, which opens a lobby with these choices instead of starting.</param>
+        public static CampaignSetupUI Build(RectTransform root, Action back, Action<CampaignSetup> toLobby = null)
         {
-            var ui = new CampaignSetupUI();
+            var ui = new CampaignSetupUI { toLobby = toLobby };
             ui.Make(root, back);
             return ui;
         }
 
         private void Make(RectTransform root, Action back)
         {
-            Panel = UiTheme.Rect(root, "NewCampaign", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f), new Vector2(1180f, 650f));
+            Panel = UiTheme.Rect(root, toLobby != null ? "NewNetworkCampaign" : "NewCampaign", new Vector2(0.5f, 0.5f), new Vector2(0f, -60f), new Vector2(1180f, 650f));
             UiTheme.PanelImage(Panel);
             PopIn.On(Panel);
             RectTransform title = UiTheme.Rect(Panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(600f, 44f));
-            UiTheme.Label(title, "Text", "Нова кампанія", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Label(title, "Text", toLobby != null ? "Нова мережева кампанія" : "Нова кампанія", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.Divider(Panel, -66f, 560f);
 
             // The world
@@ -57,13 +61,22 @@ namespace BattleOfAges.UI
             summary.horizontalOverflow = HorizontalWrapMode.Wrap;
 
             // The hero
-            Heading(-92f, 290f, "Ваш герой");
-            Cycler(-150f, 290f, "Клас", () => HeroClassRules.Name(Classes[classIndex]), d => classIndex = Wrap(classIndex + d, Classes.Length), out classText);
-            classDescription = Description(-195f, 290f);
-            Cycler(-330f, 290f, "Стартовий артефакт", () => Artifacts.Name(Artifacts.All[artifactIndex], Classes[classIndex]), d => artifactIndex = Wrap(artifactIndex + d, Artifacts.All.Length), out artifactText);
-            artifactDescription = Description(-375f, 290f);
+            if (toLobby != null)
+            {
+                Heading(-92f, 290f, "Герої");
+                Description(-110f, 290f).text = "Клас і стартовий артефакт кожен гравець, і ви теж, обирає в лобі.\n\n"
+                                              + "Ви отримаєте адресу, яку скажете іншим. Коли всі будуть готові, натисніть «Почати».";
+            }
+            else
+            {
+                Heading(-92f, 290f, "Ваш герой");
+                Cycler(-150f, 290f, "Клас", () => HeroClassRules.Name(Classes[classIndex]), d => classIndex = Wrap(classIndex + d, Classes.Length), out classText);
+                classDescription = Description(-195f, 290f);
+                Cycler(-330f, 290f, "Стартовий артефакт", () => Artifacts.Name(Artifacts.All[artifactIndex], Classes[classIndex]), d => artifactIndex = Wrap(artifactIndex + d, Artifacts.All.Length), out artifactText);
+                artifactDescription = Description(-375f, 290f);
+            }
 
-            UiTheme.TextButton(Panel, "Start", "Почати", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), Start, 22)
+            UiTheme.TextButton(Panel, "Start", toLobby != null ? "У лобі" : "Почати", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), Start, 22)
                    .GetComponent<Image>().color = new Color(1f, 0.92f, 0.7f);
             UiTheme.TextButton(Panel, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(-130f, 26f), new Vector2(230f, 56f), () => back(), 20);
             Refresh();
@@ -133,8 +146,8 @@ namespace BattleOfAges.UI
             float km = CampaignSetup.Sizes[sizeIndex] / 1000f;
             summary.text = $"Крім вас — {others} героїв: {kings} королів і {others - kings} вільних ватаг, кожен на своїй стоянці. "
                          + $"Світ {km:0} × {km:0} км, гори по краю, озера; ближчі сусіди — від {World.StartSites.ClearanceFor(CampaignSetup.Sizes[sizeIndex]) / 1000f:0.#} км.";
-            classDescription.text = HeroClassRules.Description(Classes[classIndex]) + "\n" + TipText.Dim("Клас обирається один раз.");
-            artifactDescription.text = Artifacts.Description(Artifacts.All[artifactIndex]);
+            if (classDescription != null) classDescription.text = HeroClassRules.Description(Classes[classIndex]) + "\n" + TipText.Dim("Клас обирається один раз.");
+            if (artifactDescription != null) artifactDescription.text = Artifacts.Description(Artifacts.All[artifactIndex]);
         }
 
         private void Start()
@@ -147,6 +160,7 @@ namespace BattleOfAges.UI
             setup.HasArtifact = true;
             setup.Artifact = Artifacts.All[artifactIndex];
             Advisor.Hidden = !tips;
+            if (toLobby != null) { setup.Seed = setup.SeedOrRandom(); toLobby(setup); return; } // (the world fixed now: everyone gets the same)
             SaveSystem.NewGame(setup);
         }
     }

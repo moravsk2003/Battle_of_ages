@@ -73,6 +73,7 @@ namespace BattleOfAges.RTS
             a.lastEnemySeen = Time.time;
             a.gathered = false;
             a.nextCheck = 0f;
+            GameSound.Play2D(GameSound.Kind.AlarmBell);
             StrategyHud.Notify(why ?? "Тривога! Усі до зброї");
         }
 
@@ -86,6 +87,7 @@ namespace BattleOfAges.RTS
                 u.StandDownFromWall(); // the archers come down
                 u.StopDefending();     // and no one runs after a raid that has gone
             }
+            GameSound.Play2D(GameSound.Kind.StandDown);
             StrategyHud.Notify(why ?? "Відбій: усі до роботи");
         }
 

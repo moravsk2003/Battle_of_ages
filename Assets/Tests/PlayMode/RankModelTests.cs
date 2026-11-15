@@ -66,6 +66,22 @@ namespace BattleOfAges.PlayModeTests
             yield return null;
             foreach (Renderer r in unit.GetComponentsInChildren<Renderer>(true)) Assert.IsFalse(r.enabled, "seen through the mine's roof");
             Assert.IsTrue(unit.GetComponentInChildren<GpuSkinnedCharacter>(true).Hidden);
+
+            // Promoted to Knight (which has SkinnedMeshLod): RefreshAll must not re-enable its body while hidden
+            unit.GetComponent<UnitProgress>().Promote();
+            yield return null;
+            var camGo = new GameObject("TestCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.transform.position = unit.transform.position + new Vector3(0f, 2f, -4f);
+            cam.transform.LookAt(unit.transform.position + Vector3.up);
+            SkinnedMeshLod.ViewerOverride = cam;
+            GpuSkinnedCharacter.ViewerOverride = cam;
+            SkinnedMeshLod.RefreshAll(cam);
+            GpuSkinnedCharacter.RefreshAll(cam);
+            foreach (Renderer r in unit.GetComponentsInChildren<Renderer>(true)) Assert.IsFalse(r.enabled, "knight LOD must stay hidden inside mine");
+            SkinnedMeshLod.ViewerOverride = null;
+            GpuSkinnedCharacter.ViewerOverride = null;
+            Object.Destroy(camGo);
             Object.Destroy(unit);
             yield return null;
 

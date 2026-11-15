@@ -74,6 +74,7 @@ namespace BattleOfAges.Combat
             rank++;
             battleXp = 0;
             ApplyStats();
+            UI.GameSound.At(UI.GameSound.Kind.Promote, transform.position);
             Promoted?.Invoke(this);
         }
 

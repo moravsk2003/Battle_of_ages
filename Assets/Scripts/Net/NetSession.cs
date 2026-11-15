@@ -29,11 +29,18 @@ namespace BattleOfAges.Net
         public WorldSave World = new WorldSave();
         /// <summary>Everyone's marked cells: x, z, type in a row.</summary>
         public List<int> Zones = new List<int>();
+        /// <summary>A new player's hero as chosen in the lobby (HeroClass 0: chosen later in the hero window).</summary>
+        public int Class;
+        public bool HasArtifact;
+        public int Artifact;
+        /// <summary>The campaign's heroes and kings (0: as this machine has them).</summary>
+        public int Heroes;
+        public float KingShare;
     }
 
-    [Serializable] public sealed class NetHello { public string Token, Version; }
-    /// <summary>Who is in the game (by their numbers: 0 is the host), and what has just happened, to say on the screen.</summary>
-    [Serializable] public sealed class NetRoster { public List<int> Players = new List<int>(); public string Said = ""; }
+    [Serializable] public sealed class NetHello { public string Token, Version, Name = ""; }
+    /// <summary>Who is in the game (by their numbers: 0 is the host), their names in the same order, and what has just happened, to say on the screen.</summary>
+    [Serializable] public sealed class NetRoster { public List<int> Players = new List<int>(); public List<string> Names = new List<string>(); public string Said = ""; }
     [Serializable] public sealed class NetClock { public double Hours; }
     [Serializable] public sealed class NetTrees { public List<TreeSave> Trees = new List<TreeSave>(); }
     [Serializable] public sealed class NetZones { public List<int> Cells = new List<int>(); }
@@ -73,7 +80,7 @@ namespace BattleOfAges.Net
     {
         public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
                           TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12,
-                          RefusedMessage = 13, RosterMessage = 14, WorldMapMessage = 15;
+                          RefusedMessage = 13, RosterMessage = 14, WorldMapMessage = 15, LobbyMessage = 16, LobbyChoiceMessage = 17;
         /// <summary>How often a guest's game goes to its host, and the host's clock to its guests.</summary>
         public static float GuestSaveSeconds = 60f;
         private const float ClockSeconds = 5f, WorldSeconds = 1f;
@@ -105,7 +112,16 @@ namespace BattleOfAges.Net
         /// <summary>Who is in the game, by number (0 is the host).</summary>
         public IReadOnlyList<int> Players => players;
         /// <summary>This machine's number among them.</summary>
-        public int Number => link != null && link.IsHost ? 0 : Welcome != null ? Welcome.Number : -1;
+        public int Number => link != null && link.IsHost ? 0 : Welcome != null ? Welcome.Number : Lobby != null ? Lobby.You : -1;
+
+        /// <summary>A player's name by its number (empty if none is known).</summary>
+        public string NameOf(int number)
+        {
+            int i = players.IndexOf(number);
+            return i >= 0 && i < names.Count ? names[i] : "";
+        }
+
+        private readonly List<string> names = new List<string>();
 
         /// <summary>Everyone's hero on the global map: known here on the host, told to the guests.</summary>
         public List<NetPlayerAt> PlayersOnMap()
@@ -158,7 +174,10 @@ namespace BattleOfAges.Net
             return Current;
         }
 
-        /// <summary>Opens the game in progress to others; false if the port cannot be taken.</summary>
+        /// <summary>
+        /// Opens the game in progress to others, anyone at all coming in (the old way: NetDemo and tests; the menu goes by the
+        /// lobby, HostLobby). False if the port cannot be taken.
+        /// </summary>
         public static bool Host(ushort port = NetLink.DefaultPort)
         {
             NetSession s = Create();
@@ -167,9 +186,138 @@ namespace BattleOfAges.Net
             s.playerId = 0;
             s.joined = true;
             s.basePlaced = true;
+            s.acceptNew = true;
             s.Wire();
             s.Listen();
             return true;
+        }
+
+        // ------------------------------------------------------------------ the lobby (§14.4)
+
+        /// <summary>The lobby as last told here (the host's own view on the host); null outside a lobby.</summary>
+        public NetLobby Lobby { get; private set; }
+        /// <summary>Goes up each time the lobby changes (for its screen).</summary>
+        public int LobbyVersion { get; private set; }
+        /// <summary>A guest is in the host's lobby, waiting for the game.</summary>
+        public bool Seated => seated;
+        /// <summary>The host is in its lobby or starting the game from it.</summary>
+        public static bool HostingLobby => IsHost && Current.lobby != null && !Current.basePlaced;
+
+        private LobbyHost lobby;
+        private CampaignSetup lobbySetup;
+        private SaveData lobbySave;
+        private bool seated, acceptNew;
+
+        /// <summary>This machine's name for others (kept between games).</summary>
+        public static string LocalName
+        {
+            get => PlayerPrefs.GetString("NetPlayerName", "");
+            set { PlayerPrefs.SetString("NetPlayerName", LobbyHost.CleanName(value)); PlayerPrefs.Save(); }
+        }
+
+        /// <summary>
+        /// Opens a lobby from the main menu, the game not yet begun: a new campaign of these choices, or this save (its guests
+        /// come back to their kingdoms). False if the port cannot be taken.
+        /// </summary>
+        public static bool HostLobby(CampaignSetup setup, SaveData save, string saveName = "", ushort port = NetLink.DefaultPort)
+        {
+            NetSession s = Create();
+            s.link = NetLink.Host(port);
+            if (s.link == null) { Stop(); return false; }
+            s.playerId = 0;
+            s.joined = true;
+            s.basePlaced = false;
+            s.Wire();
+            if (save != null) GuestBook.Load(save.Guests);
+            else GuestBook.Clear();
+            s.lobbySetup = setup ?? new CampaignSetup();
+            s.lobbySave = save;
+            s.lobby = new LobbyHost
+            {
+                FromSave = save != null,
+                Campaign = save != null ? LobbyHost.CampaignLine(save, saveName) : LobbyHost.CampaignLine(s.lobbySetup)
+            };
+            s.lobby.Host.Name = LocalName;
+            if (save != null) s.lobby.Host.Hero = LobbyHost.HeroLine(save);
+            s.TellLobby();
+            return true;
+        }
+
+        /// <summary>This machine's choice in the lobby: the host's is taken at once, a guest's goes to the host.</summary>
+        public static void ChooseInLobby(NetLobbyChoice choice)
+        {
+            NetSession s = Current;
+            if (s == null || s.link == null || choice == null) return;
+            if (s.lobby != null) { s.lobby.ChooseHost(choice); s.TellLobby(); return; }
+            if (s.seated && !s.joined) s.Send(0, LobbyChoiceMessage, JsonUtility.ToJson(choice));
+        }
+
+        /// <summary>The host sends a guest out of its lobby.</summary>
+        public static void Kick(int number)
+        {
+            NetSession s = Current;
+            if (s == null || s.lobby == null || s.basePlaced) return;
+            int peer = s.lobby.PeerOf(number);
+            if (peer < 0) return;
+            s.Send(peer, RefusedMessage, JsonUtility.ToJson(new NetText { Text = "Хост прибрав вас із лобі" }));
+            s.lobby.Leave(peer);
+            s.TellLobby();
+        }
+
+        /// <summary>
+        /// The host starts the game of its lobby. Null once it is starting, else why not: those not ready yet (with force it
+        /// starts anyway, they come with what they have chosen).
+        /// </summary>
+        public static string StartLobbyGame(bool force = false)
+        {
+            NetSession s = Current;
+            if (s == null || s.lobby == null || s.basePlaced) return "Лобі немає";
+            if (s.lobby.Starting) return null;
+            List<string> waiting = s.lobby.NotReady();
+            if (waiting.Count > 0 && !force) return "Не готові: " + string.Join(", ", waiting);
+            s.lobby.Starting = true;
+            s.TellLobby();
+            s.Listen();
+            if (s.lobbySave != null) SaveSystem.LoadFrom(s.lobbySave); // (its guests are in the book already)
+            else
+            {
+                CampaignSetup setup = s.lobbySetup;
+                setup.Class = (HeroClass)s.lobby.Host.Class;
+                setup.HasArtifact = s.lobby.Host.HasArtifact;
+                setup.Artifact = (ArtifactType)s.lobby.Host.Artifact;
+                SaveSystem.NewGame(setup);
+            }
+            s.StartCoroutine(s.WelcomeWhenIn());
+            return null;
+        }
+
+        /// <summary>The host's world is up: everyone of the lobby gets theirs, and the game is on.</summary>
+        private IEnumerator WelcomeWhenIn()
+        {
+            yield return null;
+            while (Managers.GameContext.Player == null) yield return null;
+            yield return new WaitForSecondsRealtime(1f); // (a save is applied once the scene is ready)
+            basePlaced = true;
+            // Those of the lobby, and those of the save who came back while it was starting (already in guestOf)
+            foreach (KeyValuePair<int, GuestRecord> g in lobby.Here) guestOf[g.Key] = g.Value;
+            Lobby = null;
+            foreach (KeyValuePair<int, GuestRecord> g in new List<KeyValuePair<int, GuestRecord>>(guestOf)) SendWelcome(g.Key, g.Value);
+            TellRoster("Гра почалася");
+            TellWorldMap();
+        }
+
+        /// <summary>The host: the lobby, to each guest as its own copy (to one of them with a word: what was not taken), and to this machine's screen.</summary>
+        private void TellLobby(int saidTo = -1, string said = null)
+        {
+            if (lobby == null) return;
+            Lobby = lobby.View(0);
+            LobbyVersion++;
+            foreach (KeyValuePair<int, GuestRecord> g in lobby.Here)
+            {
+                NetLobby view = lobby.View(g.Value.Number);
+                if (g.Key == saidTo && said != null) view.Said = said;
+                Send(g.Key, LobbyMessage, JsonUtility.ToJson(view));
+            }
         }
 
         /// <summary>Goes to a host: the world comes once it answers.</summary>
@@ -239,33 +387,63 @@ namespace BattleOfAges.Net
 
         private void OnConnected(int peer)
         {
-            if (!link.IsHost) Send(0, HelloMessage, JsonUtility.ToJson(new NetHello { Token = GuestBook.LocalToken, Version = GameVersion }));
+            if (!link.IsHost) Send(0, HelloMessage, JsonUtility.ToJson(new NetHello { Token = GuestBook.LocalToken, Version = GameVersion, Name = LocalName }));
         }
 
-        /// <summary>A guest has said who it is: its place, its game from last time if it has been here, and the world as it stands.</summary>
+        /// <summary>Told, not thrown out: a connection cut at once could lose the reason. It goes away on hearing it.</summary>
+        private void Refuse(int peer, string why) => Send(peer, RefusedMessage, JsonUtility.ToJson(new NetText { Text = why }));
+
+        /// <summary>
+        /// A guest has said who it is. In the lobby it takes its place there; in the game it gets its world: its place, its game
+        /// from last time, the world as it stands. Once the game is on only those it knows come in (§14.4: new players by the lobby).
+        /// </summary>
         private void Greet(int peer, NetHello who)
         {
             if (!SameVersion(who.Version, GameVersion))
             {
-                // Told, not thrown out: a connection cut at once could lose the reason. It goes away on hearing it.
                 string theirs = string.IsNullOrEmpty(who.Version) ? "стара" : who.Version;
-                Send(peer, RefusedMessage, JsonUtility.ToJson(new NetText { Text = $"Різні версії гри: у хоста {GameVersion}, у вас {theirs}" }));
+                Refuse(peer, $"Різні версії гри: у хоста {GameVersion}, у вас {theirs}");
                 UI.StrategyHud.Notify($"Гравець не зайшов: у нього версія {theirs}, у вас {GameVersion}");
                 return;
             }
-            GuestRecord record = GuestBook.Of(who.Token);
+            string name = LobbyHost.CleanName(who.Name);
+            if (lobby != null && !basePlaced && !lobby.Starting)
+            {
+                string refused = lobby.Join(peer, who.Token, name);
+                if (refused != null) { Refuse(peer, refused); return; }
+                TellLobby();
+                return;
+            }
+            GuestRecord record = acceptNew ? GuestBook.Of(who.Token) : GuestBook.Find(who.Token);
+            if (record == null)
+            {
+                Refuse(peer, "Гра вже йде: нові гравці заходять лише через лобі");
+                UI.StrategyHud.Notify($"{(name.Length > 0 ? name : "Новий гравець")} не зайшов: гра вже йде");
+                return;
+            }
+            foreach (GuestRecord inGame in guestOf.Values)
+                if (inGame == record) { Refuse(peer, "Цей гравець уже в грі (той самий комп'ютер)"); return; }
+            if (name.Length > 0) record.Name = name;
             guestOf[peer] = record;
+            if (!basePlaced) return; // the game is starting: its world comes with everyone's (WelcomeWhenIn)
+            SendWelcome(peer, record);
+            TellRoster($"{LobbyHost.NameOf(record)} зайшов у гру");
+            TellWorldMap();
+        }
+
+        private void SendWelcome(int peer, GuestRecord record)
+        {
             var hello = new NetWelcome
             {
                 PlayerId = peer, Number = record.Number, WorldSeed = WorldSettings.Seed, WorldSize = WorldSettings.Size, GameHours = WorldClock.GameHours,
-                Site = SiteFor(record.Number, GameBalance.CampaignHeroes), Save = record.Save, World = WorldPersistence.Capture(), Zones = AllZones()
+                Site = SiteFor(record.Number, GameBalance.CampaignHeroes), Save = record.Save, World = WorldPersistence.Capture(), Zones = AllZones(),
+                Class = record.Class, HasArtifact = record.HasArtifact, Artifact = record.Artifact,
+                Heroes = GameBalance.CampaignHeroes, KingShare = GameBalance.CampaignKingShare
             };
             Send(peer, WelcomeMessage, JsonUtility.ToJson(hello));
             // What stands in the world already, its own and the others'
             foreach (NetBuilding b in sentBuildings.Values) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
             foreach (NetBuilding b in shownBuildings.Keys) if (b.Owner != peer) Send(peer, BuildingMessage, JsonUtility.ToJson(b));
-            TellRoster($"Гравець {record.Number} зайшов у гру");
-            TellWorldMap();
         }
 
         /// <summary>The host: the kingdoms and everyone's place, to the guests.</summary>
@@ -278,12 +456,16 @@ namespace BattleOfAges.Net
         /// <summary>The host: who is in the game now, to everyone, with what has just happened.</summary>
         private void TellRoster(string said)
         {
+            var everyone = new List<GuestRecord>(guestOf.Values);
+            everyone.Sort((a, b) => a.Number.CompareTo(b.Number));
             players.Clear();
+            names.Clear();
             players.Add(0);
-            foreach (GuestRecord g in guestOf.Values) players.Add(g.Number);
-            players.Sort();
+            names.Add(LocalName);
+            foreach (GuestRecord g in everyone) { players.Add(g.Number); names.Add(g.Name ?? ""); }
             var roster = new NetRoster { Said = said };
             roster.Players.AddRange(players);
+            roster.Names.AddRange(names);
             BroadcastText(RosterMessage, JsonUtility.ToJson(roster));
             UI.StrategyHud.Notify(said);
         }
@@ -301,15 +483,22 @@ namespace BattleOfAges.Net
         {
             if (link.IsHost)
             {
+                if (lobby != null && lobby.Here.ContainsKey(peer) && !basePlaced)
+                {
+                    lobby.Leave(peer);
+                    guestOf.Remove(peer);
+                    TellLobby();
+                    return;
+                }
                 remote.ForgetOwner(peer);
                 ForgetBuildingsOf(peer);
                 bool wasIn = guestOf.TryGetValue(peer, out GuestRecord left);
                 guestOf.Remove(peer);
                 foreach (Vector2Int freed in claims.ReleaseAll(peer)) TellFree(freed);
-                if (wasIn) TellRoster($"Гравець {left.Number} вийшов із гри");
+                if (wasIn && basePlaced) TellRoster($"{LobbyHost.NameOf(left)} вийшов із гри");
                 return;
             }
-            string why = joined ? "Зв'язок із хостом втрачено" : "Не вдалося приєднатися";
+            string why = joined ? "Зв'язок із хостом втрачено" : seated ? "Хост закрив лобі" : "Не вдалося приєднатися";
             UI.StrategyHud.Notify(why);
             Failed?.Invoke(why);
             Stop();
@@ -326,7 +515,7 @@ namespace BattleOfAges.Net
                 return;
             }
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
-            if (data[0] >= HelloMessage && data[0] <= WorldMapMessage) { ReceiveWorld(peer, data, length); return; }
+            if (data[0] >= HelloMessage && data[0] <= LobbyChoiceMessage) { ReceiveWorld(peer, data, length); return; }
             if (data[0] == BuildingMessage)
             {
                 ReceiveBuilding(JsonUtility.FromJson<NetBuilding>(Encoding.UTF8.GetString(data, 1, length - 1)));
@@ -341,12 +530,19 @@ namespace BattleOfAges.Net
         {
             joined = true;
             Welcome = hello;
+            Lobby = null;
             playerId = hello.PlayerId;
             writer.Owner = (byte)playerId;
             remote.Self = (byte)playerId;
             bool back = !string.IsNullOrEmpty(hello.Save);
             if (back) SaveSystem.LoadFrom(JsonUtility.FromJson<SaveData>(hello.Save)); // its own game from last time
-            else SaveSystem.NewGame(new CampaignSetup { Seed = hello.WorldSeed, Size = hello.WorldSize, Heroes = GameBalance.CampaignHeroes, KingShare = GameBalance.CampaignKingShare });
+            else
+                SaveSystem.NewGame(new CampaignSetup
+                {
+                    Seed = hello.WorldSeed, Size = hello.WorldSize,
+                    Heroes = hello.Heroes > 0 ? hello.Heroes : GameBalance.CampaignHeroes, KingShare = hello.KingShare > 0f ? hello.KingShare : GameBalance.CampaignKingShare,
+                    Class = (HeroClass)hello.Class, HasArtifact = hello.HasArtifact, Artifact = (ArtifactType)hello.Artifact // its hero as chosen in the lobby
+                });
             // The world is the host's, as it stands now, whatever this machine last knew
             WorldPersistence.Load(hello.World);
             ZoneMap.ClearForeign();
@@ -418,11 +614,12 @@ namespace BattleOfAges.Net
             }
             if (!joined)
             {
-                if (Time.realtimeSinceStartup < connectDeadline) return;
+                if (seated || Time.realtimeSinceStartup < connectDeadline) return; // (in the lobby it waits as long as the host does)
                 Failed?.Invoke("Хост не відповідає");
                 Stop();
                 return;
             }
+            if (lobby != null && !basePlaced) return; // the host's lobby: no world yet
             GameObject player = Managers.GameContext.Player;
             writer.Hero = player != null ? player.GetComponent<HealthComponent>() : null;
             writer.Tick(link, Time.realtimeSinceStartup);
@@ -565,7 +762,18 @@ namespace BattleOfAges.Net
                     if (link.IsHost) Greet(peer, JsonUtility.FromJson<NetHello>(text));
                     return;
                 case GuestSaveMessage:
-                    if (link.IsHost && guestOf.TryGetValue(peer, out GuestRecord record)) record.Save = text;
+                    if (link.IsHost && guestOf.TryGetValue(peer, out GuestRecord record)) { record.Save = text; record.Hero = null; }
+                    return;
+                case LobbyMessage:
+                    if (link.IsHost || joined) return;
+                    Lobby = JsonUtility.FromJson<NetLobby>(text);
+                    seated = true;
+                    LobbyVersion++;
+                    return;
+                case LobbyChoiceMessage:
+                    if (!link.IsHost || lobby == null || basePlaced || lobby.Starting) return;
+                    string refused = lobby.Choose(peer, JsonUtility.FromJson<NetLobbyChoice>(text));
+                    TellLobby(peer, refused);
                     return;
                 case WorldMapMessage:
                     if (link.IsHost) return;
@@ -581,6 +789,8 @@ namespace BattleOfAges.Net
                     NetRoster roster = JsonUtility.FromJson<NetRoster>(text);
                     players.Clear();
                     players.AddRange(roster.Players);
+                    names.Clear();
+                    if (roster.Names != null) names.AddRange(roster.Names);
                     if (!string.IsNullOrEmpty(roster.Said) && basePlaced) UI.StrategyHud.Notify(roster.Said);
                     return;
                 case ClockMessage:

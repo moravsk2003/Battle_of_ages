@@ -39,6 +39,8 @@ namespace BattleOfAges.Player
         private Vector3 lastMovedPos = new Vector3(1e9f, 1e9f, 1e9f);
         private float pitch = 0.0f;
         private bool isGrounded;
+        private bool wasGrounded = true;
+        private float stepTimer;
         private bool isControlEnabled = true;
         private bool combatChecked;
 
@@ -144,6 +146,28 @@ namespace BattleOfAges.Player
             if (jumping)
             {
                 velocity.y = Mathf.Sqrt(jumpHeight * -2.0f * gravity);
+                GameSound.Play2D(GameSound.Kind.Jump, 0.55f);
+            }
+            else if (isGrounded && !wasGrounded && velocity.y <= GROUND_STICK_FORCE)
+            {
+                GameSound.Play2D(GameSound.Kind.StepGrass, 0.5f);
+            }
+            wasGrounded = isGrounded;
+
+            if (isGrounded && move.sqrMagnitude > 0.05f && Time.deltaTime > 0f)
+            {
+                stepTimer -= Time.deltaTime * Mathf.Clamp(speed / 9f, 0.8f, 2.2f);
+                if (stepTimer <= 0f)
+                {
+                    stepTimer = 0.42f;
+                    Vector3 cur = transform.position;
+                    bool nearWater = World.Lakes.TryLake(cur.x, cur.z, 2.2f, out _);
+                    GameSound.Play2D(nearWater ? GameSound.Kind.StepSplash : GameSound.Kind.StepGrass, 0.38f);
+                }
+            }
+            else if (move.sqrMagnitude <= 0.05f)
+            {
+                stepTimer = Mathf.Min(stepTimer, 0.12f);
             }
 
             velocity.y += gravity * Time.deltaTime;

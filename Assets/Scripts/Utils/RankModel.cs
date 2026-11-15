@@ -68,6 +68,8 @@ namespace BattleOfAges.Utils
             if (hidden)
             {
                 foreach (Renderer r in fresh.GetComponentsInChildren<Renderer>(true)) r.enabled = false;
+                SkinnedMeshLod lod = fresh.GetComponentInChildren<SkinnedMeshLod>(true);
+                if (lod != null) lod.SetHidden(true);
                 GpuSkinnedCharacter gpu = fresh.GetComponentInChildren<GpuSkinnedCharacter>(true);
                 if (gpu != null) gpu.SetHidden(true);
             }

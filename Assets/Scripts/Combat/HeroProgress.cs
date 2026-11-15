@@ -70,13 +70,17 @@ namespace BattleOfAges.Combat
             HeroArtifacts bag = GetComponent<HeroArtifacts>();
             if (bag != null) amount = Mathf.RoundToInt(amount * (1f + bag.XpBonus)); // the Wisdom artifact
             xp += amount;
+            bool leveled = false;
             while (xp >= XpToNextLevel)
             {
                 xp -= XpToNextLevel;
                 level++;
                 attributePoints++;
                 skillPoints++;
+                leveled = true;
             }
+            if (leveled && (combat == null || combat.Team == RTS.UnitSpatialGrid.TeamPlayer))
+                UI.GameSound.Play2D(UI.GameSound.Kind.LevelUp);
             Changed?.Invoke(this);
         }
 

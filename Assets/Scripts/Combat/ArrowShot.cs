@@ -36,7 +36,7 @@ namespace BattleOfAges.Combat
             if (a == null) a = Create();
             if (a == null) { Hit(shooter, target, damage, piercing); return; }
             a.gameObject.SetActive(true);
-            UI.GameSound.At(UI.GameSound.Kind.BowShot, shooter.transform.position);
+            UI.GameSound.At(piercing ? UI.GameSound.Kind.PiercingShot : UI.GameSound.Kind.BowShot, shooter.transform.position);
             a.shooter = shooter;
             a.target = target;
             a.damage = damage;

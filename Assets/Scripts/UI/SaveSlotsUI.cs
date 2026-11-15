@@ -27,11 +27,22 @@ namespace BattleOfAges.UI
         {
             if (instance == null) instance = new GameObject("SaveSlotsUI").AddComponent<SaveSlotsUI>();
             instance.saving = save;
+            instance.onPick = null;
             instance.onClosed = closed;
             instance.armedSlot = -1;
             instance.window.SetActive(true);
             instance.Refresh();
         }
+
+        /// <summary>The slots to choose one from, not to load it here (a network game's lobby is opened from it).</summary>
+        public static void OpenToPick(System.Action<int> picked)
+        {
+            Open(false);
+            instance.onPick = picked;
+            instance.Refresh();
+        }
+
+        private System.Action<int> onPick;
 
         public static void Close()
         {
@@ -78,7 +89,10 @@ namespace BattleOfAges.UI
                 case "load":
                     window.SetActive(false);
                     onClosed = null;
-                    SaveSystem.Load(slot);
+                    System.Action<int> pick = onPick;
+                    onPick = null;
+                    if (pick != null) pick(slot);
+                    else SaveSystem.Load(slot);
                     break;
             }
         }
@@ -87,7 +101,7 @@ namespace BattleOfAges.UI
 
         private void Refresh()
         {
-            title.text = saving ? "Зберегти гру" : "Завантажити гру";
+            title.text = saving ? "Зберегти гру" : onPick != null ? "Мережева гра зі збереження" : "Завантажити гру";
             for (int i = list.childCount - 1; i >= 0; i--) Destroy(list.GetChild(i).gameObject);
             for (int slot = 0; slot <= SaveSystem.ManualSlots; slot++) Row(slot, (slot / 2) * 112f, slot % 2 == 0 ? -386f : 386f);
         }
@@ -124,7 +138,7 @@ namespace BattleOfAges.UI
             }
             else
             {
-                Button b = UiTheme.TextButton(row, "Load", "Завантажити", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "load"), 17);
+                Button b = UiTheme.TextButton(row, "Load", onPick != null ? "У лобі" : "Завантажити", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "load"), 17);
                 b.interactable = m.Exists;
             }
         }

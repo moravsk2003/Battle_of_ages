@@ -47,7 +47,7 @@ namespace BattleOfAges.UI
             if (!show) return;
             NetSession s = NetSession.Current;
             string now = s == null ? Describe(false, false, 0, null, null)
-                                   : Describe(true, NetSession.IsHost, s.Number, s.Players, NetSession.IsHost ? NetSession.AddressLine() : null);
+                                   : Describe(true, NetSession.IsHost, s.Number, s.Players, NetSession.IsHost ? NetSession.AddressLine() : null, s.NameOf);
             if (now == shown) return;
             shown = now;
             text.text = now;
@@ -55,14 +55,16 @@ namespace BattleOfAges.UI
         }
 
         /// <summary>The list's words: alone with the game closed, alone with it open, or everyone by name.</summary>
-        public static string Describe(bool inSession, bool host, int self, IReadOnlyList<int> players, string address)
+        public static string Describe(bool inSession, bool host, int self, IReadOnlyList<int> players, string address, System.Func<int, string> nameOf = null)
         {
             var b = new StringBuilder("<b>Гравці</b>\n");
             if (!inSession)
-                return b.Append("Ви граєте самі.\nЩоб запросити інших: Esc → «Відкрити гру в мережі».").ToString();
+                return b.Append("Ви граєте самі.\nЩоб грати з іншими: збережіться, тоді головне меню → «Гра в мережі».").ToString();
             foreach (int who in players)
             {
                 b.Append(who == 0 ? "Хост" : "Гравець " + who);
+                string name = nameOf?.Invoke(who);
+                if (!string.IsNullOrEmpty(name)) b.Append(" «").Append(name).Append('»');
                 if (who == self) b.Append(" (ви)");
                 b.Append('\n');
             }

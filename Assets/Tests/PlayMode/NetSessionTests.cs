@@ -178,6 +178,116 @@ namespace BattleOfAges.PlayModeTests
             StringAssert.Contains("7777", NetSession.AddressLine());
         }
 
+        /// <summary>A guest over the wire, by hand: says hello, hears the lobby, sends its choice (one process holds one NetSession).</summary>
+        private sealed class WireGuest : System.IDisposable
+        {
+            public readonly NetLink Link;
+            public NetLobby Lobby;
+            public NetWelcome Welcome;
+            public string Refused;
+
+            public WireGuest(ushort port, string token, string name)
+            {
+                Link = NetLink.Join("127.0.0.1", port);
+                Link.Connected += _ => Say(NetSession.HelloMessage, JsonUtility.ToJson(new NetHello { Token = token, Version = NetSession.GameVersion, Name = name }));
+                Link.Received += (peer, channel, data, length) =>
+                {
+                    if (length < 1) return;
+                    string text = System.Text.Encoding.UTF8.GetString(data, 1, length - 1);
+                    if (data[0] == NetSession.LobbyMessage) Lobby = JsonUtility.FromJson<NetLobby>(text);
+                    else if (data[0] == NetSession.WelcomeMessage) Welcome = JsonUtility.FromJson<NetWelcome>(text);
+                    else if (data[0] == NetSession.RefusedMessage) Refused = JsonUtility.FromJson<NetText>(text).Text;
+                };
+            }
+
+            public void Say(byte kind, string text)
+            {
+                byte[] utf = System.Text.Encoding.UTF8.GetBytes(text);
+                var message = new byte[utf.Length + 1];
+                message[0] = kind;
+                System.Array.Copy(utf, 0, message, 1, utf.Length);
+                Link.Send(0, NetChannel.Reliable, message, message.Length);
+            }
+
+            public IEnumerator Until(System.Func<bool> done, float seconds = 10f)
+            {
+                float end = Time.realtimeSinceStartup + seconds;
+                while (!done() && Time.realtimeSinceStartup < end) { Link.Poll(); yield return null; }
+            }
+
+            public void Dispose() => Link.Dispose();
+        }
+
+        [UnityTest, Timeout(30000)]
+        public IEnumerator ALobby_SeatsAGuest_TakesItsHero_AndTurnsAwayTheSameMachineTwice()
+        {
+            const ushort port = 27795;
+            Assert.IsTrue(NetSession.HostLobby(new CampaignSetup { Seed = 777, Size = 4000f, Heroes = 10 }, null, "", port));
+            Assert.IsTrue(NetSession.HostingLobby);
+            using (var guest = new WireGuest(port, "lobby-guest", "Гість"))
+            {
+                yield return guest.Until(() => guest.Lobby != null);
+                Assert.IsNotNull(guest.Lobby, "the lobby comes to one who says hello");
+                Assert.AreEqual(1, guest.Lobby.You);
+                Assert.AreEqual(2, guest.Lobby.Seats.Count);
+                Assert.AreEqual("Гість", guest.Lobby.SeatOf(1).Name);
+                StringAssert.Contains("Нова кампанія", guest.Lobby.Campaign);
+
+                guest.Say(NetSession.LobbyChoiceMessage, JsonUtility.ToJson(new NetLobbyChoice { Class = (int)Combat.HeroClass.Mage, HasArtifact = true, Artifact = (int)Combat.ArtifactType.Wisdom, Ready = true }));
+                yield return guest.Until(() => guest.Lobby.SeatOf(1).Ready);
+                Assert.IsTrue(guest.Lobby.SeatOf(1).Ready, "its choice is taken and told back");
+                Assert.AreEqual((int)Combat.HeroClass.Mage, NetSession.Current.Lobby.SeatOf(1).Class, "the host has it too");
+
+                using (var twin = new WireGuest(port, "lobby-guest", "Двійник"))
+                {
+                    yield return twin.Until(() => twin.Refused != null || twin.Lobby != null);
+                    StringAssert.Contains("уже в лобі", twin.Refused, "the same machine twice is turned away");
+                }
+                guest.Say(NetSession.LobbyChoiceMessage, JsonUtility.ToJson(new NetLobbyChoice { Class = (int)Combat.HeroClass.Mage, HasArtifact = true, Artifact = (int)Combat.ArtifactType.CentralEmpire, Ready = true }));
+                yield return guest.Until(() => !string.IsNullOrEmpty(guest.Lobby.Said));
+                StringAssert.Contains("хост", guest.Lobby.Said, "told why the empire was not taken");
+                Assert.AreEqual((int)Combat.ArtifactType.Wisdom, guest.Lobby.SeatOf(1).Artifact);
+            }
+            Assert.IsTrue(NetSession.HostingLobby, "the lobby stays open, its game not begun");
+        }
+
+        [Category("Slow")]
+        [UnityTest, Timeout(90000)]
+        public IEnumerator ALobbysGame_GivesTheGuestItsWorldAndHero_AndTurnsANewcomerAway()
+        {
+            const ushort port = 27796;
+            Assert.IsTrue(NetSession.HostLobby(new CampaignSetup { Seed = 777, Size = 4000f, Heroes = 10 }, null, "", port));
+            using (var guest = new WireGuest(port, "start-guest", "Гість"))
+            {
+                yield return guest.Until(() => guest.Lobby != null);
+                guest.Say(NetSession.LobbyChoiceMessage, JsonUtility.ToJson(new NetLobbyChoice { Class = (int)Combat.HeroClass.Archer, HasArtifact = true, Artifact = (int)Combat.ArtifactType.Lightning, Ready = false }));
+                yield return guest.Until(() => guest.Lobby.SeatOf(1).Class == (int)Combat.HeroClass.Archer);
+                StringAssert.Contains("Гість", NetSession.StartLobbyGame(), "not ready: it says who is waited for");
+                Assert.IsNull(NetSession.StartLobbyGame(force: true), "pressed again, it starts without waiting");
+
+                yield return guest.Until(() => guest.Welcome != null, 60f);
+                Assert.IsNotNull(guest.Welcome, "the world comes once the host's is up");
+                Assert.AreEqual(777, guest.Welcome.WorldSeed);
+                Assert.AreEqual((int)Combat.HeroClass.Archer, guest.Welcome.Class, "with the hero it chose");
+                Assert.AreEqual((int)Combat.ArtifactType.Lightning, guest.Welcome.Artifact);
+                Assert.IsTrue(guest.Welcome.HasArtifact);
+                Assert.IsFalse(NetSession.HostingLobby, "the game is on");
+                Assert.IsNotNull(Managers.GameContext.Player, "the host is in its world");
+            }
+            using (var late = new WireGuest(port, "late-guest", "Пізній"))
+            {
+                yield return late.Until(() => late.Refused != null || late.Welcome != null);
+                StringAssert.Contains("лише через лобі", late.Refused, "a new player once the game is on is turned away");
+            }
+            using (var back = new WireGuest(port, "start-guest", "Гість"))
+            {
+                yield return back.Until(() => back.Refused != null || back.Welcome != null);
+                Assert.IsNull(back.Refused, "one of the lobby comes back at any time");
+                Assert.IsNotNull(back.Welcome);
+                Assert.AreEqual((int)Combat.HeroClass.Archer, back.Welcome.Class, "its hero kept, though it had not saved yet");
+            }
+        }
+
         [Category("Slow")]
         [UnityTest, Timeout(60000)]
         public IEnumerator AGuestLeft_WithNoAnswer_IsToldSo()

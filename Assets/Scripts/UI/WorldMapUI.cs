@@ -130,7 +130,8 @@ namespace BattleOfAges.UI
                 foreach (NetPlayerAt other in session.PlayersOnMap())
                 {
                     if (other.Number == session.Number) continue;
-                    string name = other.Number == 0 ? "Хост" : "Гравець " + other.Number;
+                    string name = session.NameOf(other.Number);
+                    if (string.IsNullOrEmpty(name)) name = other.Number == 0 ? "Хост" : "Гравець " + other.Number;
                     Show(map, other.At, OtherPlayer, 13f, name, TipText.Title(name, OtherPlayer) + "\n" + Far(other.At, me));
                 }
             for (int i = used; i < pool.Count; i++) if (pool[i].Rect.gameObject.activeSelf) pool[i].Rect.gameObject.SetActive(false);

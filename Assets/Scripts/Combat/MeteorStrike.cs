@@ -34,6 +34,7 @@ namespace BattleOfAges.Combat
             MeteorStrike m = go.AddComponent<MeteorStrike>();
             m.caster = caster;
             m.spot = spot;
+            UI.GameSound.At(UI.GameSound.Kind.MeteorDrop, spot);
             return m;
         }
 
@@ -50,6 +51,7 @@ namespace BattleOfAges.Combat
         /// <summary>Hits everyone of the caster's enemies within the radius of the spot; returns how many.</summary>
         public int Impact()
         {
+            UI.GameSound.At(UI.GameSound.Kind.MeteorImpact, spot);
             if (caster == null) return 0;
             int damage = Mathf.RoundToInt(caster.AttackDamage * GameBalance.MeteorDamageFactor);
             int n = UnitSpatialGrid.QueryEnemies(spot, GameBalance.MeteorRadius, caster.Team, found);

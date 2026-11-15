@@ -35,18 +35,27 @@ namespace BattleOfAges.UI
                 source.spatialBlend = 0f;
                 source.ignoreListenerPause = true;
             }
-            source.PlayOneShot(Clip(kind), Volume(kind));
+            float vol = Volume(kind) * Managers.SettingsManager.AmbienceShare;
+            if (vol <= 0.005f) return;
+            if (kind == Kind.Alert) GameSound.Duck(1.2f);
+            source.PlayOneShot(Clip(kind), vol);
         }
 
         public static AudioClip Clip(Kind kind)
         {
             if (clips.TryGetValue(kind, out AudioClip c) && c != null) return c;
-            float[] data = Make(kind);
-            c = AudioClip.Create("Ui_" + kind, data.Length, 1, Rate, false);
-            c.SetData(data, 0);
+            c = UnityEngine.Resources.Load<AudioClip>("Audio/Ui/" + kind);
+            if (c == null)
+            {
+                float[] data = Make(kind);
+                c = AudioClip.Create("Ui_" + kind, data.Length, 1, Rate, false);
+                c.SetData(data, 0);
+            }
             clips[kind] = c;
             return c;
         }
+
+        public static float[] Synth(Kind kind) => Make(kind);
 
         private static float[] Make(Kind kind)
         {

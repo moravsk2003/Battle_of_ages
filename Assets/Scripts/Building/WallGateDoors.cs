@@ -28,7 +28,12 @@ namespace BattleOfAges.Building
             if (checkClock <= 0f)
             {
                 checkClock = CheckEvery;
-                WantsOpen = OwnNear(transform.position, GameBalance.GateOpenRadius);
+                bool open = OwnNear(transform.position, GameBalance.GateOpenRadius);
+                if (open != WantsOpen)
+                {
+                    WantsOpen = open;
+                    UI.GameSound.At(UI.GameSound.Kind.Gate, transform.position);
+                }
             }
             float target = WantsOpen ? OpenAngle : 0f;
             if (Mathf.Approximately(angle, target)) return;

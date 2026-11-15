@@ -142,6 +142,7 @@ namespace BattleOfAges.Combat
             {
                 case HeroClass.Tank:
                     health.Heal(Mathf.Max(1, Mathf.RoundToInt(health.MaxHealth * HealShare)));
+                    UI.GameSound.At(UI.GameSound.Kind.Heal, transform.position);
                     readyAt[slot] = Time.time + GameBalance.HealCooldown;
                     return true;
                 case HeroClass.Mage:
@@ -162,12 +163,23 @@ namespace BattleOfAges.Combat
                 case HeroClass.Archer:
                     if (Combat == null) return false;
                     Combat.NextShotPiercing = true; // the next arrow: x2 and on through
+                    UI.GameSound.At(UI.GameSound.Kind.PiercingShot, transform.position);
                     readyAt[slot] = Time.time + GameBalance.PierceCooldown;
                     return true;
                 case HeroClass.Dd:
                     if (Combat == null) return false;
-                    if (slot == 0) { Combat.Boost(DashFactor, GameBalance.DashSeconds); readyAt[slot] = Time.time + GameBalance.DashCooldown; }
-                    else { Combat.NextHitCritical = true; readyAt[slot] = Time.time + GameBalance.CritCooldown; }
+                    if (slot == 0)
+                    {
+                        Combat.Boost(DashFactor, GameBalance.DashSeconds);
+                        UI.GameSound.At(UI.GameSound.Kind.Dash, transform.position);
+                        readyAt[slot] = Time.time + GameBalance.DashCooldown;
+                    }
+                    else
+                    {
+                        Combat.NextHitCritical = true;
+                        UI.GameSound.At(UI.GameSound.Kind.OrderAttack, transform.position);
+                        readyAt[slot] = Time.time + GameBalance.CritCooldown;
+                    }
                     return true;
             }
             return false;
@@ -207,6 +219,7 @@ namespace BattleOfAges.Combat
                 hits++;
             }
             FireFanEffect.Spawn(transform.position + Vector3.up * 1.2f, forward, range);
+            UI.GameSound.At(UI.GameSound.Kind.FireFan, transform.position);
             return hits;
         }
 

@@ -19,7 +19,7 @@ namespace BattleOfAges.Combat
             public CombatUnit Striker;
             public HealthComponent Target;
             public int Damage;
-            public bool Bolts, Piercing;
+            public bool Bolts, Piercing, Critical;
             public float At, Reach;
             public Vector3 From;
         }
@@ -28,9 +28,9 @@ namespace BattleOfAges.Combat
         private static readonly List<(float at, System.Action act)> actions = new List<(float, System.Action)>(16);
         public static int Count => hits.Count;
 
-        public static void Add(CombatUnit striker, HealthComponent target, int damage, bool bolts, float windup, float reach, bool piercing = false)
+        public static void Add(CombatUnit striker, HealthComponent target, int damage, bool bolts, float windup, float reach, bool piercing = false, bool critical = false)
         {
-            hits.Add(new Hit { Striker = striker, Target = target, Damage = damage, Bolts = bolts, Piercing = piercing, At = Time.time + windup,
+            hits.Add(new Hit { Striker = striker, Target = target, Damage = damage, Bolts = bolts, Piercing = piercing, Critical = critical, At = Time.time + windup,
                                Reach = reach, From = striker.transform.position });
         }
 
@@ -69,7 +69,8 @@ namespace BattleOfAges.Combat
             if (h.Striker == null) { h.Target.TakeDamage(h.Damage); return; }
             if (h.Bolts) { UI.GameSound.At(UI.GameSound.Kind.Magic, h.Striker.transform.position); MageBolt.Volley(h.Striker, h.Target, h.Damage); return; }
             if (h.Striker.IsRanged) { ArrowShot.Fire(h.Striker, h.Target, h.Damage, h.Piercing); return; } // the draw is over: the arrow flies, the hit lands on arrival
-            UI.GameSound.Hit(h.Target);
+            if (h.Critical) UI.GameSound.At(UI.GameSound.Kind.CritHit, h.Target.transform.position);
+            else UI.GameSound.Hit(h.Target);
             h.Striker.DeliverHit(h.Target, h.Damage, ignoreArmor: false);
         }
 

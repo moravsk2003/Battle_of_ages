@@ -6,35 +6,117 @@ using BattleOfAges.RTS;
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// The world's sounds made in code like UiSound (no audio assets): a unit's reply when selected (by rank) and to an
-    /// order, swords, fists, bows, spells, axes, picks, hammers, a fall, a building's collapse, a fanfare. A world sound
-    /// is heard from the camera: loud by the point it looks at, quieter with distance and height, panned left or right.
-    /// A pool of 2D sources plays them; each kind has a cap of voices at once, so a mass battle drops what does not fit.
+    /// The world's sound engine: hybrid CC0 audio assets (Resources/Audio/Sfx) combined with procedural physical-modelling
+    /// DSP synthesis. Heard from the camera with distance attenuation, stereo panning, and air-absorption low-pass filtering.
+    /// Tracks battle intensity for crowd clatter and dynamic combat music, and provides audio ducking for major events.
     /// </summary>
     public static class GameSound
     {
         public enum Kind
         {
             SelectPerson, SelectWarrior, SelectKnight, SelectHero, OrderMove, OrderAttack, OrderWork,
-            Sword, Thud, Swing, BowShot, ArrowHit, Magic, Chop, Branches, Pick, Hammer, Place, Fall, Collapse, Fanfare
+            Sword, Thud, Swing, BowShot, ArrowHit, Magic, Chop, Branches, Pick, Hammer, Place, Fall, Collapse, Fanfare,
+            FireFan, MeteorDrop, MeteorImpact, Lightning, Heal, Dash, CritHit, PiercingShot, Artifact,
+            LevelUp, Promote, HeroDeath,
+            StepGrass, StepSplash, Jump,
+            AlarmBell, StandDown, Coins, Gate, ZonePaint,
+            AnimalHurt, RaiderHorn
         }
 
         public const int Rate = 44100, Variants = 3;
         /// <summary>Beyond this (metres from the camera's view point, zoom counted in) a sound is not heard.</summary>
         public const float HearRange = 90f;
-        private const int Voices = 20, PerFrame = 6;
+        private const int Voices = 24, PerFrame = 8;
 
         private static AudioSource[] pool;
+        private static AudioLowPassFilter[] poolFilter;
         private static Kind[] poolKind;
         private static readonly Dictionary<int, AudioClip> clips = new Dictionary<int, AudioClip>();
-        private static readonly float[] lastPlayed = new float[System.Enum.GetValues(typeof(Kind)).Length];
+        private static float[] lastPlayed = new float[64];
         private static readonly System.Random rng = new System.Random(); // not UnityEngine.Random: sounds do not shift the game's rolls
         private static int frame, startedThisFrame;
+        private static float duckUntil;
+        private static float battleEnergy, lastEnergyTime;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { pool = null; clips.Clear(); System.Array.Clear(lastPlayed, 0, lastPlayed.Length); }
+        private static void ResetStatics()
+        {
+            pool = null;
+            poolFilter = null;
+            clips.Clear();
+            System.Array.Clear(lastPlayed, 0, lastPlayed.Length);
+            duckUntil = 0f;
+            battleEnergy = 0f;
+            lastEnergyTime = 0f;
+        }
 
         public static bool Enabled => Application.isPlaying && !Application.isBatchMode;
+
+        /// <summary>Temporarily lowers music and ambience volume during major alerts, fanfares or explosions.</summary>
+        public static void Duck(float seconds = 1.2f)
+        {
+            if (Application.isPlaying) duckUntil = Mathf.Max(duckUntil, Time.unscaledTime + seconds);
+        }
+
+        /// <summary>Multiplier (0.6..1.0) applied to background ambience and music when a major sound ducks them.</summary>
+        public static float DuckShare => Application.isPlaying && Time.unscaledTime < duckUntil ? 0.6f : 1f;
+
+        /// <summary>How intense the fighting near the camera is right now (0..1), decaying smoothly over time.</summary>
+        public static float BattleIntensity
+        {
+            get
+            {
+                if (!Application.isPlaying) return 0f;
+                float dt = Mathf.Max(0f, Time.unscaledTime - lastEnergyTime);
+                float current = battleEnergy * Mathf.Exp(-dt * 0.85f);
+                return Mathf.Clamp01(current / 10f);
+            }
+        }
+
+        private static void AddBattleEnergy(float amount)
+        {
+            float now = Time.unscaledTime;
+            float dt = Mathf.Max(0f, now - lastEnergyTime);
+            battleEnergy = Mathf.Min(35f, battleEnergy * Mathf.Exp(-dt * 0.85f) + amount);
+            lastEnergyTime = now;
+        }
+
+        private static bool IsCombatKind(Kind k)
+        {
+            switch (k)
+            {
+                case Kind.Sword:
+                case Kind.Thud:
+                case Kind.BowShot:
+                case Kind.ArrowHit:
+                case Kind.Magic:
+                case Kind.FireFan:
+                case Kind.MeteorImpact:
+                case Kind.Lightning:
+                case Kind.CritHit:
+                case Kind.PiercingShot:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsMajorEvent(Kind k)
+        {
+            switch (k)
+            {
+                case Kind.Fanfare:
+                case Kind.MeteorImpact:
+                case Kind.Lightning:
+                case Kind.LevelUp:
+                case Kind.HeroDeath:
+                case Kind.AlarmBell:
+                case Kind.RaiderHorn:
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
         private static float Volume(Kind k)
         {
@@ -42,25 +124,32 @@ namespace BattleOfAges.UI
             {
                 case Kind.SelectPerson: case Kind.SelectWarrior: case Kind.SelectKnight: case Kind.SelectHero: return 0.45f;
                 case Kind.OrderMove: case Kind.OrderAttack: case Kind.OrderWork: return 0.4f;
-                case Kind.Branches: case Kind.Pick: return 0.22f;
-                case Kind.BowShot: case Kind.ArrowHit: case Kind.Swing: return 0.28f;
-                case Kind.Place: case Kind.Fanfare: return 0.5f;
-                case Kind.Collapse: return 0.6f;
-                default: return 0.32f;
+                case Kind.Branches: case Kind.Pick: case Kind.ZonePaint: return 0.24f;
+                case Kind.StepGrass: return 0.20f;
+                case Kind.StepSplash: case Kind.Jump: return 0.28f;
+                case Kind.BowShot: case Kind.ArrowHit: case Kind.Swing: case Kind.Dash: return 0.30f;
+                case Kind.Place: case Kind.Fanfare: case Kind.LevelUp: case Kind.Promote: case Kind.Artifact: return 0.52f;
+                case Kind.Collapse: case Kind.MeteorImpact: case Kind.Lightning: case Kind.HeroDeath: case Kind.AlarmBell: return 0.65f;
+                case Kind.FireFan: case Kind.CritHit: case Kind.PiercingShot: case Kind.Heal: case Kind.StandDown: case Kind.RaiderHorn: return 0.48f;
+                default: return 0.34f;
             }
         }
 
-        /// <summary>Voices of a kind at once (the rest of a battle's clatter is dropped).</summary>
-        private static int Cap(Kind k) => k == Kind.Sword ? 4 : k == Kind.Thud || k == Kind.BowShot || k == Kind.ArrowHit || k == Kind.Chop ? 3 : k <= Kind.OrderWork || k >= Kind.Place && k != Kind.Fall ? 1 : 2;
+        /// <summary>Voices of a kind at once (the rest of a battle's clatter is dropped and handled by the crowd layer).</summary>
+        private static int Cap(Kind k) =>
+            k == Kind.Sword ? 4 :
+            k == Kind.Thud || k == Kind.BowShot || k == Kind.ArrowHit || k == Kind.Chop ? 3 :
+            k <= Kind.OrderWork || k == Kind.Fanfare || k == Kind.LevelUp || k == Kind.HeroDeath || k == Kind.AlarmBell || k == Kind.StandDown || k == Kind.RaiderHorn ? 1 : 2;
 
         /// <summary>A sound not in the world (a reply to the player's click, a fanfare).</summary>
-        public static void Play2D(Kind kind, float volume = 1f) => Start(kind, volume, 0f);
+        public static void Play2D(Kind kind, float volume = 1f) => Start(kind, volume, 0f, 22000f);
 
         /// <summary>A sound at a point of the world, heard from the camera.</summary>
         public static void At(Kind kind, Vector3 position, float volume = 1f)
         {
-            if (!Enabled || !Hear(position, out float gain, out float pan)) return;
-            Start(kind, volume * gain, pan);
+            if (!Enabled || !Hear(position, out float gain, out float pan, out float distance)) return;
+            if (IsCombatKind(kind)) AddBattleEnergy(kind == Kind.MeteorImpact || kind == Kind.Lightning ? 4f : 1f);
+            Start(kind, volume * gain, pan, DistanceCutoff(distance));
         }
 
         /// <summary>The unit answers being selected: cloth for a person, mail for a warrior, plate for a knight, a horn for a hero.</summary>
@@ -79,6 +168,10 @@ namespace BattleOfAges.UI
         public static void Hit(HealthComponent target)
         {
             if (target == null || !Enabled) return;
+            if (target.TryGetComponent<AI.PeacefulAnimalAI>(out _))
+            {
+                At(Kind.AnimalHurt, target.transform.position, 0.85f);
+            }
             At(target.DamageReduction > 0.05f ? Kind.Sword : Kind.Thud, target.transform.position);
         }
 
@@ -95,22 +188,24 @@ namespace BattleOfAges.UI
         /// in the middle of the view, zoomed out as from farther (half the view's half-height is added); in first person
         /// from where it stands.
         /// </summary>
-        public static bool Hear(Vector3 position, out float gain, out float pan)
+        public static bool Hear(Vector3 position, out float gain, out float pan) =>
+            Hear(position, out gain, out pan, out _);
+
+        public static bool Hear(Vector3 position, out float gain, out float pan, out float distance)
         {
-            gain = 0f; pan = 0f;
+            gain = 0f; pan = 0f; distance = HearRange;
             Camera cam = Utils.ViewCamera.Current; // the map camera (not tagged MainCamera) or first person
             if (cam == null) return false;
             Transform c = cam.transform;
             Vector3 cp = c.position, fwd = c.forward;
-            float d;
             if (cam.orthographic && fwd.y < -0.1f)
             {
                 Vector3 focus = cp + fwd * ((cp.y - position.y) / -fwd.y);
                 Vector3 flat = position - focus; flat.y = 0f;
-                d = flat.magnitude + cam.orthographicSize * 0.5f;
+                distance = flat.magnitude + cam.orthographicSize * 0.5f;
             }
-            else d = Vector3.Distance(cp, position);
-            gain = Loudness(d);
+            else distance = Vector3.Distance(cp, position);
+            gain = Loudness(distance);
             if (gain < 0.02f) return false;
             Vector3 dir = position - cp; dir.y = 0f;
             if (dir.sqrMagnitude > 1e-4f) pan = Vector3.Dot(c.right, dir.normalized) * 0.6f;
@@ -124,11 +219,21 @@ namespace BattleOfAges.UI
             return u * u;
         }
 
-        private static void Start(Kind kind, float volume, float pan)
+        /// <summary>Air absorption: high frequencies roll off smoothly beyond 18 metres.</summary>
+        public static float DistanceCutoff(float distance)
         {
-            if (!Enabled || volume <= 0.01f) return;
+            float u = Mathf.Clamp01((distance - 18f) / (HearRange - 18f));
+            return Mathf.Lerp(22000f, 1900f, u * u);
+        }
+
+        private static void Start(Kind kind, float volume, float pan, float cutoffHz)
+        {
+            float sfxShare = Managers.SettingsManager.SfxShare;
+            if (!Enabled || volume * sfxShare <= 0.01f) return;
             if (Time.frameCount != frame) { frame = Time.frameCount; startedThisFrame = 0; }
-            if (startedThisFrame >= PerFrame || Time.unscaledTime - lastPlayed[(int)kind] < 0.04f) return;
+            int idx = (int)kind;
+            if (idx >= lastPlayed.Length) System.Array.Resize(ref lastPlayed, idx + 16);
+            if (startedThisFrame >= PerFrame || Time.unscaledTime - lastPlayed[idx] < 0.035f) return;
             if (pool == null || pool[0] == null) MakePool();
             int same = 0, free = -1;
             for (int i = 0; i < pool.Length; i++)
@@ -137,14 +242,21 @@ namespace BattleOfAges.UI
                 else if (free < 0) free = i;
             }
             if (free < 0 || same >= Cap(kind)) return;
+            if (IsMajorEvent(kind)) Duck(1.3f);
+
             AudioSource s = pool[free];
             poolKind[free] = kind;
             s.clip = Clip(kind, rng.Next(Variants));
-            s.volume = Mathf.Clamp01(Volume(kind) * volume);
+            s.volume = Mathf.Clamp01(Volume(kind) * volume * sfxShare);
             s.panStereo = pan;
             s.pitch = 0.93f + (float)rng.NextDouble() * 0.14f;
+            if (poolFilter != null && poolFilter[free] != null)
+            {
+                poolFilter[free].cutoffFrequency = cutoffHz;
+                poolFilter[free].enabled = cutoffHz < 20000f;
+            }
             s.Play();
-            lastPlayed[(int)kind] = Time.unscaledTime;
+            lastPlayed[idx] = Time.unscaledTime;
             startedThisFrame++;
         }
 
@@ -153,13 +265,20 @@ namespace BattleOfAges.UI
             var go = new GameObject("GameSound");
             Object.DontDestroyOnLoad(go);
             pool = new AudioSource[Voices];
+            poolFilter = new AudioLowPassFilter[Voices];
             poolKind = new Kind[Voices];
             for (int i = 0; i < Voices; i++)
             {
-                AudioSource s = go.AddComponent<AudioSource>();
+                var child = new GameObject("Voice_" + i);
+                child.transform.SetParent(go.transform, false);
+                AudioSource s = child.AddComponent<AudioSource>();
                 s.playOnAwake = false;
                 s.spatialBlend = 0f;
+                AudioLowPassFilter f = child.AddComponent<AudioLowPassFilter>();
+                f.cutoffFrequency = 22000f;
+                f.enabled = false;
                 pool[i] = s;
+                poolFilter[i] = f;
             }
         }
 
@@ -167,9 +286,15 @@ namespace BattleOfAges.UI
         {
             int key = (int)kind * 16 + variant;
             if (clips.TryGetValue(key, out AudioClip c) && c != null) return c;
-            float[] data = Synth(kind, variant);
-            c = AudioClip.Create("Sfx_" + kind + variant, data.Length, 1, Rate, false);
-            c.SetData(data, 0);
+
+            c = UnityEngine.Resources.Load<AudioClip>($"Audio/Sfx/{kind}_{variant}");
+            if (c == null && variant != 0) c = UnityEngine.Resources.Load<AudioClip>($"Audio/Sfx/{kind}_0");
+            if (c == null)
+            {
+                float[] data = Synth(kind, variant);
+                c = AudioClip.Create("Sfx_" + kind + variant, data.Length, 1, Rate, false);
+                c.SetData(data, 0);
+            }
             clips[key] = c;
             return c;
         }
@@ -184,15 +309,15 @@ namespace BattleOfAges.UI
             float[] d;
             switch (kind)
             {
-                case Kind.SelectPerson: // cloth rustle and a wooden tok
-                    d = Buf(0.22f);
-                    s.Rustle(d, 0f, 0.18f, 1800f, 0.5f);
-                    s.Modes(d, 0.015f, new[] { 380f * (1f + 0.05f * v), 1030f }, new[] { 0.6f, 0.2f }, new[] { 45f, 70f });
+                case Kind.SelectPerson: // cloth rustle and a warm wooden tok
+                    d = Buf(0.24f);
+                    s.Rustle(d, 0f, 0.19f, 1750f, 0.5f);
+                    s.Modes(d, 0.015f, new[] { 380f * (1f + 0.06f * v), 1030f }, new[] { 0.6f, 0.22f }, new[] { 42f, 65f });
                     break;
                 case Kind.SelectWarrior: // mail jingling, a leather creak
                     d = Buf(0.32f);
-                    s.Rustle(d, 0f, 0.1f, 650f, 0.35f);
-                    s.Jingle(d, 0f, 0.16f, 10, 0.5f, v);
+                    s.Rustle(d, 0f, 0.12f, 650f, 0.38f);
+                    s.Jingle(d, 0f, 0.17f, 11, 0.52f, v);
                     break;
                 case Kind.SelectKnight: // a plate clank, then mail
                     d = Buf(0.45f);
@@ -203,8 +328,8 @@ namespace BattleOfAges.UI
                 case Kind.SelectHero: // a soft clank and a rising horn call
                     d = Buf(0.62f);
                     s.Modes(d, 0f, Ratios(240f, 1f, 2.32f, 4.25f), new[] { 0.3f, 0.2f, 0.12f }, new[] { 10f, 16f, 24f });
-                    s.Horn(d, 0.03f, 0.13f, 392f * (1f + 0.03f * v), 0.45f);
-                    s.Horn(d, 0.15f, 0.45f, 587f * (1f + 0.03f * v), 0.5f);
+                    s.Horn(d, 0.03f, 0.14f, 392f * (1f + 0.03f * v), 0.48f);
+                    s.Horn(d, 0.16f, 0.44f, 587f * (1f + 0.03f * v), 0.55f, vibrato: true);
                     break;
                 case Kind.OrderMove: // two steps on earth
                     d = Buf(0.3f);
@@ -228,10 +353,10 @@ namespace BattleOfAges.UI
                 {
                     d = Buf(0.5f);
                     float f0 = 700f + 120f * v + s.Range(-40f, 40f);
-                    s.Band(d, 0f, 0.012f, 3000f, 1f, 0.7f, 250f);
-                    float[] r = Ratios(f0, 1f, 2.76f, 5.40f, 8.93f, 13.3f), a = { 0.5f, 0.45f, 0.3f, 0.2f, 0.1f }, k = { 7f, 9f, 13f, 18f, 25f };
+                    s.Band(d, 0f, 0.014f, 3200f, 1f, 0.75f, 220f);
+                    float[] r = Ratios(f0, 1f, 2.76f, 5.40f, 8.93f, 13.3f), a = { 0.52f, 0.45f, 0.32f, 0.2f, 0.12f }, k = { 7f, 9f, 13f, 18f, 25f };
                     s.Modes(d, 0f, r, a, k);
-                    s.Modes(d, 0f, Ratios(f0 * 1.004f, 1f, 2.76f), new[] { 0.3f, 0.25f }, new[] { 8f, 10f });
+                    s.Modes(d, 0f, Ratios(f0 * 1.004f, 1f, 2.76f), new[] { 0.32f, 0.25f }, new[] { 8f, 10f });
                     break;
                 }
                 case Kind.Thud: // a blow on cloth and leather
@@ -244,17 +369,11 @@ namespace BattleOfAges.UI
                     d = Buf(0.26f);
                     s.Sweep(d, 0f, 0.24f, 600f * (1f + 0.1f * v), 1800f, 1.5f, 0.7f, arch: true);
                     break;
-                case Kind.BowShot: // the string's twang and the arrow's hiss
+                case Kind.BowShot: // Karplus-Strong plucked bowstring + arrow hiss
                 {
-                    d = Buf(0.36f);
-                    float f = 165f + 15f * v;
-                    for (int i = 0; i < d.Length; i++)
-                    {
-                        float t = i / (float)Rate, ph = 2f * Mathf.PI * f * (t + 0.08f * (1f - Mathf.Exp(-t * 30f)) / 30f), x = 0f;
-                        for (int n = 1; n <= 6; n++) x += Mathf.Sin(ph * n) / n * Mathf.Exp(-t * (10f + 3f * n));
-                        d[i] += x * 0.6f * Mathf.Clamp01(t / 0.002f);
-                    }
-                    s.Sweep(d, 0.02f, 0.2f, 2500f, 1500f, 1.2f, 0.2f, arch: true);
+                    d = Buf(0.38f);
+                    s.Pluck(d, 0f, 0.28f, 155f * (1f + 0.07f * v), 0.75f, 0.988f);
+                    s.Sweep(d, 0.015f, 0.22f, 2600f, 1450f, 1.2f, 0.25f, arch: true);
                     break;
                 }
                 case Kind.ArrowHit: // an arrow thunks in
@@ -324,6 +443,131 @@ namespace BattleOfAges.UI
                         s.Band(d, at, 0.05f, s.Range(500f, 1500f), 2f, 0.5f * (1f - at), 45f);
                     }
                     break;
+                case Kind.FireFan: // roaring burst of flame and crackling embers
+                    d = Buf(0.65f);
+                    s.Low(d, 0f, 0.6f, 380f * (1f + 0.06f * v), 0.85f, 4.5f);
+                    s.Sweep(d, 0f, 0.55f, 450f, 1600f * (1f + 0.05f * v), 0.9f, 0.7f, arch: true);
+                    for (int p = 0; p < 12; p++) s.Click(d, s.Range(0.03f, 0.5f), 0.003f, 0.35f);
+                    break;
+                case Kind.MeteorDrop: // falling whistle from the sky
+                    d = Buf(0.85f);
+                    s.Sweep(d, 0f, 0.82f, 2200f * (1f + 0.05f * v), 320f, 3.5f, 0.65f, arch: true);
+                    s.Low(d, 0.2f, 0.62f, 260f, 0.5f, 3f);
+                    break;
+                case Kind.MeteorImpact: // tectonic explosion and rock shatter
+                    d = Buf(1.25f);
+                    s.Click(d, 0f, 0.008f, 0.9f);
+                    s.Drop(d, 0f, 130f * (1f + 0.06f * v), 34f, 0.95f, 3.2f);
+                    s.Low(d, 0f, 1.2f, 240f, 0.9f, 2.8f);
+                    for (int p = 0; p < 14; p++)
+                        s.Band(d, s.Range(0.02f, 0.75f), 0.06f, s.Range(450f, 1800f), 1.8f, 0.45f, 35f);
+                    break;
+                case Kind.Lightning: // sharp electric crack followed by rolling thunder
+                    d = Buf(1.1f);
+                    s.Click(d, 0f, 0.01f, 0.95f);
+                    s.Band(d, 0f, 0.14f, 3800f * (1f + 0.06f * v), 0.8f, 0.8f, 22f);
+                    s.Drop(d, 0.02f, 180f, 42f, 0.85f, 3.8f);
+                    s.Low(d, 0.04f, 1.0f, 320f * (1f + 0.05f * v), 0.8f, 3.2f);
+                    break;
+                case Kind.Heal: // warm harmonic chord and crystalline chimes
+                    d = Buf(0.7f);
+                    s.Modes(d, 0f, new[] { 523.25f * (1f + 0.03f * v), 659.25f, 783.99f, 1046.5f }, new[] { 0.4f, 0.35f, 0.3f, 0.22f }, new[] { 4.5f, 5f, 5.5f, 6.5f });
+                    s.Modes(d, 0.12f, new[] { 1567.98f * (1f + 0.04f * v), 2093f }, new[] { 0.2f, 0.15f }, new[] { 12f, 15f });
+                    break;
+                case Kind.Dash: // swift air rush and low impulse
+                    d = Buf(0.28f);
+                    s.Drop(d, 0f, 160f * (1f + 0.06f * v), 65f, 0.55f, 22f);
+                    s.Sweep(d, 0f, 0.25f, 480f, 2400f * (1f + 0.07f * v), 1.4f, 0.75f, arch: true);
+                    break;
+                case Kind.CritHit: // heavy metallic cleave and deep impact
+                {
+                    d = Buf(0.55f);
+                    float f0 = 540f * (1f + 0.06f * v);
+                    s.Click(d, 0f, 0.006f, 0.9f);
+                    s.Drop(d, 0f, 170f, 52f, 0.85f, 14f);
+                    s.Modes(d, 0f, Ratios(f0, 1f, 2.41f, 4.78f, 7.9f), new[] { 0.6f, 0.45f, 0.35f, 0.2f }, new[] { 6.5f, 8.5f, 12f, 16f });
+                    break;
+                }
+                case Kind.PiercingShot: // high-tension bowstring and supersonic whistle
+                    d = Buf(0.45f);
+                    s.Pluck(d, 0f, 0.35f, 220f * (1f + 0.06f * v), 0.8f, 0.991f);
+                    s.Sweep(d, 0.01f, 0.38f, 3800f * (1f + 0.05f * v), 1400f, 2.5f, 0.5f, arch: true);
+                    break;
+                case Kind.Artifact: // mystical resonant bell and plucked harp triad
+                    d = Buf(0.75f);
+                    s.Pluck(d, 0f, 0.65f, 440f * (1f + 0.04f * v), 0.55f, 0.994f);
+                    s.Pluck(d, 0.07f, 0.60f, 659.25f * (1f + 0.04f * v), 0.5f, 0.994f);
+                    s.Modes(d, 0.14f, new[] { 880f * (1f + 0.04f * v), 1760f, 2640f }, new[] { 0.4f, 0.25f, 0.15f }, new[] { 4f, 6f, 9f });
+                    break;
+                case Kind.LevelUp: // triumphant brass and chime flourish
+                    d = Buf(0.95f);
+                    s.Horn(d, 0f, 0.18f, 440f * (1f + 0.02f * v), 0.48f);
+                    s.Horn(d, 0.16f, 0.18f, 554.37f * (1f + 0.02f * v), 0.52f);
+                    s.Horn(d, 0.32f, 0.58f, 659.25f * (1f + 0.02f * v), 0.62f, vibrato: true);
+                    s.Pluck(d, 0.32f, 0.58f, 1318.5f, 0.35f, 0.994f);
+                    break;
+                case Kind.Promote: // armour clank and short proud horn note
+                    d = Buf(0.55f);
+                    s.Jingle(d, 0f, 0.18f, 8, 0.45f, v);
+                    s.Horn(d, 0.08f, 0.42f, 493.88f * (1f + 0.03f * v), 0.55f, vibrato: true);
+                    break;
+                case Kind.HeroDeath: // deep solemn tolling bell and low horn
+                    d = Buf(1.35f);
+                    s.Modes(d, 0f, new[] { 196f * (1f + 0.03f * v), 392f, 466.16f, 784f }, new[] { 0.65f, 0.4f, 0.3f, 0.18f }, new[] { 2.2f, 3.2f, 4.0f, 6.0f });
+                    s.Horn(d, 0.08f, 1.15f, 196f * (1f + 0.02f * v), 0.45f);
+                    break;
+                case Kind.StepGrass: // soft earth step and grass brush
+                    d = Buf(0.18f);
+                    s.Step(d, 0f, 0.85f, v);
+                    s.Rustle(d, 0.01f, 0.12f, 2400f * (1f + 0.06f * v), 0.35f);
+                    break;
+                case Kind.StepSplash: // water splash and droplets
+                    d = Buf(0.32f);
+                    s.Band(d, 0f, 0.24f, 1100f * (1f + 0.07f * v), 0.8f, 0.65f, 14f);
+                    for (int p = 0; p < 6; p++)
+                        s.Modes(d, s.Range(0.02f, 0.22f), new[] { s.Range(900f, 2400f) }, new[] { 0.25f }, new[] { 45f });
+                    break;
+                case Kind.Jump: // quick cloth rustle and springy push-off
+                    d = Buf(0.22f);
+                    s.Drop(d, 0f, 85f, 135f * (1f + 0.06f * v), 0.65f, 18f);
+                    s.Rustle(d, 0f, 0.18f, 1600f, 0.45f);
+                    break;
+                case Kind.AlarmBell: // urgent town-hall tocsin bell struck thrice
+                    d = Buf(1.3f);
+                    for (int hit = 0; hit < 3; hit++)
+                        s.Modes(d, hit * 0.36f, new[] { 520f * (1f + 0.03f * v), 1040f, 1380f, 2120f }, new[] { 0.6f, 0.38f, 0.28f, 0.16f }, new[] { 3.5f, 5f, 7f, 11f });
+                    break;
+                case Kind.StandDown: // warm descending horn call (all-clear)
+                    d = Buf(0.75f);
+                    s.Horn(d, 0f, 0.26f, 523.25f * (1f + 0.03f * v), 0.48f);
+                    s.Horn(d, 0.24f, 0.46f, 392f * (1f + 0.03f * v), 0.52f);
+                    break;
+                case Kind.Coins: // clinking gold coins
+                    d = Buf(0.38f);
+                    for (int c = 0; c < 5; c++)
+                        s.Modes(d, c * 0.055f + s.Range(0f, 0.015f), new[] { (2800f + c * 320f) * (1f + 0.04f * v), 5800f + c * 410f }, new[] { 0.45f, 0.28f }, new[] { 28f, 42f });
+                    break;
+                case Kind.Gate: // heavy timber creak and iron latch
+                    d = Buf(0.55f);
+                    s.Sweep(d, 0f, 0.42f, 260f * (1f + 0.06f * v), 180f, 4f, 0.55f, arch: true);
+                    s.Drop(d, 0.38f, 110f, 58f, 0.7f, 18f);
+                    s.Modes(d, 0.38f, new[] { 420f, 980f }, new[] { 0.4f, 0.25f }, new[] { 24f, 36f });
+                    break;
+                case Kind.ZonePaint: // soft parchment brush and wooden peg tap
+                    d = Buf(0.18f);
+                    s.Rustle(d, 0f, 0.14f, 2100f * (1f + 0.06f * v), 0.45f);
+                    s.Modes(d, 0.04f, new[] { 620f * (1f + 0.05f * v), 1480f }, new[] { 0.45f, 0.2f }, new[] { 55f, 75f });
+                    break;
+                case Kind.AnimalHurt: // low guttural boar/beast grunt
+                    d = Buf(0.32f);
+                    s.Horn(d, 0f, 0.26f, 115f * (1f + 0.08f * v), 0.55f);
+                    s.Band(d, 0f, 0.26f, 340f * (1f + 0.06f * v), 1.8f, 0.6f, 12f);
+                    break;
+                case Kind.RaiderHorn: // low menacing war-horn blast
+                    d = Buf(0.95f);
+                    s.Horn(d, 0f, 0.88f, 146.83f * (1f + 0.04f * v), 0.7f, vibrato: true);
+                    s.Low(d, 0f, 0.5f, 220f, 0.35f, 4f);
+                    break;
                 default: // Fanfare: three rising notes on a brass horn
                     d = Buf(1.15f);
                     s.Horn(d, 0f, 0.17f, 392f * (1f + 0.02f * v), 0.5f);
@@ -344,9 +588,15 @@ namespace BattleOfAges.UI
             return f;
         }
 
-        /// <summary>A 1 ms fade in and 5 ms out (no clicks), then the peak to 0.9.</summary>
+        /// <summary>Subtle early-reflection ambience, 1 ms fade-in and 5 ms fade-out (no clicks), normalized to peak 0.9.</summary>
         public static void Finish(float[] d)
         {
+            int tap1 = (int)(0.017f * Rate), tap2 = (int)(0.031f * Rate);
+            for (int i = d.Length - 1; i >= tap1; i--)
+            {
+                float echo = d[i - tap1] * 0.14f + (i >= tap2 ? d[i - tap2] * 0.07f : 0f);
+                d[i] += echo;
+            }
             int fin = Mathf.Min(44, d.Length), fout = Mathf.Min(220, d.Length);
             for (int i = 0; i < fin; i++) d[i] *= i / (float)fin;
             for (int i = 0; i < fout; i++) d[d.Length - 1 - i] *= i / (float)fout;
@@ -384,7 +634,7 @@ namespace BattleOfAges.UI
         }
 
         /// <summary>The building blocks the sounds are mixed from, each added into the buffer from a start time.</summary>
-        private sealed class Gen
+        public sealed class Gen
         {
             private readonly System.Random r;
             public Gen(int seed) { r = new System.Random(seed); }
@@ -392,6 +642,26 @@ namespace BattleOfAges.UI
             public float Range(float a, float b) => a + (float)r.NextDouble() * (b - a);
 
             private static int From(float t) => Mathf.Max(0, (int)(t * Rate));
+
+            /// <summary>Karplus-Strong plucked string physical model (bowstring, lute, harp).</summary>
+            public void Pluck(float[] d, float start, float length, float f, float amp, float damping = 0.992f)
+            {
+                int period = Mathf.Max(4, Mathf.RoundToInt(Rate / Mathf.Max(40f, f)));
+                float[] ring = new float[period];
+                for (int i = 0; i < period; i++) ring[i] = Noise();
+                int s0 = From(start), n = Mathf.Min(d.Length, s0 + (int)(length * Rate));
+                int p = 0;
+                float prev = ring[period - 1];
+                for (int i = s0; i < n; i++)
+                {
+                    float cur = ring[p];
+                    float next = (cur + prev) * 0.5f * damping;
+                    prev = cur;
+                    ring[p] = next;
+                    if (++p >= period) p = 0;
+                    d[i] += cur * amp;
+                }
+            }
 
             /// <summary>Struck modes: sines with their own amplitudes and decays (a bell, a blade, a plank).</summary>
             public void Modes(float[] d, float start, float[] f, float[] a, float[] k)

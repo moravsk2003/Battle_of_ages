@@ -61,6 +61,9 @@ namespace BattleOfAges.UI
         private RectTransform joinPanel;
         private InputField joinAddress;
         private Text joinStatus;
+        private CampaignSetupUI networkCampaign;
+        private LobbyUI lobby;
+        private bool joining;
 
         private void ShowJoin(bool show)
         {
@@ -69,33 +72,72 @@ namespace BattleOfAges.UI
             if (show) joinStatus.text = "";
         }
 
-        /// <summary>To a host by its address: the world comes from it once it answers.</summary>
+        /// <summary>To a host by its address: its lobby comes once it answers (or the world, to one coming back to a game on).</summary>
         private void JoinGame()
         {
             string address = joinAddress.text.Trim();
             if (string.IsNullOrEmpty(address)) { joinStatus.text = "Вкажіть адресу хоста"; return; }
             Net.NetSession.Failed -= OnJoinFailed;
             Net.NetSession.Failed += OnJoinFailed;
-            if (Net.NetSession.Join(address)) joinStatus.text = "З'єднання…";
-            else joinStatus.text = "Адреса не схожа на IP, наприклад 192.168.0.5";
+            joining = Net.NetSession.Join(address);
+            joinStatus.text = joining ? "З'єднання…" : "Адреса не схожа на IP, наприклад 192.168.0.5";
         }
 
         private void OnJoinFailed(string why)
         {
+            joining = false;
             if (joinStatus != null) joinStatus.text = why;
         }
 
         private void OnDestroy() => Net.NetSession.Failed -= OnJoinFailed;
 
+        private void Update()
+        {
+            // A guest in: to the lobby (one coming back to a game on goes straight into the world instead)
+            Net.NetSession s = Net.NetSession.Current;
+            if (joining && s != null && s.Seated) { joining = false; ShowLobby(); }
+        }
+
+        /// <summary>A lobby of one's own: a new network campaign's choices, or a save (§14.4).</summary>
+        private void HostLobby(CampaignSetup setup, SaveData save, string saveName)
+        {
+            networkCampaign.Panel.gameObject.SetActive(false);
+            if (!Net.NetSession.HostLobby(setup, save, saveName)) { ShowJoin(true); joinStatus.text = $"Порт {Net.NetLink.DefaultPort} зайнятий"; return; }
+            ShowLobby();
+        }
+
+        private void HostFromSave()
+        {
+            SaveSlotsUI.OpenToPick(slot =>
+            {
+                SaveData d = SaveSystem.ReadSlot(slot);
+                if (d == null) { joinStatus.text = "Збереження не читається"; return; }
+                HostLobby(null, d, SaveSystem.SlotName(slot));
+            });
+        }
+
+        private void ShowLobby()
+        {
+            menu.gameObject.SetActive(false);
+            joinPanel.gameObject.SetActive(false);
+            lobby.Open();
+        }
+
+        private void LobbyClosed(string why)
+        {
+            ShowJoin(true);
+            joinStatus.text = why ?? "";
+        }
+
         private void BuildJoinPanel(RectTransform root)
         {
-            joinPanel = UiTheme.Rect(root, "Join", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(640f, 360f));
+            joinPanel = UiTheme.Rect(root, "Join", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(640f, 490f));
             UiTheme.PanelImage(joinPanel);
             PopIn.On(joinPanel);
             UiTheme.Label(UiTheme.Rect(joinPanel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(560f, 44f)), "Text", "Гра в мережі", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.Divider(joinPanel, -66f, 400f);
             Text hint = UiTheme.Label(UiTheme.Rect(joinPanel, "Hint", new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(580f, 56f)), "Text",
-                "Адреса хоста. Хост відкриває свою гру в меню паузи й бачить там свою адресу. У вас буде своє королівство в його світі.", 16, TextAnchor.UpperCenter, UiTheme.InkDim);
+                "Адреса хоста: він бачить її у своєму лобі. Ви потрапите в лобі, оберете героя, а гра почнеться, коли хост натисне «Почати».", 16, TextAnchor.UpperCenter, UiTheme.InkDim);
             hint.horizontalOverflow = HorizontalWrapMode.Wrap;
 
             RectTransform f = UiTheme.Rect(joinPanel, "Address", new Vector2(0.5f, 1f), new Vector2(0f, -170f), new Vector2(380f, 46f));
@@ -109,9 +151,21 @@ namespace BattleOfAges.UI
             joinAddress.characterLimit = 45;
 
             joinStatus = UiTheme.Label(UiTheme.Rect(joinPanel, "Status", new Vector2(0.5f, 1f), new Vector2(0f, -218f), new Vector2(580f, 30f)), "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Bad);
-            UiTheme.TextButton(joinPanel, "JoinNow", "Приєднатися", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), JoinGame, 20);
-            UiTheme.TextButton(joinPanel, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(-130f, 26f), new Vector2(230f, 56f), () => { Net.NetSession.Stop(); ShowJoin(false); }, 20);
+            UiTheme.TextButton(joinPanel, "JoinNow", "Приєднатися", new Vector2(0.5f, 1f), new Vector2(0f, -270f), new Vector2(300f, 52f), JoinGame, 20);
+
+            UiTheme.Divider(joinPanel, -312f, 400f);
+            UiTheme.Label(UiTheme.Rect(joinPanel, "HostHint", new Vector2(0.5f, 1f), new Vector2(0f, -334f), new Vector2(580f, 28f)), "Text",
+                "Або створіть гру самі, і інші зайдуть до вас:", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            UiTheme.TextButton(joinPanel, "HostNew", "Нова кампанія", new Vector2(0.5f, 1f), new Vector2(-150f, -378f), new Vector2(280f, 52f),
+                               () => { joinPanel.gameObject.SetActive(false); networkCampaign.Panel.gameObject.SetActive(true); }, 19);
+            UiTheme.TextButton(joinPanel, "HostSave", "Зі збереження", new Vector2(0.5f, 1f), new Vector2(150f, -378f), new Vector2(280f, 52f), HostFromSave, 19);
+            UiTheme.TextButton(joinPanel, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(230f, 46f), () => { joining = false; Net.NetSession.Stop(); ShowJoin(false); }, 19);
             joinPanel.gameObject.SetActive(false);
+
+            networkCampaign = CampaignSetupUI.Build(root, () => { networkCampaign.Panel.gameObject.SetActive(false); ShowJoin(true); },
+                                                    setup => HostLobby(setup, null, ""));
+            networkCampaign.Panel.gameObject.SetActive(false);
+            lobby = LobbyUI.Build(root, LobbyClosed);
         }
 
         private void ShowSettings(bool show)
@@ -157,21 +211,24 @@ namespace BattleOfAges.UI
             y -= 18f;
             Big(menu, "Нова гра", ref y, () => ShowCampaign(true));
             Big(menu, "Завантажити", ref y, () => SaveSlotsUI.Open(false, RefreshContinue));
-            Big(menu, "Приєднатися до гри", ref y, () => ShowJoin(true));
+            Big(menu, "Гра в мережі", ref y, () => ShowJoin(true));
             Big(menu, "Налаштування", ref y, () => ShowSettings(true));
             Big(menu, "Вихід", ref y, Quit);
 
-            settings = UiTheme.Rect(root, "Settings", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(1100f, 540f));
+            settings = UiTheme.Rect(root, "Settings", new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(1100f, 640f));
             UiTheme.PanelImage(settings);
             RectTransform st = UiTheme.Rect(settings, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(500f, 44f));
             UiTheme.Label(st, "Text", "Налаштування", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.Divider(settings, -66f, 520f);
             PopIn.On(settings);
             SettingsManager sm = SettingsManager.Instance;
-            SliderRow(settings, "Чутливість миші (від першої особи)", -90f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_SENSITIVITY, sm != null ? sm.FpsSensitivity : 1f, v => SettingsManager.Instance?.SetFpsSensitivity(v));
-            SliderRow(settings, "Чутливість камери мапи", -165f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_MAP_SENSITIVITY, sm != null ? sm.MapSensitivity : 1f, v => SettingsManager.Instance?.SetMapSensitivity(v));
-            SliderRow(settings, "Колесо миші на мапі (швидкість зуму)", -240f, SettingsManager.MIN_ZOOM_SENSITIVITY, SettingsManager.MAX_ZOOM_SENSITIVITY, sm != null ? sm.ZoomSensitivity : 1f, v => SettingsManager.Instance?.SetZoomSensitivity(v));
-            SliderRow(settings, "Гучність", -315f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MasterVolume : 1f, v => SettingsManager.Instance?.SetMasterVolume(v));
+            SliderRow(settings, "Чутливість миші (від першої особи)", -82f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_SENSITIVITY, sm != null ? sm.FpsSensitivity : 1f, v => SettingsManager.Instance?.SetFpsSensitivity(v));
+            SliderRow(settings, "Чутливість камери мапи", -148f, SettingsManager.MIN_SENSITIVITY, SettingsManager.MAX_MAP_SENSITIVITY, sm != null ? sm.MapSensitivity : 1f, v => SettingsManager.Instance?.SetMapSensitivity(v));
+            SliderRow(settings, "Колесо миші на мапі (швидкість зуму)", -214f, SettingsManager.MIN_ZOOM_SENSITIVITY, SettingsManager.MAX_ZOOM_SENSITIVITY, sm != null ? sm.ZoomSensitivity : 1f, v => SettingsManager.Instance?.SetZoomSensitivity(v));
+            SliderRow(settings, "Гучність", -280f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MasterVolume : 1f, v => SettingsManager.Instance?.SetMasterVolume(v));
+            SliderRow(settings, "Музика", -346f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MusicVolume : 0.85f, v => SettingsManager.Instance?.SetMusicVolume(v));
+            SliderRow(settings, "Ефекти світу", -412f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.SfxVolume : 1f, v => SettingsManager.Instance?.SetSfxVolume(v));
+            SliderRow(settings, "Оточення та інтерфейс", -478f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.AmbienceVolume : 0.9f, v => SettingsManager.Instance?.SetAmbienceVolume(v));
             OptionRow(settings, "Графіка", -86f, () => GraphicsQuality.Names[(int)GraphicsQuality.Current], GraphicsQuality.Cycle);
             OptionRow(settings, "Масштаб інтерфейсу", -136f, () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
             OptionRow(settings, "Повний екран", -186f, () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);

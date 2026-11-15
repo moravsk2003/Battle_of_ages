@@ -284,6 +284,9 @@ namespace BattleOfAges.SaveLoad
 
         // ------------------------------------------------------------------ load / new game
 
+        /// <summary>A slot's save, read but not started (a lobby is opened from it); null if there is none.</summary>
+        public static SaveData ReadSlot(int slot) => Read(slot);
+
         public static bool Load(int slot)
         {
             SaveData d = Read(slot);
@@ -316,7 +319,7 @@ namespace BattleOfAges.SaveLoad
         public static void NewGame(CampaignSetup setup)
         {
             WorldIds.Reset(1);
-            if (!Net.NetSession.IsGuest) Net.GuestBook.Clear();
+            if (!Net.NetSession.Active) Net.GuestBook.Clear(); // (a lobby's game keeps the guests it was started with)
             setup = setup ?? new CampaignSetup();
             startingSetup = setup;
             pending = null;

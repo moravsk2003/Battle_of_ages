@@ -73,6 +73,7 @@ namespace BattleOfAges.UI
             if (take == Good.Wood) rm.AddResource(ResourceType.Wood, takeAmount);
             else if (take == Good.Food) rm.AddFood(takeAmount);
             else rm.AddOre(0, takeAmount);
+            GameSound.Play2D(GameSound.Kind.Coins);
             return true;
         }
 

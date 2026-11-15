@@ -118,6 +118,7 @@ namespace BattleOfAges.Combat
             if (isShard) bag.AddShard(type);
             else bag.Add(type);
             HeroClass cls = bag.TryGetComponent(out HeroProgress bearer) ? bearer.Class : HeroClass.None;
+            UI.GameSound.At(UI.GameSound.Kind.Artifact, transform.position);
             UI.StrategyHud.Notify(isShard ? $"Осколок: {Artifacts.Name(type, cls)}" : $"Артефакт: {Artifacts.Name(type, cls)}");
             Destroy(gameObject);
         }

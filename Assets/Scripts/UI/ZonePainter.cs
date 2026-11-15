@@ -149,6 +149,7 @@ namespace BattleOfAges.UI
                 changed += ZoneMap.Paint(Vector3.Lerp(from, to, i / (float)steps), radius, type, out string why);
                 if (why != null) refused = why;
             }
+            if (changed > 0) GameSound.Play2D(GameSound.Kind.ZonePaint, 0.55f);
             return changed;
         }
 

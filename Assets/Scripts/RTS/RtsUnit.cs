@@ -380,6 +380,7 @@ namespace BattleOfAges.RTS
         private void Update()
         {
             if (health != null && !health.IsAlive) return; // fallen units neither walk nor fight
+            if (InsideMine) return; // inside a mine: does not walk or step aside outside
             if (!combatUnitChecked) { combatUnit = GetComponent<CombatUnit>(); combatUnitChecked = true; }
             if (wallState == WallState.ToStairs && FlatDistance(transform.position, wallPath[0]) < 1.2f) { wallState = WallState.Climbing; wallLeg = 0; hasTarget = false; }
             if (wallState >= WallState.Climbing) { UpdateOnWall(); return; }

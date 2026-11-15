@@ -55,6 +55,7 @@ namespace BattleOfAges.Combat
             if (InInterregnum || IsGameOver) return;
             interregnumLeft = GameBalance.InterregnumSeconds;
             SetControl(false);
+            UI.GameSound.Play2D(UI.GameSound.Kind.HeroDeath);
             HeroDied?.Invoke(this, transform.position);
             Desert(OwnUnits(), TownHallPosition());
         }

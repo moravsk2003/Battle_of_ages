@@ -114,10 +114,11 @@ namespace BattleOfAges.Combat
             int finalDamage = ItemStatCalculator.CalculateDamageWithHighGround(
                 attackDamage, transform.position.y, target.transform.position.y);
             if (OnWall) finalDamage = Mathf.RoundToInt(finalDamage * (1f + Building.Fortifications.DamageBonus)); // the walls' level
-            if (NextHitCritical) { finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); NextHitCritical = false; } // the DD's Critical hit
+            bool critical = NextHitCritical;
+            if (critical) { finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.CritMultiplier); NextHitCritical = false; } // the DD's Critical hit
             bool piercing = NextShotPiercing && IsRanged && !FiresBolts;
             if (piercing) { NextShotPiercing = false; finalDamage = Mathf.RoundToInt(finalDamage * GameBalance.PierceShotMultiplier); }
-            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, AttackRange, piercing);
+            PendingHits.Add(this, target, finalDamage, FiresBolts, windup, AttackRange, piercing, critical);
 
             TriggerAttackAnimation();
             return true;

@@ -19,6 +19,7 @@ namespace BattleOfAges.Combat
 
         public static void Show(Vector3 target)
         {
+            UI.GameSound.At(UI.GameSound.Kind.Lightning, target);
             if (!Application.isPlaying) return;
             Material look = RuntimeShaders.UnlitMaterial(new Color(0.75f, 0.85f, 1f));
             if (look == null) return; // without its shader nothing to draw

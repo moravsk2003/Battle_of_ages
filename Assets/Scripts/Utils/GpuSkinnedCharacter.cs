@@ -89,6 +89,11 @@ namespace BattleOfAges.Utils
             if (!Eligible()) { rejected = true; Destroy(this); return false; }
             animator.keepAnimatorStateOnDisable = true;
             lod = GetComponent<SkinnedMeshLod>();
+            if (hidden)
+            {
+                if (lod != null) lod.SetHidden(true);
+                body.enabled = false;
+            }
             footIK = animator.GetComponent<FootIK>();
             driver = GetComponentInChildren<CharacterAnimationDriver>();
             combat = GetComponentInParent<CombatUnit>();
@@ -260,6 +265,7 @@ namespace BattleOfAges.Utils
                 if (gpuRenderer != null) gpuRenderer.enabled = shown = false;
                 animator.enabled = true;
                 if (footIK != null) footIK.enabled = true;
+                if (lod != null) lod.SetHidden(hidden);
                 body.enabled = !hidden;
                 if (lod != null) lod.enabled = true; // re-picks its mesh and hides specks
                 if (driver != null) { driver.SetFar(false, dead); driver.Resync(dead); }
@@ -274,7 +280,14 @@ namespace BattleOfAges.Utils
         public void SetHidden(bool value)
         {
             hidden = value;
-            if (!ready) return;
+            if (lod == null) lod = GetComponent<SkinnedMeshLod>();
+            if (lod != null) lod.SetHidden(value);
+            if (!ready)
+            {
+                SkinnedMeshRenderer b = GetComponentInChildren<SkinnedMeshRenderer>(true);
+                if (b != null) b.enabled = !value;
+                return;
+            }
             if (IsFar) { body.enabled = false; if (gpuRenderer != null) gpuRenderer.enabled = shown = !hidden && !speck; }
             else { if (gpuRenderer != null) gpuRenderer.enabled = shown = false; if (lod == null) body.enabled = !hidden; }
         }

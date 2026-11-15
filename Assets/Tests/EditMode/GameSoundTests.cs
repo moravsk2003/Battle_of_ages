@@ -69,6 +69,83 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void DistanceCutoff_MufflesHighFrequenciesWithDistance()
+        {
+            Assert.AreEqual(22000f, GameSound.DistanceCutoff(0f), 1f);
+            Assert.AreEqual(22000f, GameSound.DistanceCutoff(18f), 1f);
+            float mid = GameSound.DistanceCutoff(50f);
+            float far = GameSound.DistanceCutoff(GameSound.HearRange);
+            Assert.Less(mid, 22000f);
+            Assert.Less(far, mid);
+            Assert.GreaterOrEqual(far, 1400f);
+        }
+
+        [Test]
+        public void Ambience_NightAndProximityLoops_AndOwls_AreValid()
+        {
+            Assert.IsFalse(Ambience.IsNight(12f));
+            Assert.IsTrue(Ambience.IsNight(22f));
+            Assert.IsTrue(Ambience.IsNight(3f));
+
+            float[][] loops =
+            {
+                Ambience.Crickets(4f, 22),
+                Ambience.Water(4f, 33),
+                Ambience.Campfire(4f, 44),
+                Ambience.BattleClatter(4f, 55)
+            };
+            foreach (float[] loop in loops)
+            {
+                Assert.AreEqual(4 * GameSound.Rate, loop.Length);
+                double sum = 0;
+                foreach (float x in loop)
+                {
+                    Assert.IsFalse(float.IsNaN(x) || float.IsInfinity(x));
+                    sum += x * x;
+                }
+                Assert.Greater(Math.Sqrt(sum / loop.Length), 0.02);
+            }
+
+            for (int s = 70; s < 73; s++)
+            {
+                float[] owl = Ambience.Owl(s);
+                Assert.Greater(owl.Length, GameSound.Rate / 2);
+                Assert.Less(Mathf.Abs(owl[owl.Length - 1]), 0.01f);
+            }
+        }
+
+        [Test]
+        public void GameMusic_Synth_ProducesValidLoopsForEveryMood()
+        {
+            foreach (GameMusic.Mood mood in Enum.GetValues(typeof(GameMusic.Mood)))
+            {
+                float[] d = GameMusic.Synth(mood);
+                Assert.AreEqual(8 * GameSound.Rate, d.Length, mood + ": length");
+                double sum = 0;
+                float peak = 0f;
+                foreach (float x in d)
+                {
+                    Assert.IsFalse(float.IsNaN(x) || float.IsInfinity(x), mood + ": NaN/Inf");
+                    peak = Mathf.Max(peak, Mathf.Abs(x));
+                    sum += x * x;
+                }
+                Assert.AreEqual(0.85f, peak, 0.02f, mood + ": peak");
+                Assert.Greater(Math.Sqrt(sum / d.Length), 0.03, mood + ": RMS");
+            }
+        }
+
+        [Test]
+        public void UiSound_EveryKind_IsAudibleAndEndsQuietly()
+        {
+            foreach (UiSound.Kind kind in Enum.GetValues(typeof(UiSound.Kind)))
+            {
+                float[] d = UiSound.Synth(kind);
+                Assert.Greater(d.Length, GameSound.Rate / 40, kind + ": length");
+                Assert.Less(Mathf.Abs(d[d.Length - 1]), 0.01f, kind + ": ends quietly");
+            }
+        }
+
+        [Test]
         public void DumpToWav_WhenAsked()
         {
             string dir = Environment.GetEnvironmentVariable("SFX_DUMP");

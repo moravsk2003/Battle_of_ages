@@ -89,6 +89,7 @@ namespace BattleOfAges.Building
                 if (Good == CaravanGood.Wood) stock.AddResource(ResourceType.Wood, Amount);
                 else if (Good == CaravanGood.Food) stock.AddFood(Amount);
                 else stock.AddOre(0, Amount);
+                UI.GameSound.At(UI.GameSound.Kind.Coins, hall.transform.position);
             }
             Destroy(gameObject);
         }
@@ -131,6 +132,7 @@ namespace BattleOfAges.Building
             Vector3 toward = to.transform.position - from.transform.position;
             toward.y = 0f;
             Caravan.Create(from.transform.position + toward.normalized * 8f, from, to, good, amount);
+            UI.GameSound.At(UI.GameSound.Kind.Coins, from.transform.position);
             lastSent[(from, to)] = WorldClock.GameHours;
             return true;
         }

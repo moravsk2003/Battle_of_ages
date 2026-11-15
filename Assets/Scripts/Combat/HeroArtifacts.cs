@@ -82,6 +82,7 @@ namespace BattleOfAges.Combat
             ArtifactType a = shards[0], b = shards[1];
             shards.RemoveRange(0, 2);
             Add(UnityEngine.Random.value < 0.5f ? a : b);
+            UI.GameSound.Play2D(UI.GameSound.Kind.Artifact);
             return true;
         }
 
@@ -95,6 +96,7 @@ namespace BattleOfAges.Combat
             {
                 hp.Heal(hp.MaxHealth);
                 hp.InvulnerableUntil = Time.time + GameBalance.FullHealInvulnerableSeconds; // and a moment nothing hurts
+                UI.GameSound.At(UI.GameSound.Kind.Heal, transform.position);
             }
             else
             {

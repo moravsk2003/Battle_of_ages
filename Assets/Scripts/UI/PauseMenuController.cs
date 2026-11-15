@@ -41,6 +41,9 @@ namespace BattleOfAges.UI
         private readonly Dictionary<KeyAction, Text> keybindButtonTexts = new Dictionary<KeyAction, Text>();
         private GameObject keybindsContainerObj;
         private Slider zoomSlider;
+        private Slider musicSlider;
+        private Slider sfxSlider;
+        private Slider ambienceSlider;
 
         private void Awake()
         {
@@ -81,7 +84,6 @@ namespace BattleOfAges.UI
             Vector2 at = settings.anchoredPosition;
             AddPauseButton("SaveButton", "Зберегти", at += step, () => SaveSlotsUI.Open(true));
             AddPauseButton("LoadButton", "Завантажити", at += step, () => SaveSlotsUI.Open(false));
-            AddPauseButton("OpenGameButton", "Відкрити гру в мережі", at += step, OpenGame);
             AddPauseButton("MainMenuButton", "Головне меню", at += step, SaveSystem.ToMainMenu);
             if (quitButton != null) ((RectTransform)quitButton.transform).anchoredPosition = at + step;
 
@@ -92,14 +94,6 @@ namespace BattleOfAges.UI
             RectTransform window = UiTheme.Rect(resume.parent, "PauseWindow", new Vector2(0.5f, 0.5f), new Vector2(0f, (top + bottom) * 0.5f), new Vector2(resume.rect.width + 140f, top - bottom));
             UiTheme.PanelImage(window).raycastTarget = false;
             window.SetAsFirstSibling();
-        }
-
-        /// <summary>Lets others in: says the address to give them.</summary>
-        private static void OpenGame()
-        {
-            if (Net.NetSession.IsGuest) { StrategyHud.Notify("Ви в чужій грі"); return; }
-            if (Net.NetSession.IsHost) { StrategyHud.Notify($"Гру вже відкрито: {Net.NetSession.AddressLine()}"); return; }
-            StrategyHud.Notify(Net.NetSession.Host() ? $"Гру відкрито: {Net.NetSession.AddressLine()}" : $"Порт {Net.NetLink.DefaultPort} зайнятий");
         }
 
         private void AddPauseButton(string name, string text, Vector2 position, UnityEngine.Events.UnityAction onClick)
@@ -154,7 +148,29 @@ namespace BattleOfAges.UI
                 volumeSlider.maxValue = SettingsManager.MAX_VOLUME;
                 volumeSlider.value = SettingsManager.Instance.MasterVolume;
                 volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+                AddAudioSliders();
             }
+        }
+
+        private void AddAudioSliders()
+        {
+            if (settingsPanel == null || musicSlider != null) return;
+            musicSlider = CloneVolumeSlider("MusicSlider", SettingsManager.Instance.MusicVolume, v => SettingsManager.Instance?.SetMusicVolume(v));
+            sfxSlider = CloneVolumeSlider("SfxSlider", SettingsManager.Instance.SfxVolume, v => SettingsManager.Instance?.SetSfxVolume(v));
+            ambienceSlider = CloneVolumeSlider("AmbienceSlider", SettingsManager.Instance.AmbienceVolume, v => SettingsManager.Instance?.SetAmbienceVolume(v));
+        }
+
+        private Slider CloneVolumeSlider(string sliderName, float initialValue, UnityEngine.Events.UnityAction<float> onChanged)
+        {
+            GameObject go = Instantiate(volumeSlider.gameObject, settingsPanel.transform);
+            go.name = sliderName;
+            Slider s = go.GetComponent<Slider>();
+            s.onValueChanged = new Slider.SliderEvent();
+            s.minValue = SettingsManager.MIN_VOLUME;
+            s.maxValue = SettingsManager.MAX_VOLUME;
+            s.value = initialValue;
+            s.onValueChanged.AddListener(onChanged);
+            return s;
         }
 
         /// <summary>The map's wheel zoom speed: a copy of the map slider (BuildSettingsWindow puts it in its row).</summary>
@@ -353,7 +369,12 @@ namespace BattleOfAges.UI
             SliderRow(control, row++, "Перетяг мапи", mapSensSlider, v => v.ToString("0.0"));
             SliderRow(control, row, "Зум колесом на мапі", zoomSlider, v => v.ToString("0.0"));
 
-            SliderRow(SettingsTab(win, "Звук", 1), 0, "Гучність", volumeSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+            RectTransform sound = SettingsTab(win, "Звук", 1);
+            int sRow = 0;
+            SliderRow(sound, sRow++, "Гучність", volumeSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+            SliderRow(sound, sRow++, "Музика", musicSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+            SliderRow(sound, sRow++, "Ефекти світу", sfxSlider, v => Mathf.RoundToInt(v * 100f) + "%");
+            SliderRow(sound, sRow, "Оточення та інтерфейс", ambienceSlider, v => Mathf.RoundToInt(v * 100f) + "%");
 
             Transform screen = ScrollList(SettingsTab(win, "Графіка", 2));
             CreateGraphicsRow(screen);
