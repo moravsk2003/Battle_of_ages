@@ -182,7 +182,8 @@ namespace BattleOfAges.UI
             $"{Key(KeyAction.Equipment)}: виділіть людей на мапі, клік по речі на складі дає по одній кожному. «Найкраще зі складу» — усім кращу броню. Кайло шахтарі беруть самі.\n\n" +
             Head("Верстак і шахта") + "\n" +
             "• Верстак: робітники кують речі I–V, переплавка — 10 руди в 1 руду рівнем вище.\n" +
-            "• Шахта: люди копають усередині, носії несуть руду в скриню. Повна шахта стоїть.\n\n" +
+            "• Шахта: двоє копають усередині, носії несуть руду в скриню. Повна шахта стоїть.\n" +
+            "• Інструменти — самі: копач бере зі складу найкраще кайло, лісоруб — сокиру; хто перейшов на іншу роботу, здає свій назад.\n\n" +
             Head("Їжа") + "\n" +
             "1 на людину на день. Без неї населення не росте, а люди по одному гинуть. Робітники «Авто» йдуть у поле, коли їжі менше ніж на 3 дні.";
 
@@ -286,7 +287,8 @@ namespace BattleOfAges.UI
             $"{Key(KeyAction.Equipment)}: select people on the map, click an item in the armory to issue one each. \"Best from Armory\" equips better armor automatically. Miners take pickaxes automatically.\n\n" +
             Head("Workbench & Mine") + "\n" +
             "• Workbench: crafters forge tier I–V gear and smelt 10 ore into 1 higher-tier ore.\n" +
-            "• Mine: miners dig inside, haulers carry ore to a chest. A full mine stops producing.\n\n" +
+            "• Mine: two dig inside, haulers carry ore to a chest. A full mine stops producing.\n" +
+            "• Tools go by themselves: diggers take the best pickaxe from the store, woodcutters the axe; one moving to other work puts its tool back.\n\n" +
             Head("Food") + "\n" +
             "1 food per person per day. Without food, growth stops and villagers starve one by one. Auto workers farm when reserves drop below 3 days.";
 

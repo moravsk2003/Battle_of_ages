@@ -68,7 +68,7 @@ namespace BattleOfAges.Building
             {
                 Type = BuildingType.Mine,
                 DisplayName = "Шахта",
-                Description = "До 10 робітників копають 1 руду/с (з кайлом більше); носії несуть її в скриню",
+                Description = "Двоє робітників копають по 1 руді/с (з кайлом більше); носії несуть її в скриню",
                 WoodCost = 8,
                 OreCost = 2,
                 OreTierRequired = 0,
@@ -157,7 +157,7 @@ namespace BattleOfAges.Building
                     break;
                 case BuildingType.Mine:
                     def.DisplayName = "Mine";
-                    def.Description = "Up to 10 workers mine 1 ore/s (more with a pickaxe); haulers carry it to a chest";
+                    def.Description = "Two workers mine 1 ore/s each (more with a pickaxe); haulers carry it to a chest";
                     break;
                 case BuildingType.Workbench:
                     def.DisplayName = "Workbench";

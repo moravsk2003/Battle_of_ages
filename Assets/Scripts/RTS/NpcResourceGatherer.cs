@@ -520,8 +520,51 @@ namespace BattleOfAges.RTS
             targetMine = null;
         }
 
+        /// <summary>
+        /// The tool this worker's job takes (null: none): a pickaxe for the mine, an axe for felling and the sawmill. The
+        /// rest (fields, benches, sites, hauling, branches, stones) take none; one standing by as a soldier keeps its own.
+        /// </summary>
+        public Crafting.ItemType? ToolWanted
+        {
+            get
+            {
+                if (assignedMine != null || currentState == GathererState.WorkingInsideMine || currentState == GathererState.MovingToMineToWork) return Crafting.ItemType.Pickaxe;
+                if (assignedPlace != null) return assignedPlace is SawmillNode ? Crafting.ItemType.Axe : (Crafting.ItemType?)null;
+                if (assignedSite != null || assignedBench != null) return null;
+                if (currentDirective == GatherDirective.WoodChopTreesOnly || currentDirective == GatherDirective.Auto) return Crafting.ItemType.Axe;
+                return null;
+            }
+        }
+
+        private float toolClock;
+
+        /// <summary>
+        /// The tool goes with the job (the author asked for a way to share tools out, 2026-11-15): one whose job takes a
+        /// tool has the best of it from the store; one whose job takes none, or another, puts its tool back in the store,
+        /// where the next miner or woodcutter takes it (a pickaxe put back goes straight to a miner without one,
+        /// GearDispenser). A sword or bow is never touched.
+        /// </summary>
+        private void KeepTheRightTool()
+        {
+            toolClock -= Time.deltaTime;
+            if (toolClock > 0f) return;
+            toolClock = ToolEvery + (GetInstanceID() & 7) * 0.1f; // (spread over the frames)
+            if (rtsUnit == null || Gear == null || Crafting.Armory.Instance == null) return;
+            Crafting.Item held = Gear[Crafting.EquipSlot.Weapon];
+            Crafting.ItemType? wanted = ToolWanted;
+            // One standing by as a soldier keeps what it holds: an axe is still better than bare hands in a fight
+            bool soldier = currentDirective == GatherDirective.Idle && assignedPlace == null && assignedSite == null && assignedBench == null && assignedMine == null;
+            if (!soldier && !held.IsEmpty && Crafting.GearDispenser.IsTool(held.Type) && held.Type != wanted && !Gear.IsLocked(Crafting.EquipSlot.Weapon))
+                Crafting.Armory.Instance.UnequipToStore(Gear, Crafting.EquipSlot.Weapon);
+            if (wanted.HasValue) Crafting.GearDispenser.GiveTool(Gear, wanted.Value);
+        }
+
+        /// <summary>How often a worker sees to its tool (seconds).</summary>
+        public const float ToolEvery = 2f;
+
         private void Update()
         {
+            KeepTheRightTool();
             // Inside a mine the worker stays hidden until the mine's "Вивести" button sends them out (LeaveMine)
             if (currentState == GathererState.WorkingInsideMine)
             {

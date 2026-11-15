@@ -49,5 +49,43 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(new Item(ItemType.Pickaxe, 1), gearB[EquipSlot.Weapon], "the one digging without took it");
             Assert.Greater(mine.OrePerSecond, before, "and digs faster");
         }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator TheTool_GoesWithTheJob_AndTheMine_TakesTwo()
+        {
+            GameObject mineObj = MineNode.CreateMinePrefab("TestMine2");
+            mineObj.transform.position = Far + new Vector3(30f, 0f, 0f);
+            spawned.Add(mineObj);
+            MineNode mine = mineObj.GetComponent<MineNode>();
+            GameObject field = Utils.ZoneBuildingBuilder.CreateField("TestToolField");
+            field.transform.position = Far + new Vector3(30f, 0f, 20f);
+            spawned.Add(field);
+            var crew = new NpcResourceGatherer[3];
+            for (int i = 0; i < crew.Length; i++)
+            {
+                GameObject w = BuildingNode.CreateWorkerNpc(Far + new Vector3(24f + i * 2f, 0f, 6f), "NPC_ToolCrew" + i);
+                spawned.Add(w);
+                crew[i] = w.GetComponent<NpcResourceGatherer>();
+            }
+            yield return null;
+            Assert.AreEqual(2, MineNode.MAX_WORKERS, "two at a time in a mine");
+            Armory.Instance.Add(new Item(ItemType.Pickaxe, 3));
+            crew[0].EnterMineNow(mine);
+            crew[1].EnterMineNow(mine);
+            crew[2].EnterMineNow(mine);
+            Assert.AreEqual(2, mine.AssignedWorkerCount, "the third does not get in");
+            Assert.IsTrue(mine.IsFullWorkers);
+            Equipment first = crew[0].GetComponent<Equipment>(), second = crew[1].GetComponent<Equipment>();
+            Assert.AreEqual(new Item(ItemType.Pickaxe, 3), first[EquipSlot.Weapon], "the first digger took the only pickaxe");
+            Assert.AreNotEqual(ItemType.Pickaxe, second[EquipSlot.Weapon].Type);
+
+            // The first goes to the field: its pickaxe goes back to the store, and on to the one digging without
+            crew[0].LeaveMine();
+            Assert.IsTrue(crew[0].AssignToPlace(field.GetComponent<WorkPlace>(), true));
+            Assert.IsNull(crew[0].ToolWanted, "a field takes no tool");
+            yield return new WaitForSeconds(NpcResourceGatherer.ToolEvery + 1.5f);
+            Assert.AreNotEqual(ItemType.Pickaxe, first[EquipSlot.Weapon].Type, "the farmer put the pickaxe back");
+            Assert.AreEqual(new Item(ItemType.Pickaxe, 3), second[EquipSlot.Weapon], "and the digger has it now");
+        }
     }
 }

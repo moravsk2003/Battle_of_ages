@@ -110,6 +110,8 @@ namespace BattleOfAges.Player
 
         /// <summary>Walks forward by itself where the hero looks: on with its key, off with it, with walking back, or on the map.</summary>
         public bool AutoWalking { get; set; }
+        /// <summary>Ran (not walked) in the last step (MoveSettings).</summary>
+        public bool Running { get; private set; } = true;
 
         private void HandleMovement(bool input)
         {
@@ -142,6 +144,8 @@ namespace BattleOfAges.Player
             {
                 speed *= BattleFront.Factor(RTS.UnitSpatialGrid.TeamPlayer, move); // the pull of a battle
                 speed *= CharacterSpeed.DirectionFactor(transform.forward, move); // back half as fast, aside 80%
+                Running = MoveSettings.Running(input && InputSystem.KeybindsManager.GetKeyHeld(InputSystem.KeyAction.RunWalk));
+                if (!Running) speed *= GameBalance.WalkFactor; // a walk: the hero's speed is its run
             }
 
             if (jumping)

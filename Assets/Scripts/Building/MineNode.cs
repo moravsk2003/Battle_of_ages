@@ -9,14 +9,14 @@ using BattleOfAges.Resources;
 namespace BattleOfAges.Building
 {
     /// <summary>
-    /// Ore Mine building component. Holds up to 10 workers, each generating 1 ore per second (tier 0..99: 80% tier 0,
+    /// Ore Mine building component. Holds up to MAX_WORKERS (2) workers, each generating 1 ore per second (tier 0..99: 80% tier 0,
     /// 18% tier I, then ten times rarer per tier) into an output buffer that haulers carry to the storage chest; the HUD label shows it and lets workers out.
     /// Supports worker assignment and hauling to storage chests.
     /// </summary>
     [DisallowMultipleComponent]
     public class MineNode : MonoBehaviour
     {
-        public const int MAX_WORKERS = 10;
+        public const int MAX_WORKERS = 2; // (the author's word, 2026-11-15: two at a time; was 10)
 
         private static readonly List<MineNode> activeMines = new List<MineNode>();
         public static IReadOnlyList<MineNode> ActiveMines => activeMines;

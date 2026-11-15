@@ -429,8 +429,8 @@ namespace BattleOfAges.UI
                 "Pick up ore pebbles from the ground and carry them to the chest.");
             CreateDirectiveButton(orders, UiTheme.Icon.House, "Носій", GatherDirective.HaulOreFromMineToChest,
                 "Носити руду з шахти", "Haul ore from the mine",
-                "Носять уже видобуту руду з шахти в скриню; самі не копають. Щоб копати в шахті — ПКМ по шахті.",
-                "Carry ore already mined from the mine to the chest; they do not dig. To dig inside a mine — RMB on the mine.",
+                "Носять уже видобуту руду з шахти в скриню; самі не копають. Щоб копати в шахті — ПКМ по шахті (місць два; кайло зі складу копачі беруть самі).",
+                "Carry ore already mined from the mine to the chest; they do not dig. To dig inside a mine — RMB on the mine (two places; diggers take a pickaxe from the store themselves).",
                 UiTheme.ItemSprite(ItemType.Pickaxe, 2));
             CreateDirectiveButton(orders, UiTheme.Icon.Worker, "Авто", GatherDirective.Auto,
                 "Самостійно", "Autonomous",
@@ -508,7 +508,9 @@ namespace BattleOfAges.UI
             UiTheme.Label(txt, "Text", "Спорядж.", 14, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             Tooltip.Set(go, () => TipText.Title(Loc.Pick("Спорядження", "Equipment"), UiTheme.Gold)
                 + Loc.Pick("\nЗброя й броня обраних зі спільного складу.  ", "\nWeapons and armor for selected units from the shared armory.  ")
-                + TipText.Key(HudTips.Key(KeyAction.Equipment)));
+                + TipText.Key(HudTips.Key(KeyAction.Equipment))
+                + "\n" + TipText.Dim(Loc.Pick("Кайла й сокири роздавати не треба: копачі й лісоруби беруть найкращі зі складу самі, інші здають їх назад.",
+                                              "No need to hand out pickaxes and axes: diggers and woodcutters take the best from the store, others put them back.")));
         }
 
         private void CreateDirectiveButton(Transform parent, UiTheme.Icon icon, string label, GatherDirective directive, string titleUk, string titleEn, string tipUk, string tipEn, Sprite spriteOverride = null)

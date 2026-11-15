@@ -181,6 +181,7 @@ namespace BattleOfAges.UI
             { "Перетяг мапи", "Map Pan Speed" },
             { "Зум колесом на мапі", "Map Wheel Zoom" },
             { "Поради «Перші кроки»", "First Steps Advisor" },
+            { "Автобіг", "Auto-Run" },
             { "сховано", "Hidden" },
             { "показано", "Shown" },
             { "Скинути клавіші", "Reset Keys" },

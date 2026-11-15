@@ -26,7 +26,9 @@ namespace BattleOfAges.InputSystem
         WorldMap,
         StopUnits,
         SelectFighters,
-        CenterSelection
+        CenterSelection,
+        /// <summary>Held: walk while auto-run is on, run while it is off (MoveSettings.AutoRun).</summary>
+        RunWalk
     }
 
     /// <summary>
@@ -58,7 +60,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.WorldMap,        KeyCode.N },
             { KeyAction.StopUnits,       KeyCode.X },
             { KeyAction.SelectFighters,  KeyCode.G },
-            { KeyAction.CenterSelection, KeyCode.L }
+            { KeyAction.CenterSelection, KeyCode.L },
+            { KeyAction.RunWalk,         KeyCode.LeftShift }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesUk = new Dictionary<KeyAction, string>
@@ -83,7 +86,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.WorldMap,        "Мапа світу" },
             { KeyAction.StopUnits,       "Обраним: стій (мапа)" },
             { KeyAction.SelectFighters,  "Обрати всіх бійців (мапа)" },
-            { KeyAction.CenterSelection, "Камера до обраних (мапа)" }
+            { KeyAction.CenterSelection, "Камера до обраних (мапа)" },
+            { KeyAction.RunWalk,         "Ходьба / біг (утримувати)" }
         };
 
         private static readonly Dictionary<KeyAction, string> actionNamesEn = new Dictionary<KeyAction, string>
@@ -108,7 +112,8 @@ namespace BattleOfAges.InputSystem
             { KeyAction.WorldMap,        "World Map" },
             { KeyAction.StopUnits,       "Stop Selected (Map)" },
             { KeyAction.SelectFighters,  "Select All Fighters (Map)" },
-            { KeyAction.CenterSelection, "Center Camera on Selected" }
+            { KeyAction.CenterSelection, "Center Camera on Selected" },
+            { KeyAction.RunWalk,         "Walk / Run (hold)" }
         };
 
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();

@@ -181,6 +181,11 @@ namespace BattleOfAges.Combat
         /// a known amount of digging (town hall V from ~100 000 mined ore to ~24 000; docs/GAME_DESIGN.md §13).
         /// </summary>
         public static int SmeltRatio = 10;
+        /// <summary>
+        /// The hero's walk against its run (Player/MoveSettings): its CharacterSpeed is the run, as the units' is (they
+        /// march and charge at it); the walk is half, as a person's walk is about half its run.
+        /// </summary>
+        public static float WalkFactor = 0.5f;
         public static float SmeltSecondsPerPiece = 1f;
         /// <summary>
         /// Wood to melt one piece of ore of this tier out of the tier below: 2 to the power of the tier (the author's word,
