@@ -8,6 +8,7 @@ using BattleOfAges.Managers;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -137,7 +138,7 @@ namespace BattleOfAges.UI
     {
         private static DevEditorUI instance;
         private GameObject window;
-        private UnityEngine.UI.Text endlessLabel, status;
+        private TMP_Text endlessLabel, status;
         private bool open;
         private float nextTopUp;
 
@@ -238,7 +239,7 @@ namespace BattleOfAges.UI
                     ? Loc.Pick("Склад тепер повний завжди", "Stores now stay full")
                     : Loc.Pick("Склад знову звичайний", "Stores back to normal");
             });
-            endlessLabel = endless.GetComponentInChildren<UnityEngine.UI.Text>();
+            endlessLabel = endless.GetComponentInChildren<TMP_Text>();
             LocText.Detach(endlessLabel);
             endlessLabel.text = EndlessText();
 

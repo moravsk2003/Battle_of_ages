@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.Combat;
 using BattleOfAges.Net;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -20,9 +21,9 @@ namespace BattleOfAges.UI
         public RectTransform Panel { get; private set; }
 
         private Action<string> closed;
-        private Text campaign, address, status, heroNote, classValue, classDescription, artifactValue, artifactDescription, readyText;
+        private TMP_Text campaign, address, status, heroNote, classValue, classDescription, artifactValue, artifactDescription, readyText;
         private RectTransform list, choicePane;
-        private InputField nameField;
+        private TMP_InputField nameField;
         private Button startButton, readyButton;
         private int shownVersion = -1;
         private bool synced, ready, closing;
@@ -143,7 +144,7 @@ namespace BattleOfAges.UI
             LocText.Detach(artifactValue);
             LocText.Detach(artifactDescription);
             LocText.Detach(readyText);
-            if (startButton != null) LocText.Detach(startButton.GetComponentInChildren<Text>());
+            if (startButton != null) LocText.Detach(startButton.GetComponentInChildren<TMP_Text>());
 
             NetSession s = NetSession.Current;
             NetLobby lobby = s != null ? s.Lobby : null;
@@ -187,7 +188,7 @@ namespace BattleOfAges.UI
             bool starting = lobby != null && lobby.Starting;
             startButton.gameObject.SetActive(host);
             startButton.interactable = lobby != null && !starting;
-            startButton.GetComponentInChildren<Text>().text = startArmedUntil > 0f ? Loc.Pick("Почати без них", "Start Anyway") : Loc.Pick("Почати", "Start");
+            startButton.GetComponentInChildren<TMP_Text>().text = startArmedUntil > 0f ? Loc.Pick("Почати без них", "Start Anyway") : Loc.Pick("Почати", "Start");
             readyButton.gameObject.SetActive(!host);
             readyButton.interactable = lobby != null && !starting;
             readyText.text = ready ? Loc.Pick("Не готовий", "Not Ready") : Loc.Pick("Готовий", "Ready");
@@ -199,21 +200,21 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(row, UiTheme.SlotSprite, seat.Here ? Color.white : new Color(0.7f, 0.7f, 0.7f));
             bool mine = seat.Number == you;
             string name = seat.Name + (mine ? Loc.Pick(" (ви)", " (you)") : "");
-            Text n = UiTheme.Label(UiTheme.Rect(row, "Name", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(170f, RowHeight)), "Text",
+            TMP_Text n = UiTheme.Label(UiTheme.Rect(row, "Name", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(170f, RowHeight)), "Text",
                                    name, 17, TextAnchor.MiddleLeft, mine ? UiTheme.Gold : seat.Here ? UiTheme.Ink : UiTheme.InkDim, mine ? FontStyle.Bold : FontStyle.Normal);
             LocText.Detach(n);
-            n.horizontalOverflow = HorizontalWrapMode.Overflow;
+            n.textWrappingMode = TextWrappingModes.NoWrap;
             string hero = seat.Returning ? (string.IsNullOrEmpty(seat.Hero) ? Loc.Pick("своє королівство", "their kingdom") : seat.Hero)
                         : HeroClassRules.Name((HeroClass)seat.Class) + (seat.HasArtifact ? " · " + Artifacts.Name((ArtifactType)seat.Artifact, (HeroClass)seat.Class) : "");
-            Text h = UiTheme.Label(UiTheme.Rect(row, "Hero", new Vector2(0f, 0.5f), new Vector2(190f, 0f), new Vector2(200f, RowHeight)), "Text",
+            TMP_Text h = UiTheme.Label(UiTheme.Rect(row, "Hero", new Vector2(0f, 0.5f), new Vector2(190f, 0f), new Vector2(200f, RowHeight)), "Text",
                           hero, 15, TextAnchor.MiddleLeft, UiTheme.InkDim);
             LocText.Detach(h);
-            h.horizontalOverflow = HorizontalWrapMode.Overflow;
+            h.textWrappingMode = TextWrappingModes.NoWrap;
             string state = seat.IsHost ? TipText.Title(Loc.Pick("хост", "host"), UiTheme.Gold)
                          : !seat.Here ? Loc.Pick("немає в грі", "offline")
                          : seat.Ready ? TipText.Good(Loc.Pick("готовий", "ready")) : Loc.Pick("обирає", "choosing");
             if (seat.Returning && seat.Here && !seat.IsHost) state = (seat.Ready ? TipText.Good(Loc.Pick("готовий", "ready")) : Loc.Pick("повертається", "returning"));
-            Text st = UiTheme.Label(UiTheme.Rect(row, "State", new Vector2(1f, 0.5f), new Vector2(mayKick && seat.Here && !seat.IsHost ? -48f : -12f, 0f), new Vector2(100f, RowHeight)), "Text",
+            TMP_Text st = UiTheme.Label(UiTheme.Rect(row, "State", new Vector2(1f, 0.5f), new Vector2(mayKick && seat.Here && !seat.IsHost ? -48f : -12f, 0f), new Vector2(100f, RowHeight)), "Text",
                           state, 15, TextAnchor.MiddleRight, UiTheme.Ink);
             LocText.Detach(st);
             if (mayKick && seat.Here && !seat.IsHost)
@@ -244,7 +245,7 @@ namespace BattleOfAges.UI
             nameField.text = NetSession.LocalName;
             nameField.onEndEdit.AddListener(v => { NetSession.LocalName = v; Send(); });
             heroNote = UiTheme.Label(UiTheme.Rect(Panel, "HeroNote", new Vector2(0.5f, 1f), new Vector2(290f, -260f), new Vector2(520f, 80f)), "Text", "", 17, TextAnchor.UpperLeft, UiTheme.Ink);
-            heroNote.horizontalOverflow = HorizontalWrapMode.Wrap;
+            heroNote.textWrappingMode = TextWrappingModes.Normal;
 
             choicePane = UiTheme.Rect(Panel, "Choice", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1f, 1f));
             classValue = Cycler(choicePane, -222f, "Клас", d => { Step(ref classIndex, LobbyHost.Classes.Length, d); });
@@ -256,7 +257,7 @@ namespace BattleOfAges.UI
             startButton = UiTheme.TextButton(Panel, "Start", "Почати", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), PressStart, 22);
             startButton.GetComponent<Image>().color = new Color(1f, 0.92f, 0.7f);
             readyButton = UiTheme.TextButton(Panel, "Ready", "Готовий", new Vector2(0.5f, 0f), new Vector2(130f, 26f), new Vector2(230f, 56f), () => { ready = !ready; Send(); RefreshButtons(NetSession.Current?.Lobby); }, 22);
-            readyText = readyButton.GetComponentInChildren<Text>();
+            readyText = readyButton.GetComponentInChildren<TMP_Text>();
             UiTheme.TextButton(Panel, "Leave", "Вийти з лобі", new Vector2(0.5f, 0f), new Vector2(-130f, 26f), new Vector2(230f, 56f), Leave, 20);
             Panel.gameObject.SetActive(false);
         }
@@ -286,34 +287,35 @@ namespace BattleOfAges.UI
         }
 
         /// <summary>A row of the hero: its name, ‹ value ›; a step is sent to the host at once.</summary>
-        private Text Cycler(RectTransform parent, float y, string label, Action<int> step)
+        private TMP_Text Cycler(RectTransform parent, float y, string label, Action<int> step)
         {
             Label(parent, y, 140f, label);
             RectTransform v = UiTheme.Rect(parent, label + "_Value", new Vector2(0.5f, 1f), new Vector2(410f, y), new Vector2(200f, 40f));
             UiTheme.PanelImage(v, UiTheme.SlotSprite);
-            Text t = UiTheme.Label(v, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            TMP_Text t = UiTheme.Label(v, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.TextButton(parent, label + "_Prev", "‹", new Vector2(0.5f, 1f), new Vector2(284f, y), new Vector2(40f, 40f), () => { step(-1); Send(); Refresh(); }, 22);
             UiTheme.TextButton(parent, label + "_Next", "›", new Vector2(0.5f, 1f), new Vector2(536f, y), new Vector2(40f, 40f), () => { step(1); Send(); Refresh(); }, 22);
             return t;
         }
 
-        private static Text Description(RectTransform parent, float y)
+        private static TMP_Text Description(RectTransform parent, float y)
         {
             RectTransform d = UiTheme.Rect(parent, "Description", new Vector2(0.5f, 1f), new Vector2(290f, y - 50f), new Vector2(520f, 100f));
-            Text t = UiTheme.Label(d, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Ink);
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            TMP_Text t = UiTheme.Label(d, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Ink);
+            t.textWrappingMode = TextWrappingModes.Normal;
             return t;
         }
 
-        private InputField NameField(Vector2 at)
+        private TMP_InputField NameField(Vector2 at)
         {
             RectTransform f = UiTheme.Rect(Panel, "NameField", new Vector2(0.5f, 1f), at, new Vector2(300f, 40f));
             UiTheme.PanelImage(f, UiTheme.SlotSprite);
-            Text text = UiTheme.Label(UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 34f)), "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
-            text.supportRichText = false;
-            Text placeholder = UiTheme.Label(UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 34f)), "Text", "ваше ім'я", 16, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
-            InputField input = f.gameObject.AddComponent<InputField>();
+            TMP_Text text = UiTheme.Label(UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 34f)), "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
+            text.richText = false;
+            TMP_Text placeholder = UiTheme.Label(UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 34f)), "Text", "ваше ім'я", 16, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
+            TMP_InputField input = f.gameObject.AddComponent<TMP_InputField>();
             input.textComponent = text;
+            input.textViewport = (RectTransform)text.transform.parent;
             input.placeholder = placeholder;
             input.characterLimit = LobbyHost.MaxNameLength;
             return input;

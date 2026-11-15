@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.SaveLoad;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -38,8 +39,8 @@ namespace BattleOfAges.UI
 
         // Keybinding Rebind UI references
         private KeyAction? activeRebindAction = null;
-        private readonly Dictionary<KeyAction, Text> keybindButtonTexts = new Dictionary<KeyAction, Text>();
-        private readonly Dictionary<KeyAction, Text> keybindLabelTexts = new Dictionary<KeyAction, Text>();
+        private readonly Dictionary<KeyAction, TMP_Text> keybindButtonTexts = new Dictionary<KeyAction, TMP_Text>();
+        private readonly Dictionary<KeyAction, TMP_Text> keybindLabelTexts = new Dictionary<KeyAction, TMP_Text>();
         private readonly List<System.Action> cycleRefreshers = new List<System.Action>();
         private GameObject keybindsContainerObj;
         private Slider zoomSlider;
@@ -63,6 +64,10 @@ namespace BattleOfAges.UI
             SetupButtonListeners();
             InitializeSliders();
             BuildSaveButtons();
+            // The menu comes from the scene (SetupPauseMenuTool): the theme's face, frames and buttons are made at run time, so
+            // it takes them here, once (it used to wait for UiRestyler's pass over every canvas)
+            UiTheme.RestyleTree(transform);
+            if (GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
 
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (settingsPanel != null) settingsPanel.SetActive(false);
@@ -72,7 +77,7 @@ namespace BattleOfAges.UI
             KeybindsManager.OnKeybindsChanged += RefreshKeybindButtonTexts;
             Loc.Changed += OnLanguageChanged;
             if (pauseMenuPanel != null)
-                foreach (Text t in pauseMenuPanel.GetComponentsInChildren<Text>(true))
+                foreach (TMP_Text t in pauseMenuPanel.GetComponentsInChildren<TMP_Text>(true))
                     LocText.Attach(t);
         }
 
@@ -110,7 +115,7 @@ namespace BattleOfAges.UI
             Button b = copy.GetComponent<Button>();
             b.onClick = new Button.ButtonClickedEvent();
             b.onClick.AddListener(onClick);
-            Text label = copy.GetComponentInChildren<Text>(true);
+            TMP_Text label = copy.GetComponentInChildren<TMP_Text>(true);
             if (label != null)
             {
                 label.text = text;
@@ -369,7 +374,7 @@ namespace BattleOfAges.UI
         {
             if (settingsPanel == null || keybindsContainerObj != null) return;
             Transform panel = settingsPanel.transform;
-            foreach (Text t in panel.GetComponentsInChildren<Text>(true))
+            foreach (TMP_Text t in panel.GetComponentsInChildren<TMP_Text>(true))
                 if (t.GetComponentInParent<Slider>(true) == null && (closeSettingsButton == null || !t.transform.IsChildOf(closeSettingsButton.transform)))
                     t.gameObject.SetActive(false);
 
@@ -460,7 +465,7 @@ namespace BattleOfAges.UI
                 bool open = i == index;
                 settingsTabs[i].page.SetActive(open);
                 settingsTabs[i].tab.color = open ? Color.white : new Color(0.62f, 0.6f, 0.58f);
-                Text label = settingsTabs[i].tab.GetComponentInChildren<Text>();
+                TMP_Text label = settingsTabs[i].tab.GetComponentInChildren<TMP_Text>();
                 if (label != null) label.color = open ? UiTheme.Gold : UiTheme.InkDim;
             }
             bool keys = index == 3;
@@ -485,7 +490,7 @@ namespace BattleOfAges.UI
             const float h = 92f;
             RectTransform r = UiTheme.Child(section, "Row_" + slider.name, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -16f - h * (index + 1)), new Vector2(-22f, -16f - h * index));
             UiTheme.Label(UiTheme.Child(r, "Name", new Vector2(0f, 0.5f), new Vector2(0.75f, 1f), Vector2.zero, Vector2.zero), "Text", title, 19, TextAnchor.MiddleLeft);
-            Text value = UiTheme.Label(UiTheme.Child(r, "Value", new Vector2(0.75f, 0.5f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero), "Text", format(slider.value), 19, TextAnchor.MiddleRight, UiTheme.Gold, FontStyle.Bold);
+            TMP_Text value = UiTheme.Label(UiTheme.Child(r, "Value", new Vector2(0.75f, 0.5f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero), "Text", format(slider.value), 19, TextAnchor.MiddleRight, UiTheme.Gold, FontStyle.Bold);
             slider.onValueChanged.AddListener(v => value.text = format(v));
 
             var st = (RectTransform)slider.transform;
@@ -558,7 +563,7 @@ namespace BattleOfAges.UI
         /// <summary>A row whose button steps through values (each click: the next one); the text follows the value.</summary>
         private void CycleRow(Transform parent, string name, string label, System.Func<string> value, System.Action next)
         {
-            Text text = null;
+            TMP_Text text = null;
             text = CreateRow(parent, name, label, () =>
             {
                 next();
@@ -571,7 +576,7 @@ namespace BattleOfAges.UI
             cycleRefreshers.Add(() => { if (text != null) text.text = value(); });
         }
 
-        private static System.Collections.IEnumerator RefreshNextFrame(Text text, System.Func<string> value)
+        private static System.Collections.IEnumerator RefreshNextFrame(TMP_Text text, System.Func<string> value)
         {
             yield return null;
             yield return null;
@@ -584,12 +589,12 @@ namespace BattleOfAges.UI
             CycleRow(parent, "Row_Graphics", "Графіка", () => GraphicsQuality.CurrentName, GraphicsQuality.Cycle);
         }
 
-        private static Text CreateRow(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
+        private static TMP_Text CreateRow(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
         {
             return CreateRowWithLabel(parent, name, label, onClick).value;
         }
 
-        private static (Text label, Text value) CreateRowWithLabel(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
+        private static (TMP_Text label, TMP_Text value) CreateRowWithLabel(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
         {
             var row = new GameObject(name, typeof(RectTransform));
             row.transform.SetParent(parent, false);
@@ -598,9 +603,9 @@ namespace BattleOfAges.UI
             var rt = (RectTransform)row.transform;
             UiTheme.PanelImage(rt, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
 
-            Text lbl = UiTheme.Label(UiTheme.Child(rt, "Label", new Vector2(0f, 0f), new Vector2(0.62f, 1f), new Vector2(14f, 0f), Vector2.zero), "Text", label, 17, TextAnchor.MiddleLeft);
+            TMP_Text lbl = UiTheme.Label(UiTheme.Child(rt, "Label", new Vector2(0f, 0f), new Vector2(0.62f, 1f), new Vector2(14f, 0f), Vector2.zero), "Text", label, 17, TextAnchor.MiddleLeft);
             Button btn = UiTheme.TextButton(rt, "KeyBtn", "", new Vector2(1f, 0.5f), new Vector2(-6f, 0f), new Vector2(180f, 36f), onClick, 17);
-            return (lbl, btn.GetComponentInChildren<Text>());
+            return (lbl, btn.GetComponentInChildren<TMP_Text>());
         }
 
         private void StartRebinding(KeyAction action)
@@ -621,7 +626,7 @@ namespace BattleOfAges.UI
             foreach (var kvp in keybindButtonTexts)
             {
                 KeyAction action = kvp.Key;
-                Text txt = kvp.Value;
+                TMP_Text txt = kvp.Value;
                 if (txt == null) continue;
 
                 if (activeRebindAction.HasValue && activeRebindAction.Value == action)

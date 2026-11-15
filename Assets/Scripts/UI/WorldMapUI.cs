@@ -10,6 +10,7 @@ using BattleOfAges.Net;
 using BattleOfAges.SaveLoad;
 using BattleOfAges.Utils;
 using BattleOfAges.World;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -31,7 +32,7 @@ namespace BattleOfAges.UI
         private GameObject window;
         private RawImage picture;
         private RectTransform marks, hero;
-        private Text list;
+        private TMP_Text list;
         private bool open;
         private float refresh;
         private readonly List<Mark> pool = new List<Mark>();
@@ -41,7 +42,7 @@ namespace BattleOfAges.UI
         {
             public RectTransform Rect;
             public Image Dot;
-            public Text Label;
+            public TMP_Text Label;
             public string Tip;
         }
 
@@ -279,9 +280,9 @@ namespace BattleOfAges.UI
             RectTransform side = UiTheme.Rect(panel, "List", new Vector2(1f, 1f), new Vector2(-18f, -66f), new Vector2(ListWidth, MapPx - 10f));
             list = UiTheme.Label(side, "Text", "", 18, TextAnchor.UpperLeft, UiTheme.Ink);
             LocText.Detach(list);
-            list.horizontalOverflow = HorizontalWrapMode.Wrap;
-            list.supportRichText = true;
-            list.lineSpacing = 1.1f;
+            list.textWrappingMode = TextWrappingModes.Normal;
+            list.richText = true;
+            list.lineSpacing = 10f; // (TextMeshPro: extra, in hundredths of an em)
         }
 
         private static Sprite heroArrow;

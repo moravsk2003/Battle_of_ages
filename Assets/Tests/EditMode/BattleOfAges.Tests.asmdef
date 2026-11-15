@@ -3,6 +3,7 @@
     "rootNamespace": "BattleOfAges.Tests",
     "references": [
         "BattleOfAges.Runtime",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

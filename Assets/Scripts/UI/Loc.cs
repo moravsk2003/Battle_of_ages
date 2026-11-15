@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -625,12 +626,12 @@ namespace BattleOfAges.UI
     [DisallowMultipleComponent]
     public sealed class LocText : MonoBehaviour
     {
-        private Text label;
+        private TMP_Text label;
         private string ukSource;
         private string lastSeenText;
         private bool updating;
 
-        public static LocText Attach(Text t)
+        public static LocText Attach(TMP_Text t)
         {
             if (t == null) return null;
             LocText lt = t.GetComponent<LocText>();
@@ -639,7 +640,7 @@ namespace BattleOfAges.UI
             return lt;
         }
 
-        public static void SetSource(Text t, string uk)
+        public static void SetSource(TMP_Text t, string uk)
         {
             if (t == null) return;
             LocText lt = Attach(t);
@@ -648,7 +649,7 @@ namespace BattleOfAges.UI
             lt.Apply();
         }
 
-        public static void Detach(Text t)
+        public static void Detach(TMP_Text t)
         {
             if (t == null) return;
             LocText lt = t.GetComponent<LocText>();
@@ -665,7 +666,7 @@ namespace BattleOfAges.UI
             label = null;
         }
 
-        private void Bind(Text t)
+        private void Bind(TMP_Text t)
         {
             if (label != null) return;
             label = t;

@@ -5,6 +5,7 @@ using BattleOfAges.Managers;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
 using InputKey = BattleOfAges.InputSystem.KeyAction;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -12,14 +13,14 @@ namespace BattleOfAges.UI
     /// Always-on strategy HUD in the UiTheme look. It owns the canvas, the resource bar (wood, ore by tier, workers,
     /// army, clock) and the mode hint at the top, the alarm banner, and on the map the alarm and idle-worker buttons;
     /// the rest are parts of their own: HudFirstPerson (crosshair, health, skills), HudMinimap, HudWorldLabels (plates
-    /// over mines and the hall, unit bars), HudToasts, Advisor, CombatFeedback. Started by UiRestyler.
+    /// over mines and the hall, unit bars), HudToasts, Advisor, CombatFeedback. Started by UiBoot.
     /// </summary>
     public sealed class StrategyHud : MonoBehaviour
     {
         private static readonly string[] Roman = { "0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X" };
 
         private RectTransform root, mode, fpGroup, rtsGroup, alarmBanner;
-        private Text woodText, oreText, foodText, workerText, armyText, clockText, modeText, alarmText, idleText;
+        private TMP_Text woodText, oreText, foodText, workerText, armyText, clockText, modeText, alarmText, idleText;
         private Button alarmButton, idleButton;
         private bool alarmShown;
         private float idleTimer;
@@ -83,7 +84,7 @@ namespace BattleOfAges.UI
             modeText = UiTheme.Label(mode, "Text", "", 19, TextAnchor.MiddleCenter, UiTheme.InkDim);
         }
 
-        private Text Entry(RectTransform parent, UiTheme.Icon icon, string name, System.Func<string> tip)
+        private TMP_Text Entry(RectTransform parent, UiTheme.Icon icon, string name, System.Func<string> tip)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -97,7 +98,7 @@ namespace BattleOfAges.UI
             var img = iconGo.AddComponent<Image>();
             img.sprite = UiTheme.IconSprite(icon); img.preserveAspect = true; img.raycastTarget = false;
             var le = iconGo.AddComponent<LayoutElement>(); le.preferredWidth = le.preferredHeight = 36f;
-            Text t = UiTheme.Label(go.transform, "Value", "0", 24, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            TMP_Text t = UiTheme.Label(go.transform, "Value", "0", 24, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
             t.gameObject.AddComponent<LayoutElement>().minWidth = 34f;
             return t;
         }
@@ -118,11 +119,11 @@ namespace BattleOfAges.UI
             float x = 18f, w = HudMinimap.FramePx, above = HudMinimap.FramePx + 30f;
             ZoneToolbar.Create(rtsGroup);
             alarmButton = UiTheme.TextButton(rtsGroup, "Alarm", "", new Vector2(0f, 0f), new Vector2(x, above), new Vector2(w, 46f), () => Net.CommandBus.Submit(new Net.ToggleAlarmCommand()), 16);
-            alarmText = alarmButton.GetComponentInChildren<Text>();
+            alarmText = alarmButton.GetComponentInChildren<TMP_Text>();
             Tooltip.Set(alarmButton.gameObject, HudTips.Alarm);
 
             idleButton = UiTheme.TextButton(rtsGroup, "IdleWorkers", "", new Vector2(0f, 0f), new Vector2(x, above + 54f), new Vector2(w, 46f), SelectNextIdle, 16);
-            idleText = idleButton.GetComponentInChildren<Text>();
+            idleText = idleButton.GetComponentInChildren<TMP_Text>();
             Tooltip.Set(idleButton.gameObject, () => TipText.Title("Робітники без діла", UiTheme.Gold)
                 + "\nМають роботу, але не знаходять, що робити (немає дерев, руди, скрині поруч)." + "\n" + TipText.Dim("Клік — наступний: виділити й показати  ") + TipText.Key(HudTips.Key(InputKey.IdleWorker)));
         }

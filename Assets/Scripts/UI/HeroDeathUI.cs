@@ -3,6 +3,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using BattleOfAges.Combat;
 using BattleOfAges.SaveLoad;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -14,7 +15,7 @@ namespace BattleOfAges.UI
     {
         private static HeroDeathUI instance;
         private GameObject banner, gameOver;
-        private Text bannerText;
+        private TMP_Text bannerText;
         private HeroSuccession watched;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]

@@ -74,6 +74,10 @@
 
 ## 5. Інтерфейс
 
+- **Текст — TextMeshPro** (`TMP_Text`, `TextMeshProUGUI`, поля вводу — `TMP_InputField`): `UiTheme.TmpFont` — системна
+  шрифтова гарнітура (Palatino / Georgia / Constantia) у динамічному атласі SDF, із запасним LiberationSans (кирилиця),
+  тінь — матеріал `UiTheme.TmpShadowed` (ефект `Shadow` uGUI на TMP не діє), `UiTheme.Align` / `Style` / `Dress`.
+  Ресурси TMP — у `Assets/TextMesh Pro` (`TmpSetupTool`: імпорт і перетворення старих `Text` у сценах).
 - **`UiTheme`** — весь вигляд: кольори, шрифт, спрайти (рамки, кнопки, слоти, іконки, курсори — малюються кодом),
   будівники (`Rect`, `Child`, `Label`, `TextButton`, `PanelImage`, `Divider`, `AddButton`), `CreateCanvas` (полотно з
   масштабом інтерфейсу). Нове вікно будується цими будівниками.
@@ -84,8 +88,9 @@
   `UiSound` (інтерфейс), `GameSound` (світ і бій), `GameMusic`, `Ambience`.
 - **Окремі вікна:** `HeroUI`, `EquipmentUI`, `WorkbenchUI`, `WorldMapUI`, `LobbyUI` (мережеве лобі), `NetPauseUI`
   (пауза для всіх, F6), `DevEditorUI` (редактор тестувальника, F8, лише одиночна гра), `HelpUI` (F1).
-- **Старі вікна** (інвентар, розподіл робіт, пауза зі сцени) зібрані без теми; `UiRestyler` один раз після завантаження
-  сцени дає їм вигляд `UiTheme`, рядки, створені пізніше, — `UiTheme.RestyleTree`. Нове так не робити.
+- **Вікна носять тему від побудови.** Меню паузи зі сцени й інвентар, зібрані частково без теми, один раз оформлюють
+  себе самі (`UiTheme.RestyleTree` на собі); загального проходу по всіх полотнах (`UiRestyler`) більше немає. `UiBoot`
+  лише ставить HUD і масштаб інтерфейсу. Нове будувати будівниками `UiTheme`.
 - Вікна — `GameWindows` (що відкрите, `BlockGameplay`, закрити все).
 
 ## 6. Тести й інструменти
@@ -142,8 +147,6 @@
 1. **Стан і показ змішані** в MonoBehaviour юнітів і будівель. Накази з інтерфейсу вже йдуть командами (`CommandBus`), стан
    королівств, армій і героїв — даними (`WorldState`), але юніт поруч і досі живе в компонентах (`GAME_DESIGN.md` §14.3).
    Нові системи (стосунки §22) робити одразу як дані + команди.
-2. Старі вікна (інвентар, розподіл робіт, пауза зі сцени) — перебудувати на будівниках `UiTheme`, тоді `UiRestyler`
-   не потрібен зовсім.
-3. Текст — старий `UnityEngine.UI.Text`; TextMeshPro дав би чіткий текст за будь-якого масштабу інтерфейсу.
-4. Великі класи: `NpcResourceGatherer`, `RtsUnit`, `SaveSystem`, `NpcKingdom` — ділити на частини, як `StrategyHud`.
-5. `AIBaseController.IsTerrain` ще впізнає землю за іменем об'єкта.
+2. Меню паузи живе в сцені (`SetupPauseMenuTool`) і дооформлюється під час гри; зібрати його кодом, як решту вікон.
+3. Великі класи: `NpcResourceGatherer`, `RtsUnit`, `SaveSystem`, `NpcKingdom` — ділити на частини, як `StrategyHud`.
+4. `AIBaseController.IsTerrain` ще впізнає землю за іменем об'єкта.

@@ -8,6 +8,7 @@ using BattleOfAges.Managers;
 using BattleOfAges.RTS;
 using BattleOfAges.Combat;
 using BattleOfAges.Player;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -36,14 +37,14 @@ namespace BattleOfAges.UI
         private int filter = -1; // -1 all, else EquipSlot
         private bool toAll = true; // with several units chosen a click on the store gives one to each
         private Button toAllButton;
-        private Text toAllText;
+        private TMP_Text toAllText;
 
         private GameObject window;
-        private Text title, counter, stats, hint;
+        private TMP_Text title, counter, stats, hint;
         private Button prevButton, nextButton;
-        private readonly Dictionary<EquipSlot, (Image rim, Image icon, Text level, Text caption)> slotViews = new Dictionary<EquipSlot, (Image, Image, Text, Text)>();
+        private readonly Dictionary<EquipSlot, (Image rim, Image icon, TMP_Text level, TMP_Text caption)> slotViews = new Dictionary<EquipSlot, (Image, Image, TMP_Text, TMP_Text)>();
         private RectTransform grid;
-        private Text emptyStore;
+        private TMP_Text emptyStore;
         private readonly List<Button> filterButtons = new List<Button>();
         private bool dirty;
 
@@ -415,8 +416,8 @@ namespace BattleOfAges.UI
             RectTransform stText = UiTheme.Rect(st, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(360f, 130f));
             stats = UiTheme.Label(stText, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(stats);
-            stats.supportRichText = true;
-            stats.lineSpacing = 1.15f;
+            stats.richText = true;
+            stats.lineSpacing = 15f; // (TextMeshPro: extra, in hundredths of an em)
 
             // Armory
             RectTransform store = UiTheme.Rect(panel, "Store", new Vector2(1f, 1f), new Vector2(-24f, -74f), new Vector2(690f, 590f));
@@ -430,7 +431,7 @@ namespace BattleOfAges.UI
                     "\nEquips each selected unit with the best shield, helmet, chest, gloves, and boots from the armory, plus a better weapon of the same type they hold.")
                 + "\n" + TipText.Dim(Loc.Pick("Інструмент у руках не міняється на зброю. Кайло шахтарі беруть зі складу самі, коли заходять у шахту.", "A held tool is not replaced by a weapon. Miners take pickaxes from the armory automatically when entering a mine.")));
             toAllButton = UiTheme.TextButton(store, "ToAll", "", new Vector2(1f, 1f), new Vector2(-224f, -6f), new Vector2(240f, 36f), ToggleToAll, 15);
-            toAllText = toAllButton.GetComponentInChildren<Text>();
+            toAllText = toAllButton.GetComponentInChildren<TMP_Text>();
             LocText.Detach(toAllText);
             Tooltip.Set(toAllButton.gameObject, () => TipText.Title(Loc.Pick("Кому видавати", "Issue Target"), UiTheme.Gold)
                 + Loc.Pick(
@@ -481,9 +482,9 @@ namespace BattleOfAges.UI
             Image icon = iconRt.gameObject.AddComponent<Image>();
             icon.preserveAspect = true; icon.raycastTarget = false;
             RectTransform lv = UiTheme.Rect(rt, "Level", new Vector2(1f, 0f), new Vector2(-8f, 4f), new Vector2(44f, 26f));
-            Text level = UiTheme.Label(lv, "Text", "", 19, TextAnchor.LowerRight, UiTheme.Ink, FontStyle.Bold);
+            TMP_Text level = UiTheme.Label(lv, "Text", "", 19, TextAnchor.LowerRight, UiTheme.Ink, FontStyle.Bold);
             RectTransform cap = UiTheme.Rect(rt, "Caption", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(100f, 30f));
-            Text caption = UiTheme.Label(cap, "Text", ItemTypeNames.SlotName(slot), 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            TMP_Text caption = UiTheme.Label(cap, "Text", ItemTypeNames.SlotName(slot), 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             LocText.Detach(caption);
             slotViews[slot] = (rim, icon, level, caption);
             Hover(rt.gameObject, () =>

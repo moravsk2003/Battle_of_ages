@@ -5,6 +5,7 @@ using BattleOfAges.RTS;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Crafting;
 using BattleOfAges.Combat;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -22,10 +23,10 @@ namespace BattleOfAges.UI
         private const float CardSize = 38f, CardGap = 3f; // two rows under the title
 
         private GameObject panelObj;
-        private Text titleText, statusText, statsText, hpText;
+        private TMP_Text titleText, statusText, statsText, hpText;
         private RectTransform single, grid, hpFill;
         private Image portrait;
-        private Text overflowText;
+        private TMP_Text overflowText;
         private RtsUnitCommander commander;
         private readonly List<(RectTransform rt, Image icon, RectTransform fill, RtsUnit unit)> cards = new List<(RectTransform, Image, RectTransform, RtsUnit)>();
         private int shownHash;
@@ -105,7 +106,7 @@ namespace BattleOfAges.UI
             if (singleHead.Changed(Shown.Key(unit.GetInstanceID(), (int)rank * 2 + langBit, xp)))
             {
                 int need = UnitProgress.XpToPromote(rank);
-                titleText.supportRichText = true;
+                titleText.richText = true;
                 titleText.text = DisplayName(unit) + (progress != null && need > 0
                     ? Loc.Pick($"  <size=14>до рангу «{HeroUI.RankName(rank + 1)}»: {xp}/{need} досвіду</size>", $"  <size=14>to «{HeroUI.RankName(rank + 1)}»: {xp}/{need} XP</size>")
                     : "");
@@ -155,7 +156,7 @@ namespace BattleOfAges.UI
             if (hash != shownHash)
             {
                 shownHash = hash;
-                titleText.supportRichText = true;
+                titleText.richText = true;
                 titleText.text = GroupTitle(selected);
                 for (int i = 0; i < cards.Count; i++)
                 {

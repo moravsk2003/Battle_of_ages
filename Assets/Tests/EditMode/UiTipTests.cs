@@ -8,6 +8,7 @@ using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.SaveLoad;
 using BattleOfAges.UI;
+using TMPro;
 
 namespace BattleOfAges.Tests
 {
@@ -135,10 +136,10 @@ namespace BattleOfAges.Tests
         public void LocText_UpdatesLiveOnLanguageChange()
         {
             Loc.Set(Loc.Lang.Uk, save: false);
-            var go = new GameObject("LocTextProbe", typeof(RectTransform), typeof(Text));
+            var go = new GameObject("LocTextProbe", typeof(RectTransform), typeof(TextMeshProUGUI));
             try
             {
-                Text label = go.GetComponent<Text>();
+                TMP_Text label = go.GetComponent<TMP_Text>();
                 label.text = "Налаштування";
                 LocText.Attach(label);
                 Assert.AreEqual("Налаштування", label.text);

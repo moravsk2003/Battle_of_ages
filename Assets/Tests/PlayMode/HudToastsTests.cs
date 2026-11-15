@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 using BattleOfAges.UI;
+using TMPro;
 
 namespace BattleOfAges.PlayModeTests
 {
@@ -35,16 +36,18 @@ namespace BattleOfAges.PlayModeTests
             Canvas.ForceUpdateCanvases();
 
             RectTransform older = Plate(toasts, 0), address = Plate(toasts, 1), newer = Plate(toasts, 2);
-            Text label = address.GetComponentInChildren<Text>();
+            TMP_Text label = address.GetComponentInChildren<TMP_Text>();
             Assert.AreEqual(Address, label.text);
 
-            TextGenerator shaped = label.cachedTextGenerator;
+            label.ForceMeshUpdate();
+            TMP_TextInfo shaped = label.textInfo;
             Assert.GreaterOrEqual(shaped.lineCount, 2, "too long for one line of the plate");
             float left = float.MaxValue, right = float.MinValue;
-            foreach (UIVertex v in shaped.verts)
+            for (int i = 0; i < shaped.characterCount; i++)
             {
-                left = Mathf.Min(left, v.position.x);
-                right = Mathf.Max(right, v.position.x);
+                if (!shaped.characterInfo[i].isVisible) continue;
+                left = Mathf.Min(left, shaped.characterInfo[i].bottomLeft.x);
+                right = Mathf.Max(right, shaped.characterInfo[i].topRight.x);
             }
             Assert.LessOrEqual(right - left, address.rect.width, "every letter inside the plate");
             Assert.GreaterOrEqual(address.rect.height, label.preferredHeight, "every line inside the plate");

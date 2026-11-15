@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using BattleOfAges.Resources;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -20,15 +21,15 @@ namespace BattleOfAges.UI
         private Transform contentTransform;
         private GameObject emptyPlaceholderObj;
 
-        private Text woodQuantityText;
+        private TMP_Text woodQuantityText;
         private GameObject woodSlotObj;
 
-        private readonly Dictionary<int, Text> oreQuantityTextMap = new Dictionary<int, Text>();
-        private readonly Dictionary<int, Text> oreBadgeTextMap = new Dictionary<int, Text>();
-        private readonly Dictionary<int, Text> oreNameTextMap = new Dictionary<int, Text>();
+        private readonly Dictionary<int, TMP_Text> oreQuantityTextMap = new Dictionary<int, TMP_Text>();
+        private readonly Dictionary<int, TMP_Text> oreBadgeTextMap = new Dictionary<int, TMP_Text>();
+        private readonly Dictionary<int, TMP_Text> oreNameTextMap = new Dictionary<int, TMP_Text>();
         private readonly Dictionary<int, GameObject> oreSlotObjMap = new Dictionary<int, GameObject>();
 
-        private Text titleText, emptyText;
+        private TMP_Text titleText, emptyText;
 
         public bool IsOpen { get; private set; }
 
@@ -48,6 +49,8 @@ namespace BattleOfAges.UI
             }
 
             BuildInventoryUI();
+            UiTheme.RestyleTree(transform); // its parts made with default looks take the theme now, not from a pass over every canvas
+            if (GetComponent<UiThemed>() == null) gameObject.AddComponent<UiThemed>();
             KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
             Loc.Changed += OnLanguageChanged;
         }
@@ -234,13 +237,13 @@ namespace BattleOfAges.UI
                 RectTransform bTxtRect = UiTheme.Child(badgeObj.transform, "BadgeText", Vector2.zero, Vector2.one);
                 GameObject badgeTxtObj = bTxtRect.gameObject;
 
-                Text bTxt = UiTheme.PlainText(badgeTxtObj, font, 17, TextAnchor.MiddleCenter, tierCol, Loc.Pick($"Рів. {tierLevel}", $"Lvl {tierLevel}"), style: FontStyle.Bold);
+                TMP_Text bTxt = UiTheme.PlainText(badgeTxtObj, font, 17, TextAnchor.MiddleCenter, tierCol, Loc.Pick($"Рів. {tierLevel}", $"Lvl {tierLevel}"), style: FontStyle.Bold);
                 LocText.Detach(bTxt);
 
                 RectTransform nameRect = UiTheme.Child(slotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
                 GameObject nameObj = nameRect.gameObject;
 
-                Text nameTxt = UiTheme.PlainText(nameObj, font, 20, TextAnchor.MiddleLeft, Color.white, OreTierHelper.GetTierName(tierLevel), style: FontStyle.Bold);
+                TMP_Text nameTxt = UiTheme.PlainText(nameObj, font, 20, TextAnchor.MiddleLeft, Color.white, OreTierHelper.GetTierName(tierLevel), style: FontStyle.Bold);
                 LocText.Detach(nameTxt);
 
                 RectTransform qtyRect = UiTheme.Child(slotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
@@ -249,7 +252,7 @@ namespace BattleOfAges.UI
                 qtyRect.offsetMin = new Vector2(-110f, 0f);
                 qtyRect.offsetMax = new Vector2(-15f, 0f);
 
-                Text qtyTxt = UiTheme.PlainText(qtyObj, font, 22, TextAnchor.MiddleRight, new Color(0.3f, 0.95f, 0.95f), style: FontStyle.Bold);
+                TMP_Text qtyTxt = UiTheme.PlainText(qtyObj, font, 22, TextAnchor.MiddleRight, new Color(0.3f, 0.95f, 0.95f), style: FontStyle.Bold);
                 LocText.Detach(qtyTxt);
 
                 UiTheme.RestyleTree(slotObj.transform); // a row made after the window: themed now
@@ -264,7 +267,7 @@ namespace BattleOfAges.UI
                 slot.SetActive(true);
             }
 
-            if (oreQuantityTextMap.TryGetValue(tierLevel, out Text qtyText))
+            if (oreQuantityTextMap.TryGetValue(tierLevel, out TMP_Text qtyText))
             {
                 qtyText.text = $"x{count}";
             }
@@ -309,11 +312,11 @@ namespace BattleOfAges.UI
             RectTransform titleRect = UiTheme.Child(headerObj.transform, "TitleText", Vector2.zero, Vector2.one, new Vector2(25f, 0), new Vector2(-25f, 0));
             GameObject titleObj = titleRect.gameObject;
 
-            titleText = titleObj.AddComponent<Text>();
-            titleText.font = defaultFont;
+            titleText = titleObj.AddComponent<TextMeshProUGUI>();
+            titleText.font = UiTheme.TmpFont;
             titleText.fontSize = 28;
-            titleText.fontStyle = FontStyle.Bold;
-            titleText.alignment = TextAnchor.MiddleLeft;
+            titleText.fontStyle = UiTheme.Style(FontStyle.Bold);
+            titleText.alignment = UiTheme.Align(TextAnchor.MiddleLeft);
             titleText.color = new Color(0.3f, 0.9f, 1.0f);
             UpdateHeaderText();
 
@@ -372,12 +375,12 @@ namespace BattleOfAges.UI
             RectTransform wBTxtRect = UiTheme.Child(woodBadge.transform, "BadgeText", Vector2.zero, Vector2.one);
             GameObject wBadgeTxtObj = wBTxtRect.gameObject;
 
-            Text wBTxt = UiTheme.PlainText(wBadgeTxtObj, defaultFont, 17, TextAnchor.MiddleCenter, new Color(1.0f, 0.92f, 0.55f), "Дерево", style: FontStyle.Bold);
+            TMP_Text wBTxt = UiTheme.PlainText(wBadgeTxtObj, defaultFont, 17, TextAnchor.MiddleCenter, new Color(1.0f, 0.92f, 0.55f), "Дерево", style: FontStyle.Bold);
 
             RectTransform wNameRect = UiTheme.Child(woodSlotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
             GameObject wNameObj = wNameRect.gameObject;
 
-            Text woodNameText = UiTheme.PlainText(wNameObj, defaultFont, 20, TextAnchor.MiddleLeft, new Color(0.98f, 0.88f, 0.45f), "Колоди", style: FontStyle.Bold);
+            TMP_Text woodNameText = UiTheme.PlainText(wNameObj, defaultFont, 20, TextAnchor.MiddleLeft, new Color(0.98f, 0.88f, 0.45f), "Колоди", style: FontStyle.Bold);
 
             RectTransform wQtyRect = UiTheme.Child(woodSlotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
             GameObject wQtyObj = wQtyRect.gameObject;
@@ -385,11 +388,11 @@ namespace BattleOfAges.UI
             wQtyRect.offsetMin = new Vector2(-110f, 0f);
             wQtyRect.offsetMax = new Vector2(-15f, 0f);
 
-            woodQuantityText = wQtyObj.AddComponent<Text>();
-            woodQuantityText.font = defaultFont;
+            woodQuantityText = wQtyObj.AddComponent<TextMeshProUGUI>();
+            woodQuantityText.font = UiTheme.TmpFont;
             woodQuantityText.fontSize = 22;
-            woodQuantityText.fontStyle = FontStyle.Bold;
-            woodQuantityText.alignment = TextAnchor.MiddleRight;
+            woodQuantityText.fontStyle = UiTheme.Style(FontStyle.Bold);
+            woodQuantityText.alignment = UiTheme.Align(TextAnchor.MiddleRight);
             woodQuantityText.color = new Color(0.3f, 0.95f, 0.95f);
             woodQuantityText.text = "x0";
 

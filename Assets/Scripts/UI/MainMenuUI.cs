@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using BattleOfAges.Managers;
 using BattleOfAges.SaveLoad;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -16,7 +17,7 @@ namespace BattleOfAges.UI
         private GameObject langPrompt;
         private CampaignSetupUI campaign;
         private Button continueButton;
-        private Text continueInfo;
+        private TMP_Text continueInfo;
         private readonly System.Collections.Generic.List<System.Action> optionRefreshers = new System.Collections.Generic.List<System.Action>();
 
         private void Start()
@@ -107,8 +108,8 @@ namespace BattleOfAges.UI
         }
 
         private RectTransform joinPanel;
-        private InputField joinAddress;
-        private Text joinStatus;
+        private TMP_InputField joinAddress;
+        private TMP_Text joinStatus;
         private CampaignSetupUI networkCampaign;
         private LobbyUI lobby;
         private bool joining;
@@ -188,17 +189,18 @@ namespace BattleOfAges.UI
             PopIn.On(joinPanel);
             UiTheme.Label(UiTheme.Rect(joinPanel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(560f, 44f)), "Text", "Гра в мережі", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.Divider(joinPanel, -66f, 400f);
-            Text hint = UiTheme.Label(UiTheme.Rect(joinPanel, "Hint", new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(580f, 56f)), "Text",
+            TMP_Text hint = UiTheme.Label(UiTheme.Rect(joinPanel, "Hint", new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(580f, 56f)), "Text",
                 "Адреса хоста: він бачить її у своєму лобі. Ви потрапите в лобі, оберете героя, а гра почнеться, коли хост натисне «Почати».", 16, TextAnchor.UpperCenter, UiTheme.InkDim);
-            hint.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hint.textWrappingMode = TextWrappingModes.Normal;
 
             RectTransform f = UiTheme.Rect(joinPanel, "Address", new Vector2(0.5f, 1f), new Vector2(0f, -170f), new Vector2(380f, 46f));
             UiTheme.PanelImage(f, UiTheme.SlotSprite);
-            Text text = UiTheme.Label(UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 38f)), "Text", "", 20, TextAnchor.MiddleCenter, UiTheme.Ink);
-            text.supportRichText = false;
-            Text placeholder = UiTheme.Label(UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 38f)), "Text", "192.168.0.5", 18, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
-            joinAddress = f.gameObject.AddComponent<InputField>();
+            TMP_Text text = UiTheme.Label(UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 38f)), "Text", "", 20, TextAnchor.MiddleCenter, UiTheme.Ink);
+            text.richText = false;
+            TMP_Text placeholder = UiTheme.Label(UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 38f)), "Text", "192.168.0.5", 18, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
+            joinAddress = f.gameObject.AddComponent<TMP_InputField>();
             joinAddress.textComponent = text;
+            joinAddress.textViewport = (RectTransform)text.transform.parent;
             joinAddress.placeholder = placeholder;
             joinAddress.characterLimit = 45;
 
@@ -319,9 +321,9 @@ namespace BattleOfAges.UI
                 "Text", "Оберіть мову  ·  Choose Language", 26, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             UiTheme.Divider(win, -72f, 440f);
 
-            Text note = UiTheme.Label(UiTheme.Rect(win, "Note", new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(520f, 56f)),
+            TMP_Text note = UiTheme.Label(UiTheme.Rect(win, "Note", new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(520f, 56f)),
                 "Text", "Ви можете змінити мову будь-коли в меню та налаштуваннях\nYou can change the language anytime in the menu or settings", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
-            note.horizontalOverflow = HorizontalWrapMode.Wrap;
+            note.textWrappingMode = TextWrappingModes.Normal;
 
             UiTheme.TextButton(win, "Choose_Uk", "Українська", new Vector2(0.5f, 0f), new Vector2(-128f, 46f), new Vector2(226f, 62f),
                 () => SelectInitialLanguage(Loc.Lang.Uk), 22);
@@ -351,9 +353,9 @@ namespace BattleOfAges.UI
         {
             RectTransform lab = UiTheme.Rect(parent, label, new Vector2(0.5f, 1f), new Vector2(150f, y), new Vector2(240f, 40f));
             UiTheme.Label(lab, "Text", label, 19, TextAnchor.MiddleLeft, UiTheme.Ink);
-            Text text = null;
+            TMP_Text text = null;
             Button b = UiTheme.TextButton(parent, label + "_Value", "", new Vector2(0.5f, 1f), new Vector2(390f, y), new Vector2(220f, 40f), () => { next(); text.text = value(); }, 18);
-            text = b.GetComponentInChildren<Text>();
+            text = b.GetComponentInChildren<TMP_Text>();
             LocText.Detach(text);
             text.text = value();
             optionRefreshers.Add(() => { if (text != null) text.text = value(); });
@@ -362,7 +364,7 @@ namespace BattleOfAges.UI
         private static void SliderRow(RectTransform parent, string label, float y, float min, float max, float value, System.Action<float> changed)
         {
             RectTransform lab = UiTheme.Rect(parent, label, new Vector2(0.5f, 1f), new Vector2(SliderX, y), new Vector2(480f, 28f));
-            Text valueText = null;
+            TMP_Text valueText = null;
             UiTheme.Label(lab, "Text", label, 19, TextAnchor.MiddleLeft, UiTheme.Ink);
             RectTransform valRt = UiTheme.Rect(lab, "Value", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(80f, 28f));
             valueText = UiTheme.Label(valRt, "Text", "", 19, TextAnchor.MiddleRight, UiTheme.Gold, FontStyle.Bold);

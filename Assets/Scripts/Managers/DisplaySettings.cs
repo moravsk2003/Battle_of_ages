@@ -67,7 +67,7 @@ namespace BattleOfAges.Managers
             foreach (CanvasScaler s in Object.FindObjectsByType<CanvasScaler>(FindObjectsInactive.Include, FindObjectsSortMode.None)) Apply(s);
         }
 
-        /// <summary>One canvas (UiRestyler calls it for canvases that appear later); cheap when already right.</summary>
+        /// <summary>One canvas (for canvases that appear later); cheap when already right.</summary>
         public static void Apply(CanvasScaler s)
         {
             if (s == null || s.uiScaleMode != CanvasScaler.ScaleMode.ScaleWithScreenSize) return;

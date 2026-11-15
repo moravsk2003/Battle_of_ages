@@ -5,6 +5,7 @@ using BattleOfAges.Combat;
 using BattleOfAges.Managers;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -24,8 +25,8 @@ namespace BattleOfAges.UI
         private HealthComponent player;
         private CombatUnit playerCombat;
         private float flash, hitUntil;
-        private readonly List<(RectTransform rt, Text text, Vector3 world, float born)> live = new List<(RectTransform, Text, Vector3, float)>();
-        private readonly Stack<(RectTransform rt, Text text)> pool = new Stack<(RectTransform, Text)>();
+        private readonly List<(RectTransform rt, TMP_Text text, Vector3 world, float born)> live = new List<(RectTransform, TMP_Text, Vector3, float)>();
+        private readonly Stack<(RectTransform rt, TMP_Text text)> pool = new Stack<(RectTransform, TMP_Text)>();
 
         public int LiveNumbers => live.Count;
 
@@ -96,12 +97,12 @@ namespace BattleOfAges.UI
         public void Spawn(int damage, bool ours, Vector3 world)
         {
             if (live.Count >= MaxNumbers) Recycle(0);
-            (RectTransform rt, Text text) n;
+            (RectTransform rt, TMP_Text text) n;
             if (pool.Count > 0) n = pool.Pop();
             else
             {
                 RectTransform rt = UiTheme.Rect(numbers, "Damage", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120f, 40f));
-                Text t = UiTheme.Label(rt, "Text", "", 24, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+                TMP_Text t = UiTheme.Label(rt, "Text", "", 24, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
                 t.gameObject.AddComponent<Outline>().effectColor = new Color(0f, 0f, 0f, 0.8f);
                 n = (rt, t);
             }

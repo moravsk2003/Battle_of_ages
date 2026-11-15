@@ -5,6 +5,7 @@ using BattleOfAges.Building;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.Net;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -23,12 +24,12 @@ namespace BattleOfAges.UI
         private sealed class Row
         {
             public LaborJob Job;
-            public Text Name, Detail, Value;
+            public TMP_Text Name, Detail, Value;
             public Button Minus, Plus, Free;
         }
 
         private GameObject window;
-        private Text title, summary, said;
+        private TMP_Text title, summary, said;
         private readonly List<Row> rows = new List<Row>();
         private readonly List<Button> tabs = new List<Button>();
         private TownHall shownHall;
@@ -187,7 +188,7 @@ namespace BattleOfAges.UI
                 bool on = several && i < halls.Count;
                 if (tabs[i].gameObject.activeSelf != on) tabs[i].gameObject.SetActive(on);
                 if (!on) continue;
-                Text label = tabs[i].GetComponentInChildren<Text>();
+                TMP_Text label = tabs[i].GetComponentInChildren<TMP_Text>();
                 label.text = $"{Loc.Tr(halls[i].Title)} {Crafting.ItemTypeNames.Roman(halls[i].Level)}";
                 label.color = halls[i] == shownHall ? UiTheme.Gold : UiTheme.Ink;
             }
@@ -234,7 +235,7 @@ namespace BattleOfAges.UI
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(600f, 44f));
             title = UiTheme.Label(head, "Text", "", 28, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             LocText.Detach(title);
-            title.supportRichText = true;
+            title.richText = true;
             ShowTitle();
             UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-14f, -10f), new Vector2(44f, 42f), CloseMenu, 26);
 
@@ -248,7 +249,7 @@ namespace BattleOfAges.UI
                     IReadOnlyList<TownHall> halls = TownHall.All;
                     if (index < halls.Count) { shownHall = halls[index]; said.text = ""; Refresh(); }
                 }, 14);
-                LocText.Detach(tab.GetComponentInChildren<Text>());
+                LocText.Detach(tab.GetComponentInChildren<TMP_Text>());
                 tab.gameObject.SetActive(false);
                 tabs.Add(tab);
             }
@@ -256,7 +257,7 @@ namespace BattleOfAges.UI
             RectTransform sumRect = UiTheme.Rect(panel, "Summary", new Vector2(0f, 1f), new Vector2(24f, -96f), new Vector2(Width - 48f, 26f));
             summary = UiTheme.Label(sumRect, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(summary);
-            summary.supportRichText = true;
+            summary.richText = true;
             RectTransform saidRect = UiTheme.Rect(panel, "Said", new Vector2(0f, 1f), new Vector2(24f, -120f), new Vector2(Width - 48f, 24f));
             said = UiTheme.Label(saidRect, "Text", "", 15, TextAnchor.MiddleLeft, UiTheme.Bad);
             LocText.Detach(said);

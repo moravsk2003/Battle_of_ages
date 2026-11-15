@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.Combat;
 using BattleOfAges.SaveLoad;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -14,8 +15,8 @@ namespace BattleOfAges.UI
     public sealed class CampaignSetupUI
     {
         private readonly CampaignSetup setup = new CampaignSetup();
-        private InputField seedField;
-        private Text summary, classText, classDescription, artifactText, artifactDescription;
+        private TMP_InputField seedField;
+        private TMP_Text summary, classText, classDescription, artifactText, artifactDescription;
         private int sizeIndex = Array.IndexOf(CampaignSetup.Sizes, CampaignSetup.FirstSize);
         private int heroesIndex = Array.IndexOf(CampaignSetup.HeroCounts, 16), shareIndex = 1;
         private int classIndex, artifactIndex;
@@ -59,13 +60,13 @@ namespace BattleOfAges.UI
             RectTransform sum = UiTheme.Rect(Panel, "Summary", new Vector2(0.5f, 1f), new Vector2(-290f, -470f), new Vector2(520f, 90f));
             summary = UiTheme.Label(sum, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
             LocText.Detach(summary);
-            summary.horizontalOverflow = HorizontalWrapMode.Wrap;
+            summary.textWrappingMode = TextWrappingModes.Normal;
 
             // The hero
             if (toLobby != null)
             {
                 Heading(-92f, 290f, "Герої");
-                Text lobbyNote = Description(-110f, 290f);
+                TMP_Text lobbyNote = Description(-110f, 290f);
                 LocText.SetSource(lobbyNote, "Клас і стартовий артефакт кожен гравець, і ви теж, обирає в лобі.\n\nВи отримаєте адресу, яку скажете іншим. Коли всі будуть готові, натисніть «Почати».");
             }
             else
@@ -100,41 +101,42 @@ namespace BattleOfAges.UI
         private void Cycler(float y, float x, string label, Func<string> value, Action<int> step) => Cycler(y, x, label, value, step, out _);
 
         /// <summary>A row: its name on the left, ‹ value › on the right.</summary>
-        private void Cycler(float y, float x, string label, Func<string> value, Action<int> step, out Text valueText)
+        private void Cycler(float y, float x, string label, Func<string> value, Action<int> step, out TMP_Text valueText)
         {
             Label(y, x - 150f, label);
             RectTransform v = UiTheme.Rect(Panel, label + "_Value", new Vector2(0.5f, 1f), new Vector2(x + 120f, y), new Vector2(200f, 40f));
             UiTheme.PanelImage(v, UiTheme.SlotSprite);
-            Text t = UiTheme.Label(v, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            TMP_Text t = UiTheme.Label(v, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
             valueText = t;
             UiTheme.TextButton(Panel, label + "_Prev", "‹", new Vector2(0.5f, 1f), new Vector2(x - 6f, y), new Vector2(40f, 40f), () => { step(-1); Refresh(); }, 22);
             UiTheme.TextButton(Panel, label + "_Next", "›", new Vector2(0.5f, 1f), new Vector2(x + 246f, y), new Vector2(40f, 40f), () => { step(1); Refresh(); }, 22);
             rows.Add((t, value));
         }
 
-        private readonly System.Collections.Generic.List<(Text text, Func<string> value)> rows = new System.Collections.Generic.List<(Text, Func<string>)>();
+        private readonly System.Collections.Generic.List<(TMP_Text text, Func<string> value)> rows = new System.Collections.Generic.List<(TMP_Text, Func<string>)>();
 
-        private Text Description(float y, float x)
+        private TMP_Text Description(float y, float x)
         {
             RectTransform d = UiTheme.Rect(Panel, "Description", new Vector2(0.5f, 1f), new Vector2(x, y - 40f), new Vector2(520f, 100f));
-            Text t = UiTheme.Label(d, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.Ink);
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            TMP_Text t = UiTheme.Label(d, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.Ink);
+            t.textWrappingMode = TextWrappingModes.Normal;
             return t;
         }
 
-        private InputField SeedField(Vector2 at)
+        private TMP_InputField SeedField(Vector2 at)
         {
             RectTransform f = UiTheme.Rect(Panel, "SeedField", new Vector2(0.5f, 1f), at, new Vector2(170f, 40f));
             UiTheme.PanelImage(f, UiTheme.SlotSprite);
             RectTransform tr = UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(150f, 34f));
-            Text text = UiTheme.Label(tr, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
-            text.supportRichText = false;
+            TMP_Text text = UiTheme.Label(tr, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
+            text.richText = false;
             RectTransform pr = UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(150f, 34f));
-            Text placeholder = UiTheme.Label(pr, "Text", "випадковий", 16, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
-            InputField input = f.gameObject.AddComponent<InputField>();
+            TMP_Text placeholder = UiTheme.Label(pr, "Text", "випадковий", 16, TextAnchor.MiddleCenter, UiTheme.InkDim, FontStyle.Italic);
+            TMP_InputField input = f.gameObject.AddComponent<TMP_InputField>();
             input.textComponent = text;
+            input.textViewport = (RectTransform)text.transform.parent;
             input.placeholder = placeholder;
-            input.contentType = InputField.ContentType.IntegerNumber;
+            input.contentType = TMP_InputField.ContentType.IntegerNumber;
             input.characterLimit = 9;
             return input;
         }

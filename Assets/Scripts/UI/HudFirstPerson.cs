@@ -5,6 +5,7 @@ using BattleOfAges.Combat;
 using BattleOfAges.Crafting;
 using BattleOfAges.Managers;
 using InputKey = BattleOfAges.InputSystem.KeyAction;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -19,11 +20,11 @@ namespace BattleOfAges.UI
         private static readonly InputKey[] AbilityKeys = { InputKey.Ability, InputKey.Ability2, InputKey.UseFullHeal, InputKey.UseLightning };
 
         private RectTransform crosshair, hpFill, hpTrail, xpFill, abilityBar;
-        private Text hpText, levelText;
+        private TMP_Text hpText, levelText;
         private float trail = 1f, trailHold, lastHpFill = -1f, lastHpTrail = -1f, lastXpFill = -1f;
         private Shown hpShown, levelShown;
         private readonly Shown[] abilitySeconds = new Shown[4], abilityKeys = new Shown[4];
-        private readonly List<(RectTransform rt, Image icon, Image cooldown, Text seconds, Text key)> slots = new List<(RectTransform, Image, Image, Text, Text)>();
+        private readonly List<(RectTransform rt, Image icon, Image cooldown, TMP_Text seconds, TMP_Text key)> slots = new List<(RectTransform, Image, Image, TMP_Text, TMP_Text)>();
         private HealthComponent health;
         private HeroSkills skills;
         private HeroArtifacts artifacts;
@@ -80,7 +81,7 @@ namespace BattleOfAges.UI
             }
         }
 
-        private (RectTransform, Image, Image, Text, Text) Slot(InputKey key)
+        private (RectTransform, Image, Image, TMP_Text, TMP_Text) Slot(InputKey key)
         {
             RectTransform rt = UiTheme.Rect(abilityBar, "Slot_" + key, new Vector2(0f, 0f), Vector2.zero, new Vector2(72f, 72f));
             UiTheme.PanelImage(rt, UiTheme.SlotSprite);
@@ -91,10 +92,10 @@ namespace BattleOfAges.UI
             Image cool = cd.gameObject.AddComponent<Image>();
             cool.sprite = UiTheme.BarSprite; cool.color = new Color(0f, 0f, 0f, 0.62f); cool.raycastTarget = false;
             cool.type = Image.Type.Filled; cool.fillMethod = Image.FillMethod.Radial360; cool.fillOrigin = (int)Image.Origin360.Top; cool.fillClockwise = false;
-            Text secs = UiTheme.Label(rt, "Seconds", "", 22, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            TMP_Text secs = UiTheme.Label(rt, "Seconds", "", 22, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
             LocText.Detach(secs);
             RectTransform k = UiTheme.Rect(rt, "Key", new Vector2(0f, 1f), new Vector2(4f, -2f), new Vector2(30f, 22f));
-            Text keyText = UiTheme.Label(k, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Gold, FontStyle.Bold);
+            TMP_Text keyText = UiTheme.Label(k, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Gold, FontStyle.Bold);
             rt.gameObject.SetActive(false);
             return (rt, icon, cool, secs, keyText);
         }

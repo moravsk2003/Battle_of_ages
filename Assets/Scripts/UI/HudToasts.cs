@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using BattleOfAges.Building;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -19,7 +20,7 @@ namespace BattleOfAges.UI
         private const int MaxShown = 5;
 
         private RectTransform column;
-        private readonly List<(RectTransform rt, Text text, CanvasGroup group, float born, string key, int amount)> toasts = new List<(RectTransform, Text, CanvasGroup, float, string, int)>();
+        private readonly List<(RectTransform rt, TMP_Text text, CanvasGroup group, float born, string key, int amount)> toasts = new List<(RectTransform, TMP_Text, CanvasGroup, float, string, int)>();
         private int lastWood = -1, lastOre = -1, lastWorkers = -1, lastBuildings = -1;
         private float pollTimer;
 
@@ -66,9 +67,9 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(rt);
             var group = rt.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
-            Text label = UiTheme.Label(rt, "Text", Loc.Tr(text(amount)), 19, TextAnchor.MiddleCenter, color ?? UiTheme.Gold);
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
-            label.verticalOverflow = VerticalWrapMode.Overflow;
+            TMP_Text label = UiTheme.Label(rt, "Text", Loc.Tr(text(amount)), 19, TextAnchor.MiddleCenter, color ?? UiTheme.Gold);
+            label.textWrappingMode = TextWrappingModes.Normal;
+            label.overflowMode = TextOverflowModes.Overflow;
             label.rectTransform.offsetMin = new Vector2(TextMargin, 0f);
             label.rectTransform.offsetMax = new Vector2(-TextMargin, 0f);
             FitPlate(rt, label);
@@ -95,7 +96,7 @@ namespace BattleOfAges.UI
         }
 
         /// <summary>A long message takes more lines, and its plate grows to hold them.</summary>
-        private static void FitPlate(RectTransform plate, Text label)
+        private static void FitPlate(RectTransform plate, TMP_Text label)
         {
             float height = Mathf.Max(PlateHeight, Mathf.Ceil(label.preferredHeight) + TextMarginY * 2f);
             plate.sizeDelta = new Vector2(plate.sizeDelta.x, height);

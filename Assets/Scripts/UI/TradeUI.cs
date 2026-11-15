@@ -4,6 +4,7 @@ using BattleOfAges.Building;
 using BattleOfAges.Combat;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Resources;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -29,7 +30,7 @@ namespace BattleOfAges.UI
         private static TradeUI instance;
         private GameObject window;
         private Offer[] offers;
-        private Text stock, caravanTitle;
+        private TMP_Text stock, caravanTitle;
         private RectTransform panel;
         private GameObject caravanRow;
         private Button[] caravanButtons;
@@ -94,7 +95,7 @@ namespace BattleOfAges.UI
             foreach (Offer o in offers)
             {
                 o.Button.interactable = Have(o.Give) >= o.GiveAmount;
-                Text bt = o.Button.GetComponentInChildren<Text>();
+                TMP_Text bt = o.Button.GetComponentInChildren<TMP_Text>();
                 if (bt != null) bt.text = $"{o.GiveAmount} {Name(o.Give)}  →  {o.TakeAmount} {Name(o.Take)}";
             }
             TownHall here = TownHall.Viewed, other = here != null ? Caravans.NearestOther(here) : null;
@@ -109,7 +110,7 @@ namespace BattleOfAges.UI
             for (int i = 0; i < Loads.Length; i++)
             {
                 caravanButtons[i].interactable = here.Stock != null && Caravans.Have(here.Stock, Loads[i].Good) >= Loads[i].Amount;
-                Text bt = caravanButtons[i].GetComponentInChildren<Text>();
+                TMP_Text bt = caravanButtons[i].GetComponentInChildren<TMP_Text>();
                 if (bt != null) bt.text = $"{Loads[i].Amount} {CaravanName(Loads[i].Good)}";
             }
         }
@@ -129,7 +130,7 @@ namespace BattleOfAges.UI
             RectTransform st = UiTheme.Rect(panel, "Stock", new Vector2(0.5f, 1f), new Vector2(0f, -72f), new Vector2(580f, 30f));
             stock = UiTheme.Label(st, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Ink);
             LocText.Detach(stock);
-            stock.supportRichText = true;
+            stock.richText = true;
 
             var list = Offers;
             offers = new Offer[list.Length];
@@ -138,7 +139,7 @@ namespace BattleOfAges.UI
                 var (give, giveN, take, takeN) = list[i];
                 float y = -116f - i * 60f;
                 Button b = UiTheme.TextButton(panel, "Offer" + i, $"{giveN} {Name(give)}  →  {takeN} {Name(take)}", new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(460f, 50f), () => { Net.CommandBus.Submit(new Net.TradeCommand { Give = give, GiveAmount = giveN, Take = take, TakeAmount = takeN }); Refresh(); }, 19);
-                LocText.Detach(b.GetComponentInChildren<Text>());
+                LocText.Detach(b.GetComponentInChildren<TMP_Text>());
                 offers[i] = new Offer { Give = give, GiveAmount = giveN, Take = take, TakeAmount = takeN, Button = b };
             }
             RectTransform row = UiTheme.Rect(panel, "Caravans", new Vector2(0.5f, 1f), new Vector2(0f, -490f), new Vector2(580f, 100f));
@@ -156,7 +157,7 @@ namespace BattleOfAges.UI
                     if (here != null) Caravans.Send(here, Caravans.NearestOther(here), load.Good, load.Amount);
                     Refresh();
                 }, 18);
-                LocText.Detach(caravanButtons[i].GetComponentInChildren<Text>());
+                LocText.Detach(caravanButtons[i].GetComponentInChildren<TMP_Text>());
             }
             caravanRow.SetActive(false);
             window.SetActive(false);

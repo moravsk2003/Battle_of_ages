@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.InputSystem;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -17,7 +18,7 @@ namespace BattleOfAges.UI
 
         private static FpsCounter instance;
 
-        private Text label;
+        private TMP_Text label;
         private RawImage graphImage;
         private Texture2D graph;
         private readonly Color32[] column = new Color32[GraphHeight];
@@ -67,11 +68,11 @@ namespace BattleOfAges.UI
             tr.anchorMin = new Vector2(0f, 1f); tr.anchorMax = new Vector2(1f, 1f); tr.pivot = new Vector2(0.5f, 1f);
             tr.anchoredPosition = new Vector2(0f, -4f);
             tr.sizeDelta = new Vector2(-16f, 94f);
-            label = textObj.AddComponent<Text>();
-            label.font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label = textObj.AddComponent<TextMeshProUGUI>();
+            label.font = UiTheme.TmpFont;
             label.fontSize = 17;
-            label.supportRichText = true;
-            label.alignment = TextAnchor.UpperLeft;
+            label.richText = true;
+            label.alignment = UiTheme.Align(TextAnchor.UpperLeft);
             label.raycastTarget = false;
             label.text = "FPS …";
             LocText.Detach(label);

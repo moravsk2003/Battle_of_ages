@@ -3,6 +3,7 @@
     "rootNamespace": "BattleOfAges.Editor",
     "references": [
         "BattleOfAges.Runtime",
+        "Unity.TextMeshPro",
         "Unity.InputSystem",
         "Unity.AI.Navigation",
         "Unity.AI.Navigation.Editor",

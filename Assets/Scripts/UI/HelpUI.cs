@@ -1,6 +1,7 @@
 using UnityEngine;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -16,8 +17,8 @@ namespace BattleOfAges.UI
         public static HelpUI Instance => instance;
 
         private GameObject window;
-        private UnityEngine.UI.Text page;
-        private UnityEngine.UI.Text[] tabs;
+        private TMP_Text page;
+        private TMP_Text[] tabs;
         /// <summary>The tab on show.</summary>
         public int CurrentTab { get; private set; }
         private bool open;
@@ -345,22 +346,22 @@ namespace BattleOfAges.UI
 
             const float gap = 6f;
             float tabW = (TextWidth - gap * (TabNames.Length - 1)) / TabNames.Length, x = (Size.x - TextWidth) * 0.5f;
-            tabs = new UnityEngine.UI.Text[TabNames.Length];
+            tabs = new TMP_Text[TabNames.Length];
             for (int i = 0; i < TabNames.Length; i++)
             {
                 int index = i;
                 UnityEngine.UI.Button tab = UiTheme.TextButton(panel, "Tab_" + TabNames[i], TabName(i), new Vector2(0f, 1f), new Vector2(x, -60f), new Vector2(tabW, 42f), () => ShowTab(index), 16);
-                tabs[i] = tab.GetComponentInChildren<UnityEngine.UI.Text>();
+                tabs[i] = tab.GetComponentInChildren<TMP_Text>();
                 LocText.Detach(tabs[i]);
                 x += tabW + gap;
             }
 
             RectTransform box = UiTheme.Rect(panel, "Text", new Vector2(0.5f, 1f), new Vector2(0f, -116f), new Vector2(TextWidth, TextHeight));
             page = UiTheme.Label(box, "Text", "", 19, TextAnchor.UpperLeft, UiTheme.Ink);
-            page.lineSpacing = 1.12f;
-            page.supportRichText = true;
-            page.horizontalOverflow = HorizontalWrapMode.Wrap; // lines wrap in the column, never out of the window
-            page.verticalOverflow = VerticalWrapMode.Overflow;
+            page.lineSpacing = 12f; // (TextMeshPro: extra, in hundredths of an em)
+            page.richText = true;
+            page.textWrappingMode = TextWrappingModes.Normal; // lines wrap in the column, never out of the window
+            page.overflowMode = TextOverflowModes.Overflow;
         }
 
         /// <summary>Shows this tab, with the player's keys as they are now.</summary>

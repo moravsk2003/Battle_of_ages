@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Net;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -14,7 +15,7 @@ namespace BattleOfAges.UI
     {
         private static NetPauseUI instance;
         private GameObject window, hostChoice, liftButton;
-        private Text title, line, alwaysBotLabel;
+        private TMP_Text title, line, alwaysBotLabel;
         private bool shown;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -87,7 +88,7 @@ namespace BattleOfAges.UI
             LocText.Detach(title);
             line = UiTheme.Label(UiTheme.Rect(panel, "Line", new Vector2(0.5f, 1f), new Vector2(0f, -64f), new Vector2(580f, 86f)), "Text", "", 19, TextAnchor.UpperCenter, UiTheme.Ink);
             LocText.Detach(line);
-            line.supportRichText = true;
+            line.richText = true;
 
             var choice = new GameObject("HostChoice", typeof(RectTransform));
             choice.transform.SetParent(panel, false);
@@ -98,7 +99,7 @@ namespace BattleOfAges.UI
             UiTheme.TextButton(cr, "Lobby", "Перейти в лобі", new Vector2(0.5f, 0f), new Vector2(0f, 96f), new Vector2(190f, 50f), NetSession.HostBackToLobby, 18);
             UiTheme.TextButton(cr, "Wait", "Чекати", new Vector2(0.5f, 0f), new Vector2(200f, 96f), new Vector2(190f, 50f), NetSession.HostWait, 18);
             Button always = UiTheme.TextButton(cr, "AlwaysBot", "", new Vector2(0.5f, 0f), new Vector2(0f, 34f), new Vector2(380f, 42f), () => NetSession.AlwaysBot = !NetSession.AlwaysBot, 16);
-            alwaysBotLabel = always.GetComponentInChildren<Text>();
+            alwaysBotLabel = always.GetComponentInChildren<TMP_Text>();
             LocText.Detach(alwaysBotLabel);
             Tooltip.Set(always.gameObject, () => TipText.Title(Loc.Pick("Завжди ставити бота", "Always assign bot"), UiTheme.Gold) + Loc.Pick("\nДо кінця цієї гри: хто вийде, того королівство одразу стереже бот, без паузи.", "\nFor the rest of this match: if a player leaves, a bot immediately takes over without pausing."));
 

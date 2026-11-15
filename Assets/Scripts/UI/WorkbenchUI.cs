@@ -7,6 +7,7 @@ using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.RTS;
 using BattleOfAges.Player;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -35,13 +36,13 @@ namespace BattleOfAges.UI
         private int selectedLevel = 1;
         private float refreshTimer;
 
-        private Text workersText, warningText, currentText, percentText, storeText;
+        private TMP_Text workersText, warningText, currentText, percentText, storeText;
         private RectTransform progressFill;
         private readonly List<Button> levelTabs = new List<Button>();
-        private readonly List<(ItemType type, Image icon, Text name, Text desc, Text cost, Button craft)> cards = new List<(ItemType, Image, Text, Text, Text, Button)>();
+        private readonly List<(ItemType type, Image icon, TMP_Text name, TMP_Text desc, TMP_Text cost, Button craft)> cards = new List<(ItemType, Image, TMP_Text, TMP_Text, TMP_Text, Button)>();
         private RectTransform queueList;
         private int smeltTier;
-        private Text smeltTierText, smeltInfoText;
+        private TMP_Text smeltTierText, smeltInfoText;
         private Button smeltTen, smeltAll;
 
         private void Awake()
@@ -177,9 +178,9 @@ namespace BattleOfAges.UI
                 Image img = ic.gameObject.AddComponent<Image>();
                 img.sprite = task.IsSmelt ? UiTheme.IconSprite(UiTheme.Icon.Ore) : UiTheme.ItemSprite(task.Type, task.Level); img.preserveAspect = true; img.raycastTarget = false;
                 RectTransform lbl = UiTheme.Rect(row, "Label", new Vector2(0f, 0.5f), new Vector2(46f, 0f), new Vector2(290f, 36f));
-                Text label = UiTheme.Label(lbl, "Text", task.ToString(), task.IsSmelt ? 14 : 17, TextAnchor.MiddleLeft, task.IsSmelt ? UiTheme.Ink : UiTheme.LevelColor(task.Level));
+                TMP_Text label = UiTheme.Label(lbl, "Text", task.ToString(), task.IsSmelt ? 14 : 17, TextAnchor.MiddleLeft, task.IsSmelt ? UiTheme.Ink : UiTheme.LevelColor(task.Level));
                 LocText.Detach(label);
-                label.horizontalOverflow = HorizontalWrapMode.Wrap;
+                label.textWrappingMode = TextWrappingModes.Normal;
                 string id = task.TaskId;
                 UiTheme.TextButton(row, "Cancel", "×", new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(34f, 32f), () => { bench.CancelTask(id); RefreshAll(); }, 20)
                        .GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
@@ -187,13 +188,13 @@ namespace BattleOfAges.UI
             if (q.Count > 8)
             {
                 RectTransform more = UiTheme.Rect(queueList, "More", new Vector2(0.5f, 1f), new Vector2(0f, -7 * 44f), new Vector2(380f, 30f));
-                Text t = UiTheme.Label(more, "Text", Loc.Pick($"ще {q.Count - 8} у черзі", $"{q.Count - 8} more in queue"), 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+                TMP_Text t = UiTheme.Label(more, "Text", Loc.Pick($"ще {q.Count - 8} у черзі", $"{q.Count - 8} more in queue"), 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
                 LocText.Detach(t);
             }
             else if (q.Count <= 1)
             {
                 RectTransform none = UiTheme.Rect(queueList, "Empty", new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(380f, 30f));
-                Text t = UiTheme.Label(none, "Text", Loc.Pick("Черга порожня", "Queue empty"), 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+                TMP_Text t = UiTheme.Label(none, "Text", Loc.Pick("Черга порожня", "Queue empty"), 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
                 LocText.Detach(t);
             }
         }
@@ -215,7 +216,7 @@ namespace BattleOfAges.UI
                 + $"this ore in stock: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — yields {can}" : ""));
             smeltTen.interactable = bench != null && can >= 1;
             smeltAll.interactable = bench != null && can >= 2;
-            smeltAll.GetComponentInChildren<Text>().text = can >= 2
+            smeltAll.GetComponentInChildren<TMP_Text>().text = can >= 2
                 ? Loc.Pick($"Усе ({can})", $"All ({can})")
                 : Loc.Pick("Усе", "All");
         }
@@ -310,7 +311,7 @@ namespace BattleOfAges.UI
             RectTransform wt = UiTheme.Rect(wbar, "Text", new Vector2(0f, 0.5f), new Vector2(46f, 0f), new Vector2(420f, 40f));
             workersText = UiTheme.Label(wt, "Text", "", 19, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(workersText);
-            workersText.supportRichText = true;
+            workersText.richText = true;
             UiTheme.TextButton(wbar, "Call", "+ Покликати", new Vector2(0f, 0.5f), new Vector2(470f, 0f), new Vector2(150f, 40f), CallWorker, 17);
             UiTheme.TextButton(wbar, "Release", "− Відпустити", new Vector2(0f, 0.5f), new Vector2(628f, 0f), new Vector2(150f, 40f), ReleaseWorker, 17);
             RectTransform warn = UiTheme.Rect(panel, "Warning", new Vector2(0f, 1f), new Vector2(24f, -112f), new Vector2(800f, 26f));
@@ -356,18 +357,18 @@ namespace BattleOfAges.UI
             RectTransform sinfo = UiTheme.Rect(smelt, "Info", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(350f, 56f));
             smeltInfoText = UiTheme.Label(sinfo, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             LocText.Detach(smeltInfoText);
-            smeltInfoText.supportRichText = true;
-            smeltInfoText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            smeltInfoText.richText = true;
+            smeltInfoText.textWrappingMode = TextWrappingModes.Normal;
             smeltTen = UiTheme.TextButton(smelt, "One", $"Переплавити {Combat.GameBalance.SmeltRatio}", new Vector2(0f, 0f), new Vector2(14f, 12f), new Vector2(170f, 42f), () => Smelt(false), 16);
             smeltAll = UiTheme.TextButton(smelt, "All", "Усе", new Vector2(1f, 0f), new Vector2(-14f, 12f), new Vector2(170f, 42f), () => Smelt(true), 16);
-            LocText.Detach(smeltAll.GetComponentInChildren<Text>());
+            LocText.Detach(smeltAll.GetComponentInChildren<TMP_Text>());
 
             RectTransform store = UiTheme.Rect(side, "Store", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(380f, 112f));
             UiTheme.PanelImage(store, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.9f));
             RectTransform stt = UiTheme.Rect(store, "Text", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(350f, 36f));
             storeText = UiTheme.Label(stt, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
             LocText.Detach(storeText);
-            storeText.supportRichText = true;
+            storeText.richText = true;
             UiTheme.TextButton(store, "Armory", "Склад і спорядження  [C]", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(330f, 48f), OpenArmory, 18);
         }
 
@@ -381,17 +382,17 @@ namespace BattleOfAges.UI
             Image icon = ic.gameObject.AddComponent<Image>();
             icon.preserveAspect = true; icon.raycastTarget = false;
             RectTransform nm = UiTheme.Rect(card, "Name", new Vector2(0f, 1f), new Vector2(78f, -8f), new Vector2(172f, 40f));
-            Text name = UiTheme.Label(nm, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            TMP_Text name = UiTheme.Label(nm, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             LocText.Detach(name);
-            name.horizontalOverflow = HorizontalWrapMode.Wrap;
+            name.textWrappingMode = TextWrappingModes.Normal;
             RectTransform ds = UiTheme.Rect(card, "Desc", new Vector2(0f, 1f), new Vector2(78f, -46f), new Vector2(172f, 40f));
-            Text desc = UiTheme.Label(ds, "Text", "", 13, TextAnchor.UpperLeft, UiTheme.InkDim);
+            TMP_Text desc = UiTheme.Label(ds, "Text", "", 13, TextAnchor.UpperLeft, UiTheme.InkDim);
             LocText.Detach(desc);
-            desc.horizontalOverflow = HorizontalWrapMode.Wrap;
+            desc.textWrappingMode = TextWrappingModes.Normal;
             RectTransform cs = UiTheme.Rect(card, "Cost", new Vector2(0f, 0f), new Vector2(10f, 50f), new Vector2(240f, 24f));
-            Text cost = UiTheme.Label(cs, "Text", "", 14, TextAnchor.MiddleLeft, UiTheme.Ink);
+            TMP_Text cost = UiTheme.Label(cs, "Text", "", 14, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(cost);
-            cost.supportRichText = true;
+            cost.richText = true;
             Button craft = UiTheme.TextButton(card, "Craft", "Виготовити", new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(W - 20f, 36f), () => Craft(type), 16);
             cards.Add((type, icon, name, desc, cost, craft));
             Tooltip.Set(card.gameObject, () => RecipeTip(type));

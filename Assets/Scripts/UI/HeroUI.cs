@@ -5,6 +5,7 @@ using BattleOfAges.InputSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.Net;
 using BattleOfAges.Player;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -19,14 +20,14 @@ namespace BattleOfAges.UI
         public static HeroUI Instance => instance;
 
         private GameObject window;
-        private Text header, body, points;
+        private TMP_Text header, body, points;
         private Image xpFill;
         private Button strengthButton, healthButton;
         private GameObject classPicker;
         private readonly Button[] classButtons = new Button[4];
         private static readonly HeroClass[] ClassOrder = { HeroClass.Tank, HeroClass.Archer, HeroClass.Mage, HeroClass.Dd };
         private readonly Button[] skillButtons = new Button[4];
-        private Text artifactText;
+        private TMP_Text artifactText;
         private Button pickPrev, pickNext, pickTake, useHeal, useLightning, combine;
         private int pickIndex;
         private HeroArtifacts bag;
@@ -70,7 +71,7 @@ namespace BattleOfAges.UI
             for (int i = 0; i < classButtons.Length; i++)
             {
                 if (classButtons[i] == null) continue;
-                Text t = classButtons[i].GetComponentInChildren<Text>();
+                TMP_Text t = classButtons[i].GetComponentInChildren<TMP_Text>();
                 if (t != null) t.text = HeroClassRules.Name(ClassOrder[i]);
             }
         }
@@ -212,7 +213,7 @@ namespace BattleOfAges.UI
             Button b = skillButtons[index++];
             Tooltip.Set(b.gameObject, () => TipText.Title(label, UiTheme.Gold) + "\n" + tip + "\n" + TipText.Dim(hero != null && hero.SkillPoints > 0 ? Loc.Pick("Клік — вивчити за очко навику", "Click — learn for 1 skill point") : Loc.Pick("Немає очок навику: вони даються з рівнем", "No skill points: gained on level up")));
             b.gameObject.SetActive(true);
-            b.GetComponentInChildren<Text>().text = label;
+            b.GetComponentInChildren<TMP_Text>().text = label;
             b.interactable = hero.SkillPoints > 0;
             b.onClick.RemoveAllListeners();
             b.onClick.AddListener(() => Hero(HeroCommand.Act.LearnSkill, 0, skill));
@@ -309,7 +310,7 @@ namespace BattleOfAges.UI
             RectTransform art = UiTheme.Rect(panel, "Artifacts", new Vector2(0.5f, 0f), new Vector2(0f, 262f), new Vector2(500f, 62f));
             artifactText = UiTheme.Label(art, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(artifactText);
-            artifactText.supportRichText = true;
+            artifactText.richText = true;
             pickPrev = UiTheme.TextButton(panel, "PickPrev", "‹", new Vector2(0f, 0f), new Vector2(30f, 206f), new Vector2(50f, 44f), () => StepPick(-1), 26);
             pickNext = UiTheme.TextButton(panel, "PickNext", "›", new Vector2(0f, 0f), new Vector2(90f, 206f), new Vector2(50f, 44f), () => StepPick(1), 26);
             pickTake = UiTheme.TextButton(panel, "PickTake", "Взяти", new Vector2(0f, 0f), new Vector2(150f, 206f), new Vector2(140f, 44f),
@@ -327,7 +328,7 @@ namespace BattleOfAges.UI
             for (int i = 0; i < skillButtons.Length; i++)
             {
                 skillButtons[i] = UiTheme.TextButton(panel, "Skill" + i, "", new Vector2(0f, 0f), new Vector2(20f + i * 130f, 150f), new Vector2(124f, 46f), null, 14);
-                LocText.Detach(skillButtons[i].GetComponentInChildren<Text>());
+                LocText.Detach(skillButtons[i].GetComponentInChildren<TMP_Text>());
             }
 
             // The class is picked once (docs/GAME_DESIGN.md §8.1)
@@ -338,7 +339,7 @@ namespace BattleOfAges.UI
                 HeroClass c = ClassOrder[i];
                 Button cb = UiTheme.TextButton(pick, "Class" + c, HeroClassRules.Name(c), new Vector2(0f, 0.5f), new Vector2(10f + i * 128f, 0f), new Vector2(120f, 46f),
                     () => Hero(HeroCommand.Act.ChooseClass, (int)c), 19);
-                LocText.Detach(cb.GetComponentInChildren<Text>());
+                LocText.Detach(cb.GetComponentInChildren<TMP_Text>());
                 classButtons[i] = cb;
                 Tooltip.Set(cb.gameObject, () => TipText.Title(HeroClassRules.Name(c), UiTheme.Gold) + "\n" + HeroClassRules.Description(c) + "\n" + TipText.Dim(Loc.Pick("Клас обирається один раз.", "Class is chosen once.")));
             }

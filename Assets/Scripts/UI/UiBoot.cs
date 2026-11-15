@@ -6,20 +6,19 @@ using BattleOfAges.SaveLoad;
 namespace BattleOfAges.UI
 {
     /// <summary>
-    /// Starts the game UI after a scene loads: the StrategyHud, and — once, a frame later, when every window there has
-    /// built itself — the UiTheme look for the older windows built with default looks (inventory, worker orders, the
-    /// pause menu from the scene). Their rows made later restyle themselves (UiTheme.RestyleTree). It used to poll every
-    /// canvas five times a second for new graphics; now nothing here runs per frame.
+    /// Starts the game UI after a scene loads: the StrategyHud, and a frame later, when every window there has built itself,
+    /// the interface's scale. Each window wears the theme from its own building (UiTheme's builders; the inventory and the
+    /// pause menu from the scene restyle themselves once): there is no pass over every canvas any more (UiRestyler was one).
     /// </summary>
-    public sealed class UiRestyler : MonoBehaviour
+    public sealed class UiBoot : MonoBehaviour
     {
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Boot()
         {
-            if (FindFirstObjectByType<UiRestyler>() != null) return;
-            var go = new GameObject("UiRestyler");
+            if (FindFirstObjectByType<UiBoot>() != null) return;
+            var go = new GameObject("UiBoot");
             DontDestroyOnLoad(go);
-            go.AddComponent<UiRestyler>();
+            go.AddComponent<UiBoot>();
         }
 
         private void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
@@ -31,12 +30,6 @@ namespace BattleOfAges.UI
         {
             if (scene != SaveSystem.MenuScene && FindFirstObjectByType<StrategyHud>() == null) new GameObject("StrategyHud").AddComponent<StrategyHud>();
             yield return null; // the scene's windows build in Awake and Start
-            foreach (Canvas c in FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-            {
-                if (!c.isRootCanvas || c.renderMode == RenderMode.WorldSpace || c.GetComponent<UiThemed>() != null) continue;
-                UiTheme.RestyleTree(c.transform);
-                c.gameObject.AddComponent<UiThemed>();
-            }
             Managers.DisplaySettings.ApplyScale();
         }
     }

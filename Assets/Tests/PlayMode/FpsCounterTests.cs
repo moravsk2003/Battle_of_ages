@@ -5,6 +5,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 using BattleOfAges.UI;
+using TMPro;
 
 namespace BattleOfAges.PlayModeTests
 {
@@ -23,7 +24,7 @@ namespace BattleOfAges.PlayModeTests
             counter.Shown = true;
             yield return null;
             yield return null;
-            string text = counter.GetComponentInChildren<Text>().text;
+            string text = counter.GetComponentInChildren<TMP_Text>().text;
             StringAssert.Contains("FPS", text);
             StringAssert.Contains("мс", text);
             Assert.IsTrue(System.Text.RegularExpressions.Regex.IsMatch(text, @"FPS \d+"), $"No FPS value in '{text}'.");

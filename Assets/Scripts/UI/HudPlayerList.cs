@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using BattleOfAges.Building;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Net;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -17,7 +18,7 @@ namespace BattleOfAges.UI
         private const float Width = 460f, Margin = 18f;
 
         private RectTransform panel;
-        private Text text;
+        private TMP_Text text;
         private string shown;
 
         /// <summary>With no key held (tests).</summary>
@@ -31,9 +32,9 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(list.panel);
             list.text = UiTheme.Label(list.panel, "Text", "", 20, TextAnchor.UpperLeft, UiTheme.Ink);
             LocText.Detach(list.text);
-            list.text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            list.text.verticalOverflow = VerticalWrapMode.Overflow;
-            list.text.supportRichText = true;
+            list.text.textWrappingMode = TextWrappingModes.Normal;
+            list.text.overflowMode = TextOverflowModes.Overflow;
+            list.text.richText = true;
             list.text.rectTransform.offsetMin = new Vector2(Margin, Margin);
             list.text.rectTransform.offsetMax = new Vector2(-Margin, -Margin);
             list.panel.gameObject.SetActive(false);

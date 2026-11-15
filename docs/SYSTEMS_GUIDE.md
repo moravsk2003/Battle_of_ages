@@ -42,6 +42,8 @@
 - Будівник — статичний клас у `Utils` (`WorkbenchBuilder`, `MineBuilder`, `WorkerHouseBuilder`, `SteppeTreeBuilder` …):
   `MeshKit` (Box із фаскою, Lathe, Grid, Dome) з кольором і поверхнею на вершині, один меш на всіх і легкий далекий
   меш, `MeshKit.AttachWithLod(root, name, near, far, nearScreenHeight)`.
+- Текст у вікнах — лише через `UiTheme.Label` / `PlainText` / `Dress` (TextMeshPro, шрифт і тінь теми); `UnityEngine.UI.Text`
+  у коді не вживати.
 - Поверхня — `Vector3(pattern, metallic, smoothness)`; у шейдері персонажів `Custom/CharacterSurface` візерунки:
   0 шкіра, 1 тканина, 2 шкіра-матеріал, 3 метал, **4 волосся** (не дерево), 5 очі, 6 хутро, 7 кольчуга, 8 камінь.
 - Блискучі пласкі поверхні (лезо, вода) робити матовими: сонце в них дає засліплювальний відблиск із bloom.

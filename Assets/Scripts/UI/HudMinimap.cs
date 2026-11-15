@@ -5,6 +5,7 @@ using BattleOfAges.AI;
 using BattleOfAges.Managers;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -20,7 +21,7 @@ namespace BattleOfAges.UI
         private const float Scale = Px / (2f * HalfSize);
 
         private RectTransform frame, dots, heading, kingdomMark;
-        private Text kingdomLabel;
+        private TMP_Text kingdomLabel;
         private float kingdomTimer;
         private Camera cam;
         private RenderTexture texture;

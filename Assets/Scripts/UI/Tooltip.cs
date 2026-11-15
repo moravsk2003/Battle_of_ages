@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using BattleOfAges.InputSystem;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -82,7 +83,7 @@ namespace BattleOfAges.UI
 
         private static TooltipUI instance;
         private RectTransform root, panel;
-        private Text label;
+        private TMP_Text label;
         private Tooltip hovered;
         private float since;
         private string shown;
@@ -140,8 +141,8 @@ namespace BattleOfAges.UI
             label = UiTheme.Label(panel, "Text", "", 17, TextAnchor.UpperLeft, UiTheme.Ink);
             label.rectTransform.offsetMin = new Vector2(14f, 10f);
             label.rectTransform.offsetMax = new Vector2(-14f, -10f);
-            label.supportRichText = true;
-            label.lineSpacing = 1.1f;
+            label.richText = true;
+            label.lineSpacing = 10f; // (TextMeshPro: extra, in hundredths of an em)
             panel.gameObject.SetActive(false);
         }
 
@@ -158,10 +159,10 @@ namespace BattleOfAges.UI
             {
                 shown = text;
                 label.text = text;
-                label.horizontalOverflow = HorizontalWrapMode.Overflow;
+                label.textWrappingMode = TextWrappingModes.NoWrap;
                 float w = Mathf.Min(label.preferredWidth, MaxWidth);
                 panel.sizeDelta = new Vector2(w + 28f, 40f);
-                label.horizontalOverflow = HorizontalWrapMode.Wrap;
+                label.textWrappingMode = TextWrappingModes.Normal;
                 Canvas.ForceUpdateCanvases();
                 panel.sizeDelta = new Vector2(w + 28f, label.preferredHeight + 22f);
             }

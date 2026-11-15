@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.Managers;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -11,7 +12,7 @@ namespace BattleOfAges.UI
     [DisallowMultipleComponent]
     public class ResourceUI : MonoBehaviour
     {
-        private Text promptText;
+        private TMP_Text promptText;
         private RectTransform promptPanel;
         private bool wanted;
         private GameModeManager modes;
@@ -74,7 +75,7 @@ namespace BattleOfAges.UI
             promptPanel = UiTheme.Rect(transform, "PromptPanel", new Vector2(0.5f, 0.3f), Vector2.zero, new Vector2(400f, 50f));
             UiTheme.PanelImage(promptPanel).raycastTarget = false;
             promptText = UiTheme.Label(promptPanel, "PromptText", "", 21, TextAnchor.MiddleCenter, UiTheme.Ink);
-            promptText.lineSpacing = 1.15f;
+            promptText.lineSpacing = 15f; // (TextMeshPro: extra, in hundredths of an em)
             promptPanel.gameObject.SetActive(false);
         }
     }

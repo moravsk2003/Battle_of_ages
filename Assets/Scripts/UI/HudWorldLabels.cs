@@ -7,6 +7,7 @@ using BattleOfAges.Crafting;
 using BattleOfAges.Managers;
 using BattleOfAges.RTS;
 using BattleOfAges.Utils;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -30,11 +31,11 @@ namespace BattleOfAges.UI
         private MineNode hoveredMine;
         private TownHall hoveredHall;
         private bool closeUp;
-        private readonly Dictionary<MineNode, (RectTransform rt, Text text, Button button)> mines = new Dictionary<MineNode, (RectTransform, Text, Button)>();
+        private readonly Dictionary<MineNode, (RectTransform rt, TMP_Text text, Button button)> mines = new Dictionary<MineNode, (RectTransform, TMP_Text, Button)>();
         private readonly Dictionary<MineNode, long> mineShown = new Dictionary<MineNode, long>();
         private readonly List<(RectTransform bar, RectTransform fill)> unitBars = new List<(RectTransform, RectTransform)>();
         private RectTransform hallLabel, wallRow;
-        private Text hallText, hallButtonText, wallText, wallButtonText;
+        private TMP_Text hallText, hallButtonText, wallText, wallButtonText;
         private Button hallButton, wallButton;
         private Shown hallShown, hallButtonShown, wallShown, wallButtonShown;
 
@@ -77,14 +78,14 @@ namespace BattleOfAges.UI
         private bool Full(RectTransform plate, bool buildingHovered) =>
             closeUp || buildingHovered || RectTransformUtility.RectangleContainsScreenPoint(plate, InputSystem.UniversalInput.GetMousePosition(), null);
 
-        private static void Size(RectTransform plate, Text text, bool full, Vector2 fullSize, Vector2 chipSize, float textWidth)
+        private static void Size(RectTransform plate, TMP_Text text, bool full, Vector2 fullSize, Vector2 chipSize, float textWidth)
         {
             plate.sizeDelta = full ? fullSize : chipSize;
             var box = (RectTransform)text.transform.parent;
             box.sizeDelta = full ? new Vector2(textWidth, fullSize.y - 6f) : new Vector2(chipSize.x - 20f, chipSize.y - 4f);
             box.anchoredPosition = new Vector2(full ? 12f : 10f, 0f);
             text.fontSize = full ? 16 : 14;
-            text.alignment = full ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter; // the chip: clear of the frame on both sides
+            text.alignment = UiTheme.Align(full ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter); // the chip: clear of the frame on both sides
         }
 
         /// <summary>Where a world point is on this layer, or false when it is behind the camera.</summary>
@@ -100,7 +101,7 @@ namespace BattleOfAges.UI
 
         // ------------------------------------------------------------------ building sites
 
-        private readonly List<(RectTransform plate, Text text)> sitePlates = new List<(RectTransform, Text)>();
+        private readonly List<(RectTransform plate, TMP_Text text)> sitePlates = new List<(RectTransform, TMP_Text)>();
 
         /// <summary>Over each site: what it is, how far along, how many hands (on the map; in first person when near).</summary>
         private void UpdateSites(Camera cam, bool map)
@@ -121,9 +122,9 @@ namespace BattleOfAges.UI
                                    $"\nAutonomous workers join automatically; select others and {TipText.Key("RMB")} the site. Up to {ConstructionSite.MaxBuilders} builders—more is faster.")
                         + "\n" + TipText.Dim(Loc.Pick("Без робітників будівництво стоїть.", "Construction pauses without workers.")));
                     RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(400f, 28f));
-                    Text t = UiTheme.Label(tr, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink);
+                    TMP_Text t = UiTheme.Label(tr, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink);
                     LocText.Detach(t);
-                    t.supportRichText = true;
+                    t.richText = true;
                     sitePlates.Add((rt, t));
                 }
                 var (plate, text) = sitePlates[used++];
@@ -143,7 +144,7 @@ namespace BattleOfAges.UI
         /// <summary>How long after a hit a building shows its health in first person, and how far from the viewer.</summary>
         public const float HitShowSeconds = 5f, FirstPersonHealthRange = 45f, MapHealthRange = 110f;
 
-        private readonly List<(RectTransform plate, Text text)> healthPlates = new List<(RectTransform, Text)>();
+        private readonly List<(RectTransform plate, TMP_Text text)> healthPlates = new List<(RectTransform, TMP_Text)>();
 
         /// <summary>
         /// Whether a building's health shows: on the map all in sight (a wall or a field only once hit, there are too many of
@@ -185,7 +186,7 @@ namespace BattleOfAges.UI
                 UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
                 rt.GetComponent<Image>().raycastTarget = false;
                 RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(106f, 20f));
-                Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
+                TMP_Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
                 t.raycastTarget = false;
                 healthPlates.Add((rt, t));
             }
@@ -197,7 +198,7 @@ namespace BattleOfAges.UI
             return used + 1;
         }
 
-        private readonly List<(RectTransform plate, Text text)> placePlates = new List<(RectTransform, Text)>();
+        private readonly List<(RectTransform plate, TMP_Text text)> placePlates = new List<(RectTransform, TMP_Text)>();
 
         /// <summary>On the map, with units selected: over each field or sawmill with room, that a right-click sends them there.</summary>
         private void UpdatePlaces(Camera cam, bool map)
@@ -214,7 +215,7 @@ namespace BattleOfAges.UI
                         rt.pivot = new Vector2(0.5f, 0f);
                         UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
                         RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(290f, 24f));
-                        Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
+                        TMP_Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
                         LocText.Detach(t);
                         t.raycastTarget = false;
                         rt.GetComponent<Image>().raycastTarget = false;
@@ -297,16 +298,16 @@ namespace BattleOfAges.UI
             "\n" + TipText.Dim(Loc.Pick("«Вивести» — забрати одного робітника з шахти. Повна шахта (червоне число) стоїть: потрібні носії.",
                                         "\"Release\" sends one miner back out. A full mine (red number) halts until haulers empty it."));
 
-        private (RectTransform, Text, Button) MineLabel(MineNode mine)
+        private (RectTransform, TMP_Text, Button) MineLabel(MineNode mine)
         {
             RectTransform rt = UiTheme.Rect(layer, "MineLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350f, 56f));
             rt.pivot = new Vector2(0.5f, 0f);
             UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f));
             Tooltip.Set(rt.gameObject, MineHowTo); // a tester could not make out how the ore comes about: the whole chain on hover
             RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(250f, 50f));
-            Text text = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+            TMP_Text text = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(text);
-            text.supportRichText = true;
+            text.richText = true;
             Button b = UiTheme.TextButton(rt, "Release", "Вивести", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(84f, 38f), () => mine.ReleaseOneWorker(), 15);
             return (rt, text, b);
         }
@@ -366,12 +367,12 @@ namespace BattleOfAges.UI
             RectTransform tr = UiTheme.Rect(hallLabel, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 52f));
             hallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(hallText);
-            hallText.supportRichText = true;
+            hallText.richText = true;
             hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Viewed != null) Net.CommandBus.Submit(new Net.UpgradeHallCommand { Hall = Net.WorldEntity.IdOf(TownHall.Viewed).Value }); }, 13);
-            hallButtonText = hallButton.GetComponentInChildren<Text>();
+            hallButtonText = hallButton.GetComponentInChildren<TMP_Text>();
             LocText.Detach(hallButtonText);
-            hallButtonText.supportRichText = true;
-            hallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hallButtonText.richText = true;
+            hallButtonText.textWrappingMode = TextWrappingModes.Normal;
             hallLabel.SetAsFirstSibling();
         }
 
@@ -388,12 +389,12 @@ namespace BattleOfAges.UI
                 RectTransform tr = UiTheme.Rect(wallRow, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
                 wallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
                 LocText.Detach(wallText);
-                wallText.supportRichText = true;
+                wallText.richText = true;
                 wallButton = UiTheme.TextButton(wallRow, "UpgradeWalls", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 44f), () => Net.CommandBus.Submit(new Net.UpgradeWallsCommand()), 13);
-                wallButtonText = wallButton.GetComponentInChildren<Text>();
+                wallButtonText = wallButton.GetComponentInChildren<TMP_Text>();
                 LocText.Detach(wallButtonText);
-                wallButtonText.supportRichText = true;
-                wallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                wallButtonText.richText = true;
+                wallButtonText.textWrappingMode = TextWrappingModes.Normal;
             }
             if (wallRow.gameObject.activeSelf != show) wallRow.gameObject.SetActive(show);
             if (!show) return;

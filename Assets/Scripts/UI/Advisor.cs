@@ -6,6 +6,7 @@ using BattleOfAges.Crafting;
 using BattleOfAges.InputSystem;
 using BattleOfAges.Resources;
 using BattleOfAges.RTS;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -25,7 +26,7 @@ namespace BattleOfAges.UI
 
         private static Advisor instance;
         private RectTransform panel;
-        private Text title, hint, count;
+        private TMP_Text title, hint, count;
         private float timer;
 
         private static string K(KeyAction a) => TipText.Key(HudTips.Key(a));
@@ -144,8 +145,8 @@ namespace BattleOfAges.UI
             title = UiTheme.Label(t, "Text", "", 20, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             RectTransform h = UiTheme.Rect(panel, "How", new Vector2(0f, 1f), new Vector2(16f, -62f), new Vector2(350f, 96f));
             hint = UiTheme.Label(h, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Ink);
-            hint.horizontalOverflow = HorizontalWrapMode.Wrap;
-            hint.supportRichText = true;
+            hint.textWrappingMode = TextWrappingModes.Normal;
+            hint.richText = true;
             Button close = UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-6f, -6f), new Vector2(30f, 28f), () => Hidden = true, 20);
             Tooltip.Set(close.gameObject, "Сховати поради" + "\n" + TipText.Dim("Повернути — у налаштуваннях"));
             Refresh();

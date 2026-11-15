@@ -5,6 +5,7 @@ using BattleOfAges.CameraSystem;
 using BattleOfAges.Managers;
 using BattleOfAges.Resources;
 using BattleOfAges.World;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -28,13 +29,13 @@ namespace BattleOfAges.UI
         public bool BuildOpen => open;
 
         private float nextCounts;
-        private Text[] zoneLabels;
+        private TMP_Text[] zoneLabels;
         private Button build, eraser;
         private Button[] zoneButtons;
         private Button[] sizes;
         private GameObject row, zonesRow;
         private RectTransform statusPanel;
-        private Text status;
+        private TMP_Text status;
         private bool open;
         private float nextStatus;
         private int baseIndex;
@@ -82,12 +83,12 @@ namespace BattleOfAges.UI
             float width = (types.Length + 1) * Step + SizeNamesUk.Length * SizeStep + 14f;
             x = -width * 0.5f + ButtonW * 0.5f;
             zoneButtons = new Button[types.Length];
-            zoneLabels = new Text[types.Length];
+            zoneLabels = new TMP_Text[types.Length];
             for (int i = 0; i < types.Length; i++)
             {
                 ZoneType type = types[i];
                 zoneButtons[i] = UiTheme.TextButton(zonesRect, "Zone_" + type, ZoneMap.Name(type), new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(ButtonW, RowH), () => Toggle(type), 16);
-                zoneLabels[i] = zoneButtons[i].GetComponentInChildren<Text>();
+                zoneLabels[i] = zoneButtons[i].GetComponentInChildren<TMP_Text>();
                 LocText.Detach(zoneLabels[i]);
                 RectTransform stripe = UiTheme.Child(zoneButtons[i].transform, "Stripe", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(7f, 5f), new Vector2(-7f, 11f));
                 Image img = stripe.gameObject.AddComponent<Image>();
@@ -106,7 +107,7 @@ namespace BattleOfAges.UI
             {
                 int index = i;
                 sizes[i] = UiTheme.TextButton(zonesRect, "Size" + i, Loc.En ? SizeNamesEn[i] : SizeNamesUk[i], new Vector2(0.5f, 1f), new Vector2(x, zonesY), new Vector2(44f, RowH), () => ZonePainter.BrushIndex = index, 17);
-                LocText.Detach(sizes[i].GetComponentInChildren<Text>());
+                LocText.Detach(sizes[i].GetComponentInChildren<TMP_Text>());
                 Tooltip.Set(sizes[i].gameObject, () => TipText.Title(Loc.Pick($"Пензель {SizeTipsUk[index]}", $"Brush: {SizeTipsEn[index]}"), UiTheme.Gold) + Loc.Pick($"\nРадіус {ZonePainter.Brushes[index]:0} м.", $"\nRadius {ZonePainter.Brushes[index]:0} m."));
                 x += SizeStep;
             }
@@ -116,10 +117,10 @@ namespace BattleOfAges.UI
             RectTransform text = UiTheme.Child(statusPanel, "Text", Vector2.zero, Vector2.one, new Vector2(16f, 6f), new Vector2(-148f, -6f));
             status = UiTheme.Label(text, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
             LocText.Detach(status);
-            status.supportRichText = true;
-            status.horizontalOverflow = HorizontalWrapMode.Wrap;
+            status.richText = true;
+            status.textWrappingMode = TextWrappingModes.Normal;
             UiTheme.TextButton(statusPanel, "Done", "Готово\n<size=12>Esc</size>", new Vector2(1f, 0.5f), new Vector2(-10f, 0f), new Vector2(120f, 56f), ZonePainter.Stop, 16)
-                .GetComponentInChildren<Text>().supportRichText = true;
+                .GetComponentInChildren<TMP_Text>().richText = true;
             statusPanel.gameObject.SetActive(false);
             zonesRow.SetActive(false);
             Apply();
@@ -139,7 +140,7 @@ namespace BattleOfAges.UI
                 string[] names = Loc.En ? SizeNamesEn : SizeNamesUk;
                 for (int i = 0; i < sizes.Length && i < names.Length; i++)
                 {
-                    Text t = sizes[i] != null ? sizes[i].GetComponentInChildren<Text>() : null;
+                    TMP_Text t = sizes[i] != null ? sizes[i].GetComponentInChildren<TMP_Text>() : null;
                     if (t != null) t.text = names[i];
                 }
             }
@@ -260,7 +261,7 @@ namespace BattleOfAges.UI
             }
             if (frame.enabled == on) return;
             frame.enabled = on;
-            Text label = b.GetComponentInChildren<Text>();
+            TMP_Text label = b.GetComponentInChildren<TMP_Text>();
             if (label != null) label.color = on ? UiTheme.Gold : UiTheme.Ink;
         }
 

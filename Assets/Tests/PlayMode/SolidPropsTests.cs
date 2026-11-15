@@ -241,14 +241,17 @@ namespace BattleOfAges.PlayModeTests
             yield return null;
             Canvas.ForceUpdateCanvases();
             Assert.IsTrue(panel.gameObject.activeSelf);
-            UnityEngine.UI.Text words = panel.GetComponentInChildren<UnityEngine.UI.Text>();
+            TMPro.TMP_Text words = panel.GetComponentInChildren<TMPro.TMP_Text>();
             StringAssert.Contains("самі", words.text);
             Assert.GreaterOrEqual(panel.rect.height, words.preferredHeight, "every line inside the panel");
             float left = float.MaxValue, right = float.MinValue;
-            foreach (UIVertex v in words.cachedTextGenerator.verts)
+            words.ForceMeshUpdate();
+            TMPro.TMP_TextInfo shaped = words.textInfo;
+            for (int i = 0; i < shaped.characterCount; i++)
             {
-                left = Mathf.Min(left, v.position.x);
-                right = Mathf.Max(right, v.position.x);
+                if (!shaped.characterInfo[i].isVisible) continue;
+                left = Mathf.Min(left, shaped.characterInfo[i].bottomLeft.x);
+                right = Mathf.Max(right, shaped.characterInfo[i].topRight.x);
             }
             Assert.LessOrEqual(right - left, panel.rect.width, "and every letter");
         }

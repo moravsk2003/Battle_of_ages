@@ -9,6 +9,7 @@ using UnityEngine.InputSystem.UI;
 #endif
 using BattleOfAges.Managers;
 using BattleOfAges.UI;
+using TMPro;
 
 namespace BattleOfAges.EditorTools
 {
@@ -105,8 +106,8 @@ namespace BattleOfAges.EditorTools
             foreach (Transform child in settingsPanelObj.transform) Object.DestroyImmediate(child.gameObject);
 
             // Populate Pause Panel UI
-            Text titleText = CreateText(pausePanelObj.transform, "Title", "ПАУЗА", 42, new Vector2(0, 150));
-            Text tipText = CreateText(pausePanelObj.transform, "Tip", "(Натисніть ESC або P для згортання)", 16, new Vector2(0, 100));
+            TMP_Text titleText = CreateText(pausePanelObj.transform, "Title", "ПАУЗА", 42, new Vector2(0, 150));
+            TMP_Text tipText = CreateText(pausePanelObj.transform, "Tip", "(Натисніть ESC або P для згортання)", 16, new Vector2(0, 100));
             tipText.color = new Color(0.7f, 0.7f, 0.7f, 1f);
 
             Button resumeBtn = CreateButton(pausePanelObj.transform, "ResumeButton", "Відновити гру", new Vector2(0, 30));
@@ -114,15 +115,15 @@ namespace BattleOfAges.EditorTools
             Button quitBtn = CreateButton(pausePanelObj.transform, "QuitButton", "Вийти з гри", new Vector2(0, -110));
 
             // Populate Settings Panel UI
-            Text settingsTitle = CreateText(settingsPanelObj.transform, "SettingsTitle", "НАЛАШТУВАННЯ", 36, new Vector2(0, 180));
+            TMP_Text settingsTitle = CreateText(settingsPanelObj.transform, "SettingsTitle", "НАЛАШТУВАННЯ", 36, new Vector2(0, 180));
             
-            Text fpsLabel = CreateText(settingsPanelObj.transform, "FpsLabel", "Чутливість миші (1-ша особа):", 20, new Vector2(0, 90));
+            TMP_Text fpsLabel = CreateText(settingsPanelObj.transform, "FpsLabel", "Чутливість миші (1-ша особа):", 20, new Vector2(0, 90));
             Slider fpsSlider = CreateSlider(settingsPanelObj.transform, "FpsSensSlider", new Vector2(0, 55));
 
-            Text mapLabel = CreateText(settingsPanelObj.transform, "MapLabel", "Чутливість / швидкість (2D Карта):", 20, new Vector2(0, -10));
+            TMP_Text mapLabel = CreateText(settingsPanelObj.transform, "MapLabel", "Чутливість / швидкість (2D Карта):", 20, new Vector2(0, -10));
             Slider mapSlider = CreateSlider(settingsPanelObj.transform, "MapSensSlider", new Vector2(0, -45));
 
-            Text volLabel = CreateText(settingsPanelObj.transform, "VolLabel", "Загальна гучність:", 20, new Vector2(0, -110));
+            TMP_Text volLabel = CreateText(settingsPanelObj.transform, "VolLabel", "Загальна гучність:", 20, new Vector2(0, -110));
             Slider volSlider = CreateSlider(settingsPanelObj.transform, "VolSlider", new Vector2(0, -145));
 
             Button backBtn = CreateButton(settingsPanelObj.transform, "BackButton", "Назад", new Vector2(0, -220));
@@ -165,7 +166,7 @@ namespace BattleOfAges.EditorTools
             return panel;
         }
 
-        private static Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 anchoredPos)
+        private static TMP_Text CreateText(Transform parent, string name, string content, int fontSize, Vector2 anchoredPos)
         {
             GameObject textObj = new GameObject(name);
             textObj.transform.SetParent(parent, false);
@@ -174,12 +175,12 @@ namespace BattleOfAges.EditorTools
             rect.anchoredPosition = anchoredPos;
             rect.sizeDelta = new Vector2(500, 50);
 
-            Text txt = textObj.AddComponent<Text>();
+            TMP_Text txt = textObj.AddComponent<TextMeshProUGUI>();
             txt.text = content;
             txt.fontSize = fontSize;
-            txt.alignment = TextAnchor.MiddleCenter;
+            txt.alignment = UiTheme.Align(TextAnchor.MiddleCenter);
             txt.color = Color.white;
-            txt.font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.font = UiTheme.TmpFont;
 
             return txt;
         }
@@ -212,12 +213,12 @@ namespace BattleOfAges.EditorTools
             txtRect.offsetMin = Vector2.zero;
             txtRect.offsetMax = Vector2.zero;
 
-            Text txt = txtObj.AddComponent<Text>();
+            TMP_Text txt = txtObj.AddComponent<TextMeshProUGUI>();
             txt.text = labelText;
             txt.fontSize = 20;
-            txt.alignment = TextAnchor.MiddleCenter;
+            txt.alignment = UiTheme.Align(TextAnchor.MiddleCenter);
             txt.color = Color.white;
-            txt.font = UnityEngine.Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            txt.font = UiTheme.TmpFont;
 
             return btn;
         }

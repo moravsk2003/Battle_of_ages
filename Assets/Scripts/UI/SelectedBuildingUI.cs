@@ -6,6 +6,7 @@ using BattleOfAges.Crafting;
 using BattleOfAges.Managers;
 using BattleOfAges.Net;
 using BattleOfAges.RTS;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -21,7 +22,7 @@ namespace BattleOfAges.UI
         private const float RefreshEvery = 0.2f, ConfirmSeconds = 3f;
 
         private GameObject panel;
-        private Text title, status, hpText, handsText, demolishText, actionText;
+        private TMP_Text title, status, hpText, handsText, demolishText, actionText;
         private RectTransform hpFill, handsGroup;
         private Button minus, plus, demolish, action;
         private BuildingNode shown;
@@ -228,7 +229,7 @@ namespace BattleOfAges.UI
             RectTransform st = UiTheme.Rect(rect, "Status", new Vector2(0f, 1f), new Vector2(22f, -76f), new Vector2(520f, 44f));
             status = UiTheme.Label(st, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
             LocText.Detach(status);
-            status.horizontalOverflow = HorizontalWrapMode.Wrap;
+            status.textWrappingMode = TextWrappingModes.Normal;
 
             handsGroup = UiTheme.Rect(rect, "Hands", new Vector2(1f, 0.5f), new Vector2(-340f, -4f), new Vector2(236f, 88f));
             RectTransform handsLabel = UiTheme.Rect(handsGroup, "Label", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(236f, 30f));
@@ -240,13 +241,13 @@ namespace BattleOfAges.UI
             Tooltip.Set(plus.gameObject, () => TipText.Title(Loc.Pick("Одним більше", "One More"), UiTheme.Gold) + Loc.Pick("\nПрийде найближча вільна людина.", "\nNearest available worker will come."));
 
             action = UiTheme.TextButton(rect, "Action", "", new Vector2(1f, 0.5f), new Vector2(-178f, -4f), new Vector2(152f, 88f), DoAction, 16);
-            actionText = action.GetComponentInChildren<Text>();
+            actionText = action.GetComponentInChildren<TMP_Text>();
             LocText.Detach(actionText);
-            actionText.supportRichText = true;
-            actionText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            actionText.richText = true;
+            actionText.textWrappingMode = TextWrappingModes.Normal;
 
             demolish = UiTheme.TextButton(rect, "Demolish", "Знести", new Vector2(1f, 0.5f), new Vector2(-18f, -4f), new Vector2(152f, 88f), PressDemolish, 18);
-            demolishText = demolish.GetComponentInChildren<Text>();
+            demolishText = demolish.GetComponentInChildren<TMP_Text>();
             LocText.Detach(demolishText);
             Tooltip.Set(demolish.gameObject, DemolishTip);
 

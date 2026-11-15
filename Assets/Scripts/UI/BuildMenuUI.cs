@@ -4,6 +4,7 @@ using BattleOfAges.Managers;
 using BattleOfAges.Resources;
 using BattleOfAges.Building;
 using BattleOfAges.InputSystem;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -17,10 +18,10 @@ namespace BattleOfAges.UI
         public static BuildMenuUI Instance { get; private set; }
 
         private GameObject menuPanelObj;
-        private Text statusText;
+        private TMP_Text statusText;
         private GameModeManager gameModeManager;
 
-        private Text titleText;
+        private TMP_Text titleText;
 
         public bool IsOpen { get; private set; }
 
@@ -225,7 +226,7 @@ namespace BattleOfAges.UI
             }
         }
 
-        private struct Row { public BuildingType Type; public Button Button; public Text Name, Cost, Description; public CanvasGroup Group; }
+        private struct Row { public BuildingType Type; public Button Button; public TMP_Text Name, Cost, Description; public CanvasGroup Group; }
         private readonly Row[] rows = new Row[BuildingData.GetAllDefinitions().Length];
 
         private Row CreateBuildingButton(RectTransform rect, BuildingDefinition def)
@@ -248,16 +249,16 @@ namespace BattleOfAges.UI
                               : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
             UiTheme.IconImage(iconRect, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
-            Text name = UiTheme.Label(UiTheme.Child(rect, "Name", new Vector2(0f, 0.5f), new Vector2(0.55f, 1f), new Vector2(78f, 0f), new Vector2(0f, -4f)), "NameText", def.DisplayName, 19, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            TMP_Text name = UiTheme.Label(UiTheme.Child(rect, "Name", new Vector2(0f, 0.5f), new Vector2(0.55f, 1f), new Vector2(78f, 0f), new Vector2(0f, -4f)), "NameText", def.DisplayName, 19, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
             LocText.Detach(name);
-            Text cost = UiTheme.Label(UiTheme.Child(rect, "Cost", new Vector2(0.55f, 0.5f), new Vector2(1f, 1f), Vector2.zero, new Vector2(-14f, -4f)), "CostText", "", 16, TextAnchor.MiddleRight, UiTheme.Gold);
+            TMP_Text cost = UiTheme.Label(UiTheme.Child(rect, "Cost", new Vector2(0.55f, 0.5f), new Vector2(1f, 1f), Vector2.zero, new Vector2(-14f, -4f)), "CostText", "", 16, TextAnchor.MiddleRight, UiTheme.Gold);
             LocText.Detach(cost);
-            Text desc = UiTheme.Label(UiTheme.Child(rect, "Description", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(78f, 5f), new Vector2(-14f, 0f)), "DescriptionText", def.Description, 15, TextAnchor.MiddleLeft, UiTheme.InkDim);
+            TMP_Text desc = UiTheme.Label(UiTheme.Child(rect, "Description", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(78f, 5f), new Vector2(-14f, 0f)), "DescriptionText", def.Description, 15, TextAnchor.MiddleLeft, UiTheme.InkDim);
             LocText.Detach(desc);
-            desc.horizontalOverflow = HorizontalWrapMode.Wrap;
-            desc.resizeTextForBestFit = true;
-            desc.resizeTextMinSize = 12;
-            desc.resizeTextMaxSize = 15;
+            desc.textWrappingMode = TextWrappingModes.Normal;
+            desc.enableAutoSizing = true;
+            desc.fontSizeMin = 12;
+            desc.fontSizeMax = 15;
 
             Tooltip.Set(rect.gameObject, () => BuildTip(capturedType));
             return new Row { Type = def.Type, Button = btn, Name = name, Cost = cost, Description = desc, Group = rect.gameObject.AddComponent<CanvasGroup>() };

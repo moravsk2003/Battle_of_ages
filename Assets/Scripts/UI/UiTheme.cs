@@ -4,13 +4,14 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.Crafting;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
     /// <summary>
     /// One look for the whole game UI: dark leather panels with bronze rims, gold accents, parchment text in a serif
     /// face with Cyrillic, all sprites and icons generated in code (no texture assets). Helpers build themed elements;
-    /// Restyle converts UI that older scripts built with default looks (see UiRestyler).
+    /// Restyle converts UI built with default looks (the pause menu from the scene, the inventory: they call it on themselves).
     /// </summary>
     public static class UiTheme
     {
@@ -29,7 +30,89 @@ namespace BattleOfAges.UI
         private static Sprite panel, button, bar, slot, round;
         private static readonly Dictionary<Icon, Sprite> Icons = new Dictionary<Icon, Sprite>();
 
-        /// <summary>Serif UI face with Cyrillic from the OS (Palatino / Georgia / Constantia), the built-in font otherwise.</summary>
+        private static readonly string[] Faces = { "Palatino Linotype", "Book Antiqua", "Georgia", "Constantia", "Cambria" };
+        private static TMP_FontAsset tmpFont;
+        private static Material tmpShadowed;
+
+        /// <summary>
+        /// The interface's face for TextMeshPro: the serif face of the OS (Palatino / Georgia / Constantia), its glyphs drawn into
+        /// a distance-field atlas as they are first needed (sharp at any interface scale), with TextMeshPro's LiberationSans
+        /// (Latin and Cyrillic) behind it for what it lacks, and alone where none of them is.
+        /// </summary>
+        public static TMP_FontAsset TmpFont
+        {
+            get
+            {
+                if (tmpFont != null) return tmpFont;
+                TMP_FontAsset fallback = UnityEngine.Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF - Fallback");
+                foreach (string face in Faces)
+                {
+                    try { tmpFont = TMP_FontAsset.CreateFontAsset(face, "Regular", 90); } catch (Exception) { tmpFont = null; }
+                    if (tmpFont != null) break;
+                }
+                if (tmpFont == null) tmpFont = fallback != null ? fallback : TMP_Settings.defaultFontAsset;
+                else
+                {
+                    tmpFont.name = "UI face";
+                    tmpFont.isMultiAtlasTexturesEnabled = true;
+                    if (fallback != null) tmpFont.fallbackFontAssetTable = new List<TMP_FontAsset> { fallback };
+                }
+                return tmpFont;
+            }
+        }
+
+        /// <summary>The face's material with a soft drop shadow under each letter (the uGUI Shadow effect does not reach TextMeshPro).</summary>
+        public static Material TmpShadowed
+        {
+            get
+            {
+                if (tmpShadowed != null) return tmpShadowed;
+                TMP_FontAsset f = TmpFont;
+                if (f == null || f.material == null) return null;
+                tmpShadowed = new Material(f.material) { name = "UI face shadowed" };
+                tmpShadowed.EnableKeyword(ShaderUtilities.Keyword_Underlay);
+                tmpShadowed.SetColor(ShaderUtilities.ID_UnderlayColor, new Color(0f, 0f, 0f, 0.75f));
+                tmpShadowed.SetFloat(ShaderUtilities.ID_UnderlayOffsetX, 0.6f);
+                tmpShadowed.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, -0.6f);
+                tmpShadowed.SetFloat(ShaderUtilities.ID_UnderlaySoftness, 0.25f);
+                return tmpShadowed;
+            }
+        }
+
+        /// <summary>A uGUI anchor as TextMeshPro's alignment.</summary>
+        public static TextAlignmentOptions Align(TextAnchor a)
+        {
+            switch (a)
+            {
+                case TextAnchor.UpperLeft: return TextAlignmentOptions.TopLeft;
+                case TextAnchor.UpperCenter: return TextAlignmentOptions.Top;
+                case TextAnchor.UpperRight: return TextAlignmentOptions.TopRight;
+                case TextAnchor.MiddleLeft: return TextAlignmentOptions.Left;
+                case TextAnchor.MiddleRight: return TextAlignmentOptions.Right;
+                case TextAnchor.LowerLeft: return TextAlignmentOptions.BottomLeft;
+                case TextAnchor.LowerCenter: return TextAlignmentOptions.Bottom;
+                case TextAnchor.LowerRight: return TextAlignmentOptions.BottomRight;
+                default: return TextAlignmentOptions.Center;
+            }
+        }
+
+        /// <summary>A uGUI font style as TextMeshPro's.</summary>
+        public static FontStyles Style(FontStyle s) => s == FontStyle.Bold ? FontStyles.Bold : s == FontStyle.Italic ? FontStyles.Italic
+                                                     : s == FontStyle.BoldAndItalic ? FontStyles.Bold | FontStyles.Italic : FontStyles.Normal;
+
+        /// <summary>A label's look: the face, its shadow, rich text, and its size and colour.</summary>
+        public static void Dress(TMP_Text t, int size, TextAnchor align, Color color, FontStyle style, bool shadow = true)
+        {
+            t.font = TmpFont;
+            if (shadow && TmpShadowed != null) t.fontSharedMaterial = TmpShadowed;
+            t.fontSize = size;
+            t.alignment = Align(align);
+            t.color = color;
+            t.fontStyle = Style(style);
+            t.richText = true;
+        }
+
+        /// <summary>Serif UI face with Cyrillic from the OS (Palatino / Georgia / Constantia), the built-in font otherwise (uGUI's, kept for what still asks for a Font).</summary>
         public static Font Font
         {
             get
@@ -465,15 +548,12 @@ namespace BattleOfAges.UI
             return rt;
         }
 
-        /// <summary>A plain Text on go (the older windows' style; UiRestyler themes it later).</summary>
-        public static Text PlainText(GameObject go, Font font, int size, TextAnchor align, Color color, string text = null, FontStyle style = FontStyle.Normal, bool raycast = true)
+        /// <summary>A plain text on go, in the theme's face (the font argument is the uGUI one the older windows passed; unused).</summary>
+        public static TMP_Text PlainText(GameObject go, Font font, int size, TextAnchor align, Color color, string text = null, FontStyle style = FontStyle.Normal, bool raycast = true)
         {
-            var t = go.AddComponent<Text>();
-            t.font = font;
-            t.fontSize = size;
-            t.fontStyle = style;
-            t.alignment = align;
-            t.color = color;
+            var t = go.AddComponent<TextMeshProUGUI>();
+            Dress(t, size, align, color, style);
+            t.textWrappingMode = TextWrappingModes.Normal;
             if (text != null) t.text = text;
             t.raycastTarget = raycast;
             LocText.Attach(t);
@@ -489,18 +569,16 @@ namespace BattleOfAges.UI
             return img;
         }
 
-        public static Text Label(Transform parent, string name, string text, int size, TextAnchor align, Color? color = null, FontStyle style = FontStyle.Normal)
+        public static TMP_Text Label(Transform parent, string name, string text, int size, TextAnchor align, Color? color = null, FontStyle style = FontStyle.Normal)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var rt = (RectTransform)go.transform;
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero;
-            var t = go.AddComponent<Text>();
-            t.font = Font; t.fontSize = size; t.alignment = align; t.color = color ?? Ink; t.fontStyle = style; t.text = text;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow; t.raycastTarget = false;
-            var sh = go.AddComponent<Shadow>();
-            sh.effectColor = new Color(0f, 0f, 0f, 0.75f);
-            sh.effectDistance = new Vector2(1.2f, -1.2f);
+            var t = go.AddComponent<TextMeshProUGUI>();
+            Dress(t, size, align, color ?? Ink, style);
+            t.text = text;
+            t.textWrappingMode = TextWrappingModes.NoWrap; t.raycastTarget = false;
             LocText.Attach(t);
             return t;
         }
@@ -759,18 +837,13 @@ namespace BattleOfAges.UI
         /// <summary>Gives one element of an older window the theme look (fonts, panels, buttons, accent colours).</summary>
         public static void Restyle(Graphic g)
         {
-            if (g is Text t)
+            if (g is TMP_Text t)
             {
-                t.font = Font;
+                t.font = TmpFont;
+                if (TmpShadowed != null) t.fontSharedMaterial = TmpShadowed;
                 Color.RGBToHSV(t.color, out float h, out float s, out float v);
                 if (s > 0.35f && h > 0.45f && h < 0.6f) t.color = Gold;          // cyan accents -> gold
                 else if (s < 0.25f && v > 0.7f) t.color = new Color(Ink.r, Ink.g, Ink.b, t.color.a);
-                if (t.GetComponent<Shadow>() == null)
-                {
-                    var sh = t.gameObject.AddComponent<Shadow>();
-                    sh.effectColor = new Color(0f, 0f, 0f, 0.7f);
-                    sh.effectDistance = new Vector2(1f, -1f);
-                }
                 t.text = Sanitize(t.text);
                 LocText.Attach(t);
                 return;

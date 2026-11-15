@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using BattleOfAges.InputSystem;
 using BattleOfAges.SaveLoad;
+using TMPro;
 
 namespace BattleOfAges.UI
 {
@@ -16,7 +17,7 @@ namespace BattleOfAges.UI
         public static bool IsVisible => instance != null && instance.window != null && instance.window.activeSelf;
 
         private GameObject window;
-        private Text title;
+        private TMP_Text title;
         private RectTransform list;
         private bool saving;
         private int armedSlot = -1;
@@ -122,14 +123,14 @@ namespace BattleOfAges.UI
             RectTransform nm = UiTheme.Rect(row, "Name", new Vector2(0f, 1f), new Vector2(18f, -10f), new Vector2(420f, 32f));
             bool named = saving && slot != SaveSystem.AutoSlot;
             string heading = !named && !string.IsNullOrEmpty(m.Title) ? $"{SaveSystem.SlotName(slot)}: {m.Title}" : SaveSystem.SlotName(slot);
-            Text head = UiTheme.Label(nm, "Text", heading, 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            TMP_Text head = UiTheme.Label(nm, "Text", heading, 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             LocText.Detach(head);
-            head.horizontalOverflow = HorizontalWrapMode.Overflow;
+            head.textWrappingMode = TextWrappingModes.NoWrap;
             if (named) TitleField(row, slot, m);
             RectTransform info = UiTheme.Rect(row, "Info", new Vector2(0f, 0f), new Vector2(18f, 10f), new Vector2(470f, 52f));
-            Text t = UiTheme.Label(info, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
+            TMP_Text t = UiTheme.Label(info, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
             LocText.Detach(t);
-            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.textWrappingMode = TextWrappingModes.Normal;
             t.text = m.Exists
                 ? Loc.Pick($"{m.SavedAt:dd.MM.yyyy HH:mm}   ·   у грі {PlayTime(m.PlaySeconds)}\nдерево {m.Wood}  ·  руда {m.Ore}  ·  юнітів {m.Units}  ·  будівель {m.Buildings}",
                            $"{m.SavedAt:dd.MM.yyyy HH:mm}   ·   played {PlayTime(m.PlaySeconds)}\nwood {m.Wood}  ·  ore {m.Ore}  ·  units {m.Units}  ·  buildings {m.Buildings}")
@@ -140,7 +141,7 @@ namespace BattleOfAges.UI
             {
                 bool armed = armedSlot == slot && armedAction == "delete";
                 Button del = UiTheme.TextButton(row, "Delete", armed ? Loc.Pick("Точно?", "Sure?") : "×", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(armed ? 92f : 44f, 44f), () => Act(slot, "delete"), armed ? 16 : 24);
-                LocText.Detach(del.GetComponentInChildren<Text>());
+                LocText.Detach(del.GetComponentInChildren<TMP_Text>());
                 del.GetComponent<Image>().color = new Color(1f, 0.65f, 0.6f);
                 x -= armed ? 102f : 54f;
             }
@@ -148,12 +149,12 @@ namespace BattleOfAges.UI
             {
                 bool armed = armedSlot == slot && armedAction == "save";
                 Button save = UiTheme.TextButton(row, "Save", armed ? Loc.Pick("Перезаписати?", "Overwrite?") : Loc.Pick("Зберегти", "Save"), new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "save"), 17);
-                LocText.Detach(save.GetComponentInChildren<Text>());
+                LocText.Detach(save.GetComponentInChildren<TMP_Text>());
             }
             else
             {
                 Button b = UiTheme.TextButton(row, "Load", onPick != null ? Loc.Pick("У лобі", "To Lobby") : Loc.Pick("Завантажити", "Load"), new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "load"), 17);
-                LocText.Detach(b.GetComponentInChildren<Text>());
+                LocText.Detach(b.GetComponentInChildren<TMP_Text>());
                 b.interactable = m.Exists;
             }
         }
@@ -166,12 +167,13 @@ namespace BattleOfAges.UI
             RectTransform f = UiTheme.Rect(row, "Title", new Vector2(0f, 1f), new Vector2(118f, -8f), new Vector2(300f, 36f));
             UiTheme.PanelImage(f, UiTheme.SlotSprite);
             RectTransform tr = UiTheme.Rect(f, "Input", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 30f));
-            Text text = UiTheme.Label(tr, "Text", "", 18, TextAnchor.MiddleLeft, UiTheme.Ink);
-            text.supportRichText = false;
+            TMP_Text text = UiTheme.Label(tr, "Text", "", 18, TextAnchor.MiddleLeft, UiTheme.Ink);
+            text.richText = false;
             RectTransform pr = UiTheme.Rect(f, "Placeholder", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 30f));
-            Text placeholder = UiTheme.Label(pr, "Text", "назва збереження", 16, TextAnchor.MiddleLeft, UiTheme.InkDim, FontStyle.Italic);
-            InputField input = f.gameObject.AddComponent<InputField>();
+            TMP_Text placeholder = UiTheme.Label(pr, "Text", "назва збереження", 16, TextAnchor.MiddleLeft, UiTheme.InkDim, FontStyle.Italic);
+            TMP_InputField input = f.gameObject.AddComponent<TMP_InputField>();
             input.textComponent = text;
+            input.textViewport = (RectTransform)text.transform.parent;
             input.placeholder = placeholder;
             input.characterLimit = 32;
             input.text = titles.TryGetValue(slot, out string typed) ? typed : m.Title ?? "";
