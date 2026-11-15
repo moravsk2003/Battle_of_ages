@@ -1,7 +1,7 @@
 # Battle of Ages — архітектура коду
 
 > Що гра робить і чому — у [GAME_DESIGN.md](GAME_DESIGN.md) (джерело правди). Цей файл — карта коду: де що лежить, як
-> частини знаходять одна одну, правила, яких тримаємося. Оновлено 2026-10-27 (після проходу якості коду).
+> частини знаходять одна одну, правила, яких тримаємося. Оновлено 2026-11-15. Як додати нове — [SYSTEMS_GUIDE.md](SYSTEMS_GUIDE.md).
 >
 > Unity 6 (`6000.3.6f1`), URP, C# 9. Збірки: `BattleOfAges.Runtime` (`Assets/Scripts`), редакторські інструменти
 > (`Assets/Editor`), тести `BattleOfAges.Tests` (EditMode) і PlayMode (`Assets/Tests`).
@@ -10,19 +10,21 @@
 
 | Папка | Що там |
 |---|---|
-| `AI` | вороги й звірі: `AIBaseController` (стани), `HostileMobAI` (бандити, облоги, драбини), `NpcKingdom` / `HostileSettlementLeader` (королі-ШІ, набіги), `PeacefulAnimalAI` |
+| `AI` | вороги й звірі: `AIBaseController` (стани), `HostileMobAI` (бандити, облоги, драбини), `NpcKingdom` / `HostileSettlementLeader` (королі-ШІ, набіги), `PeacefulAnimalAI`; далекий світ даними — `KingdomRealm`, `FarWorld`, `KingdomEconomy`, `AbstractBattle`; рух усіх ШІ — `CrowdSim` (§4.1) |
 | `RTS` | свої юніти: `RtsUnit` (рух, бій, повідець, стіни), `NpcResourceGatherer` (робота), `RtsUnitCommander` (виділення, накази), `SettlementAlarm`, реєстри `UnitRegistry` / `WorkerRegistry` / `UnitSpatialGrid` |
 | `Combat` | `HealthComponent`, `CombatUnit`, ранги й прокачка (`UnitProgress`, `HeroProgress`, `HeroSkills`, `HeroClass`), артефакти, `WorldClock`, **`GameBalance`** — усі числа балансу |
 | `Building` | будівлі (`BuildingNode`, `TownHall`, `MineNode`), стіни (`WallSegment`, `WallBarriers`, `SiegeLadder`, `WallWalk`, `Fortifications`), `BuildingPlacementSystem`, `BuildGhost` |
 | `Resources` | дерева, камінці руди, скриня, `ResourceManager` (склад), `ResourceGrid` (дерева й камінці по клітинках) |
 | `Crafting` | речі, `Equipment` (6 слотів), `Armory` (спільний склад), верстак і черга крафту |
-| `World` | нескінченний світ шматками (`InfiniteWorldManager`, `ProceduralBiomeChunk`), пул дерев і каміння (`EnvironmentPoolManager`) |
+| `World` | скінченний світ шматками (`InfiniteWorldManager`, `ProceduralBiomeChunk`, `WorldSettings`), груба карта й стоянки (`CoarseWorldMap`, `StartSites`), озера, трава, далекий рельєф, зони (`ZoneMap`), пул дерев і каміння (`EnvironmentPoolManager`) |
 | `Player` | гравець від першої особи: рух, бій, збір, руки й зброя в кадрі |
 | `Managers` | `GameContext`, `GameModeManager` (перша особа / мапа), налаштування (`SettingsManager`, `DisplaySettings`, `GraphicsQuality`) |
 | `Input` | `UniversalInput` (стара й нова система вводу), `KeybindsManager` (перепризначення клавіш) |
-| `SaveLoad` | `SaveSystem`, `WorldPersistence` |
+| `SaveLoad` | `SaveSystem` (слоти, F5/F9), `WorldPersistence` (зміни світу), `WorldState` (стан королівств, армій, героїв даними), `CampaignSetup` |
+| `Net` | мережа (§6.2) |
+| `Camera` | `RtsMapCameraController` (ортографічна камера мапи) |
 | `UI` | §5 |
-| `Utils` | будівники моделей (MeshKit, SDF-істоти, персонажі на ригу), допоміжне |
+| `Utils` | будівники моделей (`MeshKit`, SDF-істоти, персонажі на ригу, ліплені лицар / генерал / герой — `KnightModelBuilder`), GPU-скінінг далеких (`GpuSkinnedCharacter`, `GpuSkinBake`), `FootIK`, допоміжне |
 
 ## 2. Як частини знаходять одна одну
 
@@ -78,8 +80,10 @@
 - **HUD:** `StrategyHud` (полотно, панель ресурсів, підказка режиму, кнопки на мапі) збирає частини: `HudFirstPerson`,
   `HudMinimap`, `HudWorldLabels`, `HudToasts`, `Advisor`, `CombatFeedback`. Повідомлення — `StrategyHud.Notify`.
 - **Підказки:** `Tooltip.Set(go, text)` / `TipText` (заголовок, приглушене, клавіша, порівняння статів).
-- **Рух і звук:** `PopIn` (вікно з'являється), `ButtonFx` (кнопка відгукується; додає `UiTheme.AddButton`), `UiSound`
-  (звуки згенеровані кодом).
+- **Рух і звук:** `PopIn` (вікно з'являється), `ButtonFx` (кнопка відгукується; додає `UiTheme.AddButton`). Звук:
+  `UiSound` (інтерфейс), `GameSound` (світ і бій), `GameMusic`, `Ambience`.
+- **Окремі вікна:** `HeroUI`, `EquipmentUI`, `WorkbenchUI`, `WorldMapUI`, `LobbyUI` (мережеве лобі), `NetPauseUI`
+  (пауза для всіх, F6), `DevEditorUI` (редактор тестувальника, F8, лише одиночна гра), `HelpUI` (F1).
 - **Старі вікна** (інвентар, розподіл робіт, пауза зі сцени) зібрані без теми; `UiRestyler` один раз після завантаження
   сцени дає їм вигляд `UiTheme`, рядки, створені пізніше, — `UiTheme.RestyleTree`. Нове так не робити.
 - Вікна — `GameWindows` (що відкрите, `BlockGameplay`, закрити все).
@@ -92,10 +96,12 @@
   правила й PlayMode без тестів `[Category("Slow")]`; це звичайний запуск, у тому числі перед випуском. `-Full` — усе, лише на прохання автора; `-Filter X` — лише потрібні.
   Тест, що йде понад 3 секунди, позначаємо `Slow`, крім кількох головних для перевірки гри (збереження, новий світ, сцена без помилок).
 - **Інструменти перегляду** (Explicit, PlayMode): `UiCapture`, `MenuCapture`, `ObjectCapture`, `ModelCapture`, `KnightCapture`,
-  `AnimalCapture`, `GearCapture`, `GraphicsCapture`, `GpuSkinCapture` — знімки в `CAPTURE_DIR`; заміри — `PerformanceProbe`, `StressTest`,
-  `GrassProbe`, `BalanceProbe`, `SessionSim`, `BanditRaidSim`. Разові інструменти, що вже дали відповідь, видаляємо: їх легко написати знову.
-- Редакторські інструменти перебудови (`Assets/Editor`): моделі персонажів, руки від першої особи, сцена, збірки
-  (`BuildGameTool`).
+  `RankCapture`, `AnimalCapture`, `GearCapture`, `GraphicsCapture`, `GpuSkinCapture`, `ViewmodelCapture`, `AnimationReview` — знімки в
+  `CAPTURE_DIR`; заміри — `PerformanceProbe`, `StressTest`, `MassProbe`, `KingdomLoadProbe`, `GrassProbe`, `BalanceProbe`, `PaceSim`,
+  `PushProbe`. Разові інструменти, що вже дали відповідь, видаляємо: їх легко написати знову.
+- Редакторські інструменти (`Assets/Editor`): запікання ліплених моделей (`BakeCreatureMeshesTool`), персонажі сцени
+  (`RebuildCharacterVisualsTool`), пропи й дерева сцени (`RebuildScenePropsTool`, `RebuildSceneTreesTool`), руки від першої
+  особи (`SetupFpsViewmodelTool`), кліпи (`CharacterClipTool`), головне меню, збірки (`BuildGameTool`).
 
 ## 6.1 Поселення, зони, абстрактний шар (M5, M6)
 
@@ -112,10 +118,27 @@
 
 Заміри: `PaceSim` (темп зі справжнього старту; `SIM_ZONES`: що дає кожна зона), `PushProbe`.
 
+## 6.2 Мережа (M8, M9; `Assets/Scripts/Net`)
+
+- **Транспорт:** `NetLink` на Unity Transport (`DefaultPort` 7777): надійний канал (повідомлення шматками по 16 КБ) і швидкий.
+- **Сесія:** `NetSession` (partial: `NetPause.cs`) — один на гру, хост або гість. Повідомлення — байт виду (`…Message`, 2–21) і
+  текст JSON або байти; обробка після `NetLink.Poll`, зупиняти сесію всередині опитування не можна. Хост перевіряє версію
+  (`SameVersion`), видає номер і стоянку (`SiteFor`), тримає сейви гостей (`GuestBook`).
+- **Лобі:** `NetLobby` / `LobbyHost` (місця, клас, артефакт, готовність, повернення за токеном), вікно `LobbyUI`.
+- **Накази:** `GameCommands` (`CommandBus`, `CommandCodec`, `WorldEntity` — стабільні номери об'єктів).
+- **Юніти:** кожен рахує своє (авторитет клієнта, §14.2). `UnitSnapshotWriter` шле змінені юніти 10 разів на секунду,
+  `RemoteUnits` показує чужі тіла (`RemoteBody`) з інтерполяцією; удар по чужому тілу летить власникові (`SendHit`),
+  убивство повертається нападникові (`SendKill`).
+- **Спільний світ:** `Net/SharedWorld.cs` (`LifeClaims` — чиї табори й тварини, `GuestBook` — записи гостей) і `WorldPersistence`: дерева, табори, тварини, зони, час через хоста.
+- **Гравець вийшов:** `GuestBot` (його королівство стереже бот із сейву), пауза й рішення хоста — `NetPause` / `NetPauseUI`.
+- **Перевірка двома процесами:** `NetDemo` (`-netdemo sessionhost|sessionjoin -netdemostep …`) у збірці.
+- NPC-королівства рахує хост навіть біля гостя (відхилення від §14.2, `GAME_DESIGN.md` §18.4).
+
 ## 7. Відомий борг
 
-1. **Стан і показ змішані** в MonoBehaviour, дії викликаються напряму — для мережі (M8) потрібні команди й окремий стан
-   (`GAME_DESIGN.md` §14.3). Нові системи (стосунки §22) робити одразу як дані + команди.
+1. **Стан і показ змішані** в MonoBehaviour юнітів і будівель. Накази з інтерфейсу вже йдуть командами (`CommandBus`), стан
+   королівств, армій і героїв — даними (`WorldState`), але юніт поруч і досі живе в компонентах (`GAME_DESIGN.md` §14.3).
+   Нові системи (стосунки §22) робити одразу як дані + команди.
 2. Старі вікна (інвентар, розподіл робіт, пауза зі сцени) — перебудувати на будівниках `UiTheme`, тоді `UiRestyler`
    не потрібен зовсім.
 3. Текст — старий `UnityEngine.UI.Text`; TextMeshPro дав би чіткий текст за будь-якого масштабу інтерфейсу.

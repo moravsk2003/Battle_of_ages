@@ -1,132 +1,100 @@
-# 📘 Battle of Ages — Довідник Розробника та Інструкція з Розширення (Systems Guide)
+# Battle of Ages — довідник розробника
 
-> Цей документ містить покрокові інструкції щодо додавання нових механік, розширення існуючих підсистем та дотримання стандартів чистого коду (Clean Code & Architecture).
+> Як додати річ, споруду, модель, роль персонажа, наказ чи мережеве повідомлення так, щоб нічого не загубилось.
+> Що гра робить — [GAME_DESIGN.md](GAME_DESIGN.md), карта коду — [ARCHITECTURE.md](ARCHITECTURE.md). Оновлено 2026-11-15.
+> Тут лише точки входу: деталі — у коментарях `///` самих класів.
 
----
+## 0. Загальні правила
 
-## 1. Як Додати Новий Предмет у Систему Крафту
+- **Числа балансу** — лише в `Combat/GameBalance` (або в таблицях `UnitRanks`, `ItemStatCalculator`), з посиланням на
+  розділ `GAME_DESIGN.md`.
+- **Нові значення переліків — у кінець.** `ItemType`, `BuildingType`, `ZoneType`, `ArtifactType`, `CommandCodec.Types`
+  і мережеві номери лежать у сейвах і на дроті номером: вставка в середину ламає старі збереження й гравців іншої збірки.
+- **Дія гравця — наказом** (`GameCommand`, §4), а не прямим викликом з інтерфейсу: так вона працює й у мережі.
+- **Без пошуку по сцені щокадру:** `GameContext`, реєстри (`UnitRegistry`, `BuildingNode.Active`, `ResourceGrid` …).
+- **Кожна механіка — з тестом** (EditMode для правил, PlayMode для поведінки), візуал — зі знімком (§6).
 
-1. **Додайте значення в Enum**:
-   У [`ItemData.cs`](file:///c:/Users/olesm/Battle_of_ages/Assets/Scripts/Crafting/ItemData.cs):
-   ```csharp
-   public enum ItemType
-   {
-       Sword,
-       Bow,
-       Armor,
-       Axe,
-       Pickaxe,
-       Shield // <-- Новий предмет
-   }
-   ```
-2. **Налаштуйте математику розрахунку**:
-   У класі `ItemStatCalculator`:
-   ```csharp
-   public static float CalculateShieldDefense(int level, float baseDefense = 12.0f)
-   {
-       int lvl = ClampLevel(level);
-       return baseDefense * (1.0f + 0.15f * (lvl - 1));
-   }
-   ```
-3. **Додайте рядок у UI верстака**:
-   У [`WorkbenchUI.cs`](file:///c:/Users/olesm/Battle_of_ages/Assets/Scripts/UI/WorkbenchUI.cs#L360):
-   ```csharp
-   CreateRecipeRow(itemsContainer.transform, defaultFont, ItemType.Shield, "🛡️ Щит", "+15% захисту за рівень");
-   ```
-4. **Покрийте нову формулу Unit-тестом**:
-   У `Assets/Tests/EditMode/ItemScalingTests.cs`.
+## 1. Нова річ (зброя, броня, інструмент)
 
----
+1. `Crafting/ItemData.cs`: значення в кінець `ItemType`; у `ItemTypeNames` — `Display`, `SlotOf` (який із 6 слотів
+   `EquipSlot`), `MaterialName`, `Describe`, і в `All`, якщо її кують на верстаті (`WorkbenchUI` будує картки з `All`).
+2. `ItemStatCalculator` (той самий файл): що вона дає (`WeaponDamageMultiplier`, `CooldownMultiplier`,
+   `DamageReduction`, `HealthBonus`) і ціна (`CalculateWoodCost`, `CalculateOreCost`, `CalculateRequiredOreTier`).
+3. Вигляд на персонажі — `Utils/GearMeshBuilder` (злиття в один меш тіла); від першої особи —
+   `ViewmodelArmsBuilder.BuildWeapon` / `BuildShield`, підставляє `Player/FpsViewmodelGear`.
+   Лицар, генерал і герой ліплені: спорядження в них змінює лише числа (`CharacterGear.Sculpted`).
+4. Тести: `ItemScalingTests`, `CraftedItemInteractionTests` (EditMode); знімок — `GearCapture`.
 
-## 2. Як Додати Нову Споруду
+## 2. Нова споруда
 
-1. **Зареєструйте тип споруди**:
-   У [`BuildingData.cs`](file:///c:/Users/olesm/Battle_of_ages/Assets/Scripts/Building/BuildingData.cs):
-   ```csharp
-   public enum BuildingType
-   {
-       WorkerHouse,
-       StorageChest,
-       Mine,
-       Workbench,
-       CastleWall,
-       GuardTower // <-- Нова споруда
-   }
-   ```
-2. **Додайте визначення (`BuildingDefinition`)**:
-   ```csharp
-   new BuildingDefinition
-   {
-       Type = BuildingType.GuardTower,
-       DisplayName = "Охоронна Вежа",
-       Description = "Автоматично обстрілює наближаючихся ворогів",
-       WoodCost = 6,
-       OreCost = 4,
-       OreTierRequired = 0,
-       NpcSpawnCount = 0,
-       Size = new Vector3(3.0f, 6.0f, 3.0f),
-       MaxHealth = 800
-   }
-   ```
-3. **Створіть префаб/генератор 3D-візуалів**:
-   У `BuildingNode.cs`:
-   `public static GameObject CreateGuardTowerPrefab(string name = "GuardTower") { ... }`
-4. **Оновіть примарне прев'ю та кнопку в меню**:
-   У `BuildingNode.CreateGhostPreview()` та `BuildingPlacementSystem.TryConfirmPlacement()`.
+1. `Building/BuildingData.cs`: значення в кінець `BuildingType`, `BuildingDefinition` (назва, опис, ціна, розмір
+   `Size` — площа під забудову, здоров'я).
+2. Об'єкт: статичний `Create…Prefab(string name)` (як `WorkbenchNode.CreateWorkbenchPrefab`): корінь, компонент,
+   `BuildingNode`, модель, колайдер. Підключити в `BuildingPlacementSystem` (перемикач за типом, ~рядок 500) і в
+   `BuildingNode.CreateGhostPreview` (примара).
+3. Модель — будівник на `MeshKit` (§3). Якщо споруда стоїть у `SampleScene` наперед — додати в список
+   `Editor/RebuildScenePropsTool` і перебудувати сцену.
+4. Розмістити з інтерфейсу — `PlaceBuildingCommand` (уже загальний для всіх типів). Робота в споруді — `WorkPlace`,
+   зона — `ZoneGrower` / `ZoneWork`.
 
----
+## 3. Модель у коді (пропи, будівлі)
 
-## 3. Як Створити Новий Стан AI (FSM)
+- Будівник — статичний клас у `Utils` (`WorkbenchBuilder`, `MineBuilder`, `WorkerHouseBuilder`, `SteppeTreeBuilder` …):
+  `MeshKit` (Box із фаскою, Lathe, Grid, Dome) з кольором і поверхнею на вершині, один меш на всіх і легкий далекий
+  меш, `MeshKit.AttachWithLod(root, name, near, far, nearScreenHeight)`.
+- Поверхня — `Vector3(pattern, metallic, smoothness)`; у шейдері персонажів `Custom/CharacterSurface` візерунки:
+  0 шкіра, 1 тканина, 2 шкіра-матеріал, 3 метал, **4 волосся** (не дерево), 5 очі, 6 хутро, 7 кольчуга, 8 камінь.
+- Блискучі пласкі поверхні (лезо, вода) робити матовими: сонце в них дає засліплювальний відблиск із bloom.
+- Перевірка — `ObjectCapture` (`CAPTURE_FOCUS=workbench|house|chest|mine|wall|dummy|camp` — 14 ракурсів, `CAPTURE_LIST`).
+- Зміна `MeshKit` чи `SdfCreature` міняє хеш рук від першої особи: перезапустити
+  `SetupFpsViewmodelTool.ConfigureInSampleScene`.
 
-1. **Створіть клас, який реалізує `IAIState`**:
-   ```csharp
-   public class MobAmbushState : IAIState
-   {
-       public AIStateType StateType => AIStateType.Idle;
+## 4. Наказ гравця (команда)
 
-       public void Enter(AIBaseController controller)
-       {
-           controller.StopMovement();
-       }
+1. `Net/GameCommands.cs`: `[Serializable] sealed class …Command : GameCommand` з `Execute()`; поля — дані, об'єкти —
+   номером (`WorldEntity`), бо об'єкт може зникнути, поки наказ іде.
+2. Тип — **у кінець** `CommandCodec.Types`.
+3. Інтерфейс викликає `CommandBus.Submit(new …Command { … })`.
+4. Тест — `GameCommandTests` (кодек туди й назад і виконання).
 
-       public void UpdateState(AIBaseController controller, float deltaTime)
-       {
-           // Логіка засідки: чекаємо гравця на дистанції < 8м
-       }
+## 5. Персонаж, роль, анімація
 
-       public void Exit(AIBaseController controller) { }
-   }
-   ```
-2. **Зареєструйте стан у контролері AI**:
-   У `RegisterStates()` контролера:
-   ```csharp
-   states[AIStateType.Idle] = new MobAmbushState();
-   ```
+- Ролі — `HumanoidModelBuilder.HumanType`; модель будує `RiggedCharacterBuilder.TryCreate` на FBX-ригу
+  (`CharacterModelLibrary`): колір ролі (`LookFor`), спорядження злите в меш (`CharacterGear`, `GearMeshBuilder`).
+- **Ліплені ролі** (`RiggedCharacterBuilder.IsSculpted`: лицар, генерал, герой) будує `KnightModelBuilder` за стилем
+  (`KnightStyle`, `GeneralStyle`, `HeroStyle`: сюрко, обробка, щит, плащ, плюмаж, корона). Після змін:
+  `BakeCreatureMeshesTool.Bake` (меші в `Resources/Creatures`, список `index.txt`), потім
+  `RebuildCharacterVisualsTool.Rebuild` (герой і персонажі сцени). Лук у руках — інша модель (`RankModel`).
+- Кліпи — `Editor/CharacterClipTool` (`Assets/Characters/*Clips`), огляд — `AnimationReview` (`CAPTURE_ROLES`,
+  `CAPTURE_CLIPS`). Будь-який знімок кліпів чи моделей зблизька вимикає `GpuSkinnedCharacter.Enabled`: GPU-шлях малює
+  далеку модель зі своєю камерою.
+- Руки від першої особи: модель — `ViewmodelArmsBuilder`, рух — `FpsViewmodelAnimation` (ключі ударів, крок, інерція),
+  огляд ударів — `ViewmodelCapture`.
+- Нова роль у мережі: як її показати чужим — `UnitSnapshots` (`DressBody`).
 
----
+## 6. Тести, знімки, заміри
 
-## 4. Як Додати Новий Біом у Генератор Світу
+- `tools\run_tests.ps1` — короткий прогін (звичайний, і перед випуском); `-Full` — лише на прохання автора;
+  `-Filter Клас` — точною назвою класу (широкий фільтр зачіпає Explicit-заміри на десятки хвилин).
+- Тест понад 3 с — `[Category("Slow")]`. PlayMode-тести йдуть одне за одним у тому самому світі: ставити об'єкти на
+  `RtsUnit.GetTerrainHeight`, після створення й пересування колайдерів — `Physics.SyncTransforms()`.
+- Знімки (`[Explicit]`, `CAPTURE_DIR`): `ObjectCapture`, `ModelCapture`, `KnightCapture` (`CAPTURE_ROLE`), `GearCapture`,
+  `RankCapture`, `AnimalCapture`, `ViewmodelCapture`, `AnimationReview`, `UiCapture`, `MenuCapture`, `GraphicsCapture`,
+  `GpuSkinCapture`. Змінні середовища `CAPTURE_*` чистити між запусками.
+- Заміри: `PerformanceProbe`, `StressTest`, `MassProbe`, `KingdomLoadProbe`, `PaceSim`, `PushProbe`, `BalanceProbe`.
+  Порівнювати з базою того самого дня, на вільній відеокарті.
 
-1. **Додайте біом у `BiomeType`**:
-   У [`InfiniteWorldManager.cs`](file:///c:/Users/olesm/Battle_of_ages/Assets/Scripts/World/InfiniteWorldManager.cs):
-   ```csharp
-   public enum BiomeType
-   {
-       Steppe,
-       PineForest,
-       Desert,
-       SnowyPeaks,
-       Swamp // <-- Новий біом
-   }
-   ```
-2. **Налаштуйте правила вибірки біому в `GetBiomeAtWorldPos()`**:
-   Використовуйте Perlin Noise для температури та вологості.
-3. **Налаштуйте матеріали та щільність декорацій** у `ProceduralBiomeChunk.ScatterBiomeResources()`.
+## 7. Мережа
 
----
+- Нове повідомлення: номер у кінець констант `NetSession` (`…Message`, зараз до 21), відправка `Send` / `BroadcastText`,
+  обробка в перемикачі прийому. Що міняє стан гри — через хоста. Не зупиняти сесію всередині `NetLink.Poll`
+  (відкласти на після опитування).
+- Перевірка двома процесами — у збірці (`BUILD_DIR` у тимчасову теку): `-netdemo sessionhost|sessionjoin
+  -netdemoport <не 7777> -netdemostep fight|leave|back|knights|duel|lobby` (`Net/NetDemo`).
+- Формат удару, знімка чи повідомлення змінився — гравці різних збірок не зіграють: підняти версію гри, хост відмовляє гравцеві іншої версії (`NetSession.SameVersion`).
 
-## 5. Стандарти Коду та Перевірка Якості
+## 8. Випуск
 
-- **Zero-GC Allocations**: Заборонено створювати `new` масиви або списки у методах `Update()`, `FixedUpdate()`, `LateUpdate()`. Використовуйте `NonAlloc` методи Unity Physics або пулінг об'єктів.
-- **SerializeField & Encapsulation**: Усі поля мають бути `private [SerializeField]`, відкритий доступ — лише через ReadOnly властивості (`public float MoveSpeed => moveSpeed;`).
-- **Unit Testing**: Будь-яка нова формула, черга чи калькулятор обов'язково супроводжується NUnit-тестами в `Assets/Tests/EditMode/`.
+- Збірка: `BuildGameTool.BuildWindows` (IL2CPP, `BUILD_DIR` або `Builds/Windows`); версія — у налаштуваннях гравця.
+- Перед збіркою — короткий прогін тестів; після — запуск exe й перевірка журналу на винятки.
+- Зміни описати в `GAME_DESIGN.md` §18 (журнал версій), виправлене прибрати з `KNOWN_ISSUES.md`.
