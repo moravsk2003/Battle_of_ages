@@ -7,8 +7,9 @@ namespace BattleOfAges.Utils
     /// The smith's workbench (front = +Z, ground at y = 0, ~2.8 x 1.3 m): a heavy oak bench of three thick planks on
     /// chamfered legs with stretchers and a lower shelf (bar stock, a crate), a back board on two posts with a peg rail of
     /// hanging tools (hammer, tongs, saw, files), a leg vise with its screw and tommy bar on the front right; beside it an
-    /// anvil (waist, face, horn and heel) on an elm stump and a quench bucket. One mesh built once and shared, and a light
-    /// one for afar, on the shared prop material (the old bench was eight plain boxes).
+    /// anvil (waist, face, horn and heel) on an elm stump and a quench bucket; a grindstone with a crank and a drip pan on
+    /// the top's back right corner, horseshoes on the board, a blade being forged on the top. One mesh built once and
+    /// shared, and a light one for afar, on the shared prop material (the old bench was eight plain boxes).
     /// </summary>
     public static class WorkbenchBuilder
     {
@@ -23,6 +24,7 @@ namespace BattleOfAges.Utils
         private static readonly Color Rust = new Color(0.42f, 0.25f, 0.14f);
         private static readonly Color Copper = new Color(0.72f, 0.42f, 0.24f);
         private static readonly Color Water = new Color(0.12f, 0.17f, 0.19f);
+        private static readonly Color Sandstone = new Color(0.66f, 0.58f, 0.46f);
 
         private static readonly Vector3 WoodS = new Vector3(4f, 0f, 0.22f);
         private static readonly Vector3 BarkS = new Vector3(4f, 0f, 0.1f);
@@ -32,6 +34,8 @@ namespace BattleOfAges.Utils
         private static readonly Vector3 BladeS = new Vector3(3f, 0.7f, 0.28f);
         private static readonly Vector3 DarkS = new Vector3(1f, 0f, 0.05f);
         private static readonly Vector3 WetS = new Vector3(1f, 0f, 0.5f); // still water mirrored the sun into a glare
+        private static readonly Vector3 StoneS = new Vector3(8f, 0f, 0.2f);
+        private const float AnvilScale = 1.35f; // a smith's anvil is long: ~0.5 m of face and the horn
 
         private static Mesh mesh, farMesh;
         private static MeshKit kit;
@@ -74,6 +78,7 @@ namespace BattleOfAges.Utils
             Vise();
             Anvil(new Vector3(-HalfW - 0.75f, 0f, 0.15f));
             Bucket(new Vector3(-HalfW - 0.55f, 0f, -0.55f));
+            Grindstone(new Vector3(HalfW - 0.42f, TopY + TopT, -0.3f));
             Mesh m = kit.ToMesh("Workbench");
             kit = null;
             return m;
@@ -115,6 +120,7 @@ namespace BattleOfAges.Utils
             for (int i = 0; i < 3; i++)
                 B(new Vector3(-0.55f + i * 0.13f, TopY + TopT + 0.025f, -0.18f), new Vector3(0.11f, 0.05f, 0.26f), i == 2 ? Copper : IronBright, WornS, 0.012f, Quaternion.Euler(0f, Rand(-6f, 6f), 0f));
             B(new Vector3(-0.1f, TopY + TopT + 0.02f, 0.3f), new Vector3(0.22f, 0.04f, 0.06f), new Color(0.48f, 0.46f, 0.42f), new Vector3(8f, 0f, 0.3f), 0.01f, Quaternion.Euler(0f, -12f, 0f));
+            Blade(new Vector3(-0.12f, TopY + TopT + 0.006f, -0.43f), Quaternion.Euler(0f, 92f, 0f));
         }
 
         // ------------------------------------------------------------------ back board and tools
@@ -144,6 +150,33 @@ namespace BattleOfAges.Utils
                 B(new Vector3(0.55f + i * 0.35f, 1.6f, face), new Vector3(0.035f, 0.1f, 0.03f), Oak, WoodS, 0.008f);
             }
             Hammer(new Vector3(1.25f, 1.62f - 0.32f, face + 0.02f), Quaternion.Euler(0f, 0f, 180f), 0.32f);
+            // Horseshoes hung on the top rail
+            for (int i = 0; i < 3; i++) Horseshoe(new Vector3(-0.95f + i * 0.17f, 1.84f - (i % 2) * 0.02f, face - 0.005f), i);
+        }
+
+        /// <summary>A horseshoe hanging toe up (a U of short iron bars, nail holes darker).</summary>
+        private static void Horseshoe(Vector3 at, int seed)
+        {
+            const int n = 9;
+            float r = 0.055f;
+            for (int k = 0; k < n; k++)
+            {
+                float a = Mathf.Lerp(-200f, 20f, k / (float)(n - 1)) * Mathf.Deg2Rad; // open at the bottom
+                Vector3 p = at + new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r * 1.1f - 0.05f, 0f);
+                Quaternion along = Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg + 90f);
+                Color c = seed == 1 ? Rust : (k % 3 == 1 ? Iron * 0.7f : Iron);
+                B(p, new Vector3(0.026f, 0.042f, 0.012f), c, IronS, 0.004f, along);
+            }
+        }
+
+        /// <summary>A sword blade being forged: tang, a dark-scaled blade with a brighter ground edge, lying flat.</summary>
+        private static void Blade(Vector3 at, Quaternion rot)
+        {
+            Vector3 along = rot * Vector3.forward;
+            B(at + along * 0.30f, new Vector3(0.045f, 0.008f, 0.62f), Iron * 0.85f, IronS, 0.003f, rot,
+              0f, p => Mathf.Abs(Vector3.Dot(p - (at + along * 0.30f), rot * Vector3.right)) > 0.015f ? IronBright * 0.9f : Iron * 0.85f);
+            B(at + along * 0.64f, new Vector3(0.02f, 0.008f, 0.08f), IronBright * 0.8f, IronS, 0.003f, rot * Quaternion.Euler(0f, 0f, 0f)); // the point, narrower
+            B(at - along * 0.07f, new Vector3(0.018f, 0.01f, 0.14f), Iron, IronS, 0.003f, rot); // the tang
         }
 
         /// <summary>A hammer lying or hanging: the handle along the frame's -Y from the head at "at".</summary>
@@ -191,15 +224,44 @@ namespace BattleOfAges.Utils
                   (i, a) => i >= 4 ? EndGrain * (0.85f + 0.15f * Mathf.Sin(a * 3f)) : Bark * (0.85f + 0.2f * SdfCreature.Noise(new Vector3(a * 3f, i, 0f))));
             Vector3 top = at + Vector3.up * 0.57f;
             Quaternion yaw = Quaternion.Euler(0f, 90f, 0f); // the anvil lies along z, the horn to the back
+            const float k = AnvilScale;
             // Feet, waist, body and the face plate
-            B(top + Vector3.up * 0.04f, new Vector3(0.3f, 0.08f, 0.22f), Iron, IronS, 0.02f, yaw);
-            B(top + Vector3.up * 0.13f, new Vector3(0.16f, 0.12f, 0.12f), Iron, IronS, 0.02f, yaw);
-            B(top + Vector3.up * 0.24f, new Vector3(0.36f, 0.1f, 0.14f), Iron, IronS, 0.02f, yaw);
-            B(top + Vector3.up * 0.3f, new Vector3(0.36f, 0.025f, 0.14f), IronBright, WornS, 0.01f, yaw);
-            // Horn: a cone off the front, heel off the back
-            Round(top + Vector3.up * 0.27f + yaw * new Vector3(0.18f, 0f, 0f), yaw * Quaternion.Euler(0f, 0f, -90f),
-                  new[] { new Vector2(0f, 0f), new Vector2(0.06f, 0f), new Vector2(0.035f, 0.14f), new Vector2(0.008f, 0.24f), new Vector2(0f, 0.25f) }, 10, Iron, IronS);
-            B(top + Vector3.up * 0.27f - yaw * new Vector3(0.24f, 0f, 0f), new Vector3(0.12f, 0.06f, 0.1f), Iron, IronS, 0.01f, yaw);
+            B(top + Vector3.up * 0.04f * k, new Vector3(0.3f, 0.08f, 0.22f) * k, Iron, IronS, 0.02f, yaw);
+            B(top + Vector3.up * 0.13f * k, new Vector3(0.16f, 0.12f, 0.12f) * k, Iron, IronS, 0.02f, yaw);
+            B(top + Vector3.up * 0.24f * k, new Vector3(0.36f, 0.1f, 0.14f) * k, Iron, IronS, 0.02f, yaw);
+            B(top + Vector3.up * 0.3f * k, new Vector3(0.36f, 0.025f, 0.14f) * k, IronBright, WornS, 0.01f, yaw);
+            // Horn: a cone off the front, heel off the back (with the hardy hole)
+            Round(top + Vector3.up * 0.27f * k + yaw * new Vector3(0.18f * k, 0f, 0f), yaw * Quaternion.Euler(0f, 0f, -90f),
+                  new[] { new Vector2(0f, 0f), new Vector2(0.06f * k, 0f), new Vector2(0.035f * k, 0.14f * k), new Vector2(0.008f * k, 0.24f * k), new Vector2(0f, 0.25f * k) }, 12, Iron, IronS);
+            B(top + Vector3.up * 0.27f * k - yaw * new Vector3(0.24f * k, 0f, 0f), new Vector3(0.12f, 0.06f, 0.1f) * k, Iron, IronS, 0.01f, yaw);
+            B(top + Vector3.up * (0.3f * k + 0.013f) - yaw * new Vector3(0.12f * k, 0f, 0f), new Vector3(0.025f, 0.004f, 0.025f), Iron * 0.3f, DarkS, 0.002f, yaw);
+        }
+
+        /// <summary>
+        /// A bench grindstone standing on the top: a sandstone wheel on an iron axle between two oak uprights, a crank on the
+        /// right and a shallow pan of water under the wheel. "at" is on the top, under the wheel.
+        /// </summary>
+        private static void Grindstone(Vector3 at)
+        {
+            const float R = 0.2f, AxleY = 0.24f, Gap = 0.075f;
+            foreach (float x in new[] { -Gap, Gap })
+            {
+                B(at + new Vector3(x, AxleY * 0.5f + 0.02f, 0f), new Vector3(0.04f, AxleY + 0.04f, 0.07f), OakDark, WoodS, 0.008f, null, 0f, Grain(OakDark, new Vector3(x, 2f, 0f)));
+                B(at + new Vector3(x, 0.012f, 0f), new Vector3(0.07f, 0.024f, 0.2f), OakDark, WoodS, 0.006f); // its foot
+            }
+            // The pan of water the wheel turns through
+            B(at + new Vector3(0f, 0.03f, 0f), new Vector3(0.1f, 0.05f, 0.3f), Oak * 0.8f, WoodS, 0.006f);
+            B(at + new Vector3(0f, 0.056f, 0f), new Vector3(0.08f, 0.003f, 0.27f), Water, WetS, 0.001f);
+            // The wheel (worn brighter round its rim), its axle, and the crank
+            Quaternion across = Quaternion.Euler(0f, 0f, 90f);
+            Vector3 hub = at + Vector3.up * AxleY;
+            Round(hub + Vector3.right * 0.028f, across,
+                  new[] { new Vector2(0f, 0f), new Vector2(R - 0.01f, 0f), new Vector2(R, 0.012f), new Vector2(R, 0.044f), new Vector2(R - 0.01f, 0.056f), new Vector2(0f, 0.056f) }, 22, Sandstone, StoneS,
+                  (i, a) => (i == 2 || i == 3 ? Sandstone * 1.08f : Sandstone * 0.94f) * (0.92f + 0.12f * SdfCreature.Noise(new Vector3(a * 4f, i, 0f))));
+            Round(hub + Vector3.right * (Gap + 0.03f), across, Cylinder(0.012f, Gap * 2f + 0.1f), 8, Iron, IronS);
+            Vector3 crank = hub + Vector3.right * (Gap + 0.06f);
+            B(crank + new Vector3(0f, -0.05f, 0f), new Vector3(0.015f, 0.11f, 0.022f), Iron, IronS, 0.004f);
+            Round(crank + new Vector3(0.075f, -0.1f, 0f), across, Cylinder(0.014f, 0.075f), 8, Oak, WoodS);
         }
 
         private static void Bucket(Vector3 at)
@@ -224,8 +286,9 @@ namespace BattleOfAges.Utils
             B(new Vector3(0f, 1.5f, -HalfD + 0.03f), new Vector3(HalfW * 2f, 0.9f, 0.05f), Oak * 0.88f, WoodS, 0f);
             Vector3 a = new Vector3(-HalfW - 0.75f, 0f, 0.15f);
             Round(a, Quaternion.identity, Cylinder(0.3f, 0.57f), 8, Bark, BarkS);
-            B(a + Vector3.up * 0.78f, new Vector3(0.14f, 0.36f, 0.5f), Iron, IronS, 0f);
+            B(a + Vector3.up * (0.57f + 0.16f * AnvilScale), new Vector3(0.14f * AnvilScale, 0.32f * AnvilScale, 0.5f * AnvilScale), Iron, IronS, 0f);
             Round(new Vector3(-HalfW - 0.55f, 0f, -0.55f), Quaternion.identity, Cylinder(0.21f, 0.36f), 8, Oak, WoodS);
+            Round(new Vector3(HalfW - 0.42f + 0.028f, TopY + TopT + 0.24f, -0.3f), Quaternion.Euler(0f, 0f, 90f), Cylinder(0.2f, 0.056f), 10, Sandstone, StoneS);
             Mesh m = kit.ToMesh("WorkbenchFar");
             kit = null;
             return m;

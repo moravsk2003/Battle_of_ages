@@ -8,7 +8,8 @@ namespace BattleOfAges.Utils
     /// A unit wears its rank's model (RankLooks): a person becomes a warrior in a gambeson, then a knight in plate, then a
     /// general with cape and crown. Checks on start (a loaded save, a unit built with another model) and on every
     /// promotion; swaps the model in place, with its worn gear, its pose under the unit and whether it was hidden.
-    /// Heroes keep theirs. A knight or general is sculpted with his arms: taking a bow (or putting it down) makes him again.
+    /// Heroes keep theirs. A knight, general or hero is sculpted with his arms: taking a bow (or putting it down) makes him
+    /// again. The player's own body (no UnitProgress) only follows its bow; the first-person setup is told of the new one.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RankModel : MonoBehaviour
@@ -40,14 +41,13 @@ namespace BattleOfAges.Utils
         public bool Sync()
         {
             if (progress == null) progress = GetComponent<UnitProgress>();
-            if (progress == null) return false;
             CharacterGear current = GetComponentInChildren<CharacterGear>(true);
             if (current == null) return false; // no rigged model (a test unit, a far one)
-            HumanoidModelBuilder.HumanType want = progress.IsHero ? current.Type : RankLooks.ModelFor(progress.Rank);
+            HumanoidModelBuilder.HumanType want = progress == null || progress.IsHero ? current.Type : RankLooks.ModelFor(progress.Rank);
             Equipment gear = GetComponent<Equipment>();
             bool bow = gear != null && gear.HasBow;
-            bool sculpted = want == HumanoidModelBuilder.HumanType.KnightGuard || want == HumanoidModelBuilder.HumanType.General;
-            if (current.Type == want && (!sculpted || current.SculptedBow == bow)) return false;
+            bool sculpted = RiggedCharacterBuilder.IsSculpted(want);
+            if (current.Type == want && (!current.Sculpted || current.SculptedBow == bow)) return false;
 
             Transform old = current.transform;
             GameObject fresh = HumanoidModelBuilder.CreateHumanoidModel(want, old.name, sculpted && bow);
@@ -77,6 +77,8 @@ namespace BattleOfAges.Utils
             syncing = true;
             if (gear != null) gear.LoadSlots(gear.SlotsCopy()); // the worn gear on the new body
             syncing = false;
+            Player.FpsViewmodelSetup fps = GetComponent<Player.FpsViewmodelSetup>();
+            if (fps != null) fps.SetWorldBodyRoot(fresh.transform); // the player's own body: hidden from its eyes again, its shadow kept
             return true;
         }
     }

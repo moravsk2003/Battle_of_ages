@@ -25,6 +25,8 @@ namespace BattleOfAges.EditorTools
             ("KnightBow", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.KnightGuard, n, bow: true)),
             ("General", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.General, n)),
             ("GeneralBow", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.General, n, bow: true)),
+            ("Hero", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.HeroPlayer, n)),
+            ("HeroBow", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.HeroPlayer, n, bow: true)),
         };
 
         [MenuItem("Battle of Ages/Bake Creature Meshes")]

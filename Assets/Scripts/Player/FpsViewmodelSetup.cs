@@ -35,6 +35,8 @@ namespace BattleOfAges.Player
         private void Awake()
         {
             Configure();
+            // The hero's body is sculpted with its arms: taking a bow (or putting it down) makes it again (and tells this setup)
+            if (Application.isPlaying && GetComponent<Utils.RankModel>() == null) gameObject.AddComponent<Utils.RankModel>();
         }
 
         private void OnValidate()

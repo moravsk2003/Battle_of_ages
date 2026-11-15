@@ -35,6 +35,8 @@ namespace BattleOfAges.Utils
             public string Key;
             public Color Surcoat, Trim, Field;
             public Color Cape, Plume; // clear: none
+            /// <summary>The plume's feathers turn to this at their tips.</summary>
+            public Color PlumeTip = new Color(0.62f, 0.06f, 0.08f);
             public bool Crown;
         }
 
@@ -47,6 +49,17 @@ namespace BattleOfAges.Utils
             Cape = new Color(0.46f, 0.06f, 0.07f), Plume = new Color(0.93f, 0.92f, 0.88f), Crown = true
         };
 
+        /// <summary>
+        /// The player's hero (§7.1): the knight's plate under a royal blue surcoat with the gold cross, a deep blue cape and
+        /// a plume of white feathers tipped blue, no crown (that is the general's). Told from every other man in the field,
+        /// near and from the map.
+        /// </summary>
+        public static readonly Style HeroStyle = new Style
+        {
+            Key = "Hero", Surcoat = new Color(0.11f, 0.20f, 0.52f), Trim = Gold, Field = new Color(0.12f, 0.23f, 0.58f),
+            Cape = new Color(0.07f, 0.11f, 0.32f), Plume = new Color(0.95f, 0.94f, 0.90f), PlumeTip = new Color(0.10f, 0.22f, 0.62f)
+        };
+
         private static Style style = KnightStyle; // the one being built (Paint reads it)
 
         // Surface = (CharacterSurface pattern, metallic, smoothness)
@@ -56,7 +69,7 @@ namespace BattleOfAges.Utils
         private static readonly Vector3 LeatherS = new Vector3(2f, 0f, 0.35f);
         private static readonly Vector3 BrassS = new Vector3(3f, 0.95f, 0.6f);
         private static readonly Vector3 WoodS = new Vector3(4f, 0f, 0.22f);
-        private static readonly Vector3 PaintS = new Vector3(4f, 0f, 0.3f); // paint over wood grain
+        private static readonly Vector3 PaintS = new Vector3(2f, 0f, 0.3f); // paint on the leather facing (pattern 4 is hair: it streaked the paint)
         private static readonly Vector3 DarkS = new Vector3(1f, 0f, 0.05f);
 
         /// <summary>Rig bones and their rest positions in character (visual root) space.</summary>
@@ -308,15 +321,22 @@ namespace BattleOfAges.Utils
                 for (int j = 0; j <= cols; j++)
                 {
                     float a = Mathf.Lerp(-1.25f, 1.25f, j / (float)cols);
-                    float fold = 1f + (near ? 0.05f * t * Mathf.Sin(a * 7f + 0.6f) : 0f);
-                    Vector3 p = new Vector3(Mathf.Sin(a) * half * fold, y, centre - Mathf.Cos(a) * depth * fold);
+                    float wave = Mathf.Sin(a * 7f + 0.6f);
+                    float hem = near && i == rows ? 0.012f * Mathf.Sin(a * 7f + 2.1f) : 0f;
                     Vector3 n = new Vector3(Mathf.Sin(a) * depth, 0f, -Mathf.Cos(a) * half).normalized;
+                    Vector3 p = new Vector3(Mathf.Sin(a) * half, y + hem, centre - Mathf.Cos(a) * depth)
+                              + n * (near ? (0.006f + 0.03f * t) * wave : 0f); // pleats, deeper as the cloth falls
                     outer[i, j] = p + n * T;
                     inner[i, j] = p - n * T;
                 }
             }
             Color cape = style.Cape, lining = style.Cape * 0.45f;
-            kit.Grid(outer, false, ClothS, (i, j) => cape * (0.92f + 0.12f * SdfCreature.Noise(outer[i, j] * 14f)) * (i == rows ? 0.8f : 1f), Vector3.back);
+            float Valley(int i, int j) // the pleats' valleys in shade, deeper further down
+            {
+                float a = Mathf.Lerp(-1.25f, 1.25f, j / (float)cols), t = i / (float)rows;
+                return near ? 1f - (0.08f + 0.16f * t) * (0.5f - 0.5f * Mathf.Sin(a * 7f + 0.6f)) : 1f;
+            }
+            kit.Grid(outer, false, ClothS, (i, j) => cape * (0.92f + 0.12f * SdfCreature.Noise(outer[i, j] * 14f)) * Valley(i, j) * (i == rows ? 0.8f : 1f), Vector3.back);
             kit.Grid(inner, false, ClothS, (i, j) => lining, Vector3.forward);
             if (near)
                 foreach (float x in new[] { -1f, 1f })
@@ -431,21 +451,55 @@ namespace BattleOfAges.Utils
             return kit;
         }
 
-        /// <summary>A plume of feathers rising from the helm's point and sweeping back (the general seen from afar).</summary>
+        /// <summary>
+        /// A plume rising from the helm's point and falling over towards the back (the general and the hero seen from afar):
+        /// a bushy tuft swept along a curve, ridged all round by its feathers, swelling from the quill and drawn to a point
+        /// at the tip; white, coloured towards the end (the old ones were flat boards, a cardboard fin from the front).
+        /// </summary>
         private static void Plume(MeshKit kit, Vector3 basePoint, bool near)
         {
-            int n = near ? 15 : 5;
-            Color tip = new Color(0.62f, 0.06f, 0.08f);
-            for (int k = 0; k < n; k++)
+            int rows = near ? 16 : 5, cols = near ? 26 : 6;
+            const float Length = 0.36f;
+            var pts = new Vector3[rows + 1, cols];
+            var us = new float[rows + 1];
+            Vector3 c = basePoint;
+            for (int i = 0; i <= rows; i++)
             {
-                float t = n == 1 ? 0f : k / (float)(n - 1);
-                float back = Mathf.Lerp(5f, 100f, t), side = (k % 3 - 1) * (near ? 9f : 0f);
-                Vector3 dir = Quaternion.Euler(-back, side, 0f) * Vector3.up; // up, then over towards the back
-                dir = new Vector3(dir.x, dir.y, -Mathf.Abs(dir.z));
-                float len = Mathf.Lerp(0.26f, 0.36f, Mathf.Sin(t * Mathf.PI));
-                Matrix4x4 m = Matrix4x4.TRS(basePoint + dir * (len * 0.5f), Quaternion.LookRotation(dir, Vector3.Cross(dir, Vector3.right)), Vector3.one);
-                // Broad feathers, white with red tips: a crest seen from the map
-                kit.Box(m, new Vector3(0.012f, near ? 0.075f : 0.1f, len), 0.004f, ClothS, p => Color.Lerp(style.Plume, tip, Mathf.Clamp01((p - basePoint).magnitude / len * 1.6f - 0.9f)));
+                float u = i / (float)rows;
+                us[i] = u;
+                Vector3 dir = Quaternion.Euler(-(8f + 125f * Mathf.Pow(u, 1.3f)), 0f, 0f) * Vector3.up; // up, then falling over the back
+                Vector3 across = Vector3.Cross(dir, Vector3.right).normalized;
+                float r = Mathf.Lerp(0.008f, 0.0f, u) + 0.06f * Mathf.Sin(Mathf.PI * Mathf.Pow(u, 0.6f)) * (1f - 0.3f * u);
+                for (int j = 0; j < cols; j++)
+                {
+                    float a = 2f * Mathf.PI * j / cols;
+                    float ridge = near ? 0.8f + 0.55f * Mathf.Pow(Mathf.Abs(Mathf.Sin(a * 3.5f + u * 5f)), 3f) : 1f; // the feathers: sharp spines round the tuft, twisting along it
+                    pts[i, j] = c + (Vector3.right * Mathf.Cos(a) * 1.15f + across * Mathf.Sin(a)) * r * ridge;
+                }
+                if (i < rows) c += dir * (Length / rows);
+            }
+            // Ring by ring (a grid's faces turn out from its centroid: the whole curved tuft's lies off its axis)
+            for (int i = 0; i < rows; i++)
+            {
+                var ring = new Vector3[2, cols];
+                for (int j = 0; j < cols; j++) { ring[0, j] = pts[i, j]; ring[1, j] = pts[i + 1, j]; }
+                int row = i;
+                kit.Grid(ring, true, ClothS, (k, j) =>
+                {
+                    float shade = near && (j % 2 == 1) ? 0.9f : 1f;
+                    return Color.Lerp(style.Plume, style.PlumeTip, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.4f, 0.85f, us[row + k]))) * shade;
+                });
+            }
+            if (!near) return;
+            // Loose feather tips splaying out of the end
+            Vector3 tipDir = Quaternion.Euler(-133f, 0f, 0f) * Vector3.up;
+            Vector3 from = c - tipDir * (Length * 0.22f);
+            for (int k = 0; k < 6; k++)
+            {
+                Vector3 d = (Quaternion.Euler(Mathf.Lerp(-28f, 28f, (k % 3) / 2f), Mathf.Lerp(-35f, 35f, k / 5f), 0f) * tipDir).normalized;
+                Matrix4x4 m = Matrix4x4.TRS(from + d * 0.05f, Quaternion.LookRotation(d, Vector3.Cross(d, Vector3.right)) * Quaternion.Euler(0f, 0f, k * 30f), Vector3.one);
+                float shade = k % 2 == 0 ? 1f : 0.85f;
+                kit.Box(m, new Vector3(0.006f, 0.03f, 0.09f), 0.003f, ClothS, q => style.PlumeTip * shade * Mathf.Lerp(1.15f, 0.9f, Mathf.Clamp01((q - from).magnitude / 0.1f)));
             }
         }
 

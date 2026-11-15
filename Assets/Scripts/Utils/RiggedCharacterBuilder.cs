@@ -50,9 +50,8 @@ namespace BattleOfAges.Utils
             animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
             root.AddComponent<GpuSkinnedCharacter>(); // drawn on the GPU when small on screen (if its body allows it)
 
-            // The knight guard has its own sculpted body and gear on this skeleton
-            bool sculpted = type == HumanoidModelBuilder.HumanType.KnightGuard || type == HumanoidModelBuilder.HumanType.General;
-            if (sculpted && KnightModelBuilder.Build(root, model.transform, type == HumanoidModelBuilder.HumanType.General ? KnightModelBuilder.GeneralStyle : KnightModelBuilder.KnightStyle, bow))
+            // The knight guard, the general and the hero have their own sculpted body and gear on this skeleton
+            if (IsSculpted(type) && KnightModelBuilder.Build(root, model.transform, SculptStyle(type), bow))
             {
                 // The Animator bound the imported body when it got its controller; with the sculpted skin unknown to
                 // it, CullUpdateTransforms saw nothing visible and never moved the bones (knights spawned in play
@@ -102,6 +101,16 @@ namespace BattleOfAges.Utils
             root.AddComponent<CharacterAnimationDriver>();
             return root;
         }
+
+        /// <summary>Roles with a sculpted body (KnightModelBuilder): their armour and arms are the model, made again for a bow.</summary>
+        public static bool IsSculpted(HumanoidModelBuilder.HumanType type) =>
+            type == HumanoidModelBuilder.HumanType.KnightGuard ||
+            type == HumanoidModelBuilder.HumanType.General ||
+            type == HumanoidModelBuilder.HumanType.HeroPlayer;
+
+        private static KnightModelBuilder.Style SculptStyle(HumanoidModelBuilder.HumanType type) =>
+            type == HumanoidModelBuilder.HumanType.General ? KnightModelBuilder.GeneralStyle :
+            type == HumanoidModelBuilder.HumanType.HeroPlayer ? KnightModelBuilder.HeroStyle : KnightModelBuilder.KnightStyle;
 
         public static bool IsKnight(HumanoidModelBuilder.HumanType type) =>
             type == HumanoidModelBuilder.HumanType.HeroPlayer ||

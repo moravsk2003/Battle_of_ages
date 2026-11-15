@@ -5,9 +5,12 @@ using BattleOfAges.Utils;
 namespace BattleOfAges.Player
 {
     /// <summary>
-    /// First-person arm animation: idle breathing sway, walk bob, and a keyframed sword swing on the shoulder pivots
-    /// ("RightArmPivot" / "LeftArmPivot" from HumanoidModelBuilder.CreateViewmodelArms):
-    /// anticipation (raise back) -> fast diagonal slash -> follow-through -> recovery, with the shield bracing.
+    /// First-person arm animation: idle breathing sway, a step bob paced by the body's real speed (by the distance walked,
+    /// not the clock: a stride per step, longer and heavier the faster), the arms lagging behind a turn of the view, a dip
+    /// on landing from a jump, and keyframed sword swings on the shoulder pivots ("RightArmPivot" / "LeftArmPivot" from
+    /// HumanoidModelBuilder.CreateViewmodelArms): anticipation (raise back) -> fast diagonal slash -> follow-through ->
+    /// recovery, with the shield bracing. Blows struck one after another alternate: a forehand slash down-left, then a
+    /// backhand cut from the left rising to the right.
     /// With a bow (FpsViewmodelGear.HoldsBow) the bow is in the left fist and a shot is drawn instead: the bow comes up
     /// to the aim, the right hand draws the string back to the cheek over the wind-up, the arrow leaves, the bow kicks and
     /// comes down, and a new arrow is nocked.
@@ -18,7 +21,6 @@ namespace BattleOfAges.Player
         [SerializeField] private float idleSwayAmount = 1.2f;
         [SerializeField] private float idleSwaySpeed = 1.6f;
         [SerializeField] private float walkBobAmount = 0.035f;
-        [SerializeField] private float walkBobSpeed = 8f;
         [SerializeField] private float transitionSpeed = 10f;
         [SerializeField] private float swingDuration = 0.6f;
 
@@ -41,6 +43,26 @@ namespace BattleOfAges.Player
             Vector3.zero
         };
 
+        // The backhand, the second blow of a pair: from the left of the body across and up to the right.
+        private static readonly Vector3[] BackEuler =
+        {
+            Vector3.zero,
+            new Vector3(-20f, -30f, 62f),   // wind-up: the hand across to the left, the blade up to the left
+            new Vector3(-14f, -8f, -30f),   // strike: the hand at the centre, the blade sweeping flat to the right
+            new Vector3(-8f, 4f, -50f),     // follow-through: low on the right
+            Vector3.zero
+        };
+        private static readonly Vector3[] BackOffset =
+        {
+            Vector3.zero,
+            new Vector3(-0.16f, 0.12f, 0.06f),
+            new Vector3(-0.04f, 0.10f, 0.08f),
+            new Vector3(0.03f, 0.06f, 0.05f),
+            Vector3.zero
+        };
+        /// <summary>A blow started within this many seconds of the last one's end is the other of the pair.</summary>
+        private const float ComboWindow = 0.7f;
+
         private Vector3 restPosition;
         private Quaternion restRotation;
         private Transform rightPivot, leftPivot;
@@ -51,6 +73,23 @@ namespace BattleOfAges.Player
         private float swingTime = -1f;   // < 0: not swinging
         private bool posedManually;
         private bool swingAtRest;
+        private int swingVariant;          // 0 forehand, 1 backhand
+        private float lastSwingEnd = -10f;
+
+        // The body the arms belong to: its speed paces the steps, its landing dips them; the view's turn drags them
+        private CharacterController body;
+        private float stepPhase, airTime, lastFallSpeed, landDip, landSpeed, airLift;
+        private bool wasGrounded = true;
+        private Vector3 lastBodyPos;
+        private bool bodyKnown;
+        private float lastYaw, lastPitch;
+        private bool lookKnown;
+        private Vector2 lookSway;
+
+        /// <summary>The swing being played or posed: 0 the forehand, 1 the backhand.</summary>
+        public int SwingVariant => swingVariant;
+        /// <summary>How far the step bob has gone (radians, a step per 2 pi).</summary>
+        public float StepPhase => stepPhase;
 
         // Bow: the left fist up to the aim (pivot offset and turn), the shot's timeline in seconds.
         private static readonly Vector3 BowAimOffset = new Vector3(0.27f, 0.27f, 0.04f);
@@ -74,7 +113,10 @@ namespace BattleOfAges.Player
             if (leftPivot != null) { leftRestPos = leftPivot.localPosition; leftRestRot = leftPivot.localRotation; }
             held = GetComponent<FpsViewmodelGear>();
             swordMarker = rightPivot != null ? rightPivot.Find("Sword") : null;
+            body = GetComponentInParent<CharacterController>();
+            bodyKnown = false;
             swingAtRest = false;
+            lookKnown = false;
         }
 
         /// <summary>Can be invoked by a weapon script after an attack or a shot.</summary>
@@ -86,6 +128,9 @@ namespace BattleOfAges.Player
         /// <summary>Starts the first-person sword swing.</summary>
         public void PlayPunchAnimation()
         {
+            // A blow right after another (or cutting into its recovery) is the other of the pair
+            bool chained = swingTime >= 0f || Time.time - lastSwingEnd < ComboWindow;
+            swingVariant = chained ? 1 - swingVariant : 0;
             swingTime = 0f;
             recoil = 0.35f;
         }
@@ -109,14 +154,40 @@ namespace BattleOfAges.Player
             ApplyBow(seconds);
         }
 
-        /// <summary>Freezes the arms at a swing phase (0..1) for previews; negative = rest pose.</summary>
-        public void PoseSwing(float phase)
+        /// <summary>Freezes the arms at a swing phase (0..1) for previews; negative = rest pose. variant 1: the backhand.</summary>
+        public void PoseSwing(float phase, int variant = 0)
         {
             if (rightPivot == null) CacheRest();
             posedManually = true;
+            swingVariant = variant;
             swingTime = phase;
+            swingAtRest = false;
             ApplySwing(phase);
         }
+
+        /// <summary>
+        /// The body's horizontal speed, by how far it really went since the last frame, and whether it stands on the ground
+        /// (no body: the move input, as a walk).
+        /// </summary>
+        private float BodySpeed(float dt, out bool grounded, out float vertical)
+        {
+            if (body != null && body.enabled)
+            {
+                Vector3 pos = body.transform.position;
+                Vector3 moved = bodyKnown && dt > 0f ? (pos - lastBodyPos) / dt : Vector3.zero;
+                lastBodyPos = pos;
+                bodyKnown = true;
+                grounded = body.isGrounded;
+                vertical = moved.y;
+                return Mathf.Min(new Vector2(moved.x, moved.z).magnitude, 30f); // (a teleport is no stride)
+            }
+            grounded = true;
+            vertical = 0f;
+            return Mathf.Clamp01(UniversalInput.GetMoveInput().magnitude) * 4f;
+        }
+
+        /// <summary>A stride per step: longer the faster (a walk ~1.2 m, a run ~1.8 m).</summary>
+        private static float StepLength(float speed) => 0.9f + 0.1f * Mathf.Min(speed, 10f);
 
         private void LateUpdate()
         {
@@ -125,7 +196,7 @@ namespace BattleOfAges.Player
             if (swingTime >= 0f)
             {
                 swingTime += Time.deltaTime / swingDuration;
-                if (swingTime >= 1f) swingTime = -1f;
+                if (swingTime >= 1f) { swingTime = -1f; lastSwingEnd = Time.time; }
             }
             if (shotTime >= 0f)
             {
@@ -134,21 +205,53 @@ namespace BattleOfAges.Player
             }
             if (Bow) ApplyBow(shotTime); else ApplySwing(swingTime);
 
-            Vector2 movement = UniversalInput.GetMoveInput();
-            float targetBlend = Mathf.Clamp01(movement.magnitude);
-            movementBlend = Mathf.MoveTowards(movementBlend, targetBlend, transitionSpeed * Time.deltaTime);
+            float dt = Time.deltaTime;
+            float speed = BodySpeed(dt, out bool grounded, out float vertical);
+
+            // Steps: by the distance walked, a bob per step and a sway side to side per stride; heavier when running
+            float targetBlend = grounded ? Mathf.Clamp01(speed / 2.5f) : 0f;
+            movementBlend = Mathf.MoveTowards(movementBlend, targetBlend, transitionSpeed * 0.5f * dt);
+            if (grounded) stepPhase = Mathf.Repeat(stepPhase + speed * dt / StepLength(speed) * Mathf.PI * 2f, Mathf.PI * 4f);
+            float amplitude = walkBobAmount * Mathf.Lerp(0.8f, 1.5f, Mathf.InverseLerp(3f, 9f, speed)) * movementBlend;
+            float walkWave = Mathf.Sin(stepPhase) * amplitude;
+            float sideWave = Mathf.Cos(stepPhase * 0.5f) * amplitude * 0.55f;
+
+            // A jump: the arms float up a little in the air and dip on landing, harder from higher (a damped spring)
+            if (!grounded) { airTime += dt; lastFallSpeed = Mathf.Max(0f, -vertical); }
+            else
+            {
+                if (!wasGrounded && airTime > 0.15f) landSpeed -= Mathf.Clamp01(lastFallSpeed / 12f) * 0.9f;
+                airTime = 0f;
+            }
+            wasGrounded = grounded;
+            landSpeed += (-landDip * 120f - landSpeed * 16f) * dt;
+            landDip += landSpeed * dt;
+            airLift = Mathf.MoveTowards(airLift, grounded ? 0f : 0.012f, 0.08f * dt);
+
+            // The view turning: the arms lag behind it (by its speed, a few degrees at most) and catch up
+            Transform view = transform.parent;
+            if (view != null && dt > 0f)
+            {
+                Vector3 e = view.eulerAngles;
+                Vector2 target = Vector2.zero;
+                if (lookKnown)
+                    target = new Vector2(Mathf.Clamp(-Mathf.DeltaAngle(lastYaw, e.y) / dt * 0.02f, -5f, 5f),
+                                         Mathf.Clamp(-Mathf.DeltaAngle(lastPitch, e.x) / dt * 0.02f, -4f, 4f));
+                lastYaw = e.y; lastPitch = e.x; lookKnown = true;
+                lookSway = Vector2.Lerp(lookSway, target, 1f - Mathf.Exp(-12f * dt));
+            }
 
             float time = Time.time;
-            float walkWave = Mathf.Sin(time * walkBobSpeed) * walkBobAmount * movementBlend;
-            float sideWave = Mathf.Cos(time * walkBobSpeed * 0.5f) * walkBobAmount * 0.55f * movementBlend;
-            float idlePitch = Mathf.Sin(time * idleSwaySpeed) * idleSwayAmount;
-            float idleYaw = Mathf.Cos(time * idleSwaySpeed * 0.78f) * idleSwayAmount;
-            recoil = Mathf.MoveTowards(recoil, 0f, 4f * Time.deltaTime);
+            float calm = 1f - 0.5f * movementBlend; // breathing shows less while walking
+            float idlePitch = Mathf.Sin(time * idleSwaySpeed) * idleSwayAmount * calm;
+            float idleYaw = Mathf.Cos(time * idleSwaySpeed * 0.78f) * idleSwayAmount * calm;
+            recoil = Mathf.MoveTowards(recoil, 0f, 4f * dt);
 
             transform.localPosition = Vector3.Lerp(transform.localPosition,
-                restPosition + new Vector3(sideWave, walkWave, -recoil * 0.04f), transitionSpeed * Time.deltaTime);
+                restPosition + new Vector3(sideWave, walkWave + landDip + airLift, -recoil * 0.04f), transitionSpeed * dt);
             transform.localRotation = Quaternion.Slerp(transform.localRotation,
-                restRotation * Quaternion.Euler(idlePitch - walkWave * 45f, idleYaw, sideWave * 35f), transitionSpeed * Time.deltaTime);
+                restRotation * Quaternion.Euler(idlePitch - walkWave * 45f - landDip * 60f + lookSway.y, idleYaw + lookSway.x, sideWave * 35f + lookSway.x * 0.5f),
+                transitionSpeed * dt);
         }
 
         private void ApplySwing(float t)
@@ -165,14 +268,14 @@ namespace BattleOfAges.Player
             }
             swingAtRest = false;
 
-            Sample(t, out Vector3 euler, out Vector3 offset);
+            Sample(t, swingVariant, out Vector3 euler, out Vector3 offset);
             rightPivot.localPosition = rightRestPos + offset;
             rightPivot.localRotation = rightRestRot * Quaternion.Euler(euler);
 
             if (leftPivot != null)
             {
                 // Shield arm braces in and up while the sword swings, then relaxes.
-                float brace = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);
+                float brace = Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI) * (swingVariant == 1 ? 1.8f : 1f); // the backhand starts on the shield side
                 leftPivot.localPosition = leftRestPos + new Vector3(-0.04f, -0.03f, 0f) * brace; // shield moves out of the blade path
                 leftPivot.localRotation = leftRestRot * Quaternion.Euler(6f * brace, -8f * brace, 6f * brace);
             }
@@ -219,14 +322,15 @@ namespace BattleOfAges.Player
         }
 
         /// <summary>Piecewise eased interpolation between the swing keys (fast in the strike segment).</summary>
-        private static void Sample(float t, out Vector3 euler, out Vector3 offset)
+        private static void Sample(float t, int variant, out Vector3 euler, out Vector3 offset)
         {
+            Vector3[] eulers = variant == 1 ? BackEuler : KeyEuler, offsets = variant == 1 ? BackOffset : KeyOffset;
             int k = 0;
             while (k < KeyTime.Length - 2 && t > KeyTime[k + 1]) k++;
             float u = Mathf.InverseLerp(KeyTime[k], KeyTime[k + 1], t);
             u = k == 1 ? u * u * u * (u * (6f * u - 15f) + 10f) : u * u * (3f - 2f * u); // strike: smootherstep
-            euler = Vector3.Lerp(KeyEuler[k], KeyEuler[k + 1], u);
-            offset = Vector3.Lerp(KeyOffset[k], KeyOffset[k + 1], u);
+            euler = Vector3.Lerp(eulers[k], eulers[k + 1], u);
+            offset = Vector3.Lerp(offsets[k], offsets[k + 1], u);
         }
     }
 }

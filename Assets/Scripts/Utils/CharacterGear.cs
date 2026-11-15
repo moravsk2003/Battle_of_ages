@@ -28,8 +28,8 @@ namespace BattleOfAges.Utils
 
         public bool DrawsGear => !Sculpted && Body != null && BaseMesh != null;
 
-        /// <summary>The knight's and the general's armour and arms are sculpted into the model: the worn gear is not drawn.</summary>
-        public bool Sculpted => Type == HumanoidModelBuilder.HumanType.KnightGuard || Type == HumanoidModelBuilder.HumanType.General;
+        /// <summary>The knight's, the general's and the hero's armour and arms are sculpted into the model: the worn gear is not drawn.</summary>
+        public bool Sculpted => RiggedCharacterBuilder.IsSculpted(Type) && Body == null;
 
         /// <summary>A sculpted model made with a bow in its hands (no sword, no shield).</summary>
         public bool SculptedBow;

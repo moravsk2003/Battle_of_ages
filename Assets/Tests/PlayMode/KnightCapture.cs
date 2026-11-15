@@ -136,6 +136,9 @@ namespace BattleOfAges.PlayModeTests
             // CAPTURE_LOD = 1 shows the distant meshes up close (to check them)
             if (Environment.GetEnvironmentVariable("CAPTURE_LOD") == "1")
                 foreach (SkinnedMeshLod lod in UnityEngine.Object.FindObjectsByType<SkinnedMeshLod>(FindObjectsSortMode.None)) lod.NearScreenHeight = 1000f;
+            // Every knight by its Animator and its own LOD: the GPU path picks its viewer apart (the scene camera, far away)
+            // and drew the near views with the distant mesh
+            GpuSkinnedCharacter.Enabled = false;
             var capture = new CaptureRenderer(dir, picked.Count, 50f, drawGrass: false);
             for (int j = 0; j < picked.Count; j++)
             {
@@ -150,6 +153,7 @@ namespace BattleOfAges.PlayModeTests
                 yield return null;
             }
             SkinnedMeshLod.ViewerOverride = null;
+            GpuSkinnedCharacter.Enabled = true;
             capture.Finish();
         }
     }
