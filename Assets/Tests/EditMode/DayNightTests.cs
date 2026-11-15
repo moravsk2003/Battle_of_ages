@@ -39,5 +39,28 @@ namespace BattleOfAges.Tests
             Assert.AreEqual(2, WorldClock.Day);
             Assert.AreEqual(0f, WorldClock.HourOfDay, 1e-4f);
         }
+
+        [Test]
+        public void TheMoon_GoesThroughItsPhases_InEightDays_AndLightsTheNight_ByItsFace()
+        {
+            double firstMidnight = 24.0 - WorldClock.DayStartHour;
+            Assert.AreEqual(0.5f, DayNightCycle.MoonPhase(firstMidnight), 1e-3f, "the first night is a full moon");
+            Assert.AreEqual(DayNightCycle.MoonPhase(firstMidnight), DayNightCycle.MoonPhase(firstMidnight + DayNightCycle.LunarDays * 24.0), 1e-3f, "and again eight days on");
+            Assert.AreEqual(0f, DayNightCycle.Illumination(0f), 1e-4f, "new: dark face");
+            Assert.AreEqual(1f, DayNightCycle.Illumination(0.5f), 1e-4f, "full: all lit");
+            Assert.AreEqual(0.5f, DayNightCycle.Illumination(0.25f), 1e-3f, "quarter: half");
+
+            DayNightCycle.MoonAt(0f, 0.5f, out _, out float fullAtMidnight);
+            Assert.Greater(fullAtMidnight, 0.7f, "a full moon stands high at midnight");
+            DayNightCycle.MoonAt(0f, 0f, out _, out float newAtMidnight);
+            Assert.Less(newAtMidnight, 0f, "a new moon is down with the sun");
+            DayNightCycle.MoonAt(21f, 0.25f, out _, out float quarterEvening);
+            DayNightCycle.MoonAt(4f, 0.25f, out _, out float quarterMorning);
+            Assert.Greater(quarterEvening, 0f, "the first quarter lights the evening");
+            Assert.Less(quarterMorning, 0f, "and is down before dawn");
+
+            Assert.AreEqual(DayNightCycle.MoonShare, DayNightCycle.MoonLight(0.5f, fullAtMidnight), 1e-3f);
+            Assert.AreEqual(0f, DayNightCycle.MoonLight(0f, newAtMidnight), 1e-4f, "no moon, no moonlight");
+        }
     }
 }
