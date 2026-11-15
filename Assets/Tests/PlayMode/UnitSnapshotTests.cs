@@ -81,7 +81,8 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsTrue(remote.TryGet(0, (ushort)idOne, out Vector3 seen, out int share), "it has come");
             Vector3 off = seen - one.transform.position;
             off.y = 0f;
-            Assert.Less(off.magnitude, 1f, "where it is");
+            // shown up to a send interval plus the render delay (0.15 s) behind: a running knight (6.7 m/s) is over a metre on
+            Assert.Less(off.magnitude, Mathf.Max(1f, one.Combat.MoveSpeed * (UnitSnapshotWriter.Interval + 0.15f)), "where it is");
             Assert.AreEqual(200, share, "whole");
 
             one.Health.TakeDamage(one.Health.MaxHealth / 2, ignoreArmor: true);
