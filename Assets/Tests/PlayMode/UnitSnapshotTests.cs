@@ -127,5 +127,22 @@ namespace BattleOfAges.PlayModeTests
             foreach (GameObject go in crowd) { go.GetComponent<HealthComponent>().TakeDamage(int.MaxValue / 2, ignoreArmor: true); Object.Destroy(go); }
             Assert.Less(quiet, 60, "at rest it says next to nothing");
         }
+
+        [UnityTest]
+        public IEnumerator ABlowOfThePlayersOwnUnit_SaysWhoStruck()
+        {
+            // The striker of a blow at another player's unit goes by its grid number (the one the snapshots carry), so a
+            // kill comes back to it: the player's own units went unnamed and never got the experience (KNOWN_ISSUES 55)
+            var go = new GameObject("OwnSoldier");
+            go.transform.position = Far + new Vector3(3f, 0f, 3f);
+            go.AddComponent<HealthComponent>();
+            CombatUnit combat = go.AddComponent<CombatUnit>();
+            RtsUnit own = go.AddComponent<RtsUnit>();
+            yield return null;
+            Assert.GreaterOrEqual(own.GridId, 0, "in the unit grid");
+            Assert.AreEqual((ushort)own.GridId, NetSession.IdOf(combat));
+            Assert.AreEqual(NetSession.NoAttacker, NetSession.IdOf(null));
+            Object.Destroy(go);
+        }
     }
 }

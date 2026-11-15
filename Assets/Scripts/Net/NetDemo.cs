@@ -363,7 +363,7 @@ namespace BattleOfAges.Net
                 string other = "not seen";
                 if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 otherAt, out int share)) other = $"at {otherAt.x:0},{otherAt.z:0} health {share}";
                 if (step == "duel")
-                    report.AppendLine($"t {Time.realtimeSinceStartup:0}: duel: FPS {1000f / Mathf.Max(0.01f, frameSum / Mathf.Max(1, frameCount)):0}, worst frame {frameWorst:0} ms, own alive {(duel != null ? duel.Population : 0)}, others shown {(s != null ? s.Remote.Count : -1)}, kills credited {NetSession.KillsCredited}");
+                    report.AppendLine($"t {Time.realtimeSinceStartup:0}: duel: FPS {1000f / Mathf.Max(0.01f, frameSum / Mathf.Max(1, frameCount)):0}, worst frame {frameWorst:0} ms, own alive {(duel != null ? duel.Population : 0)}, others shown {(s != null ? s.Remote.Count : -1)}, kills credited {NetSession.KillsCredited} (told {NetSession.KillsReceived}, striker gone {NetSession.KillsStrikerGone}), own killed and told {NetSession.KillsSent}, by no one {NetSession.DeathsByNoOne}");
                 frameSum = 0f;
                 frameCount = 0;
                 frameWorst = 0f;

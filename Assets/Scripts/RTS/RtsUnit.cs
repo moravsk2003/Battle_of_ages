@@ -41,6 +41,8 @@ namespace BattleOfAges.RTS
         public bool IsAlive => health == null || health.IsAlive;
         public bool InsideMine => gatherer != null && gatherer.IsInsideMine;
         private int gridId = -1;
+        /// <summary>Its place in the unit grid (-1: not in it): also its number in the network snapshots.</summary>
+        public int GridId => gridId;
         private Vector3 steerDir, steerDesired;
         private float steerTimer, steerElapsed, engageTimer, settleTimer;
         private float routeTimer;

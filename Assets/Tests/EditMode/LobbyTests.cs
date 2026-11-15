@@ -121,5 +121,24 @@ namespace BattleOfAges.Tests
             Assert.AreEqual((int)HeroClass.None, r.Class);
             Assert.IsNull(r.Hero);
         }
+
+        [Test]
+        public void AGuestsSave_GoesAsOftenAsItsSizeAllows()
+        {
+            // A tenth of a 1 Mbit/s upload (§14.4, GuestSaveProbe): a small save every 5 s, a late one (~200 KB) every ~16 s,
+            // and none waits over a minute
+            float was = NetSession.GuestSaveSeconds;
+            NetSession.GuestSaveSeconds = 0f;
+            try
+            {
+                Assert.AreEqual(NetSession.GuestSaveMinSeconds, NetSession.GuestSaveInterval(4 * 1024), 1e-3f);
+                Assert.AreEqual(NetSession.GuestSaveMinSeconds, NetSession.GuestSaveInterval(48 * 1024), 1e-3f);
+                Assert.AreEqual(16.1f, NetSession.GuestSaveInterval(201 * 1024), 0.1f);
+                Assert.AreEqual(NetSession.GuestSaveMaxSeconds, NetSession.GuestSaveInterval(5 * 1024 * 1024), 1e-3f);
+                NetSession.GuestSaveSeconds = 3f;
+                Assert.AreEqual(3f, NetSession.GuestSaveInterval(201 * 1024), 1e-3f, "a fixed interval wins (NetDemo)");
+            }
+            finally { NetSession.GuestSaveSeconds = was; }
+        }
     }
 }

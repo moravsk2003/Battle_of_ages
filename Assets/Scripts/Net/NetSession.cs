@@ -83,8 +83,21 @@ namespace BattleOfAges.Net
         public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
                           TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12,
                           RefusedMessage = 13, RosterMessage = 14, WorldMapMessage = 15, LobbyMessage = 16, LobbyChoiceMessage = 17, KillMessage = 18;
-        /// <summary>How often a guest's game goes to its host, and the host's clock to its guests.</summary>
-        public static float GuestSaveSeconds = 60f;
+        /// <summary>
+        /// How often a guest's game goes to its host (§14.4: the bot starts from it, the guest comes back to it), by the size of
+        /// the last one: a save may take a tenth of a weak upload (1 Mbit/s, so 12.8 KB/s) and gameplay keeps the rest, but it
+        /// goes at least every GuestSaveMaxSeconds and no oftener than GuestSaveMinSeconds (the host's own clock goes round
+        /// at 5 s). Measured with GuestSaveProbe (2026-11-15): a late settlement (105 people, 3000 felled trees) saves 201 KB
+        /// for ~10 ms of the guest's frame, so every 16 s; a mid one 48 KB / 2 ms and a fresh one 4 KB, every 5 s. The
+        /// frame is never the limit (0.06% at 16 s). GuestSaveSeconds above zero fixes it instead (NetDemo).
+        /// </summary>
+        public const int GuestSaveBytesPerSecond = 12800;
+        public const float GuestSaveMinSeconds = 5f, GuestSaveMaxSeconds = 60f;
+        public static float GuestSaveSeconds;
+
+        /// <summary>Seconds to the next guest save after one of this many bytes.</summary>
+        public static float GuestSaveInterval(int bytes) =>
+            GuestSaveSeconds > 0f ? GuestSaveSeconds : Mathf.Clamp(bytes / (float)GuestSaveBytesPerSecond, GuestSaveMinSeconds, GuestSaveMaxSeconds);
         private const float ClockSeconds = 5f, WorldSeconds = 1f;
         /// <summary>A player's site is at least this far from every hero of the campaign.</summary>
         private const float MinSiteDistance = 600f;
@@ -650,8 +663,7 @@ namespace BattleOfAges.Net
             }
             if (!link.IsHost && basePlaced && now >= nextGuestSave)
             {
-                nextGuestSave = now + GuestSaveSeconds;
-                SendOwnSave();
+                nextGuestSave = now + GuestSaveInterval(SendOwnSave());
             }
         }
 
@@ -673,7 +685,7 @@ namespace BattleOfAges.Net
             WorldPersistence.ListeningToTrees = true;
             WorldPersistence.CampChanged = c => BroadcastText(CampMessage, JsonUtility.ToJson(c));
             WorldPersistence.AnimalKilled = key => BroadcastText(AnimalMessage, JsonUtility.ToJson(new NetText { Text = key }));
-            nextGuestSave = Time.realtimeSinceStartup + GuestSaveSeconds;
+            nextGuestSave = Time.realtimeSinceStartup + GuestSaveInterval(0); // the first soon after the start
         }
 
         private void StopListening()
@@ -753,14 +765,16 @@ namespace BattleOfAges.Net
             if (cells.Cells.Count > 0) BroadcastText(ZonesMessage, JsonUtility.ToJson(cells));
         }
 
-        /// <summary>A guest's whole game to its host, to come back to.</summary>
-        private void SendOwnSave()
+        /// <summary>A guest's whole game to its host, to come back to. Its size in bytes (0: none sent).</summary>
+        private int SendOwnSave()
         {
-            if (link == null || link.IsHost || !basePlaced || !SaveSystem.InGame) return;
+            if (link == null || link.IsHost || !basePlaced || !SaveSystem.InGame) return 0;
             SaveData own = SaveSystem.Capture();
             own.Guests.Clear();
             own.KingdomStates.Clear();
-            Send(0, GuestSaveMessage, JsonUtility.ToJson(own));
+            string json = JsonUtility.ToJson(own);
+            Send(0, GuestSaveMessage, json);
+            return Encoding.UTF8.GetByteCount(json);
         }
 
         private void ReceiveWorld(int peer, byte[] data, int length)
@@ -867,13 +881,19 @@ namespace BattleOfAges.Net
             hitsWaiting++;
         }
 
-        /// <summary>This machine's unit as the others know it (its hero, or its number in the snapshots: its grid id).</summary>
-        private static ushort IdOf(CombatUnit unit)
+        /// <summary>
+        /// This machine's unit as the others know it: its hero, or its number in the snapshots (its grid id) — a king's man
+        /// (AIBaseController) or the player's own (RtsUnit: they went unnamed, and their kills of others' units were never
+        /// credited). NoAttacker for another player's body or a unit out of the grid.
+        /// </summary>
+        public static ushort IdOf(CombatUnit unit)
         {
             if (unit == null || unit.GetComponent<RemoteBody>() != null) return NoAttacker;
             if (unit.gameObject == Managers.GameContext.Player) return UnitSnapshotWriter.HeroId;
             AI.AIBaseController ai = unit.GetComponent<AI.AIBaseController>();
-            return ai != null && ai.GridId >= 0 && ai.GridId < NoAttacker ? (ushort)ai.GridId : NoAttacker;
+            int grid = ai != null ? ai.GridId : -1;
+            if (grid < 0) { RtsUnit own = unit.GetComponent<RtsUnit>(); if (own != null) grid = own.GridId; }
+            return grid >= 0 && grid < NoAttacker ? (ushort)grid : NoAttacker;
         }
 
         private void FlushHits()
@@ -939,7 +959,9 @@ namespace BattleOfAges.Net
                 target.LastAttacker = as_;
             }
             target.TakeDamage(damage);
-            if (!target.IsAlive && by != NoAttacker) SendKill(byOwner, by, HeroProgress.KillXp(target.gameObject));
+            if (target.IsAlive) return;
+            if (by != NoAttacker) { KillsSent++; SendKill(byOwner, by, HeroProgress.KillXp(target.gameObject)); }
+            else DeathsByNoOne++;
         }
 
         // ------------------------------------------------------------------ kills across: experience to whoever struck
@@ -966,7 +988,8 @@ namespace BattleOfAges.Net
             GameObject who = null;
             if (unit == UnitSnapshotWriter.HeroId) who = Managers.GameContext.Player;
             else if (unit < UnitSpatialGrid.Capacity && UnitSpatialGrid.IsAlive(unit) && UnitSpatialGrid.Owner(unit) != null) who = UnitSpatialGrid.Owner(unit).gameObject;
-            if (who == null || who.GetComponent<RemoteBody>() != null) return;
+            KillsReceived++;
+            if (who == null || who.GetComponent<RemoteBody>() != null) { KillsStrikerGone++; return; }
             UnitProgress progress = who.GetComponent<UnitProgress>();
             if (progress != null) progress.OnKill();
             HeroProgress hero = who.GetComponent<HeroProgress>();
@@ -976,6 +999,9 @@ namespace BattleOfAges.Net
 
         /// <summary>Kills of others' units credited here (NetDemo, tests).</summary>
         public static int KillsCredited;
+        /// <summary>Counted for NetDemo: this machine's units killed by others' blows, told to the striker or with no striker
+        /// known; kills told here, and those whose striker was gone by then.</summary>
+        public static int KillsSent, DeathsByNoOne, KillsReceived, KillsStrikerGone;
 
         // ------------------------------------------------------------------ buildings across
 
