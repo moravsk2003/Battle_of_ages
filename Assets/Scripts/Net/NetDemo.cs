@@ -183,10 +183,64 @@ namespace BattleOfAges.Net
             string shot = Arg(args, "-netdemoshot", "");
             float knightsSeen = -1f;
             int knightStage = 0;
+            // "-netdemostep duel": each side musters its own 500 by the host's hero and they fight, each simulating its own (§18.4 M8 step 5)
+            int duelUnits = int.Parse(Arg(args, "-netdemounits", "500"));
+            NpcKingdom duel = null;
+            float duelStart = -1f;
+            Vector3 duelCentre = Vector3.zero;
+            float frameLast = Time.realtimeSinceStartup, frameSum = 0f, frameWorst = 0f;
+            int frameCount = 0;
             while (Time.realtimeSinceStartup < end)
             {
                 yield return null;
+                float frameNow = Time.realtimeSinceStartup, frameMs = (frameNow - frameLast) * 1000f;
+                frameLast = frameNow;
+                frameSum += frameMs;
+                frameCount++;
+                if (duelStart > 0f && frameNow > duelStart + 3f) frameWorst = Mathf.Max(frameWorst, frameMs);
                 NetSession now = NetSession.Current;
+                if (step == "duel" && now != null && duel == null)
+                {
+                    GameObject mine = GameObject.Find("Player");
+                    if (host)
+                    {
+                        // Once the guest has come up: the host's 500, north of the meeting place
+                        Vector3 guestAt = Vector3.zero;
+                        bool seen = false;
+                        now.Remote.ForEachHero(body => { guestAt = body.transform.position; seen = true; });
+                        duelCentre = mine.transform.position + new Vector3(40f, 0f, 0f);
+                        if (seen && (guestAt - duelCentre).magnitude < 80f && frameNow > 20f)
+                        {
+                            duel = MusterSide(duelCentre + new Vector3(0f, 0f, 8f), 1f, duelUnits, "Хост", -1);
+                            duelStart = frameNow;
+                            report.AppendLine($"t {frameNow:0}: the host's {duelUnits} mustered");
+                        }
+                    }
+                    else if (now.Welcome != null && frameNow > 12f && now.Remote.TryGet(0, UnitSnapshotWriter.HeroId, out Vector3 hostAt, out _))
+                    {
+                        duelCentre = hostAt + new Vector3(40f, 0f, 0f);
+                        if (!stepDone)
+                        {
+                            // The guest walks up to the meeting place (its chunks load round it) ...
+                            stepDone = true;
+                            Vector3 to = duelCentre + new Vector3(0f, 0f, -45f);
+                            to.y = RtsUnit.GetTerrainHeight(to) + 1f;
+                            CharacterController cc = mine.GetComponent<CharacterController>();
+                            if (cc != null) cc.enabled = false;
+                            mine.transform.SetPositionAndRotation(to, Quaternion.LookRotation(Vector3.forward));
+                            if (cc != null) cc.enabled = true;
+                            mine.GetComponent<HealthComponent>()?.InitializeHealth(100000000);
+                            knightsSeen = frameNow;
+                        }
+                        else if (frameNow > knightsSeen + 6f)
+                        {
+                            // ... and musters its own 500 south of it, a side of its own (a byte in the snapshots)
+                            duel = MusterSide(duelCentre + new Vector3(0f, 0f, -8f), -1f, duelUnits, "Гість", 200);
+                            duelStart = frameNow;
+                            report.AppendLine($"t {frameNow:0}: the guest's {duelUnits} mustered");
+                        }
+                    }
+                }
                 // "-netdemostep knights": the host raises knights 200 m from the guest; the guest sees them from afar, then walks up to them
                 if (host && step == "knights" && now != null && !stepDone && NpcKingdom.All.Count > 0)
                 {
@@ -301,6 +355,11 @@ namespace BattleOfAges.Net
                 GameObject me = GameObject.Find("Player");
                 string other = "not seen";
                 if (s != null && s.Remote.TryGet(host ? 1 : 0, UnitSnapshotWriter.HeroId, out Vector3 otherAt, out int share)) other = $"at {otherAt.x:0},{otherAt.z:0} health {share}";
+                if (step == "duel")
+                    report.AppendLine($"t {Time.realtimeSinceStartup:0}: duel: FPS {1000f / Mathf.Max(0.01f, frameSum / Mathf.Max(1, frameCount)):0}, worst frame {frameWorst:0} ms, own alive {(duel != null ? duel.Population : 0)}, others shown {(s != null ? s.Remote.Count : -1)}, kills credited {NetSession.KillsCredited}");
+                frameSum = 0f;
+                frameCount = 0;
+                frameWorst = 0f;
                 report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, number {(s != null ? s.Number : -1)}, in the game [{(s != null ? string.Join(",", s.Players) : "")}], on the world map {WorldMapData.Now().Count} kingdoms {(s != null ? s.PlayersOnMap().Count : 0)} players, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count} bots {Bots()}, " +
                                   $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, struck by another player {StruckByAnother()}, kills credited {NetSession.KillsCredited}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)} the first at {(s != null ? s.StrikeShownBuilding(0, null) : "-")}, trees told {SaveLoad.WorldPersistence.Capture().Trees.Count}, others' zones {World.ZoneMap.ForeignCount}, guests {GuestBook.All.Count} save {(GuestBook.All.Count > 0 ? GuestBook.All[0].Save.Length : 0)}, life claims {(s != null ? s.LifeClaimCount : -1)}, clock {WorldClock.GameHours:0.00}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
             }
@@ -341,6 +400,16 @@ namespace BattleOfAges.Net
             yield return null;
             foreach (HostileMobAI m in a.Subjects) m.OrderAttack(b.Hall);
             foreach (HostileMobAI m in b.Subjects) m.OrderAttack(a.Hall);
+        }
+
+        /// <summary>One side of a duel: its own warriors in rows from here, going away (way: +1 north, -1 south).</summary>
+        private static NpcKingdom MusterSide(Vector3 front, float way, int units, string name, int team)
+        {
+            NpcKingdom side = NpcKingdom.Found(front + new Vector3(0f, 0f, way * 60f), name, 0);
+            side.enabled = false;
+            if (team >= 0) side.TeamForTests = team;
+            for (int i = 0; i < units; i++) side.AddSubject(UnitRank.Warrior, Row(front, i, units, way * 0.4f));
+            return side;
         }
 
         private static Vector3 Row(Vector3 centre, int i, int count, float back)

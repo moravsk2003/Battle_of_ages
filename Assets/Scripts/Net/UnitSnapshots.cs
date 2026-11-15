@@ -359,6 +359,7 @@ namespace BattleOfAges.Net
                 else Remove(key);
                 return;
             }
+            if (bodies.TryGetValue(key, out Body gone) && gone.Root == null) Remove(key); // (lost to a scene load)
             if (bodies.TryGetValue(key, out Body b) && b.Rank == row.Rank && b.Team == row.Team)
             {
                 Retarget(b, row);
@@ -513,14 +514,14 @@ namespace BattleOfAges.Net
         }
 
         /// <summary>The body here of another player's unit (null: not shown here).</summary>
-        public RemoteBody BodyOf(int owner, ushort id) => bodies.TryGetValue(Key(owner, id), out Body b) ? b.Mark : null;
+        public RemoteBody BodyOf(int owner, ushort id) => bodies.TryGetValue(Key(owner, id), out Body b) && b.Root != null ? b.Mark : null;
 
         /// <summary>What is known of a unit now (tests).</summary>
         public bool TryGet(int owner, ushort id, out Vector3 at, out int healthShare)
         {
             at = default;
             healthShare = 0;
-            if (!bodies.TryGetValue(Key(owner, id), out Body b)) return false;
+            if (!bodies.TryGetValue(Key(owner, id), out Body b) || b.Root == null) return false;
             at = b.Root.position;
             healthShare = b.Health;
             return true;
@@ -545,7 +546,8 @@ namespace BattleOfAges.Net
             foreach (KeyValuePair<int, Body> kv in bodies)
             {
                 Body b = kv.Value;
-                if (now - b.LastHeard > ForgetAfter) { forget.Add(kv.Key); continue; }
+                // (a body made before a scene load went with the old scene: forgotten, it comes again with the next row)
+                if (now - b.LastHeard > ForgetAfter || b.Root == null) { forget.Add(kv.Key); continue; }
                 float t = b.ToAt > b.FromAt ? Mathf.Clamp01((now - b.FromAt) / (b.ToAt - b.FromAt)) : 1f;
                 b.Root.SetPositionAndRotation(Vector3.Lerp(b.From, b.To, t), Quaternion.Euler(0f, Mathf.LerpAngle(b.FromYaw, b.ToYaw, t), 0f));
             }
