@@ -189,7 +189,11 @@ namespace BattleOfAges.Crafting
             foreach (CraftingTask t in Queue.Queue) if (t.TaskId == taskId) { task = t; break; }
             if (task == null || !Queue.CancelTask(taskId)) return false;
             ResourceManager rm = ResourceManager.Instance;
-            if (rm != null && task.IsSmelt) rm.AddOre(task.SmeltTier, task.SmeltCount * Combat.GameBalance.SmeltRatio);
+            if (rm != null && task.IsSmelt)
+            {
+                rm.AddOre(task.SmeltTier, task.SmeltCount * Combat.GameBalance.SmeltRatio);
+                rm.AddResource(ResourceType.Wood, task.SmeltCount * Combat.GameBalance.SmeltWood(task.SmeltTier + 1));
+            }
             else if (rm != null)
             {
                 rm.AddResource(ResourceType.Wood, ItemStatCalculator.CalculateWoodCost(task.Type, task.Level));
@@ -215,20 +219,30 @@ namespace BattleOfAges.Crafting
             return pos;
         }
 
-        /// <summary>Pieces of the next tier the stock of this tier melts into now (GameBalance.SmeltRatio each).</summary>
+        /// <summary>Pieces of the next tier the stock melts into now: GameBalance.SmeltRatio of this tier and SmeltWood wood each.</summary>
         public static int SmeltableCount(int tier)
         {
             ResourceManager rm = ResourceManager.Instance;
-            return rm == null || tier < 0 ? 0 : rm.GetOreTierCount(tier) / Combat.GameBalance.SmeltRatio;
+            if (rm == null || tier < 0) return 0;
+            int byOre = rm.GetOreTierCount(tier) / Combat.GameBalance.SmeltRatio, wood = Combat.GameBalance.SmeltWood(tier + 1);
+            return wood > 0 ? Mathf.Min(byOre, rm.WoodCount / wood) : byOre;
         }
 
-        /// <summary>Queues melting count x SmeltRatio ore of the tier into count pieces of the next; the ore is taken now (cancel gives it back).</summary>
+        /// <summary>
+        /// Queues melting count x SmeltRatio ore of the tier into count pieces of the next, with count x SmeltWood(tier + 1)
+        /// wood for the fire; both are taken now (cancel gives them back).
+        /// </summary>
         public bool TryEnqueueSmelt(int tier, int count)
         {
             if (count <= 0 || tier < 0 || tier >= OreTierHelper.MAX_TIERS - 1) return false;
-            int ore = count * Combat.GameBalance.SmeltRatio;
+            int ore = count * Combat.GameBalance.SmeltRatio, wood = count * Combat.GameBalance.SmeltWood(tier + 1);
             ResourceManager rm = ResourceManager.Instance;
-            if (rm != null && (rm.GetOreTierCount(tier) < ore || !rm.ConsumeOre(tier, ore))) return false;
+            if (rm != null)
+            {
+                if (rm.GetOreTierCount(tier) < ore || rm.WoodCount < wood) return false;
+                if (!rm.ConsumeOre(tier, ore)) return false;
+                if (wood > 0 && !rm.ConsumeResource(ResourceType.Wood, wood)) { rm.AddOre(tier, ore); return false; }
+            }
             craftingQueue.EnqueueSmelt(tier, count);
             return true;
         }

@@ -64,7 +64,7 @@ namespace BattleOfAges.PlayModeTests
             NpcResourceGatherer other = Worker(Far + new Vector3(-9f, 0f, 7f), "NPC_Other_Test");
             RtsUnit unit = worker.GetComponent<RtsUnit>();
             ResourceManager rm = ResourceManager.Instance;
-            rm.SetState(0, new[] { new KeyValuePair<int, int>(0, 25) });
+            rm.SetState(10, new[] { new KeyValuePair<int, int>(0, 25) });
             yield return null;
 
             Assert.IsTrue(bench.AssignWorker(unit));
@@ -72,6 +72,7 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(0, bench.AssignedWorkerCount, "still on the way: not crafting yet");
             Assert.IsTrue(bench.TryEnqueueSmelt(0, 2));
             Assert.AreEqual(5, rm.GetOreTierCount(0), "the ore is taken when queued");
+            Assert.AreEqual(10 - 2 * Combat.GameBalance.SmeltWood(1), rm.WoodCount, "and the wood for the fire: 2 a piece of ore I");
             Assert.IsFalse(bench.TryEnqueueSmelt(0, 1), "five is not enough for one more");
 
             Time.timeScale = 3f;

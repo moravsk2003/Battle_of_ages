@@ -25,6 +25,13 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void Smelting_BurnsTwoToThePowerOfTheTier_InWood()
+        {
+            int[] wood = { 0, 2, 4, 8, 16, 32 };
+            for (int tier = 0; tier < wood.Length; tier++) Assert.AreEqual(wood[tier], GameBalance.SmeltWood(tier), $"a piece of ore {tier}");
+        }
+
+        [Test]
         public void ASmeltTask_TakesItsTime_AndSaysWhatItMakes()
         {
             var queue = new CraftingQueue();

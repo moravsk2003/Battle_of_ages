@@ -231,14 +231,16 @@ namespace BattleOfAges.Crafting
         public static int CalculateOreCost(ItemType type, int level)
         {
             if (PricedAsSword(type, out float factor)) return Mathf.CeilToInt(CalculateOreCost(ItemType.Sword, level) * factor);
-            int lvl = ClampLevel(level);
-            int baseCost;
+            // The same at every level (the author's word, 2026-11-15): a higher level asks for a higher tier of ore, not more of it
             switch (type)
             {
-                case ItemType.Sword: case ItemType.Armor: case ItemType.Helmet: baseCost = 2; break;
-                default: baseCost = 1; break;
+                case ItemType.Sword: return 3;
+                case ItemType.Helmet: return 5;
+                case ItemType.Shield: return 2;
+                case ItemType.Armor: return 6;
+                case ItemType.Gloves: case ItemType.Boots: return 4;
+                default: return 3; // axe, pickaxe
             }
-            return baseCost + (lvl - 1) * 2;
         }
 
         /// <summary>A bow costs 1.5 swords, a staff 2 (GameBalance.BowCostFactor / StaffCostFactor).</summary>

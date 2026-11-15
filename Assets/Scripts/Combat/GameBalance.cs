@@ -182,6 +182,11 @@ namespace BattleOfAges.Combat
         /// </summary>
         public static int SmeltRatio = 10;
         public static float SmeltSecondsPerPiece = 1f;
+        /// <summary>
+        /// Wood to melt one piece of ore of this tier out of the tier below: 2 to the power of the tier (the author's word,
+        /// 2026-11-15): 0 → I takes 2, I → II 4, II → III 8, III → IV 16, IV → V 32.
+        /// </summary>
+        public static int SmeltWood(int toTier) => toTier <= 0 ? 0 : 1 << System.Math.Min(toTier, 20);
         public static float AlarmRadius = 60f, AlarmTriggerRadius = 40f, AlarmStandDownSeconds = 10f, AlarmGatherRadius = 25f, AlarmChaseRadius = 90f, AlarmGatherNear = 9f, AlarmGatherFar = 16f;
         public static bool AutoAlarm = true;
 

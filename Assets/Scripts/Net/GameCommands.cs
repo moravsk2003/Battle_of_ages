@@ -481,7 +481,7 @@ namespace BattleOfAges.Net
         public override void Execute()
         {
             WorkbenchNode bench = WorldEntity.Find<WorkbenchNode>(Bench);
-            if (bench != null && (Count <= 0 || !bench.TryEnqueueSmelt(Tier, Count))) Say($"Не вистачає руди {CraftingTask.Tier(Tier)}: потрібно {Combat.GameBalance.SmeltRatio}");
+            if (bench != null && (Count <= 0 || !bench.TryEnqueueSmelt(Tier, Count))) Say($"Не вистачає: на шматок руди {CraftingTask.Tier(Tier + 1)} треба {Combat.GameBalance.SmeltRatio} руди {CraftingTask.Tier(Tier)} і {Combat.GameBalance.SmeltWood(Tier + 1)} дерева");
         }
     }
 

@@ -261,6 +261,22 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator TheLastHeir_FallingInTheInterregnum_EndsTheGameThen()
+        {
+            yield return ClearWorld();
+            CreateGround();
+            HeroSuccession hero = CreateHero();
+            RtsUnit heir = CreateKnight(new Vector3(3f, 0f, 0f)); // one alone: half of one deserts none
+            yield return null;
+            hero.GetComponent<HealthComponent>().TakeDamage(100000);
+            Assert.IsTrue(hero.InInterregnum, "with someone left the interregnum runs");
+            heir.GetComponent<HealthComponent>().TakeDamage(100000);
+            yield return new WaitForSeconds(1f);
+            Assert.IsTrue(hero.IsGameOver, "the last one fell: lost now, not when the time runs out");
+            Assert.IsFalse(hero.InInterregnum);
+        }
+
+        [UnityTest]
         public IEnumerator HeroDeath_WithNoUnitsLeft_IsTheEndOfTheGame()
         {
             yield return ClearWorld();
@@ -273,9 +289,10 @@ namespace BattleOfAges.PlayModeTests
             {
                 yield return null;
                 hero.GetComponent<HealthComponent>().TakeDamage(100000);
-                hero.EndInterregnum();
-                Assert.IsTrue(over);
+                // No one to take over: lost at once, no countdown (the interregnum is not even begun)
+                Assert.IsTrue(over, "the game is over the moment the hero falls");
                 Assert.IsTrue(hero.IsGameOver);
+                Assert.IsFalse(hero.InInterregnum, "no timer to nothing");
             }
             finally { HeroSuccession.GameOver -= onOver; }
         }

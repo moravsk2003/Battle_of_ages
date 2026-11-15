@@ -68,7 +68,7 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
-        public void ResourceCosts_ScaleMonotonicallyWithLevel()
+        public void Wood_GrowsWithLevel_Ore_StaysTheSame()
         {
             for (int lvl = 1; lvl < 5; lvl++)
             {
@@ -78,8 +78,15 @@ namespace BattleOfAges.Tests
 
                 int oreCurrent = ItemStatCalculator.CalculateOreCost(ItemType.Sword, lvl);
                 int oreNext = ItemStatCalculator.CalculateOreCost(ItemType.Sword, lvl + 1);
-                Assert.Greater(oreNext, oreCurrent, $"Level {lvl + 1} ore cost should exceed level {lvl}.");
+                Assert.AreEqual(oreCurrent, oreNext, $"Ore is the same at level {lvl + 1} as at {lvl}: a higher level asks for a higher tier, not more.");
             }
+            var ore = new System.Collections.Generic.Dictionary<ItemType, int>
+            {
+                { ItemType.Sword, 3 }, { ItemType.Helmet, 5 }, { ItemType.Shield, 2 }, { ItemType.Axe, 3 }, { ItemType.Pickaxe, 3 },
+                { ItemType.Armor, 6 }, { ItemType.Gloves, 4 }, { ItemType.Boots, 4 }
+            };
+            foreach (var kv in ore)
+                for (int lvl = 1; lvl <= 5; lvl++) Assert.AreEqual(kv.Value, ItemStatCalculator.CalculateOreCost(kv.Key, lvl), $"{kv.Key} {lvl}: the author's table");
         }
 
         [Test]

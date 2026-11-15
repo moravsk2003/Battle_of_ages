@@ -13,7 +13,8 @@ namespace BattleOfAges.Combat
     /// 1. its artifacts fall where it died (HeroDied); 2. an interregnum of 90 s begins; 3. about half of the units desert
     /// and become deserter bands (hostile, not dead; units far from the town hall go first); 4. after the interregnum the
     /// strongest unit left (highest rank, then battle experience, then HP) becomes the new hero: x2 of its rank, level 1,
-    /// the class chosen anew, its gear; 5. with no units left the game is over (single player: load a save).
+    /// the class chosen anew, its gear; 5. with no units left the game is over at once, with no interregnum to wait out (also
+    /// when the last of them falls during one; single player: load a save).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class HeroSuccession : MonoBehaviour
@@ -58,12 +59,31 @@ namespace BattleOfAges.Combat
             UI.GameSound.Play2D(UI.GameSound.Kind.HeroDeath);
             HeroDied?.Invoke(this, transform.position);
             Desert(OwnUnits(), TownHallPosition());
+            // No one left to take over (none at all, or all ran off): lost at once, no countdown to nothing (the author's word, 2026-11-15)
+            if (!AnyHeir()) EndInterregnum();
         }
+
+        /// <summary>Someone of one's own is still there to become the hero.</summary>
+        public static bool AnyHeir()
+        {
+            foreach (RtsUnit u in UnitRegistry.ActiveUnits)
+            {
+                if (u == null || !u.gameObject.activeInHierarchy || u.GetComponent<HeroSuccession>() != null) continue;
+                HealthComponent hp = u.GetComponent<HealthComponent>();
+                if (hp == null || hp.IsAlive) return true;
+            }
+            return false;
+        }
+
+        private float heirCheck;
 
         private void Update()
         {
             if (!InInterregnum) return;
             interregnumLeft -= Time.deltaTime;
+            heirCheck -= Time.deltaTime;
+            // The last of them fell during the interregnum: lost now, not when the time runs out
+            if (heirCheck <= 0f) { heirCheck = 0.5f; if (!AnyHeir()) { EndInterregnum(); return; } }
             if (interregnumLeft <= 0f) EndInterregnum();
         }
 
