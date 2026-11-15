@@ -52,8 +52,9 @@ namespace BattleOfAges.UI
         /// when nothing changes. A shorter cooldown is better.
         /// </summary>
         public static string Compare((int health, int damage, float cooldown, float reduction, float range) a,
-                                     (int health, int damage, float cooldown, float reduction, float range) b, string heading = "Якщо надягти:")
+                                     (int health, int damage, float cooldown, float reduction, float range) b, string heading = null)
         {
+            string head = heading != null ? Loc.Tr(heading) : Loc.Pick("Якщо надягти:", "If equipped:");
             var sb = new System.Text.StringBuilder();
             void Line(string name, float from, float to, string format, string unit, bool lowerIsBetter = false)
             {
@@ -62,12 +63,12 @@ namespace BattleOfAges.UI
                 string delta = (to > from ? "+" : "−") + Mathf.Abs(to - from).ToString(format) + unit;
                 sb.Append($"\n{name}  {from.ToString(format)}{unit} → {to.ToString(format)}{unit}  ").Append(better ? Good(delta) : Bad(delta));
             }
-            Line("Здоров'я", a.health, b.health, "0", "");
-            Line("Шкода", a.damage, b.damage, "0", "");
-            Line("Удар раз на", a.cooldown, b.cooldown, "0.0#", " с", true);
-            Line("Поглинання", a.reduction * 100f, b.reduction * 100f, "0", "%");
-            Line("Дальність", a.range, b.range, "0.#", " м");
-            return sb.Length == 0 ? "" : "\n" + Dim(heading) + sb;
+            Line(Loc.Pick("Здоров'я", "Health"), a.health, b.health, "0", "");
+            Line(Loc.Pick("Шкода", "Damage"), a.damage, b.damage, "0", "");
+            Line(Loc.Pick("Удар раз на", "Attack every"), a.cooldown, b.cooldown, "0.0#", Loc.Pick(" с", " s"), true);
+            Line(Loc.Pick("Поглинання", "Armor"), a.reduction * 100f, b.reduction * 100f, "0", "%");
+            Line(Loc.Pick("Дальність", "Range"), a.range, b.range, "0.#", Loc.Pick(" м", " m"));
+            return sb.Length == 0 ? "" : "\n" + Dim(head) + sb;
         }
     }
 
@@ -150,7 +151,7 @@ namespace BattleOfAges.UI
             if (Time.unscaledTime - since < Delay) return;
             if (panel.gameObject.activeSelf && Time.unscaledTime < nextRead) { Place(); return; }
             nextRead = Time.unscaledTime + 0.25f;
-            string text = hovered.Text;
+            string text = Loc.Tr(hovered.Text);
             if (string.IsNullOrEmpty(text)) { panel.gameObject.SetActive(false); return; }
             if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);
             if (text != shown)

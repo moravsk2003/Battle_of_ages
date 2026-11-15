@@ -37,9 +37,22 @@ namespace BattleOfAges.UI
             Build();
             window.SetActive(false);
             DontDestroyOnLoad(gameObject);
+            Loc.Changed += OnLanguageChanged;
         }
 
-        private void OnDestroy() { if (instance == this) instance = null; }
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+            if (instance == this) instance = null;
+        }
+
+        private void OnLanguageChanged()
+        {
+            if (tabs == null) return;
+            for (int i = 0; i < tabs.Length; i++)
+                if (tabs[i] != null) tabs[i].text = TabName(i);
+            if (page != null) page.text = TabText(CurrentTab);
+        }
 
         public void Open()
         {
@@ -86,19 +99,22 @@ namespace BattleOfAges.UI
 
         /// <summary>The tabs' names, in order.</summary>
         public static readonly string[] TabNames = { "Основи", "Мапа", "Будівництво", "Люди", "Бій і герой", "Світ", "Гра в мережі" };
+        public static readonly string[] TabNamesEn = { "Basics", "Map", "Building", "People", "Hero & Combat", "World", "Multiplayer" };
+
+        public static string TabName(int index) => (Loc.En ? TabNamesEn : TabNames)[Mathf.Clamp(index, 0, TabNames.Length - 1)];
 
         /// <summary>A tab's text, with the player's own keys.</summary>
         public static string TabText(int index)
         {
             switch (index)
             {
-                case 0: return Basics();
-                case 1: return MapControls();
-                case 2: return Building();
-                case 3: return People();
-                case 4: return Fight();
-                case 5: return TheWorld();
-                default: return Network();
+                case 0: return Loc.En ? BasicsEn() : Basics();
+                case 1: return Loc.En ? MapControlsEn() : MapControls();
+                case 2: return Loc.En ? BuildingEn() : Building();
+                case 3: return Loc.En ? PeopleEn() : People();
+                case 4: return Loc.En ? FightEn() : Fight();
+                case 5: return Loc.En ? TheWorldEn() : TheWorld();
+                default: return Loc.En ? NetworkEn() : Network();
             }
         }
 
@@ -206,6 +222,110 @@ namespace BattleOfAges.UI
             "• Зберігає гру хост. Гра гостя зберігається в нього й повертається при вході.\n" +
             "• Усі гравці вороги, кожен зі своїм королівством.";
 
+        private static string BasicsEn() =>
+            Head("First Person") + "\n" +
+            $"{K("W A S D")} — move,  {K("Space")} — jump,  mouse — look,  {K(HudTips.Key(KeyAction.AutoWalk))} — auto-walk\n" +
+            $"{K("LMB")} — strike or shoot\n" +
+            $"{Key(KeyAction.InteractGather)} — gather, open chest, workbench, mine,  {Key(KeyAction.ChopTree)} — chop tree\n" +
+            $"{Key(KeyAction.ToggleGameMode)} — switch to map view\n\n" +
+            Head("Windows") + "\n" +
+            $"{Key(KeyAction.Inventory)} — inventory,  {Key(KeyAction.Equipment)} — equipment,  {Key(KeyAction.Hero)} — hero\n" +
+            $"{Key(KeyAction.BuildMenu)} — build menu,  {Key(KeyAction.WorkerCommandUI)} — worker assignment,  {Key(KeyAction.WorldMap)} — world map\n" +
+            $"{K("F1")} — this help,  {K("F3")} — FPS,  {K("F8")} — dev editor,  {K("Esc / P")} — pause (closes windows first)\n\n" +
+            Head("Getting Started") + "\n" +
+            "1. Gather wood and ore and store them in a chest. Villagers also gather on their own.\n" +
+            "2. Build a Town Hall: population does not grow without one.\n" +
+            "3. Paint fields, housing, and mining zones: workers construct them automatically.\n" +
+            "4. The advisor panel at the top right guides you step by step.\n\n" +
+            Head("More") + "\n" +
+            "• Hover over any button, icon, or item for a detailed tooltip.\n" +
+            "• Pause → Save / Load, Settings: sensitivity, audio, graphics, keybinds, language, advisor.";
+
+        private static string MapControlsEn() =>
+            Head("Selection") + "\n" +
+            $"{K("LMB")} — select a unit,  box drag — select several,  {K("Shift")} — add or remove\n" +
+            $"{K("Double-click")} or {K("Ctrl+click")} — select all of the same rank on screen\n" +
+            $"{K("Ctrl+A")} — all units,  {Key(KeyAction.SelectFighters)} — all fighters,  {Key(KeyAction.IdleWorker)} — next idle worker\n" +
+            $"{K("Ctrl+1…0")} — assign control group,  {K("Shift+1…0")} — add to group,  {K("1…0")} — select, double-tap — focus camera\n" +
+            $"{K("Esc")} — clear selection, press again — return to first person\n\n" +
+            Head("Orders") + "\n" +
+            $"{K("RMB")} — move, attack enemy, or work at target\n" +
+            $"{K("Ctrl+RMB")} — attack-move along the way,  {K("Shift+RMB")} — queue waypoint\n" +
+            $"{Key(KeyAction.StopUnits)} — stop current job or march\n" +
+            $"{K("Minimap")}: LMB — move camera, RMB — move selected units\n\n" +
+            Head("Camera") + "\n" +
+            $"{K("RMB")} (drag) or {K("W A S D")} — pan,  {K("Wheel")} — zoom\n" +
+            $"{K("Q / E")} — rotate,  {K("R / F")} — tilt,  {K("Middle mouse")} — orbit\n" +
+            $"{Key(KeyAction.CenterSelection)} — center on selected,  {Key(KeyAction.AlertJump)} — jump to last attack\n\n" +
+            Head("Markers") + "\n" +
+            "• Ground ring: blue — allies, red — bandits, other colors — kingdoms. Diamond above head shows rank.";
+
+        private static string BuildingEn() =>
+            Head("Zones: Auto-Built by Workers") + "\n" +
+            $"{Key(KeyAction.BuildMenu)} — zones and buildings. Pick a zone and drag {K("LMB")} inside the golden radius, {K("RMB")} erases, {K("Esc")} finishes.\n" +
+            "• Housing boosts population growth, Fields produce food, Forest builds sawmills, Crafts builds workbenches, Mining builds mines, Trade builds markets (Town Hall II+).\n" +
+            $"• \"Erase\" or {K("Delete")} — zone eraser. Buttons show completed vs planned buildings.\n\n" +
+            Head("Structures: Placed Manually") + "\n" +
+            $"\"Buildings\": Town Hall, Storage Chest, Walls, Gate. {K("Z / X")} — rotate, {K("LMB")} — place, {K("RMB")} — cancel.\n" +
+            $"• Walls: {K("Tab")} cycles ore tier; segments snap to adjacent walls. Upgrade walls via Town Hall or wall panel.\n" +
+            "• Construction stalls unless workers are assigned or in Auto mode.\n\n" +
+            Head("Building Panel") + "\n" +
+            $"{K("LMB")} on a building: health, workers, upgrade, open, demolish. Demolishing refunds half cost; canceling a site refunds everything unbuilt.\n\n" +
+            Head("New Settlement") + "\n" +
+            "From Town Hall II, place another Town Hall in unclaimed land and send workers there. Each settlement has its own stock and zones; Markets send caravans where needed.";
+
+        private static string PeopleEn() =>
+            Head("Worker Assignment") + "\n" +
+            $"{Key(KeyAction.WorkerCommandUI)} — assign workers by district and job for each settlement.\n" +
+            "• \"+\" calls the nearest free worker, \"−\" releases them and caps auto-assignment; click × to clear the cap.\n" +
+            "• On the selection bar: job orders. \"Auto\" lets workers choose what is needed most.\n\n" +
+            Head("Ranks") + "\n" +
+            "Villager → Warrior → Knight → General. Villagers promote to Warrior in combat or rarely from labor; Knight & General only in combat. Everyone can work and fight.\n\n" +
+            Head("Equipment") + "\n" +
+            $"{Key(KeyAction.Equipment)}: select people on the map, click an item in the armory to issue one each. \"Best from Armory\" equips better armor automatically. Miners take pickaxes automatically.\n\n" +
+            Head("Workbench & Mine") + "\n" +
+            "• Workbench: crafters forge tier I–V gear and smelt 10 ore into 1 higher-tier ore.\n" +
+            "• Mine: miners dig inside, haulers carry ore to a chest. A full mine stops producing.\n\n" +
+            Head("Food") + "\n" +
+            "1 food per person per day. Without food, growth stops and villagers starve one by one. Auto workers farm when reserves drop below 3 days.";
+
+        private static string FightEn() =>
+            Head("Hero") + "\n" +
+            $"{Key(KeyAction.Hero)}: XP from kills, level ups, strength & health points. Class: Tank, Archer, Mage, or DD.\n" +
+            $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — class skills,  {Key(KeyAction.UseFullHeal)} / {Key(KeyAction.UseLightning)} — consumable artifacts\n\n" +
+            Head("Alarm") + "\n" +
+            $"{Key(KeyAction.Alarm)}: everyone drops work and arms up. Triggers automatically when enemies approach the Town Hall and stands down after battle.\n\n" +
+            Head("Walls") + "\n" +
+            $"{K("RMB")} on a wall: units climb stairs onto posts to strike harder (and archers shoot farther). Alarm sends archers to walls.\n\n" +
+            Head("Hero Death") + "\n" +
+            "Interregnum: some forces desert, then the strongest ally rises as the new hero.";
+
+        private static string TheWorldEn() =>
+            Head("World Map") + "\n" +
+            $"{Key(KeyAction.WorldMap)}: terrain overview, rival kingdoms, distance, and population.\n\n" +
+            Head("Neighbors") + "\n" +
+            "• Rival heroes camp kilometers away. Nearby kings expand and launch raids on you and each other.\n" +
+            "• Bandit camps with bows and swords, plus wild animals.\n" +
+            "• Bandit raids arrive starting day 1 in growing bands; alerts tell you which direction they come from.\n\n" +
+            Head("Notes") + "\n" +
+            "• The global World Map is currently view-only (no direct map orders there).\n" +
+            "• Resources and buildings cannot be placed on steep mountains.\n" +
+            "• No Shift-sprint: hero movement speed scales with Strength and Health.";
+
+        private static string NetworkEn() =>
+            Head("How to Play Together") + "\n" +
+            "1. Host: Main Menu → Multiplayer → New Campaign or From Save. Share the lobby address shown.\n" +
+            "2. Guests: Main Menu → Multiplayer, enter the IP address to join the lobby.\n" +
+            "3. New players pick a class and starting artifact in the lobby; returning players resume their kingdom.\n" +
+            "4. Host clicks Start when ready. New players join only via lobby; returning kingdom owners can rejoin anytime.\n" +
+            "5. All players must run the same game version.\n\n" +
+            Head("In-Game") + "\n" +
+            $"{Key(KeyAction.PlayerList)} (hold) — show player list.\n" +
+            $"{K("F6")} — global pause (3 per player per match; unpaused by whoever paused, anyone after 30 s, or host anytime).\n" +
+            "• On disconnect: game pauses for the host to assign a bot, return to lobby, or wait.\n" +
+            "• Host saves the world. Guest hero progress saves on the host.\n" +
+            "• All players are rivals, each leading their own kingdom.";
+
         // ------------------------------------------------------------------ the window
 
         private const float TextWidth = 1060f, TextHeight = 640f;
@@ -229,8 +349,9 @@ namespace BattleOfAges.UI
             for (int i = 0; i < TabNames.Length; i++)
             {
                 int index = i;
-                UnityEngine.UI.Button tab = UiTheme.TextButton(panel, "Tab_" + TabNames[i], TabNames[i], new Vector2(0f, 1f), new Vector2(x, -60f), new Vector2(tabW, 42f), () => ShowTab(index), 16);
+                UnityEngine.UI.Button tab = UiTheme.TextButton(panel, "Tab_" + TabNames[i], TabName(i), new Vector2(0f, 1f), new Vector2(x, -60f), new Vector2(tabW, 42f), () => ShowTab(index), 16);
                 tabs[i] = tab.GetComponentInChildren<UnityEngine.UI.Text>();
+                LocText.Detach(tabs[i]);
                 x += tabW + gap;
             }
 

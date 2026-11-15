@@ -134,7 +134,11 @@ namespace BattleOfAges.Player
         {
             HeroArtifacts bag = GetComponent<HeroArtifacts>();
             if (bag == null || !bag.Has(a)) return;
-            if (!bag.Use(a)) StrategyHud.Notify(a == ArtifactType.Lightning ? "Блискавці нема в кого влучити" : "Не вдалося");
+            if (!bag.Use(a))
+            {
+                UiSound.Play(UiSound.Kind.Error);
+                StrategyHud.Notify(a == ArtifactType.Lightning ? "Блискавці нема в кого влучити" : "Не вдалося");
+            }
         }
 
         private void UseSkill(int slot)
@@ -143,7 +147,10 @@ namespace BattleOfAges.Player
             HeroSkills skills = GetComponent<HeroSkills>();
             if (skills == null || !skills.HasActiveIn(slot)) return;
             if (!skills.UseActive(slot, fpsCamera != null ? fpsCamera.transform.forward : transform.forward) && skills.CooldownLeftIn(slot) > 0f)
+            {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify($"Уміння перезаряджається: {skills.CooldownLeftIn(slot):0} с");
+            }
         }
 
         private void PerformPlayerAttack()
@@ -173,7 +180,7 @@ namespace BattleOfAges.Player
                 HealthComponent targetHp = hit.collider.GetComponentInParent<HealthComponent>();
                 if (targetHp != null && targetHp != healthComponent && targetHp.IsAlive)
                 {
-                    if (combatUnit.NeedsStaff) { StrategyHud.Notify("Маг атакує лише з посохом (зробіть на верстаті)"); return; }
+                    if (combatUnit.NeedsStaff) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify("Маг атакує лише з посохом (зробіть на верстаті)"); return; }
                     combatUnit.TryAttack(targetHp);
                     return;
                 }

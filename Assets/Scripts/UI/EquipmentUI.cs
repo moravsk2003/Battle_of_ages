@@ -68,12 +68,20 @@ namespace BattleOfAges.UI
         {
             Equipment.AnyChanged += OnEquipmentChanged;
             Armory.Changed += MarkDirty;
+            Loc.Changed += OnLanguageChanged;
         }
 
         private void OnDisable()
         {
             Equipment.AnyChanged -= OnEquipmentChanged;
             Armory.Changed -= MarkDirty;
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        private void OnLanguageChanged()
+        {
+            dirty = true;
+            if (open) Refresh();
         }
 
         private void OnDestroy()
@@ -177,8 +185,9 @@ namespace BattleOfAges.UI
 
         private void OnSlotClicked(EquipSlot slot)
         {
-            if (Target != null && Target.IsLocked(slot)) { StrategyHud.Notify("Артефакт не знімається"); return; }
+            if (Target != null && Target.IsLocked(slot)) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify("Артефакт не знімається"); return; }
             Net.CommandBus.Submit(new Net.EquipCommand { Units = new[] { Net.WorldEntity.IdOf(Target).Value }, TakeOff = true, Slot = slot });
+            GameSound.Play2D(GameSound.Kind.EquipGear);
             Refresh();
         }
 
@@ -189,11 +198,13 @@ namespace BattleOfAges.UI
                 var ids = new System.Collections.Generic.List<int>();
                 foreach (Equipment e in targets) if (e != null) ids.Add(Net.WorldEntity.IdOf(e).Value);
                 Net.CommandBus.Submit(new Net.EquipCommand { Units = ids.ToArray(), Item = item.Type, Level = item.Level });
+                GameSound.Play2D(GameSound.Kind.EquipGear);
                 Refresh();
                 return;
             }
-            if (Target != null && Target.IsLocked(item.Slot)) { StrategyHud.Notify("Цей слот тримає артефакт"); return; }
+            if (Target != null && Target.IsLocked(item.Slot)) { UiSound.Play(UiSound.Kind.Error); StrategyHud.Notify("Цей слот тримає артефакт"); return; }
             Net.CommandBus.Submit(new Net.EquipCommand { Units = new[] { Net.WorldEntity.IdOf(Target).Value }, Item = item.Type, Level = item.Level });
+            GameSound.Play2D(GameSound.Kind.EquipGear);
             Refresh();
         }
 
@@ -202,7 +213,11 @@ namespace BattleOfAges.UI
         {
             var who = toAll ? (IList<Equipment>)targets : new List<Equipment> { Target };
             int n = GearDispenser.UpgradeAll(who);
-            StrategyHud.Notify(n > 0 ? $"Вдягнуто зі складу: {n}" : "На складі немає нічого кращого");
+            if (n > 0) GameSound.Play2D(GameSound.Kind.EquipGear);
+            else UiSound.Play(UiSound.Kind.Error);
+            StrategyHud.Notify(n > 0
+                ? Loc.Pick($"Вдягнуто зі складу: {n}", $"Equipped from armory: {n}")
+                : Loc.Pick("На складі немає нічого кращого", "Nothing better in armory"));
             Refresh();
         }
 
@@ -225,14 +240,18 @@ namespace BattleOfAges.UI
             dirty = false;
             Equipment t = Target;
             if (t == null) return;
-            title.text = "Спорядження — " + DisplayName(t.gameObject);
+            title.text = Loc.Pick("Спорядження — ", "Equipment — ") + DisplayName(t.gameObject);
             counter.text = targets.Count > 1 ? $"{current + 1} / {targets.Count}" : "";
             prevButton.gameObject.SetActive(targets.Count > 1);
             nextButton.gameObject.SetActive(targets.Count > 1);
             toAllButton.gameObject.SetActive(targets.Count > 1);
-            toAllText.text = toAll ? $"Видати: усім обраним ({targets.Count})" : "Видати: лише цьому";
-            hint.text = (toAll && targets.Count > 1 ? "Клік по речі — по одній кожному обраному" : "Клік по речі — надягти")
-                        + "  ·  клік по слоту — зняти на склад  ·  [C] закрити";
+            toAllText.text = toAll
+                ? Loc.Pick($"Видати: усім обраним ({targets.Count})", $"Issue: all selected ({targets.Count})")
+                : Loc.Pick("Видати: лише цьому", "Issue: this unit only");
+            hint.text = (toAll && targets.Count > 1
+                ? Loc.Pick("Клік по речі — по одній кожному обраному", "Click an item — one to each selected unit")
+                : Loc.Pick("Клік по речі — надягти", "Click an item — equip"))
+                + Loc.Pick("  ·  клік по слоту — зняти на склад  ·  [C] закрити", "  ·  click a slot — store in armory  ·  [C] close");
 
             foreach (EquipSlot s in ItemTypeNames.Slots)
             {
@@ -245,7 +264,7 @@ namespace BattleOfAges.UI
                     v.icon.sprite = UiTheme.ItemSprite(ArtifactLook(s), 5);
                     v.level.text = s == EquipSlot.Weapon ? "×5" : s == EquipSlot.Chest ? "80%" : "";
                     v.level.color = ArtifactGold;
-                    v.caption.text = "артефакт";
+                    v.caption.text = Loc.Pick("артефакт", "artifact");
                     v.rim.color = ArtifactGold;
                     continue;
                 }
@@ -258,12 +277,17 @@ namespace BattleOfAges.UI
                 v.rim.color = has ? UiTheme.LevelColor(item.Level) : new Color(1f, 1f, 1f, 0.55f);
             }
 
-            stats.text =
+            stats.text = Loc.Pick(
                 $"Здоров'я  <color=#F5CC73>{t.MaxHealth}</color>\n" +
                 $"Шкода  <color=#F5CC73>{t.Damage}</color>   ·   удар раз на {t.Cooldown:0.0} с\n" +
                 $"Дальність  <color=#F5CC73>{t.Range:0.#} м</color>\n" +
                 $"Поглинання шкоди  <color=#F5CC73>{Mathf.RoundToInt(t.DamageReduction * 100f)}%</color>\n" +
-                $"Сила  <color=#F5CC73>{t.Strength:0.#}</color>   ·   швидкість {SpeedOf(t):0.#} м/с";
+                $"Сила  <color=#F5CC73>{t.Strength:0.#}</color>   ·   швидкість {SpeedOf(t):0.#} м/с",
+                $"Health  <color=#F5CC73>{t.MaxHealth}</color>\n" +
+                $"Damage  <color=#F5CC73>{t.Damage}</color>   ·   hit every {t.Cooldown:0.0} s\n" +
+                $"Range  <color=#F5CC73>{t.Range:0.#} m</color>\n" +
+                $"Damage Reduction  <color=#F5CC73>{Mathf.RoundToInt(t.DamageReduction * 100f)}%</color>\n" +
+                $"Strength  <color=#F5CC73>{t.Strength:0.#}</color>   ·   speed {SpeedOf(t):0.#} m/s");
 
             for (int i = 0; i < filterButtons.Count; i++)
             {
@@ -281,12 +305,12 @@ namespace BattleOfAges.UI
 
         private static string DisplayName(GameObject go)
         {
-            if (go.GetComponent<PlayerCombatController>() != null) return "Герой";
+            if (go.GetComponent<PlayerCombatController>() != null) return Loc.Pick("Герой", "Hero");
             RtsUnit unit = go.GetComponent<RtsUnit>();
             if (unit != null) return SelectedUnitUI.DisplayName(unit); // by its rank, as in the selection panel
             string n = go.name;
-            if (n.StartsWith("NPC_Villager_")) return "Робітник " + n.Substring("NPC_Villager_".Length);
-            if (n.Contains("Knight")) return "Лицар";
+            if (n.StartsWith("NPC_Villager_")) return Loc.Pick("Робітник ", "Worker ") + n.Substring("NPC_Villager_".Length);
+            if (n.Contains("Knight")) return Loc.Pick("Лицар", "Knight");
             return n.Replace("NPC_", "").Replace("_", " ");
         }
 
@@ -338,9 +362,9 @@ namespace BattleOfAges.UI
             if (compare && t != null)
             {
                 Item worn = t[item.Slot];
-                s += "\n" + TipText.Dim(worn.IsEmpty ? "Слот вільний" : "Замість: " + worn);
+                s += "\n" + TipText.Dim(worn.IsEmpty ? Loc.Pick("Слот вільний", "Slot empty") : Loc.Pick("Замість: ", "Replaces: ") + worn);
                 s += TipText.Compare(t.StatsWith(worn), t.StatsWith(item));
-                s += "\n" + TipText.Dim("Клік — надягти");
+                s += "\n" + TipText.Dim(Loc.Pick("Клік — надягти", "Click — equip"));
             }
             return s;
         }
@@ -367,10 +391,12 @@ namespace BattleOfAges.UI
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(800f, 44f));
             UiTheme.Divider(panel, -60f, 520f);
             title = UiTheme.Label(head, "Text", "Спорядження", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(title);
             prevButton = UiTheme.TextButton(panel, "Prev", "‹", new Vector2(0f, 1f), new Vector2(24f, -14f), new Vector2(46f, 44f), () => Step(-1), 30);
             nextButton = UiTheme.TextButton(panel, "Next", "›", new Vector2(0f, 1f), new Vector2(78f, -14f), new Vector2(46f, 44f), () => Step(1), 30);
             RectTransform cnt = UiTheme.Rect(panel, "Counter", new Vector2(0f, 1f), new Vector2(132f, -14f), new Vector2(90f, 44f));
             counter = UiTheme.Label(cnt, "Text", "", 19, TextAnchor.MiddleLeft, UiTheme.InkDim);
+            LocText.Detach(counter);
             UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-16f, -14f), new Vector2(46f, 44f), Close, 28)
                    .GetComponent<Image>().color = new Color(1f, 0.72f, 0.68f);
 
@@ -388,6 +414,7 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(st, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
             RectTransform stText = UiTheme.Rect(st, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(360f, 130f));
             stats = UiTheme.Label(stText, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
+            LocText.Detach(stats);
             stats.supportRichText = true;
             stats.lineSpacing = 1.15f;
 
@@ -397,13 +424,18 @@ namespace BattleOfAges.UI
             RectTransform storeTitle = UiTheme.Rect(store, "Title", new Vector2(0f, 1f), new Vector2(18f, -8f), new Vector2(300f, 34f));
             UiTheme.Label(storeTitle, "Text", "Склад", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
             Button best = UiTheme.TextButton(store, "Best", "Найкраще зі складу", new Vector2(1f, 1f), new Vector2(-16f, -6f), new Vector2(200f, 36f), GiveBest, 15);
-            Tooltip.Set(best.gameObject, () => TipText.Title("Найкраще зі складу", UiTheme.Gold)
-                + "\nКожному обраному — найкращі зі складу щит, шолом, нагрудник, рукавиці й чоботи, якщо вони кращі за вдягнуті, і краща зброя того ж виду, що в руках."
-                + "\n" + TipText.Dim("Інструмент у руках не міняється на зброю. Кайло шахтарі беруть зі складу самі, коли заходять у шахту."));
+            Tooltip.Set(best.gameObject, () => TipText.Title(Loc.Pick("Найкраще зі складу", "Best from Armory"), UiTheme.Gold)
+                + Loc.Pick(
+                    "\nКожному обраному — найкращі зі складу щит, шолом, нагрудник, рукавиці й чоботи, якщо вони кращі за вдягнуті, і краща зброя того ж виду, що в руках.",
+                    "\nEquips each selected unit with the best shield, helmet, chest, gloves, and boots from the armory, plus a better weapon of the same type they hold.")
+                + "\n" + TipText.Dim(Loc.Pick("Інструмент у руках не міняється на зброю. Кайло шахтарі беруть зі складу самі, коли заходять у шахту.", "A held tool is not replaced by a weapon. Miners take pickaxes from the armory automatically when entering a mine.")));
             toAllButton = UiTheme.TextButton(store, "ToAll", "", new Vector2(1f, 1f), new Vector2(-224f, -6f), new Vector2(240f, 36f), ToggleToAll, 15);
             toAllText = toAllButton.GetComponentInChildren<Text>();
-            Tooltip.Set(toAllButton.gameObject, () => TipText.Title("Кому видавати", UiTheme.Gold)
-                + "\nУсім обраним: клік по речі на складі дає по одній кожному, поки вистачає. Лише цьому: тому, чиє спорядження зараз видно.");
+            LocText.Detach(toAllText);
+            Tooltip.Set(toAllButton.gameObject, () => TipText.Title(Loc.Pick("Кому видавати", "Issue Target"), UiTheme.Gold)
+                + Loc.Pick(
+                    "\nУсім обраним: клік по речі на складі дає по одній кожному, поки вистачає. Лише цьому: тому, чиє спорядження зараз видно.",
+                    "\nAll selected: clicking an item gives one to each selected unit while stock lasts. This unit only: equips only the unit currently shown."));
 
             string[] names = { "Усе", "Зброя", "Щит", "Шолом", "Нагр.", "Рукав.", "Чоботи" };
             for (int i = 0; i < names.Length; i++)
@@ -430,6 +462,7 @@ namespace BattleOfAges.UI
 
             RectTransform hintRt = UiTheme.Rect(store, "Hint", new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(654f, 30f));
             hint = UiTheme.Label(hintRt, "Text", "Клік по речі — надягти  ·  клік по слоту — зняти на склад  ·  [C] закрити", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            LocText.Detach(hint);
 
             // Tooltip
         }
@@ -451,13 +484,14 @@ namespace BattleOfAges.UI
             Text level = UiTheme.Label(lv, "Text", "", 19, TextAnchor.LowerRight, UiTheme.Ink, FontStyle.Bold);
             RectTransform cap = UiTheme.Rect(rt, "Caption", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(100f, 30f));
             Text caption = UiTheme.Label(cap, "Text", ItemTypeNames.SlotName(slot), 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            LocText.Detach(caption);
             slotViews[slot] = (rim, icon, level, caption);
             Hover(rt.gameObject, () =>
             {
                 Item worn = Target != null ? Target[slot] : Item.None;
-                if (Target != null && Target.IsLocked(slot)) return TipText.Title("Артефакт", new Color(1f, 0.78f, 0.3f)) + "\n" + TipText.Dim("Тримає цей слот, не знімається");
-                if (worn.IsEmpty) return TipText.Title(ItemTypeNames.SlotName(slot), UiTheme.Gold) + "\n" + TipText.Dim("Порожньо — оберіть річ на складі");
-                return Describe(worn, false) + TipText.Compare(Target.StatsWith(worn), Target.StatsWithout(slot), "Якщо зняти:") + "\n" + TipText.Dim("Клік — зняти на склад");
+                if (Target != null && Target.IsLocked(slot)) return TipText.Title(Loc.Pick("Артефакт", "Artifact"), new Color(1f, 0.78f, 0.3f)) + "\n" + TipText.Dim(Loc.Pick("Тримає цей слот, не знімається", "Locked in this slot, cannot be removed"));
+                if (worn.IsEmpty) return TipText.Title(ItemTypeNames.SlotName(slot), UiTheme.Gold) + "\n" + TipText.Dim(Loc.Pick("Порожньо — оберіть річ на складі", "Empty — choose an item from the armory"));
+                return Describe(worn, false) + TipText.Compare(Target.StatsWith(worn), Target.StatsWithout(slot), Loc.Pick("Якщо зняти:", "If removed:")) + "\n" + TipText.Dim(Loc.Pick("Клік — зняти на склад", "Click — store in armory"));
             });
         }
 

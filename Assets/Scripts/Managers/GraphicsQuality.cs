@@ -21,6 +21,18 @@ namespace BattleOfAges.Managers
         private const string PrefKey = "Settings_Graphics";
         public static readonly string[] Names = { "Низька", "Середня", "Висока" };
 
+        public static string GetName(Level level)
+        {
+            switch (level)
+            {
+                case Level.Low: return UI.Loc.Pick("Низька", "Low");
+                case Level.Medium: return UI.Loc.Pick("Середня", "Medium");
+                default: return UI.Loc.Pick("Висока", "High");
+            }
+        }
+
+        public static string CurrentName => GetName(Current);
+
         public static Level Current { get; private set; } = Level.High;
         /// <summary>Render scale the dynamic resolution is at now (1 = the screen's resolution).</summary>
         public static float Scale { get; private set; } = 1f;

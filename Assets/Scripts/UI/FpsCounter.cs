@@ -74,6 +74,7 @@ namespace BattleOfAges.UI
             label.alignment = TextAnchor.UpperLeft;
             label.raycastTarget = false;
             label.text = "FPS …";
+            LocText.Detach(label);
 
             graph = new Texture2D(GraphFrames, GraphHeight, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Repeat };
             graph.SetPixels32(new Color32[GraphFrames * GraphHeight]);
@@ -115,10 +116,15 @@ namespace BattleOfAges.UI
             float fps = 1000f / Mathf.Max(avgMs, 0.01f);
             int hitches = 0;
             foreach (float t in hitchTimes) if (t > 0f && Time.unscaledTime - t < 10f) hitches++;
-            label.text = $"<color={Grade(fps)}><b>FPS {fps:0}</b></color>  {avgMs:0.0} мс\n" +
-                         $"найгірший кадр за 1 с: <color={GradeMs(worstMs)}>{worstMs:0.0} мс</color>\n" +
-                         $"лаги (>{HitchMs:0} мс) за 10 с: <color={(hitches > 0 ? "#ff5050" : "#7CFC7C")}>{hitches}</color>\n" +
-                         $"графіка: {BattleOfAges.Managers.GraphicsQuality.Names[(int)BattleOfAges.Managers.GraphicsQuality.Current]} · {BattleOfAges.Managers.GraphicsQuality.Scale * 100f:0}%";
+            label.text = Loc.Pick(
+                $"<color={Grade(fps)}><b>FPS {fps:0}</b></color>  {avgMs:0.0} мс\n" +
+                $"найгірший кадр за 1 с: <color={GradeMs(worstMs)}>{worstMs:0.0} мс</color>\n" +
+                $"лаги (>{HitchMs:0} мс) за 10 с: <color={(hitches > 0 ? "#ff5050" : "#7CFC7C")}>{hitches}</color>\n" +
+                $"графіка: {BattleOfAges.Managers.GraphicsQuality.CurrentName} · {BattleOfAges.Managers.GraphicsQuality.Scale * 100f:0}%",
+                $"<color={Grade(fps)}><b>FPS {fps:0}</b></color>  {avgMs:0.0} ms\n" +
+                $"worst frame (1s): <color={GradeMs(worstMs)}>{worstMs:0.0} ms</color>\n" +
+                $"hitches (>{HitchMs:0} ms) / 10s: <color={(hitches > 0 ? "#ff5050" : "#7CFC7C")}>{hitches}</color>\n" +
+                $"graphics: {BattleOfAges.Managers.GraphicsQuality.CurrentName} · {BattleOfAges.Managers.GraphicsQuality.Scale * 100f:0}%");
             refreshTimer = 0f;
             accumulated = 0f;
             accumulatedFrames = 0;

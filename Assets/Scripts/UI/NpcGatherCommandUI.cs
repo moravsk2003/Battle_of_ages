@@ -58,12 +58,22 @@ namespace BattleOfAges.UI
             for (int i = transform.childCount - 1; i >= 0; i--) Destroy(transform.GetChild(i).gameObject); // the scene's old window
             Build();
             KeybindsManager.OnKeybindsChanged += ShowTitle;
+            Loc.Changed += OnLanguageChanged;
         }
 
         private void OnDestroy()
         {
             KeybindsManager.OnKeybindsChanged -= ShowTitle;
+            Loc.Changed -= OnLanguageChanged;
             if (Instance == this) Instance = null;
+        }
+
+        private void OnLanguageChanged()
+        {
+            ShowTitle();
+            foreach (Row row in rows)
+                if (row.Name != null) row.Name.text = SettlementLabor.NameOf(row.Job);
+            Refresh();
         }
 
         private void Start() => CloseMenu();
@@ -130,7 +140,7 @@ namespace BattleOfAges.UI
         {
             if (title == null) return;
             string key = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.WorkerCommandUI));
-            title.text = $"Розподіл людей  <size=17><color=#B8A88E>[{key}]</color></size>";
+            title.text = Loc.Pick($"Розподіл людей  <size=17><color=#B8A88E>[{key}]</color></size>", $"Worker Assignment  <size=17><color=#B8A88E>[{key}]</color></size>");
         }
 
         private void Refresh()
@@ -139,7 +149,10 @@ namespace BattleOfAges.UI
             if (shownHall == null && TownHall.All.Count > 0) shownHall = TownHall.All[0];
             ShowTabs();
             int people = SettlementLabor.PeopleCount(shownHall), free = SettlementLabor.FreeCount(shownHall);
-            summary.text = $"Людей: <color=#F5CC73>{people}</color>{(shownHall != null ? $" із {shownHall.Cap}" : "")}   ·   самостійно: <color=#F5CC73>{free}</color>   ·   без діла: <color={(HudIdle(shownHall) > 0 ? "#DB5242" : "#F5CC73")}>{HudIdle(shownHall)}</color>";
+            int idle = HudIdle(shownHall);
+            summary.text = Loc.Pick(
+                $"Людей: <color=#F5CC73>{people}</color>{(shownHall != null ? $" із {shownHall.Cap}" : "")}   ·   самостійно: <color=#F5CC73>{free}</color>   ·   без діла: <color={(idle > 0 ? "#DB5242" : "#F5CC73")}>{idle}</color>",
+                $"People: <color=#F5CC73>{people}</color>{(shownHall != null ? $" of {shownHall.Cap}" : "")}   ·   autonomous: <color=#F5CC73>{free}</color>   ·   idle: <color={(idle > 0 ? "#DB5242" : "#F5CC73")}>{idle}</color>");
             foreach (Row row in rows) ShowRow(row);
         }
 
@@ -157,8 +170,8 @@ namespace BattleOfAges.UI
             row.Value.text = r.Places >= 0 ? $"{r.Hands} / {r.Places}" : r.Hands.ToString();
             bool building = r.Places >= 0;
             string detail = "";
-            if (building) detail = r.Buildings == 0 ? (row.Job == LaborJob.Building ? "нічого не будується" : "ще не збудовано") : $"споруд: {r.Buildings}";
-            if (r.Limit >= 0) detail += (detail.Length > 0 ? "  ·  " : "") + $"самі не більше {r.Limit}";
+            if (building) detail = r.Buildings == 0 ? (row.Job == LaborJob.Building ? Loc.Pick("нічого не будується", "nothing building") : Loc.Pick("ще не збудовано", "not built yet")) : Loc.Pick($"споруд: {r.Buildings}", $"buildings: {r.Buildings}");
+            if (r.Limit >= 0) detail += (detail.Length > 0 ? "  ·  " : "") + Loc.Pick($"самі не більше {r.Limit}", $"auto up to {r.Limit}");
             row.Detail.text = detail;
             row.Minus.interactable = r.Hands > 0;
             row.Plus.interactable = !building || r.Hands < r.Places;
@@ -175,7 +188,7 @@ namespace BattleOfAges.UI
                 if (tabs[i].gameObject.activeSelf != on) tabs[i].gameObject.SetActive(on);
                 if (!on) continue;
                 Text label = tabs[i].GetComponentInChildren<Text>();
-                label.text = $"{halls[i].Title} {Crafting.ItemTypeNames.Roman(halls[i].Level)}";
+                label.text = $"{Loc.Tr(halls[i].Title)} {Crafting.ItemTypeNames.Roman(halls[i].Level)}";
                 label.color = halls[i] == shownHall ? UiTheme.Gold : UiTheme.Ink;
             }
         }
@@ -190,8 +203,9 @@ namespace BattleOfAges.UI
         /// <summary>A refusal in the window itself, where the player is looking.</summary>
         public void Say(string text)
         {
-            if (IsOpen && said != null) said.text = text;
-            else StrategyHud.Notify(text);
+            string tr = Loc.Tr(text);
+            if (IsOpen && said != null) said.text = tr;
+            else StrategyHud.Notify(tr);
         }
 
         // ------------------------------------------------------------------ build
@@ -219,6 +233,7 @@ namespace BattleOfAges.UI
 
             RectTransform head = UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(600f, 44f));
             title = UiTheme.Label(head, "Text", "", 28, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(title);
             title.supportRichText = true;
             ShowTitle();
             UiTheme.TextButton(panel, "Close", "×", new Vector2(1f, 1f), new Vector2(-14f, -10f), new Vector2(44f, 42f), CloseMenu, 26);
@@ -233,15 +248,18 @@ namespace BattleOfAges.UI
                     IReadOnlyList<TownHall> halls = TownHall.All;
                     if (index < halls.Count) { shownHall = halls[index]; said.text = ""; Refresh(); }
                 }, 14);
+                LocText.Detach(tab.GetComponentInChildren<Text>());
                 tab.gameObject.SetActive(false);
                 tabs.Add(tab);
             }
 
             RectTransform sumRect = UiTheme.Rect(panel, "Summary", new Vector2(0f, 1f), new Vector2(24f, -96f), new Vector2(Width - 48f, 26f));
             summary = UiTheme.Label(sumRect, "Text", "", 17, TextAnchor.MiddleLeft, UiTheme.Ink);
+            LocText.Detach(summary);
             summary.supportRichText = true;
             RectTransform saidRect = UiTheme.Rect(panel, "Said", new Vector2(0f, 1f), new Vector2(24f, -120f), new Vector2(Width - 48f, 24f));
             said = UiTheme.Label(saidRect, "Text", "", 15, TextAnchor.MiddleLeft, UiTheme.Bad);
+            LocText.Detach(said);
 
             float y = -top;
             y = Section(panel, "Райони: люди при спорудах", y);
@@ -250,9 +268,9 @@ namespace BattleOfAges.UI
             foreach (LaborJob job in SettlementLabor.Jobs) y = MakeRow(panel, job, y);
 
             Button allFree = UiTheme.TextButton(panel, "AllFree", "Усім: самостійно", new Vector2(0f, 0f), new Vector2(24f, 16f), new Vector2(250f, 46f), () => Order(LaborJob.Standing, LaborCommand.Kind.AllOnTheirOwn), 16);
-            Tooltip.Set(allFree.gameObject, () => TipText.Title("Усім: самостійно", UiTheme.Gold) + "\nУсі, хто не при споруді, самі беруться за те, чого бракує. Хто стоїть, теж іде працювати.");
+            Tooltip.Set(allFree.gameObject, () => TipText.Title(Loc.Pick("Усім: самостійно", "All: Autonomous"), UiTheme.Gold) + Loc.Pick("\nУсі, хто не при споруді, самі беруться за те, чого бракує. Хто стоїть, теж іде працювати.", "\nEveryone not assigned to a building takes up what's needed most. Idle workers join in."));
             Button clear = UiTheme.TextButton(panel, "ClearLimits", "Зняти обмеження", new Vector2(0f, 0f), new Vector2(284f, 16f), new Vector2(250f, 46f), () => Order(LaborJob.Fields, LaborCommand.Kind.ClearLimits), 16);
-            Tooltip.Set(clear.gameObject, () => TipText.Title("Зняти обмеження", UiTheme.Gold) + "\nРайони знову беруть вільних людей, скільки є місць.");
+            Tooltip.Set(clear.gameObject, () => TipText.Title(Loc.Pick("Зняти обмеження", "Clear Limits"), UiTheme.Gold) + Loc.Pick("\nРайони знову беруть вільних людей, скільки є місць.", "\nDistricts resume taking free villagers up to capacity."));
 
             window.SetActive(false);
         }
@@ -273,11 +291,13 @@ namespace BattleOfAges.UI
 
             RectTransform name = UiTheme.Rect(r, "Name", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(240f, RowH));
             row.Name = UiTheme.Label(name, "Text", SettlementLabor.NameOf(job), 17, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            LocText.Detach(row.Name);
             RectTransform detail = UiTheme.Rect(r, "Detail", new Vector2(0f, 0.5f), new Vector2(254f, 0f), new Vector2(290f, RowH));
             row.Detail = UiTheme.Label(detail, "Text", "", 14, TextAnchor.MiddleLeft, UiTheme.InkDim);
+            LocText.Detach(row.Detail);
 
             row.Free = UiTheme.TextButton(r, "Free", "×", new Vector2(1f, 0.5f), new Vector2(-192f, 0f), new Vector2(30f, 30f), () => Order(job, LaborCommand.Kind.ClearLimits), 16);
-            Tooltip.Set(row.Free.gameObject, () => TipText.Title("Зняти обмеження", UiTheme.Gold) + "\nРайон знову бере вільних людей, скільки є місць.");
+            Tooltip.Set(row.Free.gameObject, () => TipText.Title(Loc.Pick("Зняти обмеження", "Clear Limit"), UiTheme.Gold) + Loc.Pick("\nРайон знову бере вільних людей, скільки є місць.", "\nDistrict resumes taking free villagers up to capacity."));
             row.Free.gameObject.SetActive(false);
 
             row.Minus = UiTheme.TextButton(r, "Minus", "−", new Vector2(1f, 0.5f), new Vector2(-140f, 0f), new Vector2(44f, 34f), () => Order(job, LaborCommand.Kind.Remove), 22);

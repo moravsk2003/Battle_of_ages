@@ -57,7 +57,7 @@ namespace BattleOfAges.UI
                 {
                     var t = toasts[i];
                     t.amount += amount; t.born = Time.unscaledTime;
-                    t.text.text = text(t.amount);
+                    t.text.text = Loc.Tr(text(t.amount));
                     FitPlate(t.rt, t.text);
                     toasts[i] = t;
                     return;
@@ -66,7 +66,7 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(rt);
             var group = rt.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
-            Text label = UiTheme.Label(rt, "Text", text(amount), 19, TextAnchor.MiddleCenter, color ?? UiTheme.Gold);
+            Text label = UiTheme.Label(rt, "Text", Loc.Tr(text(amount)), 19, TextAnchor.MiddleCenter, color ?? UiTheme.Gold);
             label.horizontalOverflow = HorizontalWrapMode.Wrap;
             label.verticalOverflow = VerticalWrapMode.Overflow;
             label.rectTransform.offsetMin = new Vector2(TextMargin, 0f);

@@ -62,14 +62,22 @@ namespace BattleOfAges.UI
             Build();
             window.SetActive(false);
             DontDestroyOnLoad(gameObject);
+            Loc.Changed += OnLanguageChanged;
         }
 
-        private void OnDestroy() { if (instance == this) instance = null; }
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+            if (instance == this) instance = null;
+        }
+
+        private void OnLanguageChanged() { if (open) Refresh(); }
 
         public void Open()
         {
             open = true;
             window.SetActive(true);
+            UiSound.Play(UiSound.Kind.Open);
             picture.texture = WorldMapPicture.Current;
             refresh = 0f;
             Refresh();
@@ -81,6 +89,7 @@ namespace BattleOfAges.UI
         {
             open = false;
             window.SetActive(false);
+            UiSound.Play(UiSound.Kind.Open);
             GameModeManager modes = GameContext.Modes;
             if (!GameWindows.AnyModalOpen && !GameWindows.Paused && (modes == null || modes.CurrentMode == GameMode.FirstPerson))
             {
@@ -119,11 +128,12 @@ namespace BattleOfAges.UI
             foreach (WorldMapEntry k in kingdoms)
             {
                 bool band = k.Kind == WorldMapKind.FreeBand, empire = k.Kind == WorldMapKind.Empire;
-                Show(map, k.At, band ? Band : empire ? EmpireColour : Enemy, band ? 10f : empire ? 22f : 16f, band ? "" : k.Name, Describe(k, me));
+                string label = band ? "" : Loc.Tr(k.Name);
+                Show(map, k.At, band ? Band : empire ? EmpireColour : Enemy, band ? 10f : empire ? 22f : 16f, label, Describe(k, me));
             }
             foreach (TownHall hall in TownHall.All)
             {
-                if (hall != null) Show(map, hall.transform.position, Own, 16f, "", TipText.Title("Ваше поселення", Own) + $"\nРатуша: рівень {hall.Level}");
+                if (hall != null) Show(map, hall.transform.position, Own, 16f, "", TipText.Title(Loc.Pick("Ваше поселення", "Your settlement"), Own) + Loc.Pick($"\nРатуша: рівень {hall.Level}", $"\nTown Hall: level {hall.Level}"));
             }
             NetSession session = NetSession.Current;
             if (session != null)
@@ -131,7 +141,7 @@ namespace BattleOfAges.UI
                 {
                     if (other.Number == session.Number) continue;
                     string name = session.NameOf(other.Number);
-                    if (string.IsNullOrEmpty(name)) name = other.Number == 0 ? "Хост" : "Гравець " + other.Number;
+                    if (string.IsNullOrEmpty(name)) name = other.Number == 0 ? Loc.Pick("Хост", "Host") : Loc.Pick("Гравець ", "Player ") + other.Number;
                     Show(map, other.At, OtherPlayer, 13f, name, TipText.Title(name, OtherPlayer) + "\n" + Far(other.At, me));
                 }
             for (int i = used; i < pool.Count; i++) if (pool[i].Rect.gameObject.activeSelf) pool[i].Rect.gameObject.SetActive(false);
@@ -193,12 +203,15 @@ namespace BattleOfAges.UI
         /// <summary>A kingdom in words: what it is, how big, how far.</summary>
         public static string Describe(WorldMapEntry k, Vector3 from)
         {
-            string kind = k.Kind == WorldMapKind.Empire ? "Центральна імперія" : k.Kind == WorldMapKind.FreeBand ? "Вільна ватага, без ратуші" : "Королівство";
+            string kind = k.Kind == WorldMapKind.Empire ? Loc.Pick("Центральна імперія", "Central Empire")
+                        : k.Kind == WorldMapKind.FreeBand ? Loc.Pick("Вільна ватага, без ратуші", "Free warband, no town hall")
+                        : Loc.Pick("Королівство", "Kingdom");
             Color color = k.Kind == WorldMapKind.Empire ? EmpireColour : k.Kind == WorldMapKind.FreeBand ? Band : Enemy;
-            var b = new StringBuilder(TipText.Title(k.Name, color));
-            if (k.Name != kind) b.Append('\n').Append(TipText.Dim(kind));
-            if (k.Kind != WorldMapKind.FreeBand) b.Append('\n').Append(k.Hall > 0 ? $"Ратуша: рівень {k.Hall}" : "Ратуші ще немає");
-            b.Append($"\nЛюдей: {k.People}\n").Append(Far(k.At, from));
+            string title = Loc.Tr(k.Name);
+            var b = new StringBuilder(TipText.Title(title, color));
+            if (title != kind) b.Append('\n').Append(TipText.Dim(kind));
+            if (k.Kind != WorldMapKind.FreeBand) b.Append('\n').Append(k.Hall > 0 ? Loc.Pick($"Ратуша: рівень {k.Hall}", $"Town Hall: level {k.Hall}") : Loc.Pick("Ратуші ще немає", "No Town Hall yet"));
+            b.Append(Loc.Pick($"\nЛюдей: {k.People}\n", $"\nPeople: {k.People}\n")).Append(Far(k.At, from));
             return b.ToString();
         }
 
@@ -206,28 +219,30 @@ namespace BattleOfAges.UI
         public static string Far(Vector3 at, Vector3 from)
         {
             float metres = Flat(at, from);
-            return metres < 1000f ? $"До вас: {Mathf.RoundToInt(metres / 10f) * 10} м" : $"До вас: {metres / 1000f:0.0} км";
+            return metres < 1000f
+                ? Loc.Pick($"До вас: {Mathf.RoundToInt(metres / 10f) * 10} м", $"Distance: {Mathf.RoundToInt(metres / 10f) * 10} m")
+                : Loc.Pick($"До вас: {metres / 1000f:0.0} км", $"Distance: {metres / 1000f:0.0} km");
         }
 
         /// <summary>Beside the map: what the colours mean, and the kingdoms from the nearest.</summary>
         private static string ListOf(List<WorldMapEntry> kingdoms, Vector3 me)
         {
             var b = new StringBuilder();
-            b.Append(Colour(Enemy)).Append("● королівство</color>\n");
-            b.Append(Colour(EmpireColour)).Append("● Центральна імперія</color>\n");
-            b.Append(Colour(Band)).Append("● вільна ватага</color>\n");
-            b.Append(Colour(Own)).Append("● ваше поселення</color>\n");
-            if (NetSession.Active) b.Append(Colour(OtherPlayer)).Append("● інший гравець</color>\n");
-            b.Append("<color=#ffffff>▲ ви</color>\n\n");
+            b.Append(Colour(Enemy)).Append(Loc.Pick("● королівство</color>\n", "● kingdom</color>\n"));
+            b.Append(Colour(EmpireColour)).Append(Loc.Pick("● Центральна імперія</color>\n", "● Central Empire</color>\n"));
+            b.Append(Colour(Band)).Append(Loc.Pick("● вільна ватага</color>\n", "● free warband</color>\n"));
+            b.Append(Colour(Own)).Append(Loc.Pick("● ваше поселення</color>\n", "● your settlement</color>\n"));
+            if (NetSession.Active) b.Append(Colour(OtherPlayer)).Append(Loc.Pick("● інший гравець</color>\n", "● other player</color>\n"));
+            b.Append(Loc.Pick("<color=#ffffff>▲ ви</color>\n\n", "<color=#ffffff>▲ you</color>\n\n"));
             int standing = 0;
             foreach (WorldMapEntry k in kingdoms) if (k.Kind != WorldMapKind.FreeBand) standing++;
-            b.Append("<b>Королівств: ").Append(standing).Append("</b>\n");
-            if (standing == 0) b.Append(NetSession.IsGuest ? "Хост ще не сказав, де вони.\n" : "У цьому світі їх немає.\n");
+            b.Append(Loc.Pick($"<b>Королівств: {standing}</b>\n", $"<b>Kingdoms: {standing}</b>\n"));
+            if (standing == 0) b.Append(NetSession.IsGuest ? Loc.Pick("Хост ще не сказав, де вони.\n", "Host hasn't sent their locations yet.\n") : Loc.Pick("У цьому світі їх немає.\n", "None in this world.\n"));
             foreach (WorldMapEntry k in kingdoms)
             {
                 if (k.Kind == WorldMapKind.FreeBand) continue;
                 float km = Flat(k.At, me) / 1000f;
-                b.Append(k.Name).Append(": ").Append(km.ToString("0.0")).Append(" км, людей ").Append(k.People).Append('\n');
+                b.Append(Loc.Tr(k.Name)).Append(": ").Append(km.ToString("0.0")).Append(Loc.Pick(" км, людей ", " km, people ")).Append(k.People).Append('\n');
             }
             return b.ToString().TrimEnd('\n');
         }
@@ -263,6 +278,7 @@ namespace BattleOfAges.UI
 
             RectTransform side = UiTheme.Rect(panel, "List", new Vector2(1f, 1f), new Vector2(-18f, -66f), new Vector2(ListWidth, MapPx - 10f));
             list = UiTheme.Label(side, "Text", "", 18, TextAnchor.UpperLeft, UiTheme.Ink);
+            LocText.Detach(list);
             list.horizontalOverflow = HorizontalWrapMode.Wrap;
             list.supportRichText = true;
             list.lineSpacing = 1.1f;

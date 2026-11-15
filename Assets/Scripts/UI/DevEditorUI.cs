@@ -64,7 +64,7 @@ namespace BattleOfAges.UI
         public static HostileMobAI SpawnEnemy(UnitRank rank, Vector3 at)
         {
             NpcKingdom k = NearestKingdom(at, 600f);
-            if (k == null) { k = NpcKingdom.Found(at + new Vector3(30f, 0f, 30f), "Редактор", 0); }
+            if (k == null) { k = NpcKingdom.Found(at + new Vector3(30f, 0f, 30f), Loc.Pick("Редактор", "Editor"), 0); }
             return k.AddSubject(rank, at);
         }
 
@@ -157,15 +157,25 @@ namespace BattleOfAges.UI
             Build();
             window.SetActive(false);
             DontDestroyOnLoad(gameObject);
+            Loc.Changed += OnLanguageChanged;
         }
 
-        private void OnDestroy() { if (instance == this) instance = null; }
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+            if (instance == this) instance = null;
+        }
+
+        private void OnLanguageChanged()
+        {
+            if (endlessLabel != null) endlessLabel.text = EndlessText();
+        }
 
         public void Open()
         {
             open = true;
             window.SetActive(true);
-            Say(DevTools.Allowed ? "" : "У грі з іншими редактор вимкнено");
+            Say(DevTools.Allowed ? "" : Loc.Pick("У грі з іншими редактор вимкнено", "Editor disabled in multiplayer"));
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
         }
@@ -203,7 +213,7 @@ namespace BattleOfAges.UI
 
         private void Do(System.Func<string> act)
         {
-            if (!DevTools.Allowed) { Say("У грі з іншими редактор вимкнено"); return; }
+            if (!DevTools.Allowed) { Say(Loc.Pick("У грі з іншими редактор вимкнено", "Editor disabled in multiplayer")); return; }
             Say(act());
         }
 
@@ -224,37 +234,60 @@ namespace BattleOfAges.UI
                 DevTools.EndlessResources = !DevTools.EndlessResources;
                 if (DevTools.EndlessResources) DevTools.TopUp();
                 endlessLabel.text = EndlessText();
-                return DevTools.EndlessResources ? "Склад тепер повний завжди" : "Склад знову звичайний";
+                return DevTools.EndlessResources
+                    ? Loc.Pick("Склад тепер повний завжди", "Stores now stay full")
+                    : Loc.Pick("Склад знову звичайний", "Stores back to normal");
             });
             endlessLabel = endless.GetComponentInChildren<UnityEngine.UI.Text>();
+            LocText.Detach(endlessLabel);
             endlessLabel.text = EndlessText();
 
             y -= 6f;
             Caption(panel, ref y, "Свій юніт перед героєм");
-            Pair(panel, ref y, "Людина", () => Own(UnitRank.Person, "людина"), "Воїн", () => Own(UnitRank.Warrior, "воїн"));
-            Pair(panel, ref y, "Лицар", () => Own(UnitRank.Knight, "лицар"), "Генерал", () => Own(UnitRank.General, "генерал"));
+            Pair(panel, ref y, "Людина", () => Own(UnitRank.Person, "людина", "villager"), "Воїн", () => Own(UnitRank.Warrior, "воїн", "warrior"));
+            Pair(panel, ref y, "Лицар", () => Own(UnitRank.Knight, "лицар", "knight"), "Генерал", () => Own(UnitRank.General, "генерал", "general"));
             Caption(panel, ref y, "Ворог (найближче королівство)");
-            Pair(panel, ref y, "Воїн", () => Enemy(UnitRank.Warrior, "воїн"), "Лицар", () => Enemy(UnitRank.Knight, "лицар"));
+            Pair(panel, ref y, "Воїн", () => Enemy(UnitRank.Warrior, "воїн", "warrior"), "Лицар", () => Enemy(UnitRank.Knight, "лицар", "knight"));
             Caption(panel, ref y, "Перейти на інший бік");
             Row(panel, ref y, "Обрані на мапі → до ворога", () =>
             {
                 RtsUnitCommander commander = GameContext.Commander;
                 int n = commander != null ? DevTools.GiveToEnemy(commander.SelectedUnits) : 0;
-                return n > 0 ? $"До ворога перейшло: {n}" : "Спершу оберіть своїх на мапі (M)";
+                return n > 0
+                    ? Loc.Pick($"До ворога перейшло: {n}", $"Switched to enemy: {n}")
+                    : Loc.Pick("Спершу оберіть своїх на мапі (M)", "First select allies on the map (M)");
             });
             Row(panel, ref y, "Найближчий ворог → мій", () =>
-                GameContext.Player != null && DevTools.TakeNearestEnemy(GameContext.Player.transform.position, 40f) ? "Ворог перейшов до вас" : "Ворогів ближче 40 м немає");
+                GameContext.Player != null && DevTools.TakeNearestEnemy(GameContext.Player.transform.position, 40f)
+                    ? Loc.Pick("Ворог перейшов до вас", "Enemy switched to your side")
+                    : Loc.Pick("Ворогів ближче 40 м немає", "No enemies within 40 m"));
             Caption(panel, ref y, "Світ");
-            Row(panel, ref y, "Посадити дерево", () => { DevTools.PlantTree(DevTools.Spot(5f)); return "Дерево посаджено (у збереження не потрапить)"; });
+            Row(panel, ref y, "Посадити дерево", () =>
+            {
+                DevTools.PlantTree(DevTools.Spot(5f));
+                return Loc.Pick("Дерево посаджено (у збереження не потрапить)", "Tree planted (won't persist in saves)");
+            });
 
             RectTransform st = UiTheme.Rect(panel, "Status", new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(420f, 50f));
             status = UiTheme.Label(st, "Text", "", 16, TextAnchor.MiddleCenter, UiTheme.Ink);
+            LocText.Detach(status);
         }
 
-        private static string EndlessText() => "Безкінечні ресурси: " + (DevTools.EndlessResources ? "так" : "ні");
+        private static string EndlessText() => Loc.Pick(
+            "Безкінечні ресурси: " + (DevTools.EndlessResources ? "так" : "ні"),
+            "Infinite resources: " + (DevTools.EndlessResources ? "Yes" : "No"));
 
-        private string Own(UnitRank rank, string name) { DevTools.SpawnOwn(rank, DevTools.Spot()); return $"Свій: {name}"; }
-        private string Enemy(UnitRank rank, string name) { DevTools.SpawnEnemy(rank, DevTools.Spot(12f)); return $"Ворог: {name}"; }
+        private string Own(UnitRank rank, string nameUk, string nameEn)
+        {
+            DevTools.SpawnOwn(rank, DevTools.Spot());
+            return Loc.Pick($"Свій: {nameUk}", $"Ally: {nameEn}");
+        }
+
+        private string Enemy(UnitRank rank, string nameUk, string nameEn)
+        {
+            DevTools.SpawnEnemy(rank, DevTools.Spot(12f));
+            return Loc.Pick($"Ворог: {nameUk}", $"Enemy: {nameEn}");
+        }
 
         private void Caption(RectTransform panel, ref float y, string text)
         {

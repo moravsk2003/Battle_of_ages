@@ -41,7 +41,7 @@ namespace BattleOfAges.SaveLoad
         public static string FolderOverride { get; set; }
         public static string Folder => !string.IsNullOrEmpty(FolderOverride) ? FolderOverride : Path.Combine(Application.persistentDataPath, "saves");
         public static string PathOf(int slot) => Path.Combine(Folder, slot == AutoSlot ? "auto.json" : $"slot{slot}.json");
-        public static string SlotName(int slot) => slot == AutoSlot ? "Автозбереження" : $"Слот {slot}";
+        public static string SlotName(int slot) => slot == AutoSlot ? UI.Loc.Pick("Автозбереження", "Autosave") : UI.Loc.Pick($"Слот {slot}", $"Slot {slot}");
         public static float PlaySeconds => playSecondsAtLoad + (Time.unscaledTime - sceneStartTime);
         public static bool InGame => SceneManager.GetActiveScene().name == GameScene;
 
@@ -130,12 +130,14 @@ namespace BattleOfAges.SaveLoad
                 File.WriteAllText(tmp, JsonUtility.ToJson(d));
                 if (File.Exists(PathOf(slot))) File.Delete(PathOf(slot));
                 File.Move(tmp, PathOf(slot));
+                UiSound.Play(UiSound.Kind.Success);
                 StrategyHud.Notify(slot == AutoSlot ? "Гру збережено (авто)" : $"Гру збережено: {SlotName(slot)}");
                 return true;
             }
             catch (Exception e)
             {
                 Debug.LogError("[Save] failed: " + e);
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify("Не вдалося зберегти гру");
                 return false;
             }

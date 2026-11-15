@@ -38,9 +38,20 @@ namespace BattleOfAges.UI
             Instance = this;
             Build();
             panel.SetActive(false);
+            Loc.Changed += OnLanguageChanged;
         }
 
-        private void OnDestroy() { if (Instance == this) Instance = null; }
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+            if (Instance == this) Instance = null;
+        }
+
+        private void OnLanguageChanged()
+        {
+            refresh = 0f;
+            if (Showing && shown != null) Refresh();
+        }
 
         private void Update()
         {
@@ -65,7 +76,9 @@ namespace BattleOfAges.UI
             ConstructionSite site = shown.GetComponent<ConstructionSite>();
             TownHall hall = shown.GetComponent<TownHall>();
 
-            title.text = hall != null ? $"{hall.Title}: ратуша {ItemTypeNames.Roman(hall.Level)}" : def.DisplayName;
+            title.text = hall != null
+                ? Loc.Pick($"{hall.Title}: ратуша {ItemTypeNames.Roman(hall.Level)}", $"{hall.Title}: Town Hall {ItemTypeNames.Roman(hall.Level)}")
+                : def.DisplayName;
 
             HealthComponent hp = shown.GetComponent<HealthComponent>();
             float f = hp != null && hp.MaxHealth > 0 ? Mathf.Clamp01(hp.CurrentHealth / (float)hp.MaxHealth) : 1f;
@@ -79,7 +92,7 @@ namespace BattleOfAges.UI
             if (handsGroup.gameObject.activeSelf != people) handsGroup.gameObject.SetActive(people);
             if (people)
             {
-                handsText.text = $"Людей: {hands} / {places}";
+                handsText.text = Loc.Pick($"Людей: {hands} / {places}", $"Workers: {hands} / {places}");
                 minus.interactable = hands > 0;
                 plus.interactable = hands < places;
             }
@@ -95,17 +108,17 @@ namespace BattleOfAges.UI
             bool canGo = BuildingDemolition.CanDemolish(shown, out _);
             demolish.interactable = canGo;
             bool confirming = Time.unscaledTime < confirmUntil;
-            demolishText.text = confirming ? "Точно?" : site != null ? "Скасувати" : "Знести";
+            demolishText.text = confirming ? Loc.Pick("Точно?", "Sure?") : site != null ? Loc.Pick("Скасувати", "Cancel") : Loc.Pick("Знести", "Demolish");
         }
 
         private static string StatusOf(BuildingNode node, BuildingDefinition def, ConstructionSite site, TownHall hall)
         {
-            if (site != null) return $"Будується: {Mathf.FloorToInt(site.Progress * 100f)}%, працюють {site.PresentBuilders}";
-            if (hall != null) return $"Населення {hall.People} із {hall.Cap}";
-            if (node.TryGetComponent(out MineNode mine)) return $"Руда {mine.AccumulatedOreCount} / {mine.MaxAccumulatedOre}, {mine.OrePerSecond:0.#} за секунду";
-            if (node.TryGetComponent(out WorkPlace place)) return place.Present > 0 ? $"Працюють {place.Present}" : "Без людей стоїть";
-            if (node.TryGetComponent(out WorkbenchNode bench)) return bench.Queue.HasWork ? "Кує замовлене" : "Замовлень немає";
-            if (node.GetComponent<WallSegment>() != null) return $"Стіни {ItemTypeNames.Roman(Fortifications.Level)}, шкода зі стін +{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%";
+            if (site != null) return Loc.Pick($"Будується: {Mathf.FloorToInt(site.Progress * 100f)}%, працюють {site.PresentBuilders}", $"Building: {Mathf.FloorToInt(site.Progress * 100f)}%, {site.PresentBuilders} builders");
+            if (hall != null) return Loc.Pick($"Населення {hall.People} із {hall.Cap}", $"Population {hall.People} of {hall.Cap}");
+            if (node.TryGetComponent(out MineNode mine)) return Loc.Pick($"Руда {mine.AccumulatedOreCount} / {mine.MaxAccumulatedOre}, {mine.OrePerSecond:0.#} за секунду", $"Ore {mine.AccumulatedOreCount} / {mine.MaxAccumulatedOre}, {mine.OrePerSecond:0.#} / sec");
+            if (node.TryGetComponent(out WorkPlace place)) return place.Present > 0 ? Loc.Pick($"Працюють {place.Present}", $"Working: {place.Present}") : Loc.Pick("Без людей стоїть", "Idle without workers");
+            if (node.TryGetComponent(out WorkbenchNode bench)) return bench.Queue.HasWork ? Loc.Pick("Кує замовлене", "Crafting queue") : Loc.Pick("Замовлень немає", "No orders");
+            if (node.GetComponent<WallSegment>() != null) return Loc.Pick($"Стіни {ItemTypeNames.Roman(Fortifications.Level)}, шкода зі стін +{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%", $"Walls {ItemTypeNames.Roman(Fortifications.Level)}, wall bonus damage +{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%");
             return def.Description;
         }
 
@@ -119,16 +132,20 @@ namespace BattleOfAges.UI
             {
                 if (hall.Level >= TownHall.MaxLevel) return false;
                 TownHall.UpgradeCost(hall.Level + 1, out int wood, out int ore, out int tier);
-                label = $"До рівня {ItemTypeNames.Roman(hall.Level + 1)}\n<size=12>{wood} дер., {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+                label = Loc.Pick(
+                    $"До рівня {ItemTypeNames.Roman(hall.Level + 1)}\n<size=12>{wood} дер., {ore} руди {ItemTypeNames.Roman(tier)}+</size>",
+                    $"To Level {ItemTypeNames.Roman(hall.Level + 1)}\n<size=12>{wood} wood, {ore} ore {ItemTypeNames.Roman(tier)}+</size>");
                 can = hall.CanUpgrade(out _);
                 return true;
             }
-            if (shown.GetComponent<WorkbenchNode>() != null) { label = "Відкрити"; return true; }
-            if (shown.TryGetComponent(out MarketNode market) && market.enabled) { label = "Торгівля"; return true; }
+            if (shown.GetComponent<WorkbenchNode>() != null) { label = Loc.Pick("Відкрити", "Open"); return true; }
+            if (shown.TryGetComponent(out MarketNode market) && market.enabled) { label = Loc.Pick("Торгівля", "Trade"); return true; }
             if (shown.GetComponent<WallSegment>() != null && Fortifications.Level < Fortifications.MaxLevel)
             {
                 Fortifications.UpgradeCost(Fortifications.Level + 1, out int wood, out int ore, out int tier);
-                label = $"Стіни до {ItemTypeNames.Roman(Fortifications.Level + 1)}\n<size=12>{wood} дер., {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+                label = Loc.Pick(
+                    $"Стіни до {ItemTypeNames.Roman(Fortifications.Level + 1)}\n<size=12>{wood} дер., {ore} руди {ItemTypeNames.Roman(tier)}+</size>",
+                    $"Walls to {ItemTypeNames.Roman(Fortifications.Level + 1)}\n<size=12>{wood} wood, {ore} ore {ItemTypeNames.Roman(tier)}+</size>");
                 can = Fortifications.CanUpgrade(out _);
                 return true;
             }
@@ -171,10 +188,12 @@ namespace BattleOfAges.UI
         private string DemolishTip()
         {
             if (shown == null) return null;
-            if (!BuildingDemolition.CanDemolish(shown, out string why)) return TipText.Title("Знести", UiTheme.Gold) + "\n" + TipText.Bad(why);
+            if (!BuildingDemolition.CanDemolish(shown, out string why)) return TipText.Title(Loc.Pick("Знести", "Demolish"), UiTheme.Gold) + "\n" + TipText.Bad(Loc.Tr(why));
             BuildingDemolition.Refund(shown, out int wood, out int ore, out _);
             bool site = shown.GetComponent<ConstructionSite>() != null;
-            return TipText.Title(site ? "Скасувати будівництво" : "Знести", UiTheme.Gold) + $"\nПовернеться {wood} дерева й {ore} руди. Люди повернуться до роботи." + "\n" + TipText.Dim("Натисніть двічі.");
+            return TipText.Title(site ? Loc.Pick("Скасувати будівництво", "Cancel Construction") : Loc.Pick("Знести", "Demolish"), UiTheme.Gold)
+                + Loc.Pick($"\nПовернеться {wood} дерева й {ore} руди. Люди повернуться до роботи.", $"\nRefunds {wood} wood and {ore} ore. Workers return to duty.")
+                + "\n" + TipText.Dim(Loc.Pick("Натисніть двічі.", "Click twice to confirm."));
         }
 
         // ------------------------------------------------------------------ build
@@ -198,6 +217,7 @@ namespace BattleOfAges.UI
 
             RectTransform head = UiTheme.Rect(rect, "Title", new Vector2(0f, 1f), new Vector2(22f, -8f), new Vector2(520f, 34f));
             title = UiTheme.Label(head, "Text", "", 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(title);
 
             RectTransform bar = UiTheme.Rect(rect, "HpBar", new Vector2(0f, 1f), new Vector2(22f, -46f), new Vector2(340f, 22f));
             UiTheme.PanelImage(bar, UiTheme.SlotSprite).raycastTarget = false;
@@ -207,30 +227,34 @@ namespace BattleOfAges.UI
 
             RectTransform st = UiTheme.Rect(rect, "Status", new Vector2(0f, 1f), new Vector2(22f, -76f), new Vector2(520f, 44f));
             status = UiTheme.Label(st, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
+            LocText.Detach(status);
             status.horizontalOverflow = HorizontalWrapMode.Wrap;
 
             handsGroup = UiTheme.Rect(rect, "Hands", new Vector2(1f, 0.5f), new Vector2(-340f, -4f), new Vector2(236f, 88f));
             RectTransform handsLabel = UiTheme.Rect(handsGroup, "Label", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(236f, 30f));
             handsText = UiTheme.Label(handsLabel, "Text", "", 17, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            LocText.Detach(handsText);
             minus = UiTheme.TextButton(handsGroup, "Minus", "−", new Vector2(0.5f, 0f), new Vector2(-58f, 4f), new Vector2(104f, 46f), () => Hands(LaborCommand.Kind.Remove), 24);
             plus = UiTheme.TextButton(handsGroup, "Plus", "+", new Vector2(0.5f, 0f), new Vector2(58f, 4f), new Vector2(104f, 46f), () => Hands(LaborCommand.Kind.Add), 24);
-            Tooltip.Set(minus.gameObject, () => TipText.Title("Одним менше", UiTheme.Gold) + "\nЛюдина повертається до роботи самостійно.");
-            Tooltip.Set(plus.gameObject, () => TipText.Title("Одним більше", UiTheme.Gold) + "\nПрийде найближча вільна людина.");
+            Tooltip.Set(minus.gameObject, () => TipText.Title(Loc.Pick("Одним менше", "One Less"), UiTheme.Gold) + Loc.Pick("\nЛюдина повертається до роботи самостійно.", "\nWorker returns to autonomous duties."));
+            Tooltip.Set(plus.gameObject, () => TipText.Title(Loc.Pick("Одним більше", "One More"), UiTheme.Gold) + Loc.Pick("\nПрийде найближча вільна людина.", "\nNearest available worker will come."));
 
             action = UiTheme.TextButton(rect, "Action", "", new Vector2(1f, 0.5f), new Vector2(-178f, -4f), new Vector2(152f, 88f), DoAction, 16);
             actionText = action.GetComponentInChildren<Text>();
+            LocText.Detach(actionText);
             actionText.supportRichText = true;
             actionText.horizontalOverflow = HorizontalWrapMode.Wrap;
 
             demolish = UiTheme.TextButton(rect, "Demolish", "Знести", new Vector2(1f, 0.5f), new Vector2(-18f, -4f), new Vector2(152f, 88f), PressDemolish, 18);
             demolishText = demolish.GetComponentInChildren<Text>();
+            LocText.Detach(demolishText);
             Tooltip.Set(demolish.gameObject, DemolishTip);
 
             RectTransform close = UiTheme.Rect(rect, "Deselect", new Vector2(1f, 1f), new Vector2(14f, 14f), new Vector2(38f, 38f));
             UiTheme.PanelImage(close, UiTheme.ButtonSprite, new Color(1f, 0.72f, 0.68f));
             UiTheme.AddButton(close.gameObject).onClick.AddListener(() => GameContext.Commander?.SelectBuilding(null));
             UiTheme.Label(close, "Text", "×", 26, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
-            Tooltip.Set(close.gameObject, "Зняти виділення  " + TipText.Key("Esc"));
+            Tooltip.Set(close.gameObject, () => Loc.Pick("Зняти виділення  ", "Clear selection  ") + TipText.Key("Esc"));
         }
     }
 }

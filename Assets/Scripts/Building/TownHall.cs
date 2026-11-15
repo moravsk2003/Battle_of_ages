@@ -77,7 +77,7 @@ namespace BattleOfAges.Building
         }
 
         /// <summary>Its name on the screen.</summary>
-        public string Title { get { int i = active.IndexOf(this); return i <= 0 ? "Столиця" : "Поселення " + (i + 1); } }
+        public string Title { get { int i = active.IndexOf(this); return Loc.Pick(i <= 0 ? "Столиця" : "Поселення " + (i + 1), i <= 0 ? "Capital" : "Settlement " + (i + 1)); } }
 
         // ------------------------------------------------------------------ a settlement of its own (M5 step 7)
 
@@ -186,6 +186,7 @@ namespace BattleOfAges.Building
             chest.transform.position = at;
             BuildingNode node = chest.GetComponent<BuildingNode>();
             if (node != null) { node.SetType(BuildingType.StorageChest); node.OnBuilt(); }
+            GameSound.Play2D(GameSound.Kind.Fanfare);
             StrategyHud.Notify("Нове поселення! Робітників сюди посилайте наказом; склад у нього свій");
         }
 
@@ -244,6 +245,7 @@ namespace BattleOfAges.Building
         {
             if (!CanUpgrade(out string reason))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(reason);
                 return false;
             }
@@ -256,6 +258,7 @@ namespace BattleOfAges.Building
             }
             level++;
             ApplyLevelHealth();
+            GameSound.At(GameSound.Kind.UpgradeBuilding, transform.position);
             StrategyHud.Notify($"Ратуша {ItemTypeNames.Roman(level)}: населення до {CapForLevel(level)}");
             return true;
         }
@@ -370,7 +373,11 @@ namespace BattleOfAges.Building
                 if (starveClock >= GameBalance.StarveEveryHours)
                 {
                     starveClock = 0f;
-                    if (StarveOne()) StrategyHud.Notify("Голод: померла людина");
+                    if (StarveOne())
+                    {
+                        UiSound.Play(UiSound.Kind.Alert);
+                        StrategyHud.Notify("Голод: померла людина");
+                    }
                 }
             }
             else starveClock = 0f;
@@ -382,6 +389,7 @@ namespace BattleOfAges.Building
                 pos.y = RtsUnit.GetTerrainHeight(pos);
                 BuildingNode.CreateWorkerNpc(pos, BuildingNode.NextVillagerName());
             }
+            if (born > 0) UiSound.Play(UiSound.Kind.Success);
         }
 
         private void OnEnable() { if (!active.Contains(this)) active.Add(this); }

@@ -211,7 +211,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activeWorkbenchTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            ShowPromptCached($"[Натисніть {keyEStr}] Відкрити верстак");
+            ShowPromptCached(UI.Loc.Pick($"[Натисніть {keyEStr}] Відкрити верстак", $"[Press {keyEStr}] Open workbench"));
         }
 
         private void HandleWorkbenchInput()
@@ -232,7 +232,8 @@ namespace BattleOfAges.Player
         private void UpdateChestPromptUI()
         {
             if (resourceUI == null || activeChestTarget == null) return;
-            ShowPromptCached($"[Натисніть {KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather))}] Відкрити скриню-склад");
+            string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
+            ShowPromptCached(UI.Loc.Pick($"[Натисніть {keyEStr}] Відкрити скриню-склад", $"[Press {keyEStr}] Open storage chest"));
         }
 
         private void HandleChestInput()
@@ -257,12 +258,13 @@ namespace BattleOfAges.Player
             int axeLvl = EquippedAxeLevel;
             KeyCode kE = KeybindsManager.GetKey(KeyAction.InteractGather);
             KeyCode kF = KeybindsManager.GetKey(KeyAction.ChopTree);
-            long key = ((long)activeTreeTarget.CurrentState << 48) ^
+            long key = (((long)activeTreeTarget.CurrentState << 48) ^
                        ((long)branchPercent << 36) ^
                        ((long)fellPercent << 24) ^
                        ((long)activeTreeTarget.WoodRemaining << 12) ^
                        ((long)axeLvl << 8) ^
-                       ((long)kE << 4) ^ (long)kF;
+                       ((long)kE << 4) ^ (long)kF) ^
+                       (UI.Loc.En ? (1L << 62) : 0L);
             if (!promptHidden && key == lastTreePromptKey) return;
             lastTreePromptKey = key;
 
@@ -271,20 +273,26 @@ namespace BattleOfAges.Player
 
             if (activeTreeTarget.CurrentState == TreeState.WholeTree)
             {
-                string branchStr = (branchPercent > 0) ? $"[Утримуйте {keyEStr}] Збирання гілок ({branchPercent}%)" : $"[Утримуйте {keyEStr}] Збирати гілки (+1 деревина)";
-                string chopStr = (fellPercent > 0) ? $"[Утримуйте {keyFStr}] Рубати стовбур ({fellPercent}%)" : $"[Утримуйте {keyFStr}] Зрубати дерево (+4 деревини)";
+                string branchStr = (branchPercent > 0)
+                    ? UI.Loc.Pick($"[Утримуйте {keyEStr}] Збирання гілок ({branchPercent}%)", $"[Hold {keyEStr}] Gathering branches ({branchPercent}%)")
+                    : UI.Loc.Pick($"[Утримуйте {keyEStr}] Збирати гілки (+1 деревина)", $"[Hold {keyEStr}] Gather branches (+1 wood)");
+                string chopStr = (fellPercent > 0)
+                    ? UI.Loc.Pick($"[Утримуйте {keyFStr}] Рубати стовбур ({fellPercent}%)", $"[Hold {keyFStr}] Chopping trunk ({fellPercent}%)")
+                    : UI.Loc.Pick($"[Утримуйте {keyFStr}] Зрубати дерево (+4 деревини)", $"[Hold {keyFStr}] Fell tree (+4 wood)");
 
                 if (axeLvl > 0)
                 {
-                    chopStr += $" [Сокира {ItemTypeNames.Roman(axeLvl)}]";
+                    chopStr += UI.Loc.Pick($" [Сокира {ItemTypeNames.Roman(axeLvl)}]", $" [Axe {ItemTypeNames.Roman(axeLvl)}]");
                 }
 
                 ShowPromptCached($"{branchStr}\n{chopStr}");
             }
             else if (activeTreeTarget.CurrentState == TreeState.WoodPile)
             {
-                string axeStr = (axeLvl > 0) ? $" [Сокира {ItemTypeNames.Roman(axeLvl)}]" : "";
-                ShowPromptCached($"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} деревини){axeStr}");
+                string axeStr = (axeLvl > 0) ? UI.Loc.Pick($" [Сокира {ItemTypeNames.Roman(axeLvl)}]", $" [Axe {ItemTypeNames.Roman(axeLvl)}]") : "";
+                ShowPromptCached(UI.Loc.Pick(
+                    $"[Утримуйте {keyFStr}] Рубати колоди ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} деревини){axeStr}",
+                    $"[Hold {keyFStr}] Chop logs ({activeTreeTarget.WoodRemaining} / {activeTreeTarget.MaxWoodCapacity} wood){axeStr}"));
             }
         }
 
@@ -292,7 +300,7 @@ namespace BattleOfAges.Player
         {
             if (resourceUI == null || activePebbleTarget == null) return;
             string keyEStr = KeybindsManager.GetKeyDisplayString(KeybindsManager.GetKey(KeyAction.InteractGather));
-            ShowPromptCached($"[Натисніть {keyEStr}] Підібрати руду");
+            ShowPromptCached(UI.Loc.Pick($"[Натисніть {keyEStr}] Підібрати руду", $"[Press {keyEStr}] Pick up ore"));
         }
 
         private void HandleTreeHarvestInput()
@@ -337,8 +345,10 @@ namespace BattleOfAges.Player
 
             if (IsKeyEDown() || IsKeyFDown())
             {
+                Vector3 pebblePos = activePebbleTarget.transform.position;
                 int rolledTier = activePebbleTarget.PickupPebble();
                 activePebbleTarget = null;
+                GameSound.At(GameSound.Kind.OrePickup, pebblePos);
                 int yieldAmount = (EquippedPickaxeLevel >= 3) ? 2 : 1;
                 if (ResourceManager.Instance != null)
                 {
@@ -346,8 +356,12 @@ namespace BattleOfAges.Player
                 }
                 if (resourceUI != null)
                 {
-                    string bonusStr = (yieldAmount > 1) ? " (+2 Ore Bonus!)" : " (+1 Ore)";
-                    resourceUI.ShowTreePrompt($"Підібрано: {OreTierHelper.GetTierName(rolledTier)}{bonusStr}");
+                    string bonusStr = (yieldAmount > 1)
+                        ? UI.Loc.Pick(" (+2 руди — бонус!)", " (+2 Ore Bonus!)")
+                        : UI.Loc.Pick(" (+1 руда)", " (+1 Ore)");
+                    resourceUI.ShowTreePrompt(UI.Loc.Pick(
+                        $"Підібрано: {OreTierHelper.GetTierName(rolledTier)}{bonusStr}",
+                        $"Picked up: {OreTierHelper.GetTierName(rolledTier)}{bonusStr}"));
                 }
             }
         }

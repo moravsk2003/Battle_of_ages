@@ -85,7 +85,13 @@ namespace BattleOfAges.Combat
         public bool LearnCriticalHit() => Class == HeroClass.Dd && dashLevel > 0 && !criticalHit && Pay(1) && Set(() => criticalHit = true);
 
         private bool Pay(int points) => Hero != null && Hero.TakeSkillPoints(points);
-        private bool Set(System.Action change) { change(); ApplyPassives(); return true; }
+        private bool Set(System.Action change)
+        {
+            change();
+            ApplyPassives();
+            if (Combat == null || Combat.Team == UnitSpatialGrid.TeamPlayer) UI.UiSound.Play(UI.UiSound.Kind.Success);
+            return true;
+        }
 
         // ------------------------------------------------------------------ passives
 
@@ -140,10 +146,10 @@ namespace BattleOfAges.Combat
             if (!HasActiveIn(slot)) return null;
             switch (Class)
             {
-                case HeroClass.Tank: return "Миттєвий відхіл";
-                case HeroClass.Mage: return slot == 0 ? "Вогняне віяло" : "Метеор";
-                case HeroClass.Archer: return "Пробивна стріла";
-                case HeroClass.Dd: return slot == 0 ? "Ривок" : "Критичний удар";
+                case HeroClass.Tank: return UI.Loc.Pick("Миттєвий відхіл", "Instant Heal");
+                case HeroClass.Mage: return slot == 0 ? UI.Loc.Pick("Вогняне віяло", "Fire Fan") : UI.Loc.Pick("Метеор", "Meteor");
+                case HeroClass.Archer: return UI.Loc.Pick("Пробивна стріла", "Piercing Arrow");
+                case HeroClass.Dd: return slot == 0 ? UI.Loc.Pick("Ривок", "Dash") : UI.Loc.Pick("Критичний удар", "Critical Hit");
                 default: return null;
             }
         }

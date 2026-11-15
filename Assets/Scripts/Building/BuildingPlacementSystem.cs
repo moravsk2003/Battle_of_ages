@@ -36,6 +36,7 @@ namespace BattleOfAges.Building
         /// <summary>The ore tier walls are built of (Tab picks another the player has enough of).</summary>
         private int wallTier;
         private bool snapped;
+        private bool wasSnapped;
         /// <summary>The turn at a wall's end set with Z / X: it stays for the next segments, so that a ring is a matter of clicks.</summary>
         private float? wallTurn;
         private float usedWallTurn;
@@ -53,7 +54,7 @@ namespace BattleOfAges.Building
             get
             {
                 if (!isPlacing) return "";
-                long key = ((long)currentBuildingType * 1000 + wallTier) * 2000 + (snapped ? 1000 + Mathf.RoundToInt(usedWallTurn) + 90 : 0);
+                long key = (((long)currentBuildingType * 1000 + wallTier) * 2000 + (snapped ? 1000 + Mathf.RoundToInt(usedWallTurn) + 90 : 0)) + (UI.Loc.En ? 100000000L : 0L);
                 if (key == hintKey && hint != null) return hint;
                 hintKey = key;
                 return hint = MakeHint();
@@ -61,7 +62,9 @@ namespace BattleOfAges.Building
         }
 
         /// <summary>What is short for this building, in words.</summary>
-        private static string ShortOf(BuildingDefinition def) => $"На «{def.DisplayName}» треба {def.WoodCost} дерева й {def.OreCost} руди";
+        private static string ShortOf(BuildingDefinition def) => UI.Loc.Pick(
+            $"На «{def.DisplayName}» треба {def.WoodCost} дерева й {def.OreCost} руди",
+            $"\"{def.DisplayName}\" needs {def.WoodCost} wood and {def.OreCost} ore");
 
         /// <summary>Why it cannot stand where the mouse is now (null: it can).</summary>
         private string whyNot;
@@ -69,10 +72,22 @@ namespace BattleOfAges.Building
         private string MakeHint()
         {
             BuildingDefinition def = BuildingData.GetDefinition(currentBuildingType);
-            if (whyNot != null) return $"{def.DisplayName}: тут не можна, {whyNot}\nZ / X — поворот  ·  ПКМ — скасувати";
-            if (!WallSegment.IsWall(currentBuildingType)) return $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати";
-            return $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
-                 + (snapped ? $"прилипла, кут {usedWallTurn:+0;-0;0}°: Z / X — змінити" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати";
+            if (whyNot != null)
+            {
+                string why = UI.Loc.Tr(whyNot);
+                return UI.Loc.Pick(
+                    $"{def.DisplayName}: тут не можна, {why}\nZ / X — поворот  ·  ПКМ — скасувати",
+                    $"{def.DisplayName}: cannot place here, {why}\nZ / X — rotate  ·  RMB — cancel");
+            }
+            if (!WallSegment.IsWall(currentBuildingType))
+                return UI.Loc.Pick(
+                    $"{def.DisplayName}\nZ / X — поворот  ·  ЛКМ — збудувати  ·  ПКМ — скасувати",
+                    $"{def.DisplayName}\nZ / X — rotate  ·  LMB — build  ·  RMB — cancel");
+            return UI.Loc.Pick(
+                $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — руда  ·  "
+                + (snapped ? $"прилипла, кут {usedWallTurn:+0;-0;0}°: Z / X — змінити" : "Z / X — поворот, біля краю стіни прилипне") + "  ·  ПКМ — скасувати",
+                $"{def.DisplayName}: {OreTierHelper.GetTierName(wallTier)}, HP {WallSegment.MaxHealthFor(currentBuildingType, wallTier)}\nTab — ore tier  ·  "
+                + (snapped ? $"snapped, angle {usedWallTurn:+0;-0;0}°: Z / X — change" : "Z / X — rotate, snaps near wall end") + "  ·  RMB — cancel");
         }
 
         /// <summary>The frame a placement was last cancelled (that Escape is not also the pause or the way out of the map).</summary>
@@ -125,13 +140,19 @@ namespace BattleOfAges.Building
             {
                 if (atWallEnd) wallTurn = Mathf.Clamp(usedWallTurn - wallStep, -90f, 90f);
                 else ghostYaw -= TurnStep;
+                UiSound.Play(UiSound.Kind.Hover);
             }
             if (UniversalInput.IsKeyDown(KeyCode.X))
             {
                 if (atWallEnd) wallTurn = Mathf.Clamp(usedWallTurn + wallStep, -90f, 90f);
                 else ghostYaw += TurnStep;
+                UiSound.Play(UiSound.Kind.Hover);
             }
-            if (WallSegment.IsWall(currentBuildingType) && UniversalInput.IsKeyDown(KeyCode.Tab)) wallTier = NextWallTier(wallTier, BuildingData.GetDefinition(currentBuildingType).OreCost);
+            if (WallSegment.IsWall(currentBuildingType) && UniversalInput.IsKeyDown(KeyCode.Tab))
+            {
+                wallTier = NextWallTier(wallTier, BuildingData.GetDefinition(currentBuildingType).OreCost);
+                UiSound.Play(UiSound.Kind.Hover);
+            }
 
             UpdateGhostPosition();
 
@@ -144,6 +165,7 @@ namespace BattleOfAges.Building
             // Cancel placement on Right Mouse Button or Escape
             if (UniversalInput.GetMouseButtonDown(1) || UniversalInput.GetKeyDownEscape())
             {
+                UiSound.Play(UiSound.Kind.Click);
                 CancelPlacement();
             }
         }
@@ -158,17 +180,20 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(type);
             if (!CanAfford(def))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(ShortOf(def));
                 return;
             }
             if (!IsAllowed(type, out string why))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(why);
                 return;
             }
 
             currentBuildingType = type;
             isPlacing = true;
+            wasSnapped = false;
             if (WallSegment.IsWall(type) && !CanAffordTier(def, wallTier)) wallTier = NextWallTier(wallTier, def.OreCost);
 
             ghostPreview = BuildingNode.CreateGhostPreview(type);
@@ -183,6 +208,7 @@ namespace BattleOfAges.Building
         {
             if (isPlacing) CancelledFrame = Time.frameCount;
             isPlacing = false;
+            wasSnapped = false;
             if (ghostPreview != null)
             {
                 Destroy(ghostPreview);
@@ -204,6 +230,8 @@ namespace BattleOfAges.Building
                 Quaternion rot = Quaternion.Euler(0f, ghostYaw, 0f);
                 float yaw = 0f, endY = 0f;
                 snapped = WallSegment.IsWall(currentBuildingType) && WallSegment.Snap(pos, def.Size.x, wallTurn, out pos, out yaw, out endY, out usedWallTurn);
+                if (snapped && !wasSnapped) UiSound.Play(UiSound.Kind.Click);
+                wasSnapped = snapped;
                 if (snapped) rot = Quaternion.Euler(0f, yaw, 0f);
                 bool level = FootprintLevel(currentBuildingType, pos, rot, out float h);
                 // A snapped segment keeps its neighbour's height (one walkway) while its foundation still reaches the ground
@@ -363,6 +391,7 @@ namespace BattleOfAges.Building
 
             if (!IsAllowed(currentBuildingType, out string notAllowed))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(notAllowed);
                 CancelPlacement();
                 return;
@@ -370,28 +399,33 @@ namespace BattleOfAges.Building
 
             if (!FootprintLevel(currentBuildingType, buildPos, buildRot, out _))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify("Тут надто круто для будівлі");
                 return;
             }
             if (World.Lakes.InWater(buildPos.x, buildPos.z, 3f))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify("На воді не збудувати");
                 return;
             }
 
             if (def.Type == BuildingType.TownHall && World.WorldSettings.Bounded && TownHall.FoundingForbidden(buildPos) is string foundingNo)
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(foundingNo);
                 return;
             }
             if (!CheckLocationValid(buildPos, buildRot, def))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify("Тут зайнято: навколо споруди потрібен прохід для людей");
                 return;
             }
 
             if (!CanAfford(def))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(ShortOf(def));
                 CancelPlacement();
                 return;

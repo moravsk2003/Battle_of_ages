@@ -1,7 +1,12 @@
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
+using BattleOfAges.Building;
 using BattleOfAges.Combat;
 using BattleOfAges.Crafting;
+using BattleOfAges.InputSystem;
+using BattleOfAges.Managers;
+using BattleOfAges.SaveLoad;
 using BattleOfAges.UI;
 
 namespace BattleOfAges.Tests
@@ -24,7 +29,12 @@ namespace BattleOfAges.Tests
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(unit);
+        public void TearDown()
+        {
+            Object.DestroyImmediate(unit);
+            Loc.Set(Loc.Lang.Uk, save: false);
+            PlayerPrefs.DeleteKey(Loc.PrefKey);
+        }
 
         [Test]
         public void StatsWith_PreviewsTheItem_WithoutPuttingItOn()
@@ -62,6 +72,87 @@ namespace BattleOfAges.Tests
             string text = TipText.Compare(gear.StatsWith(gear[EquipSlot.Helmet]), gear.StatsWith(new Item(ItemType.Helmet, 4)));
             StringAssert.Contains("Поглинання", text);
             StringAssert.Contains(ColorUtility.ToHtmlStringRGB(UiTheme.Good), text);
+        }
+
+        [Test]
+        public void Loc_DefaultsToUk_SwitchesAndCyclesCleanly()
+        {
+            PlayerPrefs.DeleteKey(Loc.PrefKey);
+            Loc.Set(Loc.Lang.Uk, save: false);
+            Assert.AreEqual(Loc.Lang.Uk, Loc.Current);
+            Assert.IsFalse(Loc.En);
+            Assert.IsFalse(Loc.HasChosen);
+
+            Loc.Set(Loc.Lang.En, save: true);
+            Assert.AreEqual(Loc.Lang.En, Loc.Current);
+            Assert.IsTrue(Loc.En);
+            Assert.IsTrue(Loc.HasChosen);
+
+            Loc.Cycle();
+            Assert.AreEqual(Loc.Lang.Uk, Loc.Current);
+            Assert.IsFalse(Loc.En);
+        }
+
+        [Test]
+        public void Loc_TranslatesCoreGameplayAndUiLabels()
+        {
+            Loc.Set(Loc.Lang.Uk, save: false);
+            Assert.AreEqual("Будинок", BuildingData.GetDefinition(BuildingType.WorkerHouse).DisplayName);
+            Assert.AreEqual("Меч", ItemTypeNames.Display(ItemType.Sword));
+            Assert.AreEqual("Танк", HeroClassRules.Name(HeroClass.Tank));
+            Assert.AreEqual("Блискавка", Artifacts.Name(ArtifactType.Lightning));
+            Assert.AreEqual("Пробіл", KeybindsManager.GetKeyDisplayString(KeyCode.Space));
+            Assert.AreEqual("Меню будівництва", KeybindsManager.GetActionDisplayName(KeyAction.BuildMenu));
+            Assert.AreEqual("Низька", GraphicsQuality.GetName(GraphicsQuality.Level.Low));
+            Assert.AreEqual("Автозбереження", SaveSystem.SlotName(SaveSystem.AutoSlot));
+            Assert.AreEqual("Слот 1", SaveSystem.SlotName(1));
+            Assert.AreEqual(DisplaySettings.FrameCap == 0 ? "без обмеження" : DisplaySettings.FrameCap + " FPS", DisplaySettings.FrameCapName);
+            Assert.AreEqual("Основи", HelpUI.TabName(0));
+            StringAssert.Contains("Від першої особи", HelpUI.TabText(0));
+
+            Loc.Set(Loc.Lang.En, save: false);
+            Assert.AreEqual("House", BuildingData.GetDefinition(BuildingType.WorkerHouse).DisplayName);
+            Assert.AreEqual("Sword", ItemTypeNames.Display(ItemType.Sword));
+            Assert.AreEqual("Tank", HeroClassRules.Name(HeroClass.Tank));
+            Assert.AreEqual("Lightning", Artifacts.Name(ArtifactType.Lightning));
+            Assert.AreEqual("Space", KeybindsManager.GetKeyDisplayString(KeyCode.Space));
+            Assert.AreEqual("Build Menu", KeybindsManager.GetActionDisplayName(KeyAction.BuildMenu));
+            Assert.AreEqual("Low", GraphicsQuality.GetName(GraphicsQuality.Level.Low));
+            Assert.AreEqual("Autosave", SaveSystem.SlotName(SaveSystem.AutoSlot));
+            Assert.AreEqual("Slot 1", SaveSystem.SlotName(1));
+            Assert.AreEqual(DisplaySettings.FrameCap == 0 ? "Unlimited" : DisplaySettings.FrameCap + " FPS", DisplaySettings.FrameCapName);
+            StringAssert.Contains("First Person", HelpUI.TabText(0));
+            Assert.AreEqual("Game saved (auto)", Loc.Tr("Гру збережено (авто)"));
+            Assert.AreEqual("Wolf Reach has fallen: town hall destroyed", Loc.Tr("Вовчий край впало: ратушу зруйновано"));
+
+            var a = (health: 100, damage: 10, cooldown: 2f, reduction: 0.1f, range: 3f);
+            var b = (health: 100, damage: 14, cooldown: 2.5f, reduction: 0.1f, range: 3f);
+            string cmpEn = TipText.Compare(a, b);
+            StringAssert.Contains("Damage  10 → 14", cmpEn);
+        }
+
+        [Test]
+        public void LocText_UpdatesLiveOnLanguageChange()
+        {
+            Loc.Set(Loc.Lang.Uk, save: false);
+            var go = new GameObject("LocTextProbe", typeof(RectTransform), typeof(Text));
+            try
+            {
+                Text label = go.GetComponent<Text>();
+                label.text = "Налаштування";
+                LocText.Attach(label);
+                Assert.AreEqual("Налаштування", label.text);
+
+                Loc.Set(Loc.Lang.En, save: false);
+                Assert.AreEqual("Settings", label.text);
+
+                Loc.Set(Loc.Lang.Uk, save: false);
+                Assert.AreEqual("Налаштування", label.text);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
         }
     }
 }

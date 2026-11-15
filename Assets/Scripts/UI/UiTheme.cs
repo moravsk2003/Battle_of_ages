@@ -476,6 +476,7 @@ namespace BattleOfAges.UI
             t.color = color;
             if (text != null) t.text = text;
             t.raycastTarget = raycast;
+            LocText.Attach(t);
             return t;
         }
 
@@ -500,6 +501,7 @@ namespace BattleOfAges.UI
             var sh = go.AddComponent<Shadow>();
             sh.effectColor = new Color(0f, 0f, 0f, 0.75f);
             sh.effectDistance = new Vector2(1.2f, -1.2f);
+            LocText.Attach(t);
             return t;
         }
 
@@ -770,6 +772,7 @@ namespace BattleOfAges.UI
                     sh.effectDistance = new Vector2(1f, -1f);
                 }
                 t.text = Sanitize(t.text);
+                LocText.Attach(t);
                 return;
             }
             if (!(g is Image img) || img.sprite != null && img.sprite.name != "UISprite" && img.sprite.name != "Background") return;

@@ -54,8 +54,20 @@ namespace BattleOfAges.UI
             Refresh();
         }
 
-        private void OnEnable() { NetSession.Failed -= OnFailed; NetSession.Failed += OnFailed; }
-        private void OnDisable() => NetSession.Failed -= OnFailed;
+        private void OnEnable()
+        {
+            NetSession.Failed -= OnFailed;
+            NetSession.Failed += OnFailed;
+            Loc.Changed -= Refresh;
+            Loc.Changed += Refresh;
+        }
+
+        private void OnDisable()
+        {
+            NetSession.Failed -= OnFailed;
+            Loc.Changed -= Refresh;
+        }
+
         private void OnFailed(string why) => failedWhy = why;
 
         private void Update()
@@ -63,7 +75,7 @@ namespace BattleOfAges.UI
             NetSession s = NetSession.Current;
             if (s == null)
             {
-                if (!closing) Close(failedWhy ?? "Лобі закрито");
+                if (!closing) Close(!string.IsNullOrEmpty(failedWhy) ? Loc.Tr(failedWhy) : Loc.Pick("Лобі закрито", "Lobby closed"));
                 return;
             }
             if (s.LobbyVersion != shownVersion) Refresh();
@@ -122,38 +134,50 @@ namespace BattleOfAges.UI
 
         private void Refresh()
         {
+            LocText.Detach(address);
+            LocText.Detach(campaign);
+            LocText.Detach(status);
+            LocText.Detach(heroNote);
+            LocText.Detach(classValue);
+            LocText.Detach(classDescription);
+            LocText.Detach(artifactValue);
+            LocText.Detach(artifactDescription);
+            LocText.Detach(readyText);
+            if (startButton != null) LocText.Detach(startButton.GetComponentInChildren<Text>());
+
             NetSession s = NetSession.Current;
             NetLobby lobby = s != null ? s.Lobby : null;
             shownVersion = s != null ? s.LobbyVersion : -1;
             bool host = NetSession.IsHost;
-            address.text = host ? "Скажіть іншим: " + NetSession.AddressLine() : "";
+            address.text = host ? Loc.Pick("Скажіть іншим: ", "Share with others: ") + NetSession.AddressLine() : "";
             if (lobby == null)
             {
-                campaign.text = host ? "" : s != null && s.Welcome != null ? "Завантаження світу…" : "З'єднання з хостом…";
+                campaign.text = host ? "" : s != null && s.Welcome != null ? Loc.Pick("Завантаження світу…", "Loading world…") : Loc.Pick("З'єднання з хостом…", "Connecting to host…");
                 for (int i = list.childCount - 1; i >= 0; i--) Destroy(list.GetChild(i).gameObject);
                 choicePane.gameObject.SetActive(false);
                 heroNote.text = "";
                 RefreshButtons(null);
                 return;
             }
-            campaign.text = lobby.Campaign;
+            campaign.text = Loc.Tr(lobby.Campaign);
             LobbySeat me = lobby.SeatOf(lobby.You);
             if (me != null && (!synced || !string.IsNullOrEmpty(lobby.Said))) SyncFrom(me);
-            if (!string.IsNullOrEmpty(lobby.Said)) status.text = lobby.Said;
-            if (lobby.Starting) status.text = host ? "Світ завантажується…" : "Хост завантажує світ…";
+            if (!string.IsNullOrEmpty(lobby.Said)) status.text = Loc.Tr(lobby.Said);
+            if (lobby.Starting) status.text = host ? Loc.Pick("Світ завантажується…", "Loading world…") : Loc.Pick("Хост завантажує світ…", "Host is loading the world…");
 
             for (int i = list.childCount - 1; i >= 0; i--) Destroy(list.GetChild(i).gameObject);
             for (int i = 0; i < lobby.Seats.Count; i++) Row(lobby.Seats[i], i, lobby.You, host && !lobby.Starting);
 
             bool returning = me != null && me.Returning;
             choicePane.gameObject.SetActive(me != null && !returning && !lobby.Starting);
+            string meHero = string.IsNullOrEmpty(me?.Hero) ? "" : ": " + me.Hero;
             heroNote.text = me == null ? ""
-                          : returning ? $"Ви повертаєтеся до свого королівства{(string.IsNullOrEmpty(me.Hero) ? "" : ": " + me.Hero)}.\nКлас і артефакти вже ваші."
-                          : lobby.Starting ? "Обрано: " + HeroClassRules.Name(Class) + " · " + Artifacts.Name(Artifact, Class) : "";
+                          : returning ? Loc.Pick($"Ви повертаєтеся до свого королівства{meHero}.\nКлас і артефакти вже ваші.", $"You are returning to your kingdom{meHero}.\nYour class and artifacts are already yours.")
+                          : lobby.Starting ? Loc.Pick("Обрано: ", "Chosen: ") + HeroClassRules.Name(Class) + " · " + Artifacts.Name(Artifact, Class) : "";
             classValue.text = HeroClassRules.Name(Class);
-            classDescription.text = HeroClassRules.Description(Class) + "\n" + TipText.Dim("Клас обирається один раз.");
+            classDescription.text = HeroClassRules.Description(Class) + "\n" + TipText.Dim(Loc.Pick("Клас обирається один раз.", "Class is chosen once."));
             artifactValue.text = Artifacts.Name(Artifact, Class);
-            artifactDescription.text = Artifacts.Description(Artifact) + (host ? "" : "\n" + TipText.Dim("Центральну імперію в мережевій грі бере лише хост."));
+            artifactDescription.text = Artifacts.Description(Artifact) + (host ? "" : "\n" + TipText.Dim(Loc.Pick("Центральну імперію в мережевій грі бере лише хост.", "Only the host may choose Central Empire in multiplayer.")));
             RefreshButtons(lobby);
         }
 
@@ -163,10 +187,10 @@ namespace BattleOfAges.UI
             bool starting = lobby != null && lobby.Starting;
             startButton.gameObject.SetActive(host);
             startButton.interactable = lobby != null && !starting;
-            startButton.GetComponentInChildren<Text>().text = startArmedUntil > 0f ? "Почати без них" : "Почати";
+            startButton.GetComponentInChildren<Text>().text = startArmedUntil > 0f ? Loc.Pick("Почати без них", "Start Anyway") : Loc.Pick("Почати", "Start");
             readyButton.gameObject.SetActive(!host);
             readyButton.interactable = lobby != null && !starting;
-            readyText.text = ready ? "Не готовий" : "Готовий";
+            readyText.text = ready ? Loc.Pick("Не готовий", "Not Ready") : Loc.Pick("Готовий", "Ready");
         }
 
         private void Row(LobbySeat seat, int index, int you, bool mayKick)
@@ -174,20 +198,24 @@ namespace BattleOfAges.UI
             RectTransform row = UiTheme.Rect(list, "Seat" + seat.Number, new Vector2(0.5f, 1f), new Vector2(0f, -index * RowStep), new Vector2(540f, RowHeight));
             UiTheme.PanelImage(row, UiTheme.SlotSprite, seat.Here ? Color.white : new Color(0.7f, 0.7f, 0.7f));
             bool mine = seat.Number == you;
-            string name = seat.Name + (mine ? " (ви)" : "");
+            string name = seat.Name + (mine ? Loc.Pick(" (ви)", " (you)") : "");
             Text n = UiTheme.Label(UiTheme.Rect(row, "Name", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(170f, RowHeight)), "Text",
                                    name, 17, TextAnchor.MiddleLeft, mine ? UiTheme.Gold : seat.Here ? UiTheme.Ink : UiTheme.InkDim, mine ? FontStyle.Bold : FontStyle.Normal);
+            LocText.Detach(n);
             n.horizontalOverflow = HorizontalWrapMode.Overflow;
-            string hero = seat.Returning ? (string.IsNullOrEmpty(seat.Hero) ? "своє королівство" : seat.Hero)
+            string hero = seat.Returning ? (string.IsNullOrEmpty(seat.Hero) ? Loc.Pick("своє королівство", "their kingdom") : seat.Hero)
                         : HeroClassRules.Name((HeroClass)seat.Class) + (seat.HasArtifact ? " · " + Artifacts.Name((ArtifactType)seat.Artifact, (HeroClass)seat.Class) : "");
-            UiTheme.Label(UiTheme.Rect(row, "Hero", new Vector2(0f, 0.5f), new Vector2(190f, 0f), new Vector2(200f, RowHeight)), "Text",
-                          hero, 15, TextAnchor.MiddleLeft, UiTheme.InkDim).horizontalOverflow = HorizontalWrapMode.Overflow;
-            string state = seat.IsHost ? TipText.Title("хост", UiTheme.Gold)
-                         : !seat.Here ? "немає в грі"
-                         : seat.Ready ? TipText.Good("готовий") : "обирає";
-            if (seat.Returning && seat.Here && !seat.IsHost) state = (seat.Ready ? TipText.Good("готовий") : "повертається");
-            UiTheme.Label(UiTheme.Rect(row, "State", new Vector2(1f, 0.5f), new Vector2(mayKick && seat.Here && !seat.IsHost ? -48f : -12f, 0f), new Vector2(100f, RowHeight)), "Text",
+            Text h = UiTheme.Label(UiTheme.Rect(row, "Hero", new Vector2(0f, 0.5f), new Vector2(190f, 0f), new Vector2(200f, RowHeight)), "Text",
+                          hero, 15, TextAnchor.MiddleLeft, UiTheme.InkDim);
+            LocText.Detach(h);
+            h.horizontalOverflow = HorizontalWrapMode.Overflow;
+            string state = seat.IsHost ? TipText.Title(Loc.Pick("хост", "host"), UiTheme.Gold)
+                         : !seat.Here ? Loc.Pick("немає в грі", "offline")
+                         : seat.Ready ? TipText.Good(Loc.Pick("готовий", "ready")) : Loc.Pick("обирає", "choosing");
+            if (seat.Returning && seat.Here && !seat.IsHost) state = (seat.Ready ? TipText.Good(Loc.Pick("готовий", "ready")) : Loc.Pick("повертається", "returning"));
+            Text st = UiTheme.Label(UiTheme.Rect(row, "State", new Vector2(1f, 0.5f), new Vector2(mayKick && seat.Here && !seat.IsHost ? -48f : -12f, 0f), new Vector2(100f, RowHeight)), "Text",
                           state, 15, TextAnchor.MiddleRight, UiTheme.Ink);
+            LocText.Detach(st);
             if (mayKick && seat.Here && !seat.IsHost)
             {
                 int number = seat.Number;
@@ -239,7 +267,7 @@ namespace BattleOfAges.UI
             startArmedUntil = 0f;
             if (why != null)
             {
-                status.text = why + ". Натисніть ще раз, щоб почати без очікування.";
+                status.text = Loc.Tr(why) + Loc.Pick(". Натисніть ще раз, щоб почати без очікування.", ". Press again to start without waiting.");
                 startArmedUntil = Time.unscaledTime + 5f;
             }
             RefreshButtons(NetSession.Current?.Lobby);

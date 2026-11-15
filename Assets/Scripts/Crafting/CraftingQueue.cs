@@ -41,7 +41,11 @@ namespace BattleOfAges.Crafting
         public static string Tier(int tier) { string r = ItemTypeNames.Roman(tier); return r.Length > 0 ? r : tier.ToString(); }
 
         public override string ToString() =>
-            IsSmelt ? $"Переплавка: руда {Tier(SmeltTier)} ×{SmeltCount * Combat.GameBalance.SmeltRatio} → {Tier(SmeltTier + 1)} ×{SmeltCount}" : new Item(Type, Level).ToString();
+            IsSmelt
+                ? UI.Loc.Pick(
+                    $"Переплавка: руда {Tier(SmeltTier)} ×{SmeltCount * Combat.GameBalance.SmeltRatio} → {Tier(SmeltTier + 1)} ×{SmeltCount}",
+                    $"Smelting: ore {Tier(SmeltTier)} ×{SmeltCount * Combat.GameBalance.SmeltRatio} → {Tier(SmeltTier + 1)} ×{SmeltCount}")
+                : new Item(Type, Level).ToString();
     }
 
     /// <summary>

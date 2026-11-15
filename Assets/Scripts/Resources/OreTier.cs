@@ -43,16 +43,16 @@ namespace BattleOfAges.Resources
         {
             string r = Crafting.ItemTypeNames.Roman(tier);
             string level = r.Length > 0 ? r : tier.ToString(); // the same Roman tiers as the HUD and the mine plates
-            if (tier == 0) return "Звичайна руда (0)";
-            if (tier == 1) return $"Мідно-залізна руда ({level})";
-            if (tier == 2) return $"Срібно-золота руда ({level})";
-            if (tier == 3) return $"Платинова руда ({level})";
-            if (tier == 4) return $"Мітрилова руда ({level})";
-            if (tier == 5) return $"Адамантитова руда ({level})";
-            if (tier >= 90) return $"Небесна руда ({level})";
-            if (tier >= 50) return $"Драконова руда ({level})";
-            if (tier >= 20) return $"Давня реліктова руда ({level})";
-            return $"Рідкісна руда ({level})";
+            if (tier == 0) return UI.Loc.Pick("Звичайна руда (0)", "Common Ore (0)");
+            if (tier == 1) return UI.Loc.Pick($"Мідно-залізна руда ({level})", $"Copper-Iron Ore ({level})");
+            if (tier == 2) return UI.Loc.Pick($"Срібно-золота руда ({level})", $"Silver-Gold Ore ({level})");
+            if (tier == 3) return UI.Loc.Pick($"Платинова руда ({level})", $"Platinum Ore ({level})");
+            if (tier == 4) return UI.Loc.Pick($"Мітрилова руда ({level})", $"Mithril Ore ({level})");
+            if (tier == 5) return UI.Loc.Pick($"Адамантитова руда ({level})", $"Adamantite Ore ({level})");
+            if (tier >= 90) return UI.Loc.Pick($"Небесна руда ({level})", $"Celestial Ore ({level})");
+            if (tier >= 50) return UI.Loc.Pick($"Драконова руда ({level})", $"Dragon Ore ({level})");
+            if (tier >= 20) return UI.Loc.Pick($"Давня реліктова руда ({level})", $"Ancient Relic Ore ({level})");
+            return UI.Loc.Pick($"Рідкісна руда ({level})", $"Rare Ore ({level})");
         }
 
         public static Color GetTierColor(int tier)

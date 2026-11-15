@@ -13,9 +13,11 @@ namespace BattleOfAges.UI
     public sealed class MainMenuUI : MonoBehaviour
     {
         private RectTransform menu, settings;
+        private GameObject langPrompt;
         private CampaignSetupUI campaign;
         private Button continueButton;
         private Text continueInfo;
+        private readonly System.Collections.Generic.List<System.Action> optionRefreshers = new System.Collections.Generic.List<System.Action>();
 
         private void Start()
         {
@@ -31,6 +33,9 @@ namespace BattleOfAges.UI
             if (SettingsManager.Instance == null) new GameObject("SettingsManager").AddComponent<SettingsManager>();
             Build();
             RefreshContinue();
+            Loc.Changed += OnLanguageChanged;
+            if (!Application.isBatchMode && !Loc.HasChosen && langPrompt != null)
+                langPrompt.SetActive(true);
             ResumeNetworkLobby();
         }
 
@@ -77,7 +82,15 @@ namespace BattleOfAges.UI
                 SaveMeta m = SaveSystem.Meta(slot);
                 continueInfo.text = m.Exists ? $"{SaveSystem.SlotName(slot)}  ·  {m.SavedAt:dd.MM HH:mm}" : "";
             }
-            else continueInfo.text = "Збережень ще немає";
+            else continueInfo.text = Loc.Pick("Збережень ще немає", "No saves yet");
+        }
+
+        private void OnLanguageChanged()
+        {
+            RefreshContinue();
+            foreach (var r in optionRefreshers) r?.Invoke();
+            campaign?.Refresh();
+            networkCampaign?.Refresh();
         }
 
         private void Continue()
@@ -124,7 +137,11 @@ namespace BattleOfAges.UI
             if (joinStatus != null) joinStatus.text = why;
         }
 
-        private void OnDestroy() => Net.NetSession.Failed -= OnJoinFailed;
+        private void OnDestroy()
+        {
+            Net.NetSession.Failed -= OnJoinFailed;
+            Loc.Changed -= OnLanguageChanged;
+        }
 
         private void Update()
         {
@@ -264,12 +281,13 @@ namespace BattleOfAges.UI
             SliderRow(settings, "Музика", -346f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.MusicVolume : 0.85f, v => SettingsManager.Instance?.SetMusicVolume(v));
             SliderRow(settings, "Ефекти світу", -412f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.SfxVolume : 1f, v => SettingsManager.Instance?.SetSfxVolume(v));
             SliderRow(settings, "Оточення та інтерфейс", -478f, SettingsManager.MIN_VOLUME, SettingsManager.MAX_VOLUME, sm != null ? sm.AmbienceVolume : 0.9f, v => SettingsManager.Instance?.SetAmbienceVolume(v));
-            OptionRow(settings, "Графіка", -86f, () => GraphicsQuality.Names[(int)GraphicsQuality.Current], GraphicsQuality.Cycle);
-            OptionRow(settings, "Масштаб інтерфейсу", -136f, () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
-            OptionRow(settings, "Повний екран", -186f, () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);
-            OptionRow(settings, "Роздільність", -236f, () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
-            OptionRow(settings, "VSync", -286f, () => DisplaySettings.VSync ? "увімк." : "вимк.", DisplaySettings.ToggleVSync);
-            OptionRow(settings, "Ліміт кадрів", -336f, () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
+            OptionRow(settings, "Мова", -86f, () => Loc.Name, Loc.Cycle);
+            OptionRow(settings, "Графіка", -136f, () => GraphicsQuality.CurrentName, GraphicsQuality.Cycle);
+            OptionRow(settings, "Масштаб інтерфейсу", -186f, () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
+            OptionRow(settings, "Повний екран", -236f, () => DisplaySettings.FullScreen ? Loc.Pick("так", "Yes") : Loc.Pick("вікно", "Windowed"), DisplaySettings.ToggleFullScreen);
+            OptionRow(settings, "Роздільність", -286f, () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
+            OptionRow(settings, "VSync", -336f, () => DisplaySettings.VSync ? Loc.Pick("увімк.", "On") : Loc.Pick("вимк.", "Off"), DisplaySettings.ToggleVSync);
+            OptionRow(settings, "Ліміт кадрів", -386f, () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
             RectTransform kb = UiTheme.Rect(settings, "Keys", new Vector2(0.5f, 0f), new Vector2(0f, 88f), new Vector2(560f, 26f));
             UiTheme.Label(kb, "Text", "Клавіші можна перепризначити в грі: Esc → Налаштування", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
             UiTheme.TextButton(settings, "Back", "Назад", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(220f, 52f), () => ShowSettings(false), 20);
@@ -279,8 +297,44 @@ namespace BattleOfAges.UI
             campaign.Panel.gameObject.SetActive(false);
             BuildJoinPanel(root);
 
+            UiTheme.TextButton(root, "Btn_Language", "Мова: Українська", new Vector2(0f, 0f), new Vector2(140f, 40f), new Vector2(240f, 46f), Loc.Cycle, 17);
+
             RectTransform ver = UiTheme.Rect(root, "Version", new Vector2(1f, 0f), new Vector2(-16f, 12f), new Vector2(400f, 24f));
             UiTheme.Label(ver, "Text", "v" + Application.version, 14, TextAnchor.LowerRight, UiTheme.InkDim);
+
+            BuildLanguagePrompt(root);
+        }
+
+        private void BuildLanguagePrompt(RectTransform root)
+        {
+            RectTransform dim = UiTheme.Child(root, "LanguagePrompt", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            dim.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.72f);
+            langPrompt = dim.gameObject;
+
+            RectTransform win = UiTheme.Rect(dim, "Window", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(580f, 300f));
+            UiTheme.PanelImage(win);
+            PopIn.On(win);
+
+            UiTheme.Label(UiTheme.Rect(win, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -22f), new Vector2(540f, 44f)),
+                "Text", "Оберіть мову  ·  Choose Language", 26, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            UiTheme.Divider(win, -72f, 440f);
+
+            Text note = UiTheme.Label(UiTheme.Rect(win, "Note", new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(520f, 56f)),
+                "Text", "Ви можете змінити мову будь-коли в меню та налаштуваннях\nYou can change the language anytime in the menu or settings", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            note.horizontalOverflow = HorizontalWrapMode.Wrap;
+
+            UiTheme.TextButton(win, "Choose_Uk", "Українська", new Vector2(0.5f, 0f), new Vector2(-128f, 46f), new Vector2(226f, 62f),
+                () => SelectInitialLanguage(Loc.Lang.Uk), 22);
+            UiTheme.TextButton(win, "Choose_En", "English", new Vector2(0.5f, 0f), new Vector2(128f, 46f), new Vector2(226f, 62f),
+                () => SelectInitialLanguage(Loc.Lang.En), 22);
+
+            langPrompt.SetActive(false);
+        }
+
+        private void SelectInitialLanguage(Loc.Lang lang)
+        {
+            Loc.Set(lang, save: true);
+            if (langPrompt != null) langPrompt.SetActive(false);
         }
 
         private static Button Big(RectTransform parent, string text, ref float y, UnityEngine.Events.UnityAction onClick)
@@ -293,14 +347,16 @@ namespace BattleOfAges.UI
         private const float SliderX = -265f;
 
         /// <summary>A screen option on the right half: its name and a button that steps to the next value.</summary>
-        private static void OptionRow(RectTransform parent, string label, float y, System.Func<string> value, System.Action next)
+        private void OptionRow(RectTransform parent, string label, float y, System.Func<string> value, System.Action next)
         {
             RectTransform lab = UiTheme.Rect(parent, label, new Vector2(0.5f, 1f), new Vector2(150f, y), new Vector2(240f, 40f));
             UiTheme.Label(lab, "Text", label, 19, TextAnchor.MiddleLeft, UiTheme.Ink);
             Text text = null;
             Button b = UiTheme.TextButton(parent, label + "_Value", "", new Vector2(0.5f, 1f), new Vector2(390f, y), new Vector2(220f, 40f), () => { next(); text.text = value(); }, 18);
             text = b.GetComponentInChildren<Text>();
+            LocText.Detach(text);
             text.text = value();
+            optionRefreshers.Add(() => { if (text != null) text.text = value(); });
         }
 
         private static void SliderRow(RectTransform parent, string label, float y, float min, float max, float value, System.Action<float> changed)

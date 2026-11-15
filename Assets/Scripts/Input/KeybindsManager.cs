@@ -86,6 +86,31 @@ namespace BattleOfAges.InputSystem
             { KeyAction.CenterSelection, "Камера до обраних (мапа)" }
         };
 
+        private static readonly Dictionary<KeyAction, string> actionNamesEn = new Dictionary<KeyAction, string>
+        {
+            { KeyAction.WorkerCommandUI, "Worker Assignment" },
+            { KeyAction.Inventory,        "Inventory" },
+            { KeyAction.BuildMenu,        "Build Menu" },
+            { KeyAction.ToggleGameMode,   "Switch Mode (RTS / FPS)" },
+            { KeyAction.InteractGather,   "Gather / Interact" },
+            { KeyAction.ChopTree,         "Chop Tree" },
+            { KeyAction.Equipment,       "Equipment" },
+            { KeyAction.Hero,            "Hero" },
+            { KeyAction.Ability,         "Class Skill 1" },
+            { KeyAction.Ability2,        "Class Skill 2" },
+            { KeyAction.Alarm,           "Alarm (Defend Settlement)" },
+            { KeyAction.IdleWorker,      "Next Idle Worker" },
+            { KeyAction.AlertJump,       "Jump to Attack (Map)" },
+            { KeyAction.UseFullHeal,     "Artifact: Full Heal" },
+            { KeyAction.UseLightning,    "Artifact: Lightning" },
+            { KeyAction.AutoWalk,        "Auto-Walk" },
+            { KeyAction.PlayerList,      "Player List (Hold)" },
+            { KeyAction.WorldMap,        "World Map" },
+            { KeyAction.StopUnits,       "Stop Selected (Map)" },
+            { KeyAction.SelectFighters,  "Select All Fighters (Map)" },
+            { KeyAction.CenterSelection, "Center Camera on Selected" }
+        };
+
         private static readonly Dictionary<KeyAction, KeyCode> currentKeybinds = new Dictionary<KeyAction, KeyCode>();
 
         public static event Action OnKeybindsChanged;
@@ -196,7 +221,8 @@ namespace BattleOfAges.InputSystem
 
         public static string GetActionDisplayName(KeyAction action)
         {
-            return actionNamesUk.TryGetValue(action, out var name) ? name : action.ToString();
+            var dict = UI.Loc.En ? actionNamesEn : actionNamesUk;
+            return dict.TryGetValue(action, out var name) ? name : action.ToString();
         }
 
         public static string GetKeyDisplayString(KeyCode key)
@@ -225,7 +251,7 @@ namespace BattleOfAges.InputSystem
                 case KeyCode.Keypad9: return "Num 9";
                 case KeyCode.Return: return "Enter";
                 case KeyCode.Period: return ".";
-                case KeyCode.Space: return "Пробіл";
+                case KeyCode.Space: return UI.Loc.Pick("Пробіл", "Space");
                 case KeyCode.LeftShift: return "LShift";
                 case KeyCode.RightShift: return "RShift";
                 case KeyCode.LeftControl: return "LCtrl";

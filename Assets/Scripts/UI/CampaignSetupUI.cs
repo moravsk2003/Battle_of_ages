@@ -50,22 +50,23 @@ namespace BattleOfAges.UI
             Label(-150f, -440f, "Сид світу");
             seedField = SeedField(new Vector2(-250f, -150f));
             UiTheme.TextButton(Panel, "RandomSeed", "Випадковий", new Vector2(0.5f, 1f), new Vector2(-80f, -150f), new Vector2(150f, 40f), () => seedField.text = "", 16);
-            Tooltip.Set(seedField.gameObject, () => TipText.Title("Сид світу", UiTheme.Gold) + "\nЧисло, з якого виростає світ: рельєф, ліси, озера, стоянки. Той самий сид — той самий світ (можна поділитися)."
-                                                       + "\n" + TipText.Dim("Порожньо — випадковий."));
-            Cycler(-210f, -290f, "Розмір світу", () => $"{CampaignSetup.Sizes[sizeIndex] / 1000f:0} × {CampaignSetup.Sizes[sizeIndex] / 1000f:0} км", d => sizeIndex = Wrap(sizeIndex + d, CampaignSetup.Sizes.Length));
+            Tooltip.Set(seedField.gameObject, () => TipText.Title(Loc.Pick("Сид світу", "World Seed"), UiTheme.Gold) + Loc.Pick("\nЧисло, з якого виростає світ: рельєф, ліси, озера, стоянки. Той самий сид — той самий світ (можна поділитися).", "\nSeed number that grows the world: terrain, forests, lakes, and camps. Same seed gives the same world (shareable).")
+                                                       + "\n" + TipText.Dim(Loc.Pick("Порожньо — випадковий.", "Leave blank for random.")));
+            Cycler(-210f, -290f, "Розмір світу", () => $"{CampaignSetup.Sizes[sizeIndex] / 1000f:0} × {CampaignSetup.Sizes[sizeIndex] / 1000f:0}" + Loc.Pick(" км", " km"), d => sizeIndex = Wrap(sizeIndex + d, CampaignSetup.Sizes.Length));
             Cycler(-270f, -290f, "Героїв у світі", () => CampaignSetup.HeroCounts[heroesIndex].ToString(), d => heroesIndex = Wrap(heroesIndex + d, CampaignSetup.HeroCounts.Length));
             Cycler(-330f, -290f, "Королів серед них", () => $"{CampaignSetup.KingShares[shareIndex] * 100f:0}%", d => shareIndex = Wrap(shareIndex + d, CampaignSetup.KingShares.Length));
-            Cycler(-390f, -290f, "Поради радника", () => tips ? "так" : "ні", d => tips = !tips);
+            Cycler(-390f, -290f, "Поради радника", () => tips ? Loc.Pick("так", "Yes") : Loc.Pick("ні", "No"), d => tips = !tips);
             RectTransform sum = UiTheme.Rect(Panel, "Summary", new Vector2(0.5f, 1f), new Vector2(-290f, -470f), new Vector2(520f, 90f));
             summary = UiTheme.Label(sum, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
+            LocText.Detach(summary);
             summary.horizontalOverflow = HorizontalWrapMode.Wrap;
 
             // The hero
             if (toLobby != null)
             {
                 Heading(-92f, 290f, "Герої");
-                Description(-110f, 290f).text = "Клас і стартовий артефакт кожен гравець, і ви теж, обирає в лобі.\n\n"
-                                              + "Ви отримаєте адресу, яку скажете іншим. Коли всі будуть готові, натисніть «Почати».";
+                Text lobbyNote = Description(-110f, 290f);
+                LocText.SetSource(lobbyNote, "Клас і стартовий артефакт кожен гравець, і ви теж, обирає в лобі.\n\nВи отримаєте адресу, яку скажете іншим. Коли всі будуть готові, натисніть «Почати».");
             }
             else
             {
@@ -138,16 +139,32 @@ namespace BattleOfAges.UI
             return input;
         }
 
-        private void Refresh()
+        public void Refresh()
         {
-            foreach (var (text, value) in rows) text.text = value();
+            foreach (var (text, value) in rows)
+            {
+                LocText.Detach(text);
+                text.text = value();
+            }
             int others = CampaignSetup.HeroCounts[heroesIndex] - 1;
             int kings = Mathf.RoundToInt(others * CampaignSetup.KingShares[shareIndex]);
             float km = CampaignSetup.Sizes[sizeIndex] / 1000f;
-            summary.text = $"Крім вас — {others} героїв: {kings} королів і {others - kings} вільних ватаг, кожен на своїй стоянці. "
-                         + $"Світ {km:0} × {km:0} км, гори по краю, озера; ближчі сусіди — від {World.StartSites.ClearanceFor(CampaignSetup.Sizes[sizeIndex]) / 1000f:0.#} км.";
-            if (classDescription != null) classDescription.text = HeroClassRules.Description(Classes[classIndex]) + "\n" + TipText.Dim("Клас обирається один раз.");
-            if (artifactDescription != null) artifactDescription.text = Artifacts.Description(Artifacts.All[artifactIndex]);
+            float minClearance = World.StartSites.ClearanceFor(CampaignSetup.Sizes[sizeIndex]) / 1000f;
+            summary.text = Loc.Pick(
+                $"Крім вас — {others} героїв: {kings} королів і {others - kings} вільних ватаг, кожен на своїй стоянці. "
+                + $"Світ {km:0} × {km:0} км, гори по краю, озера; ближчі сусіди — від {minClearance:0.#} км.",
+                $"Besides you — {others} heroes: {kings} kings and {others - kings} free warbands, each at their own camp. "
+                + $"World {km:0} × {km:0} km, edge mountains, lakes; nearest neighbors — at least {minClearance:0.#} km away.");
+            if (classDescription != null)
+            {
+                LocText.Detach(classDescription);
+                classDescription.text = HeroClassRules.Description(Classes[classIndex]) + "\n" + TipText.Dim(Loc.Pick("Клас обирається один раз.", "Class is chosen once."));
+            }
+            if (artifactDescription != null)
+            {
+                LocText.Detach(artifactDescription);
+                artifactDescription.text = Artifacts.Description(Artifacts.All[artifactIndex]);
+            }
         }
 
         private void Start()

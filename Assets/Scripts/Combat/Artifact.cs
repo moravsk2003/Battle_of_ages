@@ -29,8 +29,8 @@ namespace BattleOfAges.Combat
         /// <summary>The name for a bearer of this class: the ×5 weapon is its class's own.</summary>
         public static string Name(ArtifactType a, HeroClass cls)
         {
-            if (a == ArtifactType.SwordX5 && cls == HeroClass.Archer) return "Лук ×5";
-            if (a == ArtifactType.SwordX5 && cls == HeroClass.Mage) return "Посох ×5";
+            if (a == ArtifactType.SwordX5 && cls == HeroClass.Archer) return UI.Loc.Pick("Лук ×5", "Bow ×5");
+            if (a == ArtifactType.SwordX5 && cls == HeroClass.Mage) return UI.Loc.Pick("Посох ×5", "Staff ×5");
             return Name(a);
         }
 
@@ -38,18 +38,31 @@ namespace BattleOfAges.Combat
         {
             switch (a)
             {
-                case ArtifactType.Vampiric: return "Вампірський";
-                case ArtifactType.SwordX5: return "Меч ×5";
-                case ArtifactType.Armor90: return "Броня 80%";
-                case ArtifactType.FullHeal: return "Повне зцілення";
-                case ArtifactType.Lightning: return "Блискавка";
-                case ArtifactType.Wisdom: return "Мудрості";
-                default: return "Центральна імперія";
+                case ArtifactType.Vampiric: return UI.Loc.Pick("Вампірський", "Vampiric");
+                case ArtifactType.SwordX5: return UI.Loc.Pick("Меч ×5", "Sword ×5");
+                case ArtifactType.Armor90: return UI.Loc.Pick("Броня 80%", "Armor 80%");
+                case ArtifactType.FullHeal: return UI.Loc.Pick("Повне зцілення", "Full Heal");
+                case ArtifactType.Lightning: return UI.Loc.Pick("Блискавка", "Lightning");
+                case ArtifactType.Wisdom: return UI.Loc.Pick("Мудрості", "Wisdom");
+                default: return UI.Loc.Pick("Центральна імперія", "Central Empire");
             }
         }
 
         public static string Description(ArtifactType a)
         {
+            if (UI.Loc.En)
+            {
+                switch (a)
+                {
+                    case ArtifactType.Vampiric: return "10% of damage dealt is restored as HP";
+                    case ArtifactType.SwordX5: return "×5 damage (occupies weapon slot, cannot be removed)";
+                    case ArtifactType.Armor90: return "armor set: −80% incoming damage (helmet, chest, gloves, boots; locked; shield separate; magic pierces it)";
+                    case ArtifactType.FullHeal: return "consumable: restores full HP + 1 s invulnerability";
+                    case ArtifactType.Lightning: return "consumable: 250 magic damage to nearest enemy (ignores armor)";
+                    case ArtifactType.Wisdom: return "+20% experience";
+                    default: return "5/4/3 gear, no labor needed, free construction";
+                }
+            }
             switch (a)
             {
                 case ArtifactType.Vampiric: return "10% завданої шкоди повертається як HP";

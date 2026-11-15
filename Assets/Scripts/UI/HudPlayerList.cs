@@ -30,6 +30,7 @@ namespace BattleOfAges.UI
             list.panel = UiTheme.Rect(holder, "Panel", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(Width, 100f));
             UiTheme.PanelImage(list.panel);
             list.text = UiTheme.Label(list.panel, "Text", "", 20, TextAnchor.UpperLeft, UiTheme.Ink);
+            LocText.Detach(list.text);
             list.text.horizontalOverflow = HorizontalWrapMode.Wrap;
             list.text.verticalOverflow = VerticalWrapMode.Overflow;
             list.text.supportRichText = true;
@@ -57,19 +58,19 @@ namespace BattleOfAges.UI
         /// <summary>The list's words: alone with the game closed, alone with it open, or everyone by name.</summary>
         public static string Describe(bool inSession, bool host, int self, IReadOnlyList<int> players, string address, System.Func<int, string> nameOf = null)
         {
-            var b = new StringBuilder("<b>Гравці</b>\n");
+            var b = new StringBuilder(Loc.Pick("<b>Гравці</b>\n", "<b>Players</b>\n"));
             if (!inSession)
-                return b.Append("Ви граєте самі.\nЩоб грати з іншими: збережіться, тоді головне меню → «Гра в мережі».").ToString();
+                return b.Append(Loc.Pick("Ви граєте самі.\nЩоб грати з іншими: збережіться, тоді головне меню → «Гра в мережі».", "Playing solo.\nTo play with others: save your game, then Main Menu → Multiplayer.")).ToString();
             foreach (int who in players)
             {
-                b.Append(who == 0 ? "Хост" : "Гравець " + who);
+                b.Append(who == 0 ? Loc.Pick("Хост", "Host") : Loc.Pick("Гравець ", "Player ") + who);
                 string name = nameOf?.Invoke(who);
                 if (!string.IsNullOrEmpty(name)) b.Append(" «").Append(name).Append('»');
-                if (who == self) b.Append(" (ви)");
+                if (who == self) b.Append(Loc.Pick(" (ви)", " (you)"));
                 b.Append('\n');
             }
-            if (players.Count <= 1) b.Append("Поки більше нікого немає.\n");
-            if (host && !string.IsNullOrEmpty(address)) b.Append("Гру відкрито: ").Append(address);
+            if (players.Count <= 1) b.Append(Loc.Pick("Поки більше нікого немає.\n", "No one else has joined yet.\n"));
+            if (host && !string.IsNullOrEmpty(address)) b.Append(Loc.Pick("Гру відкрито: ", "Hosted at: ")).Append(address);
             return b.ToString().TrimEnd('\n');
         }
     }

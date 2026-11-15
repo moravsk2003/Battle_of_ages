@@ -64,12 +64,12 @@ namespace BattleOfAges.UI
             if (u.IsHero)
             {
                 if (!MapOpen()) return false;
-                what = "герой";
+                what = Loc.Pick("герой", "hero");
                 return true;
             }
             UnitProgress p = target.GetComponent<UnitProgress>();
             UnitRank rank = p != null ? p.Rank : UnitRank.Person;
-            what = target.GetComponent<NpcResourceGatherer>() != null && rank == UnitRank.Person ? "робітник" : HeroUI.RankName(rank);
+            what = target.GetComponent<NpcResourceGatherer>() != null && rank == UnitRank.Person ? Loc.Pick("робітник", "worker") : HeroUI.RankName(rank);
             return true;
         }
 

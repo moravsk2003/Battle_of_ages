@@ -51,7 +51,7 @@ namespace BattleOfAges.UI
         private void OnNewHero(HeroSuccession s)
         {
             banner.SetActive(false);
-            StrategyHud.Notify("Новий герой узяв владу. Оберіть клас (H)");
+            StrategyHud.Notify(Loc.Pick("Новий герой узяв владу. Оберіть клас (H)", "A new hero has taken command. Choose a class (H)"));
         }
 
         private void OnGameOver(HeroSuccession s)
@@ -65,7 +65,7 @@ namespace BattleOfAges.UI
         private void Update()
         {
             if (watched != null && banner.activeSelf)
-                bannerText.text = $"Герой загинув · міжцарів'я: {watched.InterregnumLeft:0} с\nЧастина війська розбіглася";
+                bannerText.text = Loc.Pick($"Герой загинув · міжцарів'я: {watched.InterregnumLeft:0} с\nЧастина війська розбіглася", $"Hero fell · interregnum: {watched.InterregnumLeft:0}s\nPart of the army scattered");
         }
 
         private void Build()
@@ -76,6 +76,7 @@ namespace BattleOfAges.UI
             RectTransform b = UiTheme.Rect(canvas.transform, "Interregnum", new Vector2(0.5f, 1f), new Vector2(0f, -90f), new Vector2(620f, 84f));
             UiTheme.PanelImage(b);
             bannerText = UiTheme.Label(b, "Text", "", 22, TextAnchor.MiddleCenter, UiTheme.Bad, FontStyle.Bold);
+            LocText.Detach(bannerText);
             banner = b.gameObject;
             banner.SetActive(false);
 

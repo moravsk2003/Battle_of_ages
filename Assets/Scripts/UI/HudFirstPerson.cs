@@ -64,6 +64,7 @@ namespace BattleOfAges.UI
             // Hero level and the experience to the next one
             RectTransform lv = UiTheme.Rect(vitals, "Level", new Vector2(0f, 0f), new Vector2(12f, 10f), new Vector2(48f, 24f));
             levelText = UiTheme.Label(lv, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(levelText);
             RectTransform xpBack = UiTheme.Rect(vitals, "Xp", new Vector2(0f, 0f), new Vector2(64f, 16f), new Vector2(296f, 12f));
             UiTheme.PanelImage(xpBack, UiTheme.SlotSprite);
             xpFill = UiTheme.Rect(xpBack, "Fill", new Vector2(0f, 0.5f), new Vector2(2f, 0f), new Vector2(0f, 7f));
@@ -91,6 +92,7 @@ namespace BattleOfAges.UI
             cool.sprite = UiTheme.BarSprite; cool.color = new Color(0f, 0f, 0f, 0.62f); cool.raycastTarget = false;
             cool.type = Image.Type.Filled; cool.fillMethod = Image.FillMethod.Radial360; cool.fillOrigin = (int)Image.Origin360.Top; cool.fillClockwise = false;
             Text secs = UiTheme.Label(rt, "Seconds", "", 22, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            LocText.Detach(secs);
             RectTransform k = UiTheme.Rect(rt, "Key", new Vector2(0f, 1f), new Vector2(4f, -2f), new Vector2(30f, 22f));
             Text keyText = UiTheme.Label(k, "Text", "", 15, TextAnchor.UpperLeft, UiTheme.Gold, FontStyle.Bold);
             rt.gameObject.SetActive(false);
@@ -136,7 +138,7 @@ namespace BattleOfAges.UI
         private void UpdateLevel()
         {
             if (progress == null) return;
-            if (levelShown.Changed(progress.Level)) levelText.text = "Рів. " + progress.Level;
+            if (levelShown.Changed(progress.Level + (Loc.En ? 1000000L : 0L))) levelText.text = Loc.Pick("Рів. ", "Lvl ") + progress.Level;
             float f = Mathf.Clamp01(progress.Xp / (float)Mathf.Max(1, progress.XpToNextLevel));
             if (Mathf.Abs(f - lastXpFill) > 1e-4f)
             {
@@ -182,7 +184,7 @@ namespace BattleOfAges.UI
                 float fill = left > 0f ? left / total : 0f;
                 if (Mathf.Abs(s.cooldown.fillAmount - fill) > 1e-4f) s.cooldown.fillAmount = fill;
                 int secondsKey = left <= 0f ? -1 : left >= 60f ? 100000 + Mathf.CeilToInt(left / 60f) : Mathf.CeilToInt(left);
-                if (abilitySeconds[i].Changed(secondsKey)) s.seconds.text = secondsKey < 0 ? "" : secondsKey >= 100000 ? (secondsKey - 100000) + " хв" : secondsKey.ToString();
+                if (abilitySeconds[i].Changed(secondsKey + (Loc.En ? 10000000L : 0L))) s.seconds.text = secondsKey < 0 ? "" : secondsKey >= 100000 ? (secondsKey - 100000) + Loc.Pick(" хв", "m") : secondsKey.ToString();
                 Color col = left > 0f ? new Color(0.6f, 0.6f, 0.6f) : Color.white;
                 if (s.icon.color != col) s.icon.color = col;
                 if (abilityKeys[i].Changed((long)InputSystem.KeybindsManager.GetKey(AbilityKeys[i]))) s.key.text = HudTips.Key(AbilityKeys[i]);
@@ -209,11 +211,11 @@ namespace BattleOfAges.UI
                 if (skills == null) return null;
                 float left = skills.CooldownLeftIn(i);
                 return TipText.Title(skills.ActiveName(i), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i]))
-                       + "\n" + (left > 0f ? TipText.Dim($"Перезарядка ще {left:0} с") : TipText.Good("Готове"))
-                       + "\n" + TipText.Dim($"Перезарядка {skills.CooldownOf(i):0} с. Опис — у вікні героя ") + TipText.Key(HudTips.Key(InputKey.Hero));
+                       + "\n" + (left > 0f ? TipText.Dim(Loc.Pick($"Перезарядка ще {left:0} с", $"Cooldown: {left:0}s remaining")) : TipText.Good(Loc.Pick("Готове", "Ready")))
+                       + "\n" + TipText.Dim(Loc.Pick($"Перезарядка {skills.CooldownOf(i):0} с. Опис — у вікні героя ", $"Cooldown {skills.CooldownOf(i):0}s. Details in Hero window ")) + TipText.Key(HudTips.Key(InputKey.Hero));
             }
             ArtifactType a = i == 2 ? ArtifactType.FullHeal : ArtifactType.Lightning;
-            return TipText.Title(Artifacts.Name(a), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i])) + "\n" + Artifacts.Description(a) + "\n" + TipText.Dim("Одноразовий: після використання зникає");
+            return TipText.Title(Artifacts.Name(a), UiTheme.Gold) + "  " + TipText.Key(HudTips.Key(AbilityKeys[i])) + "\n" + Artifacts.Description(a) + "\n" + TipText.Dim(Loc.Pick("Одноразовий: після використання зникає", "Single-use: consumed on activation"));
         }
     }
 }

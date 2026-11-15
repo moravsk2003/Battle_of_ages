@@ -116,18 +116,22 @@ namespace BattleOfAges.UI
                     RectTransform rt = UiTheme.Rect(layer, "SiteLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(420f, 32f));
                     rt.pivot = new Vector2(0.5f, 0f);
                     UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.92f));
-                    Tooltip.Set(rt.gameObject, () => TipText.Title("Будівництво", UiTheme.Gold)
-                        + $"\nРобітники «Авто» приходять самі; інших виділіть і клацніть {TipText.Key("ПКМ")} по ділянці. До {ConstructionSite.MaxBuilders} робітників, що більше — то швидше."
-                        + "\n" + TipText.Dim("Без робітників будівництво стоїть."));
+                    Tooltip.Set(rt.gameObject, () => TipText.Title(Loc.Pick("Будівництво", "Construction"), UiTheme.Gold)
+                        + Loc.Pick($"\nРобітники «Авто» приходять самі; інших виділіть і клацніть {TipText.Key("ПКМ")} по ділянці. До {ConstructionSite.MaxBuilders} робітників, що більше — то швидше.",
+                                   $"\nAutonomous workers join automatically; select others and {TipText.Key("RMB")} the site. Up to {ConstructionSite.MaxBuilders} builders—more is faster.")
+                        + "\n" + TipText.Dim(Loc.Pick("Без робітників будівництво стоїть.", "Construction pauses without workers.")));
                     RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(400f, 28f));
                     Text t = UiTheme.Label(tr, "Text", "", 14, TextAnchor.MiddleCenter, UiTheme.Ink);
+                    LocText.Detach(t);
                     t.supportRichText = true;
                     sitePlates.Add((rt, t));
                 }
                 var (plate, text) = sitePlates[used++];
                 if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
                 plate.anchoredPosition = local;
-                string hands = s.PresentBuilders == 0 ? "<color=#DB5242>немає робітників</color>  <size=11>ПКМ виділеними — послати</size>" : $"<color=#F5CC73>{s.PresentBuilders}</color> працюють";
+                string hands = s.PresentBuilders == 0
+                    ? Loc.Pick("<color=#DB5242>немає робітників</color>  <size=11>ПКМ виділеними — послати</size>", "<color=#DB5242>no workers</color>  <size=11>RMB selected — send</size>")
+                    : Loc.Pick($"<color=#F5CC73>{s.PresentBuilders}</color> працюють", $"<color=#F5CC73>{s.PresentBuilders}</color> working");
                 text.text = $"{s.DisplayName} {Mathf.FloorToInt(s.Progress * 100f)}%  ·  {hands}";
             }
             for (int i = used; i < sitePlates.Count; i++) if (sitePlates[i].plate.gameObject.activeSelf) sitePlates[i].plate.gameObject.SetActive(false);
@@ -211,6 +215,7 @@ namespace BattleOfAges.UI
                         UiTheme.PanelImage(rt, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.85f));
                         RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(290f, 24f));
                         Text t = UiTheme.Label(tr, "Text", "", 13, TextAnchor.MiddleCenter, UiTheme.Ink);
+                        LocText.Detach(t);
                         t.raycastTarget = false;
                         rt.GetComponent<Image>().raycastTarget = false;
                         placePlates.Add((rt, t));
@@ -218,7 +223,8 @@ namespace BattleOfAges.UI
                     var (plate, text) = placePlates[used++];
                     if (!plate.gameObject.activeSelf) plate.gameObject.SetActive(true);
                     plate.anchoredPosition = local;
-                    text.text = $"{(p is FieldNode ? "Поле" : "Лісопилка")} {p.WorkerCount}/{p.Slots}  ·  ПКМ — послати сюди";
+                    string placeName = p is FieldNode ? Loc.Pick("Поле", "Field") : Loc.Pick("Лісопилка", "Sawmill");
+                    text.text = Loc.Pick($"{placeName} {p.WorkerCount}/{p.Slots}  ·  ПКМ — послати сюди", $"{placeName} {p.WorkerCount}/{p.Slots}  ·  RMB — assign here");
                 }
             for (int i = used; i < placePlates.Count; i++) if (placePlates[i].plate.gameObject.activeSelf) placePlates[i].plate.gameObject.SetActive(false);
         }
@@ -243,7 +249,7 @@ namespace BattleOfAges.UI
                 if (label.button.gameObject.activeSelf != canRelease) label.button.gameObject.SetActive(canRelease);
                 // only when something on it changed: the form, workers, rate, stock and its two best tiers
                 long key = Shown.Key(full ? 1 : 0, mine.AssignedWorkerCount, Mathf.RoundToInt(mine.OrePerSecond * 10f), mine.AccumulatedOreCount);
-                key = Shown.Key(key, mine.MaxAccumulatedOre);
+                key = Shown.Key(key, mine.MaxAccumulatedOre, Loc.En ? 1 : 0);
                 for (int t = mine.HighestTierInStock, n2 = 0; t >= 1 && n2 < 2; t--) { int n = mine.OreOfTier(t); if (n > 0) { key = Shown.Key(key, t * 100000L + n); n2++; } }
                 if (mineShown.TryGetValue(mine, out long was) && was == key) continue;
                 mineShown[mine] = key;
@@ -263,21 +269,33 @@ namespace BattleOfAges.UI
                 tiers += (shown++ == 0 ? "  " : " ") + (t < Roman.Length ? Roman[t] : t.ToString()) + "·" + n;
             }
             if (tiers.Length > 0) tiers = "<size=15><color=#c9b89a>" + tiers + "</color></size>";
-            return $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  {mine.OrePerSecond:0.#}/с\n" +
-                   $"руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}";
+            string c = mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73";
+            return Loc.Pick(
+                $"Шахта  ·  робітники <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  {mine.OrePerSecond:0.#}/с\nруда <color={c}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}",
+                $"Mine  ·  workers <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  {mine.OrePerSecond:0.#}/s\nore <color={c}>{mine.AccumulatedOreCount}/{mine.MaxAccumulatedOre}</color>{tiers}");
         }
 
         /// <summary>The chip zoomed out: workers and the stock (red when full: haulers needed).</summary>
-        private static string MineChip(MineNode mine) =>
-            $"Шахта <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  руда <color={(mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73")}>{mine.AccumulatedOreCount}</color>";
+        private static string MineChip(MineNode mine)
+        {
+            string c = mine.AccumulatedOreCount >= mine.MaxAccumulatedOre ? "#DB5242" : "#F5CC73";
+            return Loc.Pick(
+                $"Шахта <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  руда <color={c}>{mine.AccumulatedOreCount}</color>",
+                $"Mine <color=#F5CC73>{mine.AssignedWorkerCount}/{MineNode.MAX_WORKERS}</color>  ·  ore <color={c}>{mine.AccumulatedOreCount}</color>");
+        }
 
         private static string MineHowTo() =>
-            TipText.Title("Як працює шахта", UiTheme.Gold) +
-            "\n1. На мапі виділіть робітників і клацніть " + TipText.Key("ПКМ") + " по шахті: вони заходять усередину (до " + MineNode.MAX_WORKERS + ")." +
-            "\n2. Кожен копає 1 руду/с, з кайлом більше. Руда складається в шахті (число тут, на табличці)." +
-            "\n3. Інші робітники з наказом «Шахта» або «Самостійно» носять її в скриню — лише тоді вона у ваших запасах." +
-            "\n4. Зрідка трапляється руда вищого рангу (I, II…): з неї кують кращу зброю й броню." +
-            "\n" + TipText.Dim("«Вивести» — забрати одного робітника з шахти. Повна шахта (червоне число) стоїть: потрібні носії.");
+            TipText.Title(Loc.Pick("Як працює шахта", "How the Mine Works"), UiTheme.Gold) +
+            Loc.Pick("\n1. На мапі виділіть робітників і клацніть " + TipText.Key("ПКМ") + " по шахті: вони заходять усередину (до " + MineNode.MAX_WORKERS + ").",
+                     "\n1. On the map, select workers and " + TipText.Key("RMB") + " the mine: they enter inside (up to " + MineNode.MAX_WORKERS + ").") +
+            Loc.Pick("\n2. Кожен копає 1 руду/с, з кайлом більше. Руда складається в шахті (число тут, на табличці).",
+                     "\n2. Each mines 1 ore/s (more with a pickaxe). Ore piles up inside the mine (count shown on this plate).") +
+            Loc.Pick("\n3. Інші робітники з наказом «Шахта» або «Самостійно» носять її в скриню — лише тоді вона у ваших запасах.",
+                     "\n3. Workers on \"Mine\" or \"Autonomous\" carry ore to the chest—only then does it enter your stock.") +
+            Loc.Pick("\n4. Зрідка трапляється руда вищого рангу (I, II…): з неї кують кращу зброю й броню.",
+                     "\n4. Higher-tier ore (I, II…) spawns rarely: it crafts stronger weapons and armor.") +
+            "\n" + TipText.Dim(Loc.Pick("«Вивести» — забрати одного робітника з шахти. Повна шахта (червоне число) стоїть: потрібні носії.",
+                                        "\"Release\" sends one miner back out. A full mine (red number) halts until haulers empty it."));
 
         private (RectTransform, Text, Button) MineLabel(MineNode mine)
         {
@@ -287,6 +305,7 @@ namespace BattleOfAges.UI
             Tooltip.Set(rt.gameObject, MineHowTo); // a tester could not make out how the ore comes about: the whole chain on hover
             RectTransform tr = UiTheme.Rect(rt, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(250f, 50f));
             Text text = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+            LocText.Detach(text);
             text.supportRichText = true;
             Button b = UiTheme.TextButton(rt, "Release", "Вивести", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(84f, 38f), () => mine.ReleaseOneWorker(), 15);
             return (rt, text, b);
@@ -321,16 +340,21 @@ namespace BattleOfAges.UI
             int pop = hall.People, cap = hall.Cap;
             string popText = $"<color={(pop >= cap ? "#DB5242" : "#F5CC73")}>{pop}/{cap}</color>";
             bool several = TownHall.All.Count > 1;
-            string who = several ? hall.Title : "Ратуша";
-            if (hallShown.Changed(Shown.Key((full ? 1 : 0) + (several ? 2 + 2L * hall.GetInstanceID() : 0L), hall.Level, pop, cap)))
-                hallText.text = full ? $"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення {popText}"
-                                     : $"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>  ·  люди {popText}";
+            string who = several ? Loc.Tr(hall.Title) : Loc.Pick("Ратуша", "Town Hall");
+            long hallKey = Shown.Key((full ? 1 : 0) + (several ? 2 + 2L * hall.GetInstanceID() : 0L), hall.Level, pop, cap);
+            if (hallShown.Changed(Shown.Key(hallKey, Loc.En ? 1 : 0)))
+                hallText.text = full
+                    ? Loc.Pick($"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\nнаселення {popText}", $"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>\npopulation {popText}")
+                    : Loc.Pick($"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>  ·  люди {popText}", $"{who} <color=#F5CC73>{ItemTypeNames.Roman(hall.Level)}</color>  ·  pop. {popText}");
             bool canShowButton = full && map && hall.Level < TownHall.MaxLevel;
             if (hallButton.gameObject.activeSelf != canShowButton) hallButton.gameObject.SetActive(canShowButton);
             if (!canShowButton) return;
             TownHall.UpgradeCost(hall.Level + 1, out int wood, out int ore, out int tier);
-            if (hallButtonShown.Changed(Shown.Key(hall.Level, wood, ore, tier)))
-                hallButtonText.text = $"Покращити до {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+            long btnKey = Shown.Key(Shown.Key(hall.Level, wood), ore, tier * 2L + (Loc.En ? 1L : 0L));
+            if (hallButtonShown.Changed(btnKey))
+                hallButtonText.text = Loc.Pick(
+                    $"Покращити до {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>",
+                    $"Upgrade to {ItemTypeNames.Roman(hall.Level + 1)}\n<size=11>{wood} wood  ·  {ore} ore {ItemTypeNames.Roman(tier)}+</size>");
             hallButton.interactable = hall.CanUpgrade(out _);
         }
 
@@ -341,9 +365,11 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(hallLabel, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f)).raycastTarget = false;
             RectTransform tr = UiTheme.Rect(hallLabel, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 52f));
             hallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+            LocText.Detach(hallText);
             hallText.supportRichText = true;
             hallButton = UiTheme.TextButton(hallLabel, "Upgrade", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 46f), () => { if (TownHall.Viewed != null) Net.CommandBus.Submit(new Net.UpgradeHallCommand { Hall = Net.WorldEntity.IdOf(TownHall.Viewed).Value }); }, 13);
             hallButtonText = hallButton.GetComponentInChildren<Text>();
+            LocText.Detach(hallButtonText);
             hallButtonText.supportRichText = true;
             hallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
             hallLabel.SetAsFirstSibling();
@@ -361,23 +387,30 @@ namespace BattleOfAges.UI
                 UiTheme.PanelImage(wallRow, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.94f)).raycastTarget = false;
                 RectTransform tr = UiTheme.Rect(wallRow, "Text", new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(200f, 50f));
                 wallText = UiTheme.Label(tr, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Ink);
+                LocText.Detach(wallText);
                 wallText.supportRichText = true;
                 wallButton = UiTheme.TextButton(wallRow, "UpgradeWalls", "", new Vector2(1f, 0.5f), new Vector2(-8f, 0f), new Vector2(176f, 44f), () => Net.CommandBus.Submit(new Net.UpgradeWallsCommand()), 13);
                 wallButtonText = wallButton.GetComponentInChildren<Text>();
+                LocText.Detach(wallButtonText);
                 wallButtonText.supportRichText = true;
                 wallButtonText.horizontalOverflow = HorizontalWrapMode.Wrap;
             }
             if (wallRow.gameObject.activeSelf != show) wallRow.gameObject.SetActive(show);
             if (!show) return;
             int level = Fortifications.Level;
-            if (wallShown.Changed(level))
-                wallText.text = $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nшкода зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>";
+            if (wallShown.Changed(Shown.Key(level, Loc.En ? 1 : 0)))
+                wallText.text = Loc.Pick(
+                    $"Стіни <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nшкода зі стін <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>",
+                    $"Walls <color=#F5CC73>{ItemTypeNames.Roman(level)}</color>\nwall damage <color=#F5CC73>+{Mathf.RoundToInt(Fortifications.DamageBonus * 100f)}%</color>");
             bool max = level >= Fortifications.MaxLevel;
             if (wallButton.gameObject.activeSelf == max) wallButton.gameObject.SetActive(!max);
             if (max) return;
             Fortifications.UpgradeCost(level + 1, out int wood, out int ore, out int tier);
-            if (wallButtonShown.Changed(Shown.Key(level, wood, ore, tier)))
-                wallButtonText.text = $"Стіни до {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>";
+            long wallBtnKey = Shown.Key(Shown.Key(level, wood), ore, tier * 2L + (Loc.En ? 1L : 0L));
+            if (wallButtonShown.Changed(wallBtnKey))
+                wallButtonText.text = Loc.Pick(
+                    $"Стіни до {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} дер.  ·  {ore} руди {ItemTypeNames.Roman(tier)}+</size>",
+                    $"Walls to {ItemTypeNames.Roman(level + 1)}\n<size=11>{wood} wood  ·  {ore} ore {ItemTypeNames.Roman(tier)}+</size>");
             wallButton.interactable = Fortifications.CanUpgrade(out _);
         }
 

@@ -59,9 +59,16 @@ namespace BattleOfAges.UI
             instance = this;
             Build();
             window.SetActive(false);
+            Loc.Changed += OnLanguageChanged;
         }
 
-        private void OnDestroy() { if (instance == this) instance = null; }
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+            if (instance == this) instance = null;
+        }
+
+        private void OnLanguageChanged() { if (IsVisible) Refresh(); }
 
         private void Update()
         {
@@ -101,7 +108,8 @@ namespace BattleOfAges.UI
 
         private void Refresh()
         {
-            title.text = saving ? "Зберегти гру" : onPick != null ? "Мережева гра зі збереження" : "Завантажити гру";
+            LocText.Detach(title);
+            title.text = saving ? Loc.Pick("Зберегти гру", "Save Game") : onPick != null ? Loc.Pick("Мережева гра зі збереження", "Multiplayer from Save") : Loc.Pick("Завантажити гру", "Load Game");
             for (int i = list.childCount - 1; i >= 0; i--) Destroy(list.GetChild(i).gameObject);
             for (int slot = 0; slot <= SaveSystem.ManualSlots; slot++) Row(slot, (slot / 2) * 112f, slot % 2 == 0 ? -386f : 386f);
         }
@@ -114,31 +122,38 @@ namespace BattleOfAges.UI
             RectTransform nm = UiTheme.Rect(row, "Name", new Vector2(0f, 1f), new Vector2(18f, -10f), new Vector2(420f, 32f));
             bool named = saving && slot != SaveSystem.AutoSlot;
             string heading = !named && !string.IsNullOrEmpty(m.Title) ? $"{SaveSystem.SlotName(slot)}: {m.Title}" : SaveSystem.SlotName(slot);
-            UiTheme.Label(nm, "Text", heading, 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold).horizontalOverflow = HorizontalWrapMode.Overflow;
+            Text head = UiTheme.Label(nm, "Text", heading, 22, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(head);
+            head.horizontalOverflow = HorizontalWrapMode.Overflow;
             if (named) TitleField(row, slot, m);
             RectTransform info = UiTheme.Rect(row, "Info", new Vector2(0f, 0f), new Vector2(18f, 10f), new Vector2(470f, 52f));
             Text t = UiTheme.Label(info, "Text", "", 16, TextAnchor.UpperLeft, UiTheme.InkDim);
+            LocText.Detach(t);
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
             t.text = m.Exists
-                ? $"{m.SavedAt:dd.MM.yyyy HH:mm}   ·   у грі {PlayTime(m.PlaySeconds)}\nдерево {m.Wood}  ·  руда {m.Ore}  ·  юнітів {m.Units}  ·  будівель {m.Buildings}"
-                : "Порожньо";
+                ? Loc.Pick($"{m.SavedAt:dd.MM.yyyy HH:mm}   ·   у грі {PlayTime(m.PlaySeconds)}\nдерево {m.Wood}  ·  руда {m.Ore}  ·  юнітів {m.Units}  ·  будівель {m.Buildings}",
+                           $"{m.SavedAt:dd.MM.yyyy HH:mm}   ·   played {PlayTime(m.PlaySeconds)}\nwood {m.Wood}  ·  ore {m.Ore}  ·  units {m.Units}  ·  buildings {m.Buildings}")
+                : Loc.Pick("Порожньо", "Empty");
 
             float x = -14f;
             if (m.Exists && slot != SaveSystem.AutoSlot)
             {
                 bool armed = armedSlot == slot && armedAction == "delete";
-                UiTheme.TextButton(row, "Delete", armed ? "Точно?" : "×", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(armed ? 92f : 44f, 44f), () => Act(slot, "delete"), armed ? 16 : 24)
-                       .GetComponent<Image>().color = new Color(1f, 0.65f, 0.6f);
+                Button del = UiTheme.TextButton(row, "Delete", armed ? Loc.Pick("Точно?", "Sure?") : "×", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(armed ? 92f : 44f, 44f), () => Act(slot, "delete"), armed ? 16 : 24);
+                LocText.Detach(del.GetComponentInChildren<Text>());
+                del.GetComponent<Image>().color = new Color(1f, 0.65f, 0.6f);
                 x -= armed ? 102f : 54f;
             }
             if (saving)
             {
                 bool armed = armedSlot == slot && armedAction == "save";
-                UiTheme.TextButton(row, "Save", armed ? "Перезаписати?" : "Зберегти", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "save"), 17);
+                Button save = UiTheme.TextButton(row, "Save", armed ? Loc.Pick("Перезаписати?", "Overwrite?") : Loc.Pick("Зберегти", "Save"), new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "save"), 17);
+                LocText.Detach(save.GetComponentInChildren<Text>());
             }
             else
             {
-                Button b = UiTheme.TextButton(row, "Load", onPick != null ? "У лобі" : "Завантажити", new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "load"), 17);
+                Button b = UiTheme.TextButton(row, "Load", onPick != null ? Loc.Pick("У лобі", "To Lobby") : Loc.Pick("Завантажити", "Load"), new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(170f, 48f), () => Act(slot, "load"), 17);
+                LocText.Detach(b.GetComponentInChildren<Text>());
                 b.interactable = m.Exists;
             }
         }
@@ -166,7 +181,8 @@ namespace BattleOfAges.UI
         private static string PlayTime(float seconds)
         {
             int min = Mathf.FloorToInt(seconds / 60f);
-            return min >= 60 ? $"{min / 60} год {min % 60:00} хв" : $"{min} хв";
+            return Loc.Pick(min >= 60 ? $"{min / 60} год {min % 60:00} хв" : $"{min} хв",
+                            min >= 60 ? $"{min / 60} h {min % 60:00} m" : $"{min} m");
         }
 
         private void Build()

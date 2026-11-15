@@ -39,6 +39,8 @@ namespace BattleOfAges.UI
         // Keybinding Rebind UI references
         private KeyAction? activeRebindAction = null;
         private readonly Dictionary<KeyAction, Text> keybindButtonTexts = new Dictionary<KeyAction, Text>();
+        private readonly Dictionary<KeyAction, Text> keybindLabelTexts = new Dictionary<KeyAction, Text>();
+        private readonly List<System.Action> cycleRefreshers = new List<System.Action>();
         private GameObject keybindsContainerObj;
         private Slider zoomSlider;
         private Slider musicSlider;
@@ -68,6 +70,10 @@ namespace BattleOfAges.UI
             if (pauseWindow != null) PopIn.On(pauseWindow);
 
             KeybindsManager.OnKeybindsChanged += RefreshKeybindButtonTexts;
+            Loc.Changed += OnLanguageChanged;
+            if (pauseMenuPanel != null)
+                foreach (Text t in pauseMenuPanel.GetComponentsInChildren<Text>(true))
+                    LocText.Attach(t);
         }
 
         /// <summary>
@@ -105,12 +111,23 @@ namespace BattleOfAges.UI
             b.onClick = new Button.ButtonClickedEvent();
             b.onClick.AddListener(onClick);
             Text label = copy.GetComponentInChildren<Text>(true);
-            if (label != null) label.text = text;
+            if (label != null)
+            {
+                label.text = text;
+                LocText.SetSource(label, text);
+            }
         }
 
         private void OnDestroy()
         {
             KeybindsManager.OnKeybindsChanged -= RefreshKeybindButtonTexts;
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        private void OnLanguageChanged()
+        {
+            foreach (var refresh in cycleRefreshers) refresh?.Invoke();
+            RefreshKeybindButtonTexts();
         }
 
         private void InitializeReferences()
@@ -379,9 +396,9 @@ namespace BattleOfAges.UI
             Transform screen = ScrollList(SettingsTab(win, "Графіка", 2));
             CreateGraphicsRow(screen);
             CycleRow(screen, "Row_UiScale", "Масштаб інтерфейсу", () => DisplaySettings.ScaleName, DisplaySettings.CycleScale);
-            CycleRow(screen, "Row_FullScreen", "Повний екран", () => DisplaySettings.FullScreen ? "так" : "вікно", DisplaySettings.ToggleFullScreen);
+            CycleRow(screen, "Row_FullScreen", "Повний екран", () => DisplaySettings.FullScreen ? Loc.Pick("так", "Yes") : Loc.Pick("вікно", "Windowed"), DisplaySettings.ToggleFullScreen);
             CycleRow(screen, "Row_Resolution", "Роздільність", () => DisplaySettings.ResolutionName, DisplaySettings.CycleResolution);
-            CycleRow(screen, "Row_VSync", "VSync", () => DisplaySettings.VSync ? "увімк." : "вимк.", DisplaySettings.ToggleVSync);
+            CycleRow(screen, "Row_VSync", "VSync", () => DisplaySettings.VSync ? Loc.Pick("увімк.", "On") : Loc.Pick("вимк.", "Off"), DisplaySettings.ToggleVSync);
             CycleRow(screen, "Row_FrameCap", "Ліміт кадрів", () => DisplaySettings.FrameCapName, DisplaySettings.CycleFrameCap);
 
             RectTransform keys = SettingsTab(win, "Клавіші", 3);
@@ -390,11 +407,16 @@ namespace BattleOfAges.UI
             foreach (KeyAction action in System.Enum.GetValues(typeof(KeyAction)))
             {
                 KeyAction captured = action;
-                keybindButtonTexts[action] = CreateRow(keyRows, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(captured));
+                var rowTexts = CreateRowWithLabel(keyRows, $"Row_{action}", KeybindsManager.GetActionDisplayName(action), () => StartRebinding(captured));
+                LocText.Detach(rowTexts.label);
+                LocText.Detach(rowTexts.value);
+                keybindLabelTexts[action] = rowTexts.label;
+                keybindButtonTexts[action] = rowTexts.value;
             }
 
             Transform game = ScrollList(SettingsTab(win, "Гра", 4));
-            CycleRow(game, "Row_Advisor", "Поради «Перші кроки»", () => Advisor.Hidden ? "сховано" : "показано", () => Advisor.Hidden = !Advisor.Hidden);
+            CycleRow(game, "Row_Language", "Мова", () => Loc.Name, Loc.Cycle);
+            CycleRow(game, "Row_Advisor", "Поради «Перші кроки»", () => Advisor.Hidden ? Loc.Pick("сховано", "Hidden") : Loc.Pick("показано", "Shown"), () => Advisor.Hidden = !Advisor.Hidden);
 
             if (closeSettingsButton != null)
             {
@@ -544,7 +566,9 @@ namespace BattleOfAges.UI
                 // the resolution and the window change on the next frame: read them again then
                 StartCoroutine(RefreshNextFrame(text, value));
             });
+            LocText.Detach(text);
             text.text = value();
+            cycleRefreshers.Add(() => { if (text != null) text.text = value(); });
         }
 
         private static System.Collections.IEnumerator RefreshNextFrame(Text text, System.Func<string> value)
@@ -557,16 +581,15 @@ namespace BattleOfAges.UI
         /// <summary>The graphics preset (GraphicsQuality): a click goes to the next one.</summary>
         private void CreateGraphicsRow(Transform parent)
         {
-            Text value = null;
-            value = CreateRow(parent, "Row_Graphics", "Графіка", () =>
-            {
-                GraphicsQuality.Cycle();
-                value.text = GraphicsQuality.Names[(int)GraphicsQuality.Current];
-            });
-            value.text = GraphicsQuality.Names[(int)GraphicsQuality.Current];
+            CycleRow(parent, "Row_Graphics", "Графіка", () => GraphicsQuality.CurrentName, GraphicsQuality.Cycle);
         }
 
         private static Text CreateRow(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
+        {
+            return CreateRowWithLabel(parent, name, label, onClick).value;
+        }
+
+        private static (Text label, Text value) CreateRowWithLabel(Transform parent, string name, string label, UnityEngine.Events.UnityAction onClick)
         {
             var row = new GameObject(name, typeof(RectTransform));
             row.transform.SetParent(parent, false);
@@ -575,9 +598,9 @@ namespace BattleOfAges.UI
             var rt = (RectTransform)row.transform;
             UiTheme.PanelImage(rt, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
 
-            UiTheme.Label(UiTheme.Child(rt, "Label", new Vector2(0f, 0f), new Vector2(0.62f, 1f), new Vector2(14f, 0f), Vector2.zero), "Text", label, 17, TextAnchor.MiddleLeft);
+            Text lbl = UiTheme.Label(UiTheme.Child(rt, "Label", new Vector2(0f, 0f), new Vector2(0.62f, 1f), new Vector2(14f, 0f), Vector2.zero), "Text", label, 17, TextAnchor.MiddleLeft);
             Button btn = UiTheme.TextButton(rt, "KeyBtn", "", new Vector2(1f, 0.5f), new Vector2(-6f, 0f), new Vector2(180f, 36f), onClick, 17);
-            return btn.GetComponentInChildren<Text>();
+            return (lbl, btn.GetComponentInChildren<Text>());
         }
 
         private void StartRebinding(KeyAction action)
@@ -589,6 +612,11 @@ namespace BattleOfAges.UI
         private void RefreshKeybindButtonTexts()
         {
             if (this == null || keybindButtonTexts == null) return;
+
+            foreach (var kvp in keybindLabelTexts)
+            {
+                if (kvp.Value != null) kvp.Value.text = KeybindsManager.GetActionDisplayName(kvp.Key);
+            }
 
             foreach (var kvp in keybindButtonTexts)
             {

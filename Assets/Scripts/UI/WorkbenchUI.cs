@@ -52,8 +52,23 @@ namespace BattleOfAges.UI
             window.SetActive(false);
         }
 
-        private void OnEnable() => Armory.Changed += RefreshStore;
-        private void OnDisable() => Armory.Changed -= RefreshStore;
+        private void OnEnable()
+        {
+            Armory.Changed += RefreshStore;
+            Loc.Changed += OnLanguageChanged;
+        }
+
+        private void OnDisable()
+        {
+            Armory.Changed -= RefreshStore;
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        private void OnLanguageChanged()
+        {
+            RefreshAll();
+            UpdateProgress();
+        }
 
         private void Update()
         {
@@ -112,14 +127,21 @@ namespace BattleOfAges.UI
                 int tier = ItemStatCalculator.CalculateRequiredOreTier(selectedLevel);
                 ResourceManager rm = ResourceManager.Instance;
                 bool woodOk = rm == null || rm.WoodCount >= wood, oreOk = rm == null || rm.GetOreCountAtLeast(tier) >= ore;
-                string tierText = tier == 0 ? "руда" : $"руда {ItemTypeNames.Roman(tier)}+";
-                c.cost.text = $"<color={(woodOk ? "#E8DFCB" : "#DB5242")}>дерево {wood}</color>  ·  <color={(oreOk ? "#E8DFCB" : "#DB5242")}>{tierText} ×{ore}</color>  ·  {ItemStatCalculator.CalculateCraftTime(c.type, selectedLevel):0.#} с";
+                string tierText = tier == 0
+                    ? Loc.Pick("руда", "ore")
+                    : Loc.Pick($"руда {ItemTypeNames.Roman(tier)}+", $"ore {ItemTypeNames.Roman(tier)}+");
+                c.cost.text = Loc.Pick(
+                    $"<color={(woodOk ? "#E8DFCB" : "#DB5242")}>дерево {wood}</color>  ·  <color={(oreOk ? "#E8DFCB" : "#DB5242")}>{tierText} ×{ore}</color>  ·  {ItemStatCalculator.CalculateCraftTime(c.type, selectedLevel):0.#} с",
+                    $"<color={(woodOk ? "#E8DFCB" : "#DB5242")}>wood {wood}</color>  ·  <color={(oreOk ? "#E8DFCB" : "#DB5242")}>{tierText} ×{ore}</color>  ·  {ItemStatCalculator.CalculateCraftTime(c.type, selectedLevel):0.#} s");
                 c.craft.interactable = woodOk && oreOk && bench != null;
             }
 
             int workers = bench != null ? bench.AssignedWorkerCount : 0, called = bench != null ? bench.CalledWorkerCount : 0;
-            workersText.text = $"Робітники: <color=#F5CC73>{workers}/{CraftingQueue.MAX_WORKERS}</color>" + (called > workers ? $" (ще йдуть: {called - workers})" : "")
-                               + $"   ·   швидкість ×{CraftingQueue.CalculateSpeedMultiplier(workers):0.##}";
+            workersText.text = Loc.Pick(
+                $"Робітники: <color=#F5CC73>{workers}/{CraftingQueue.MAX_WORKERS}</color>" + (called > workers ? $" (ще йдуть: {called - workers})" : "")
+                + $"   ·   швидкість ×{CraftingQueue.CalculateSpeedMultiplier(workers):0.##}",
+                $"Workers: <color=#F5CC73>{workers}/{CraftingQueue.MAX_WORKERS}</color>" + (called > workers ? $" (on the way: {called - workers})" : "")
+                + $"   ·   speed ×{CraftingQueue.CalculateSpeedMultiplier(workers):0.##}");
             warningText.gameObject.SetActive(called == 0);
             RefreshSmelt();
             RefreshQueue();
@@ -131,12 +153,12 @@ namespace BattleOfAges.UI
             CraftingTask active = bench != null ? bench.Queue.ActiveTask : null;
             if (active == null)
             {
-                currentText.text = "Верстак вільний";
+                currentText.text = Loc.Pick("Верстак вільний", "Workbench idle");
                 progressFill.anchorMax = new Vector2(0f, 1f);
                 percentText.text = "";
                 return;
             }
-            currentText.text = active.IsSmelt ? active.ToString() : $"Виготовляється: {new Item(active.Type, active.Level)}";
+            currentText.text = active.IsSmelt ? active.ToString() : Loc.Pick($"Виготовляється: {new Item(active.Type, active.Level)}", $"Crafting: {new Item(active.Type, active.Level)}");
             progressFill.anchorMax = new Vector2(active.NormalizedProgress, 1f);
             percentText.text = Mathf.RoundToInt(active.NormalizedProgress * 100f) + "%";
         }
@@ -156,6 +178,7 @@ namespace BattleOfAges.UI
                 img.sprite = task.IsSmelt ? UiTheme.IconSprite(UiTheme.Icon.Ore) : UiTheme.ItemSprite(task.Type, task.Level); img.preserveAspect = true; img.raycastTarget = false;
                 RectTransform lbl = UiTheme.Rect(row, "Label", new Vector2(0f, 0.5f), new Vector2(46f, 0f), new Vector2(290f, 36f));
                 Text label = UiTheme.Label(lbl, "Text", task.ToString(), task.IsSmelt ? 14 : 17, TextAnchor.MiddleLeft, task.IsSmelt ? UiTheme.Ink : UiTheme.LevelColor(task.Level));
+                LocText.Detach(label);
                 label.horizontalOverflow = HorizontalWrapMode.Wrap;
                 string id = task.TaskId;
                 UiTheme.TextButton(row, "Cancel", "×", new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(34f, 32f), () => { bench.CancelTask(id); RefreshAll(); }, 20)
@@ -164,12 +187,14 @@ namespace BattleOfAges.UI
             if (q.Count > 8)
             {
                 RectTransform more = UiTheme.Rect(queueList, "More", new Vector2(0.5f, 1f), new Vector2(0f, -7 * 44f), new Vector2(380f, 30f));
-                UiTheme.Label(more, "Text", $"ще {q.Count - 8} у черзі", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+                Text t = UiTheme.Label(more, "Text", Loc.Pick($"ще {q.Count - 8} у черзі", $"{q.Count - 8} more in queue"), 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+                LocText.Detach(t);
             }
             else if (q.Count <= 1)
             {
                 RectTransform none = UiTheme.Rect(queueList, "Empty", new Vector2(0.5f, 1f), new Vector2(0f, -4f), new Vector2(380f, 30f));
-                UiTheme.Label(none, "Text", "Черга порожня", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+                Text t = UiTheme.Label(none, "Text", Loc.Pick("Черга порожня", "Queue empty"), 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+                LocText.Detach(t);
             }
         }
 
@@ -180,12 +205,19 @@ namespace BattleOfAges.UI
             int ratio = Combat.GameBalance.SmeltRatio, can = WorkbenchNode.SmeltableCount(smeltTier);
             ResourceManager rm = ResourceManager.Instance;
             int have = rm != null ? rm.GetOreTierCount(smeltTier) : 0;
-            smeltTierText.text = $"руда {CraftingTask.Tier(smeltTier)}  →  руда {CraftingTask.Tier(smeltTier + 1)}";
-            smeltInfoText.text = $"{ratio} шт. → 1 шт., {Combat.GameBalance.SmeltSecondsPerPiece:0.#} с за шматок\n"
-                                 + $"на складі цієї руди: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — вийде {can}" : "");
+            smeltTierText.text = Loc.Pick(
+                $"руда {CraftingTask.Tier(smeltTier)}  →  руда {CraftingTask.Tier(smeltTier + 1)}",
+                $"ore {CraftingTask.Tier(smeltTier)}  →  ore {CraftingTask.Tier(smeltTier + 1)}");
+            smeltInfoText.text = Loc.Pick(
+                $"{ratio} шт. → 1 шт., {Combat.GameBalance.SmeltSecondsPerPiece:0.#} с за шматок\n"
+                + $"на складі цієї руди: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — вийде {can}" : ""),
+                $"{ratio} pcs → 1 pc, {Combat.GameBalance.SmeltSecondsPerPiece:0.#} s per piece\n"
+                + $"this ore in stock: <color=#F5CC73>{have}</color>" + (can > 0 ? $" — yields {can}" : ""));
             smeltTen.interactable = bench != null && can >= 1;
             smeltAll.interactable = bench != null && can >= 2;
-            smeltAll.GetComponentInChildren<Text>().text = can >= 2 ? $"Усе ({can})" : "Усе";
+            smeltAll.GetComponentInChildren<Text>().text = can >= 2
+                ? Loc.Pick($"Усе ({can})", $"All ({can})")
+                : Loc.Pick("Усе", "All");
         }
 
         private void Smelt(bool all)
@@ -204,15 +236,22 @@ namespace BattleOfAges.UI
         }
 
         private static string SmeltTip() =>
-            TipText.Title("Переплавка руди", UiTheme.Gold)
-            + $"\n{Combat.GameBalance.SmeltRatio} руди одного рівня → 1 руда наступного. З шахти кожен рівень вдесятеро рідший, тож переплавка — певний шлях до рідкої руди."
-            + "\nРуду забирають зі скрині одразу, в черзі можна скасувати (руда повернеться). Йде як інші замовлення: потрібні робітники біля верстака.";
+            TipText.Title(Loc.Pick("Переплавка руди", "Ore Smelting"), UiTheme.Gold)
+            + Loc.Pick(
+                $"\n{Combat.GameBalance.SmeltRatio} руди одного рівня → 1 руда наступного. З шахти кожен рівень вдесятеро рідший, тож переплавка — певний шлях до рідкої руди."
+                + "\nРуду забирають зі скрині одразу, в черзі можна скасувати (руда повернеться). Йде як інші замовлення: потрібні робітники біля верстака.",
+                $"\n{Combat.GameBalance.SmeltRatio} ore of one tier → 1 ore of the next tier. Deeper mine tiers are 10× rarer, so smelting is a reliable path to rare ore."
+                + "\nOre is taken from the chest immediately and can be cancelled in the queue for a full refund. Uses workbench workers like other orders.");
 
         private void RefreshStore()
         {
             if (storeText == null) return;
             int n = Armory.Instance.Items.Count;
-            storeText.text = n == 0 ? "На складі поки порожньо" : $"На складі: <color=#F5CC73>{n}</color> {(n % 10 == 1 && n % 100 != 11 ? "річ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "речі" : "речей")}";
+            storeText.text = n == 0
+                ? Loc.Pick("На складі поки порожньо", "Armory is currently empty")
+                : Loc.Pick(
+                    $"На складі: <color=#F5CC73>{n}</color> {(n % 10 == 1 && n % 100 != 11 ? "річ" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "речі" : "речей")}",
+                    $"In armory: <color=#F5CC73>{n}</color> {(n == 1 ? "item" : "items")}");
         }
 
         // ------------------------------------------------------------------ actions
@@ -270,6 +309,7 @@ namespace BattleOfAges.UI
             UiTheme.IconImage(wbar, UiTheme.Icon.Worker, new Vector2(0f, 0.5f), new Vector2(0f, 0f), 38f);
             RectTransform wt = UiTheme.Rect(wbar, "Text", new Vector2(0f, 0.5f), new Vector2(46f, 0f), new Vector2(420f, 40f));
             workersText = UiTheme.Label(wt, "Text", "", 19, TextAnchor.MiddleLeft, UiTheme.Ink);
+            LocText.Detach(workersText);
             workersText.supportRichText = true;
             UiTheme.TextButton(wbar, "Call", "+ Покликати", new Vector2(0f, 0.5f), new Vector2(470f, 0f), new Vector2(150f, 40f), CallWorker, 17);
             UiTheme.TextButton(wbar, "Release", "− Відпустити", new Vector2(0f, 0.5f), new Vector2(628f, 0f), new Vector2(150f, 40f), ReleaseWorker, 17);
@@ -290,6 +330,7 @@ namespace BattleOfAges.UI
             UiTheme.PanelImage(side, UiTheme.SlotSprite, new Color(1f, 1f, 1f, 0.9f));
             RectTransform cur = UiTheme.Rect(side, "Current", new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(380f, 30f));
             currentText = UiTheme.Label(cur, "Text", "", 18, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(currentText);
             RectTransform barBg = UiTheme.Rect(side, "Bar", new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(380f, 22f));
             UiTheme.PanelImage(barBg, UiTheme.BarSprite, new Color(0.1f, 0.08f, 0.06f));
             progressFill = UiTheme.Rect(barBg, "Fill", new Vector2(0f, 0f), Vector2.zero, Vector2.zero);
@@ -311,17 +352,21 @@ namespace BattleOfAges.UI
             UiTheme.TextButton(smelt, "Up", "›", new Vector2(1f, 1f), new Vector2(-14f, -40f), new Vector2(40f, 36f), () => ShiftSmeltTier(1), 22);
             RectTransform stier = UiTheme.Rect(smelt, "Tier", new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(260f, 36f));
             smeltTierText = UiTheme.Label(stier, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink, FontStyle.Bold);
+            LocText.Detach(smeltTierText);
             RectTransform sinfo = UiTheme.Rect(smelt, "Info", new Vector2(0.5f, 1f), new Vector2(0f, -82f), new Vector2(350f, 56f));
             smeltInfoText = UiTheme.Label(sinfo, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            LocText.Detach(smeltInfoText);
             smeltInfoText.supportRichText = true;
             smeltInfoText.horizontalOverflow = HorizontalWrapMode.Wrap;
             smeltTen = UiTheme.TextButton(smelt, "One", $"Переплавити {Combat.GameBalance.SmeltRatio}", new Vector2(0f, 0f), new Vector2(14f, 12f), new Vector2(170f, 42f), () => Smelt(false), 16);
             smeltAll = UiTheme.TextButton(smelt, "All", "Усе", new Vector2(1f, 0f), new Vector2(-14f, 12f), new Vector2(170f, 42f), () => Smelt(true), 16);
+            LocText.Detach(smeltAll.GetComponentInChildren<Text>());
 
             RectTransform store = UiTheme.Rect(side, "Store", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(380f, 112f));
             UiTheme.PanelImage(store, UiTheme.PanelSprite, new Color(1f, 1f, 1f, 0.9f));
             RectTransform stt = UiTheme.Rect(store, "Text", new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(350f, 36f));
             storeText = UiTheme.Label(stt, "Text", "", 18, TextAnchor.MiddleCenter, UiTheme.Ink);
+            LocText.Detach(storeText);
             storeText.supportRichText = true;
             UiTheme.TextButton(store, "Armory", "Склад і спорядження  [C]", new Vector2(0.5f, 0f), new Vector2(0f, 12f), new Vector2(330f, 48f), OpenArmory, 18);
         }
@@ -337,12 +382,15 @@ namespace BattleOfAges.UI
             icon.preserveAspect = true; icon.raycastTarget = false;
             RectTransform nm = UiTheme.Rect(card, "Name", new Vector2(0f, 1f), new Vector2(78f, -8f), new Vector2(172f, 40f));
             Text name = UiTheme.Label(nm, "Text", "", 16, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(name);
             name.horizontalOverflow = HorizontalWrapMode.Wrap;
             RectTransform ds = UiTheme.Rect(card, "Desc", new Vector2(0f, 1f), new Vector2(78f, -46f), new Vector2(172f, 40f));
             Text desc = UiTheme.Label(ds, "Text", "", 13, TextAnchor.UpperLeft, UiTheme.InkDim);
+            LocText.Detach(desc);
             desc.horizontalOverflow = HorizontalWrapMode.Wrap;
             RectTransform cs = UiTheme.Rect(card, "Cost", new Vector2(0f, 0f), new Vector2(10f, 50f), new Vector2(240f, 24f));
             Text cost = UiTheme.Label(cs, "Text", "", 14, TextAnchor.MiddleLeft, UiTheme.Ink);
+            LocText.Detach(cost);
             cost.supportRichText = true;
             Button craft = UiTheme.TextButton(card, "Craft", "Виготовити", new Vector2(0.5f, 0f), new Vector2(0f, 10f), new Vector2(W - 20f, 36f), () => Craft(type), 16);
             cards.Add((type, icon, name, desc, cost, craft));
@@ -356,19 +404,22 @@ namespace BattleOfAges.UI
             int tier = ItemStatCalculator.CalculateRequiredOreTier(selectedLevel);
             string s = TipText.Title($"{ItemTypeNames.MaterialName(type, selectedLevel)} {ItemTypeNames.Display(type).ToLowerInvariant()} {ItemTypeNames.Roman(selectedLevel)}", UiTheme.LevelColor(selectedLevel))
                      + "\n" + ItemTypeNames.Describe(item)
-                     + $"\nДеревина {ItemStatCalculator.CalculateWoodCost(type, selectedLevel)}, руда {(tier == 0 ? "будь-якого рівня" : ItemTypeNames.Roman(tier) + " і вище")} ×{ItemStatCalculator.CalculateOreCost(type, selectedLevel)}"
-                     + $"\nЧас {ItemStatCalculator.CalculateCraftTime(type, selectedLevel):0.#} с з одним робітником; більше робітників — швидше";
+                     + Loc.Pick(
+                         $"\nДеревина {ItemStatCalculator.CalculateWoodCost(type, selectedLevel)}, руда {(tier == 0 ? "будь-якого рівня" : ItemTypeNames.Roman(tier) + " і вище")} ×{ItemStatCalculator.CalculateOreCost(type, selectedLevel)}"
+                         + $"\nЧас {ItemStatCalculator.CalculateCraftTime(type, selectedLevel):0.#} с з одним робітником; більше робітників — швидше",
+                         $"\nWood {ItemStatCalculator.CalculateWoodCost(type, selectedLevel)}, ore {(tier == 0 ? "any tier" : ItemTypeNames.Roman(tier) + "+")} ×{ItemStatCalculator.CalculateOreCost(type, selectedLevel)}"
+                         + $"\nTime {ItemStatCalculator.CalculateCraftTime(type, selectedLevel):0.#} s with one worker; more workers craft faster");
             int stored = 0;
             foreach (Item it in Armory.Instance.Items) if (it.Equals(item)) stored++;
-            if (stored > 0) s += "\n" + TipText.Dim($"На складі вже є: {stored}");
+            if (stored > 0) s += "\n" + TipText.Dim(Loc.Pick($"На складі вже є: {stored}", $"Already in armory: {stored}"));
             PlayerCombatController player = Managers.GameContext.PlayerCombat;
             if (player != null && player.Gear != null)
             {
                 Equipment gear = player.Gear;
                 Item worn = gear[item.Slot];
-                if (gear.IsLocked(item.Slot)) s += "\n" + TipText.Dim("У героя цей слот тримає артефакт");
-                else s += "\n" + TipText.Dim(worn.IsEmpty ? "У героя слот вільний" : "У героя зараз: " + worn)
-                          + TipText.Compare(gear.StatsWith(worn), gear.StatsWith(item), "Герою, якщо надягти:");
+                if (gear.IsLocked(item.Slot)) s += "\n" + TipText.Dim(Loc.Pick("У героя цей слот тримає артефакт", "Hero slot is occupied by an artifact"));
+                else s += "\n" + TipText.Dim(worn.IsEmpty ? Loc.Pick("У героя слот вільний", "Hero slot is empty") : Loc.Pick("У героя зараз: ", "Hero currently wears: ") + worn)
+                          + TipText.Compare(gear.StatsWith(worn), gear.StatsWith(item), Loc.Pick("Герою, якщо надягти:", "For hero if equipped:"));
             }
             return s;
         }

@@ -24,6 +24,8 @@ namespace BattleOfAges.UI
 
         public bool IsOpen { get; private set; }
 
+        private BuildingType? lastPlacedType;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -41,11 +43,20 @@ namespace BattleOfAges.UI
 
             BuildUI();
             KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
+            Loc.Changed += OnLanguageChanged;
         }
 
         private void OnDestroy()
         {
             KeybindsManager.OnKeybindsChanged -= UpdateHeaderText;
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        private void OnLanguageChanged()
+        {
+            UpdateHeaderText();
+            RefreshStatusText();
+            RefreshRows();
         }
 
         private void Start()
@@ -63,7 +74,9 @@ namespace BattleOfAges.UI
             {
                 if (IsOpen) CloseMenu();
                 else if (!GameWindows.BlockGameplay && IsToggleKeyPressed())
-                    StrategyHud.Notify($"Будівництво — на мапі: {HudTips.Key(KeyAction.ToggleGameMode)}, потім {HudTips.Key(KeyAction.BuildMenu)}");
+                    StrategyHud.Notify(Loc.Pick(
+                        $"Будівництво — на мапі: {HudTips.Key(KeyAction.ToggleGameMode)}, потім {HudTips.Key(KeyAction.BuildMenu)}",
+                        $"Building — on the map: {HudTips.Key(KeyAction.ToggleGameMode)}, then {HudTips.Key(KeyAction.BuildMenu)}"));
                 return;
             }
 
@@ -107,6 +120,8 @@ namespace BattleOfAges.UI
             IsOpen = true;
             if (menuPanelObj != null) menuPanelObj.SetActive(true);
             UpdateHeaderText();
+            if (BuildingPlacementSystem.Instance == null || !BuildingPlacementSystem.Instance.IsPlacing) lastPlacedType = null;
+            RefreshStatusText();
             RefreshRows();
         }
 
@@ -127,12 +142,8 @@ namespace BattleOfAges.UI
             if (placer != null)
             {
                 placer.StartPlacement(type);
-
-                BuildingDefinition def = BuildingData.GetDefinition(type);
-                if (statusText != null)
-                {
-                    statusText.text = $"Розміщуємо: {def.DisplayName}\nЛКМ — побудувати  |  ПКМ — скасувати";
-                }
+                lastPlacedType = type;
+                RefreshStatusText();
             }
 
             CloseMenu();
@@ -166,10 +177,13 @@ namespace BattleOfAges.UI
             PopIn.On(panelRect);
 
             titleText = UiTheme.Label(UiTheme.Child(panelRect, "Header", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(22f, -52f), new Vector2(-22f, -6f)), "Title", "", 24, TextAnchor.MiddleLeft, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(titleText);
             UpdateHeaderText();
             UiTheme.Divider(panelRect, -54f, 600f);
 
-            statusText = UiTheme.Label(UiTheme.Child(panelRect, "Status", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(16f, 8f), new Vector2(-16f, 42f)), "StatusText", "Оберіть споруду; ЛКМ ставить, ПКМ скасовує", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            statusText = UiTheme.Label(UiTheme.Child(panelRect, "Status", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(16f, 8f), new Vector2(-16f, 42f)), "StatusText", "", 16, TextAnchor.MiddleCenter, UiTheme.InkDim);
+            LocText.Detach(statusText);
+            RefreshStatusText();
 
             for (int i = 0; i < defs.Length; i++)
             {
@@ -181,6 +195,23 @@ namespace BattleOfAges.UI
             if (menuPanelObj != null) menuPanelObj.SetActive(false);
         }
 
+        private void RefreshStatusText()
+        {
+            if (statusText == null) return;
+            if (lastPlacedType.HasValue)
+            {
+                BuildingDefinition def = BuildingData.GetDefinition(lastPlacedType.Value);
+                statusText.text = Loc.Pick(
+                    $"Розміщуємо: {def.DisplayName}\nЛКМ — побудувати  |  ПКМ — скасувати",
+                    $"Placing: {def.DisplayName}\nLMB — build  |  RMB — cancel");
+            }
+            else
+            {
+                statusText.text = Loc.Pick(
+                    "Оберіть споруду; ЛКМ ставить, ПКМ скасовує",
+                    "Select a building; LMB places, RMB cancels");
+            }
+        }
 
         private void UpdateHeaderText()
         {
@@ -188,11 +219,13 @@ namespace BattleOfAges.UI
             {
                 KeyCode key = KeybindsManager.GetKey(KeyAction.BuildMenu);
                 string keyName = KeybindsManager.GetKeyDisplayString(key);
-                titleText.text = $"Будівництво  <size=17><color=#B8A88E>[{keyName}]</color></size>";
+                titleText.text = Loc.Pick(
+                    $"Будівництво  <size=17><color=#B8A88E>[{keyName}]</color></size>",
+                    $"Building  <size=17><color=#B8A88E>[{keyName}]</color></size>");
             }
         }
 
-        private struct Row { public BuildingType Type; public Button Button; public Text Cost, Description; public CanvasGroup Group; }
+        private struct Row { public BuildingType Type; public Button Button; public Text Name, Cost, Description; public CanvasGroup Group; }
         private readonly Row[] rows = new Row[BuildingData.GetAllDefinitions().Length];
 
         private Row CreateBuildingButton(RectTransform rect, BuildingDefinition def)
@@ -215,16 +248,19 @@ namespace BattleOfAges.UI
                               : def.Type == BuildingType.TownHall ? UiTheme.Icon.House : UiTheme.Icon.Worker;
             UiTheme.IconImage(iconRect, icon, new Vector2(0.5f, 0.5f), Vector2.zero, 42f);
 
-            UiTheme.Label(UiTheme.Child(rect, "Name", new Vector2(0f, 0.5f), new Vector2(0.55f, 1f), new Vector2(78f, 0f), new Vector2(0f, -4f)), "NameText", def.DisplayName, 19, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            Text name = UiTheme.Label(UiTheme.Child(rect, "Name", new Vector2(0f, 0.5f), new Vector2(0.55f, 1f), new Vector2(78f, 0f), new Vector2(0f, -4f)), "NameText", def.DisplayName, 19, TextAnchor.MiddleLeft, UiTheme.Ink, FontStyle.Bold);
+            LocText.Detach(name);
             Text cost = UiTheme.Label(UiTheme.Child(rect, "Cost", new Vector2(0.55f, 0.5f), new Vector2(1f, 1f), Vector2.zero, new Vector2(-14f, -4f)), "CostText", "", 16, TextAnchor.MiddleRight, UiTheme.Gold);
+            LocText.Detach(cost);
             Text desc = UiTheme.Label(UiTheme.Child(rect, "Description", new Vector2(0f, 0f), new Vector2(1f, 0.5f), new Vector2(78f, 5f), new Vector2(-14f, 0f)), "DescriptionText", def.Description, 15, TextAnchor.MiddleLeft, UiTheme.InkDim);
+            LocText.Detach(desc);
             desc.horizontalOverflow = HorizontalWrapMode.Wrap;
             desc.resizeTextForBestFit = true;
             desc.resizeTextMinSize = 12;
             desc.resizeTextMaxSize = 15;
 
             Tooltip.Set(rect.gameObject, () => BuildTip(capturedType));
-            return new Row { Type = def.Type, Button = btn, Cost = cost, Description = desc, Group = rect.gameObject.AddComponent<CanvasGroup>() };
+            return new Row { Type = def.Type, Button = btn, Name = name, Cost = cost, Description = desc, Group = rect.gameObject.AddComponent<CanvasGroup>() };
         }
 
         /// <summary>What the building is, costs against the stock, strength, and the placing keys.</summary>
@@ -235,14 +271,25 @@ namespace BattleOfAges.UI
             bool wall = WallSegment.IsWall(type);
             int wood = rm != null ? rm.WoodCount : 0;
             int ore = rm == null ? 0 : wall ? rm.GetOreCountAtLeast(0) : rm.GetOreTierCount(def.OreTierRequired);
-            string Have(int have, int need) => have >= need ? TipText.Good($"є {have}") : TipText.Bad($"є {have}");
+            string Have(int have, int need) => have >= need
+                ? TipText.Good(Loc.Pick($"є {have}", $"have {have}"))
+                : TipText.Bad(Loc.Pick($"є {have}", $"have {have}"));
             var sb = new System.Text.StringBuilder(TipText.Title(def.DisplayName, UiTheme.Gold));
             sb.Append("\n").Append(def.Description);
-            sb.Append($"\nДеревина {def.WoodCost}  ({Have(wood, def.WoodCost)})");
-            sb.Append(wall ? $"\nРуда {def.OreCost} одного рівня  ({Have(ore, def.OreCost)} усього)" : $"\nРуда {def.OreCost}, {(def.OreTierRequired == 0 ? "будь-яка" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + " і вища")}  ({Have(ore, def.OreCost)})");
-            sb.Append(wall ? $"\nМіцність {def.MaxHealth} на звичайній руді, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% за кожен рівень руди" : $"\nМіцність {def.MaxHealth}");
-            if (def.NpcSpawnCount > 0) sb.Append($"\nДає {def.NpcSpawnCount} робітника (потрібне місце в населенні)");
-            sb.Append("\n").Append(TipText.Dim(wall ? "Z / X — повернути, Tab — руда, ЛКМ — поставити, ПКМ — скасувати" : "Z / X — повернути, ЛКМ — поставити, ПКМ — скасувати"));
+            sb.Append(Loc.Pick($"\nДеревина {def.WoodCost}  ({Have(wood, def.WoodCost)})", $"\nWood {def.WoodCost}  ({Have(wood, def.WoodCost)})"));
+            sb.Append(wall
+                ? Loc.Pick($"\nРуда {def.OreCost} одного рівня  ({Have(ore, def.OreCost)} усього)", $"\nOre {def.OreCost} of one tier  ({Have(ore, def.OreCost)} total)")
+                : Loc.Pick(
+                    $"\nРуда {def.OreCost}, {(def.OreTierRequired == 0 ? "будь-яка" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + " і вища")}  ({Have(ore, def.OreCost)})",
+                    $"\nOre {def.OreCost}, {(def.OreTierRequired == 0 ? "any" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + "+")}  ({Have(ore, def.OreCost)})"));
+            sb.Append(wall
+                ? Loc.Pick($"\nМіцність {def.MaxHealth} на звичайній руді, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% за кожен рівень руди", $"\nHP {def.MaxHealth} on common ore, +{Mathf.RoundToInt(Combat.GameBalance.WallHealthPerOreTier * 100f)}% per ore tier")
+                : Loc.Pick($"\nМіцність {def.MaxHealth}", $"\nHP {def.MaxHealth}"));
+            if (def.NpcSpawnCount > 0)
+                sb.Append(Loc.Pick($"\nДає {def.NpcSpawnCount} робітника (потрібне місце в населенні)", $"\nGrants {def.NpcSpawnCount} worker (requires population cap)"));
+            sb.Append("\n").Append(TipText.Dim(wall
+                ? Loc.Pick("Z / X — повернути, Tab — руда, ЛКМ — поставити, ПКМ — скасувати", "Z / X — rotate, Tab — ore tier, LMB — place, RMB — cancel")
+                : Loc.Pick("Z / X — повернути, ЛКМ — поставити, ПКМ — скасувати", "Z / X — rotate, LMB — place, RMB — cancel")));
             return sb.ToString();
         }
 
@@ -256,10 +303,13 @@ namespace BattleOfAges.UI
                 BuildingDefinition def = BuildingData.GetDefinition(r.Type);
                 bool affordable = placer == null || placer.CanAfford(r.Type);
                 bool allowed = BuildingPlacementSystem.IsAllowed(r.Type, out string reason);
-                string ore = $"руда {def.OreCost} <size=13>({(WallSegment.IsWall(r.Type) ? "рівень — Tab" : def.OreTierRequired == 0 ? "будь-яка" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + "+")})</size>";
-                r.Cost.text = $"дерево {def.WoodCost}  ·  {ore}";
+                if (r.Name != null) r.Name.text = def.DisplayName;
+                string ore = Loc.Pick(
+                    $"руда {def.OreCost} <size=13>({(WallSegment.IsWall(r.Type) ? "рівень — Tab" : def.OreTierRequired == 0 ? "будь-яка" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + "+")})</size>",
+                    $"ore {def.OreCost} <size=13>({(WallSegment.IsWall(r.Type) ? "tier — Tab" : def.OreTierRequired == 0 ? "any" : Crafting.ItemTypeNames.Roman(def.OreTierRequired) + "+")})</size>");
+                r.Cost.text = Loc.Pick($"дерево {def.WoodCost}  ·  {ore}", $"wood {def.WoodCost}  ·  {ore}");
                 r.Cost.color = affordable ? UiTheme.Gold : UiTheme.Bad;
-                r.Description.text = allowed ? def.Description : UiTheme.Sanitize(reason);
+                r.Description.text = allowed ? def.Description : UiTheme.Sanitize(Loc.Tr(reason));
                 r.Description.color = allowed ? UiTheme.InkDim : UiTheme.Bad;
                 r.Button.interactable = allowed;
                 r.Group.alpha = affordable && allowed ? 1f : 0.7f;

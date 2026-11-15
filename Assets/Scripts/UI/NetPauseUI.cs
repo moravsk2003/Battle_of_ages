@@ -42,10 +42,12 @@ namespace BattleOfAges.UI
                 if (p.On)
                 {
                     if (NetSession.CanUnpause) NetSession.RequestPause(false);
-                    else StrategyHud.Notify(p.AwaitingHost ? "Гра чекає рішення хоста" : $"Зняти паузу може той, хто поставив, або будь-хто за {NetSession.AnyoneUnpausesAfter:0} с");
+                    else StrategyHud.Notify(p.AwaitingHost
+                        ? Loc.Pick("Гра чекає рішення хоста", "Waiting for host's decision")
+                        : Loc.Pick($"Зняти паузу може той, хто поставив, або будь-хто за {NetSession.AnyoneUnpausesAfter:0} с", $"Only the pauser can unpause, or anyone after {NetSession.AnyoneUnpausesAfter:0}s"));
                 }
                 else if (NetSession.CanPause) NetSession.RequestPause(true);
-                else StrategyHud.Notify("Ваші паузи на цю гру скінчились");
+                else StrategyHud.Notify(Loc.Pick("Ваші паузи на цю гру скінчились", "You have used all pauses for this match"));
             }
             bool on = p != null && p.On;
             if (on != shown)
@@ -61,15 +63,17 @@ namespace BattleOfAges.UI
             }
             if (!on) return;
             int seconds = Mathf.FloorToInt(NetSession.PauseSeconds);
-            title.text = p.AwaitingHost ? "Гравець вийшов" : "Пауза";
+            title.text = p.AwaitingHost ? Loc.Pick("Гравець вийшов", "Player Disconnected") : Loc.Pick("Пауза", "Paused");
+            string whyTr = Loc.Tr(p.Why);
+            int left = Mathf.Max(0, Mathf.CeilToInt(NetSession.AnyoneUnpausesAfter - NetSession.PauseSeconds));
             string said = p.AwaitingHost
-                ? (NetSession.IsHost ? (p.HostWaits ? $"Чекаємо на: {NetSession.WaitingNames}. Їх повернення зніме паузу." : $"{p.Why}. Що далі?")
-                                     : (p.HostWaits ? "Хост чекає, поки гравець повернеться" : $"{p.Why}. Чекаємо рішення хоста"))
-                : p.Why + (NetSession.CanUnpause ? "" : $". Зняти її може той, хто поставив, або будь-хто за {Mathf.Max(0, Mathf.CeilToInt(NetSession.AnyoneUnpausesAfter - NetSession.PauseSeconds))} с");
+                ? (NetSession.IsHost ? (p.HostWaits ? Loc.Pick($"Чекаємо на: {NetSession.WaitingNames}. Їх повернення зніме паузу.", $"Waiting for: {NetSession.WaitingNames}. Returning will unpause.") : Loc.Pick($"{whyTr}. Що далі?", $"{whyTr}. What next?"))
+                                     : (p.HostWaits ? Loc.Pick("Хост чекає, поки гравець повернеться", "Host is waiting for player to return") : Loc.Pick($"{whyTr}. Чекаємо рішення хоста", $"{whyTr}. Waiting for host's decision")))
+                : whyTr + (NetSession.CanUnpause ? "" : Loc.Pick($". Зняти її може той, хто поставив, або будь-хто за {left} с", $". Only the pauser can unpause, or anyone in {left}s"));
             line.text = $"{said}\n<color=#a89c86>{seconds / 60}:{seconds % 60:00}</color>";
             hostChoice.SetActive(NetSession.IsHost && p.AwaitingHost);
             liftButton.SetActive(NetSession.CanUnpause);
-            alwaysBotLabel.text = "Завжди ставити бота: " + (NetSession.AlwaysBot ? "так" : "ні");
+            alwaysBotLabel.text = Loc.Pick("Завжди ставити бота: ", "Always assign bot: ") + (NetSession.AlwaysBot ? Loc.Pick("так", "Yes") : Loc.Pick("ні", "No"));
         }
 
         private void Build()
@@ -80,7 +84,9 @@ namespace BattleOfAges.UI
             RectTransform panel = UiTheme.Rect(canvas.transform, "Window", new Vector2(0.5f, 0.5f), new Vector2(0f, 80f), new Vector2(640f, 330f));
             UiTheme.PanelImage(panel);
             title = UiTheme.Label(UiTheme.Rect(panel, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(560f, 44f)), "Text", "Пауза", 30, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Bold);
+            LocText.Detach(title);
             line = UiTheme.Label(UiTheme.Rect(panel, "Line", new Vector2(0.5f, 1f), new Vector2(0f, -64f), new Vector2(580f, 86f)), "Text", "", 19, TextAnchor.UpperCenter, UiTheme.Ink);
+            LocText.Detach(line);
             line.supportRichText = true;
 
             var choice = new GameObject("HostChoice", typeof(RectTransform));
@@ -93,7 +99,8 @@ namespace BattleOfAges.UI
             UiTheme.TextButton(cr, "Wait", "Чекати", new Vector2(0.5f, 0f), new Vector2(200f, 96f), new Vector2(190f, 50f), NetSession.HostWait, 18);
             Button always = UiTheme.TextButton(cr, "AlwaysBot", "", new Vector2(0.5f, 0f), new Vector2(0f, 34f), new Vector2(380f, 42f), () => NetSession.AlwaysBot = !NetSession.AlwaysBot, 16);
             alwaysBotLabel = always.GetComponentInChildren<Text>();
-            Tooltip.Set(always.gameObject, () => TipText.Title("Завжди ставити бота", UiTheme.Gold) + "\nДо кінця цієї гри: хто вийде, того королівство одразу стереже бот, без паузи.");
+            LocText.Detach(alwaysBotLabel);
+            Tooltip.Set(always.gameObject, () => TipText.Title(Loc.Pick("Завжди ставити бота", "Always assign bot"), UiTheme.Gold) + Loc.Pick("\nДо кінця цієї гри: хто вийде, того королівство одразу стереже бот, без паузи.", "\nFor the rest of this match: if a player leaves, a bot immediately takes over without pausing."));
 
             liftButton = UiTheme.TextButton(panel, "Lift", "Зняти паузу (F6)", new Vector2(0.5f, 0f), new Vector2(0f, 34f), new Vector2(260f, 46f), () => NetSession.RequestPause(false), 18).gameObject;
         }

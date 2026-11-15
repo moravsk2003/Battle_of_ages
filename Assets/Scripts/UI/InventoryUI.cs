@@ -24,9 +24,11 @@ namespace BattleOfAges.UI
         private GameObject woodSlotObj;
 
         private readonly Dictionary<int, Text> oreQuantityTextMap = new Dictionary<int, Text>();
+        private readonly Dictionary<int, Text> oreBadgeTextMap = new Dictionary<int, Text>();
+        private readonly Dictionary<int, Text> oreNameTextMap = new Dictionary<int, Text>();
         private readonly Dictionary<int, GameObject> oreSlotObjMap = new Dictionary<int, GameObject>();
 
-        private Text titleText;
+        private Text titleText, emptyText;
 
         public bool IsOpen { get; private set; }
 
@@ -47,6 +49,7 @@ namespace BattleOfAges.UI
 
             BuildInventoryUI();
             KeybindsManager.OnKeybindsChanged += UpdateHeaderText;
+            Loc.Changed += OnLanguageChanged;
         }
 
         private void Start()
@@ -63,12 +66,24 @@ namespace BattleOfAges.UI
         private void OnDestroy()
         {
             KeybindsManager.OnKeybindsChanged -= UpdateHeaderText;
+            Loc.Changed -= OnLanguageChanged;
 
             if (ResourceManager.Instance != null)
             {
                 ResourceManager.Instance.OnResourceChanged -= OnResourceChangedHandler;
                 ResourceManager.Instance.OnOreTierAdded -= OnOreTierAddedHandler;
             }
+        }
+
+        private void OnLanguageChanged()
+        {
+            UpdateHeaderText();
+            foreach (var kv in oreBadgeTextMap)
+                if (kv.Value != null) kv.Value.text = Loc.Pick($"Рів. {kv.Key}", $"Lvl {kv.Key}");
+            foreach (var kv in oreNameTextMap)
+                if (kv.Value != null) kv.Value.text = OreTierHelper.GetTierName(kv.Key);
+            if (emptyText != null)
+                emptyText.text = Loc.Pick("Інвентар порожній!\nЗбирайте дерева або підбирайте камінці руди в степу.", "Inventory is empty!\nHarvest trees or pick up ore pebbles in the steppe.");
         }
 
         private void Update()
@@ -219,12 +234,14 @@ namespace BattleOfAges.UI
                 RectTransform bTxtRect = UiTheme.Child(badgeObj.transform, "BadgeText", Vector2.zero, Vector2.one);
                 GameObject badgeTxtObj = bTxtRect.gameObject;
 
-                Text bTxt = UiTheme.PlainText(badgeTxtObj, font, 17, TextAnchor.MiddleCenter, tierCol, $"Рів. {tierLevel}", style: FontStyle.Bold);
+                Text bTxt = UiTheme.PlainText(badgeTxtObj, font, 17, TextAnchor.MiddleCenter, tierCol, Loc.Pick($"Рів. {tierLevel}", $"Lvl {tierLevel}"), style: FontStyle.Bold);
+                LocText.Detach(bTxt);
 
                 RectTransform nameRect = UiTheme.Child(slotObj.transform, "NameText", Vector2.zero, Vector2.one, new Vector2(115f, 0f), new Vector2(-120f, 0f));
                 GameObject nameObj = nameRect.gameObject;
 
                 Text nameTxt = UiTheme.PlainText(nameObj, font, 20, TextAnchor.MiddleLeft, Color.white, OreTierHelper.GetTierName(tierLevel), style: FontStyle.Bold);
+                LocText.Detach(nameTxt);
 
                 RectTransform qtyRect = UiTheme.Child(slotObj.transform, "QtyText", new Vector2(1f, 0f), new Vector2(1f, 1f));
                 GameObject qtyObj = qtyRect.gameObject;
@@ -233,9 +250,12 @@ namespace BattleOfAges.UI
                 qtyRect.offsetMax = new Vector2(-15f, 0f);
 
                 Text qtyTxt = UiTheme.PlainText(qtyObj, font, 22, TextAnchor.MiddleRight, new Color(0.3f, 0.95f, 0.95f), style: FontStyle.Bold);
+                LocText.Detach(qtyTxt);
 
                 UiTheme.RestyleTree(slotObj.transform); // a row made after the window: themed now
                 oreSlotObjMap[tierLevel] = slotObj;
+                oreBadgeTextMap[tierLevel] = bTxt;
+                oreNameTextMap[tierLevel] = nameTxt;
                 oreQuantityTextMap[tierLevel] = qtyTxt;
             }
 
@@ -378,7 +398,9 @@ namespace BattleOfAges.UI
             RectTransform emptyRect = emptyPlaceholderObj.GetComponent<RectTransform>();
             emptyRect.sizeDelta = new Vector2(740f, 120f);
 
-            Text emptyTxt = UiTheme.PlainText(emptyPlaceholderObj, defaultFont, 22, TextAnchor.MiddleCenter, new Color(0.6f, 0.68f, 0.78f), "Inventory is empty!\nHarvest trees or pick up pebbles in the steppe.");
+            emptyText = UiTheme.PlainText(emptyPlaceholderObj, defaultFont, 22, TextAnchor.MiddleCenter, new Color(0.6f, 0.68f, 0.78f),
+                Loc.Pick("Інвентар порожній!\nЗбирайте дерева або підбирайте камінці руди в степу.", "Inventory is empty!\nHarvest trees or pick up ore pebbles in the steppe."));
+            LocText.Detach(emptyText);
 
             if (inventoryPanelObj != null) inventoryPanelObj.SetActive(false);
         }
@@ -389,7 +411,7 @@ namespace BattleOfAges.UI
             {
                 KeyCode key = KeybindsManager.GetKey(KeyAction.Inventory);
                 string keyName = KeybindsManager.GetKeyDisplayString(key);
-                titleText.text = $"Інвентар  <size=17><color=#B8A88E>[{keyName}]</color></size>";
+                titleText.text = Loc.Pick($"Інвентар  <size=17><color=#B8A88E>[{keyName}]</color></size>", $"Inventory  <size=17><color=#B8A88E>[{keyName}]</color></size>");
             }
         }
     }

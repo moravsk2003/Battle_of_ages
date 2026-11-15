@@ -36,6 +36,17 @@ namespace BattleOfAges.Combat
         /// <summary>What the class does, in a line or two (the class picker's tooltip; docs/GAME_DESIGN.md §8.1).</summary>
         public static string Description(HeroClass c)
         {
+            if (UI.Loc.En)
+            {
+                switch (c)
+                {
+                    case HeroClass.Tank: return "+20% HP; ignores every 10th hit. Skills: Regeneration, Instant Heal.";
+                    case HeroClass.Archer: return "−20% HP; with a bow ×2 strength (damage & run speed), range from speed (min 12 m). Skills: Long Shot, Piercing Arrow.";
+                    case HeroClass.Mage: return "With a staff: 5 homing bolts at 20% damage each, pierces armor, never misses; cannot attack without a staff. Skills: Fire Fan, Meteor.";
+                    case HeroClass.Dd: return "Attacks twice as fast. Skills: Dash, Critical Hit.";
+                    default: return "";
+                }
+            }
             switch (c)
             {
                 case HeroClass.Tank: return "+20% HP; кожен 10-й удар по ньому не проходить. Навики: регенерація, миттєвий відхіл.";
@@ -50,11 +61,11 @@ namespace BattleOfAges.Combat
         {
             switch (c)
             {
-                case HeroClass.Tank: return "Танк";
-                case HeroClass.Archer: return "Лучник";
-                case HeroClass.Mage: return "Маг";
-                case HeroClass.Dd: return "ДД";
-                default: return "без класу";
+                case HeroClass.Tank: return UI.Loc.Pick("Танк", "Tank");
+                case HeroClass.Archer: return UI.Loc.Pick("Лучник", "Archer");
+                case HeroClass.Mage: return UI.Loc.Pick("Маг", "Mage");
+                case HeroClass.Dd: return UI.Loc.Pick("ДД", "DD");
+                default: return UI.Loc.Pick("без класу", "No Class");
             }
         }
     }

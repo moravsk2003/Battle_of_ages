@@ -45,21 +45,21 @@ namespace BattleOfAges.Crafting
         public static readonly EquipSlot[] Slots =
             { EquipSlot.Weapon, EquipSlot.Shield, EquipSlot.Helmet, EquipSlot.Chest, EquipSlot.Gloves, EquipSlot.Boots };
 
-        /// <summary>Ukrainian display name of an item type.</summary>
+        /// <summary>Localized display name of an item type.</summary>
         public static string Display(ItemType t)
         {
             switch (t)
             {
-                case ItemType.Sword: return "Меч";
-                case ItemType.Bow: return "Лук";
-                case ItemType.Staff: return "Посох";
-                case ItemType.Armor: return "Нагрудник";
-                case ItemType.Axe: return "Сокира";
-                case ItemType.Pickaxe: return "Кайло";
-                case ItemType.Shield: return "Щит";
-                case ItemType.Helmet: return "Шолом";
-                case ItemType.Gloves: return "Рукавиці";
-                default: return "Чоботи";
+                case ItemType.Sword: return UI.Loc.Pick("Меч", "Sword");
+                case ItemType.Bow: return UI.Loc.Pick("Лук", "Bow");
+                case ItemType.Staff: return UI.Loc.Pick("Посох", "Staff");
+                case ItemType.Armor: return UI.Loc.Pick("Нагрудник", "Chestplate");
+                case ItemType.Axe: return UI.Loc.Pick("Сокира", "Axe");
+                case ItemType.Pickaxe: return UI.Loc.Pick("Кайло", "Pickaxe");
+                case ItemType.Shield: return UI.Loc.Pick("Щит", "Shield");
+                case ItemType.Helmet: return UI.Loc.Pick("Шолом", "Helmet");
+                case ItemType.Gloves: return UI.Loc.Pick("Рукавиці", "Gloves");
+                default: return UI.Loc.Pick("Чоботи", "Boots");
             }
         }
 
@@ -67,12 +67,12 @@ namespace BattleOfAges.Crafting
         {
             switch (s)
             {
-                case EquipSlot.Weapon: return "Зброя";
-                case EquipSlot.Shield: return "Щит";
-                case EquipSlot.Helmet: return "Шолом";
-                case EquipSlot.Chest: return "Нагрудник";
-                case EquipSlot.Gloves: return "Рукавиці";
-                default: return "Чоботи";
+                case EquipSlot.Weapon: return UI.Loc.Pick("Зброя", "Weapon");
+                case EquipSlot.Shield: return UI.Loc.Pick("Щит", "Shield");
+                case EquipSlot.Helmet: return UI.Loc.Pick("Шолом", "Helmet");
+                case EquipSlot.Chest: return UI.Loc.Pick("Нагрудник", "Chest");
+                case EquipSlot.Gloves: return UI.Loc.Pick("Рукавиці", "Gloves");
+                default: return UI.Loc.Pick("Чоботи", "Boots");
             }
         }
 
@@ -98,8 +98,21 @@ namespace BattleOfAges.Crafting
         public static string MaterialName(ItemType t, int level)
         {
             bool wood = t == ItemType.Bow || t == ItemType.Shield || t == ItemType.Staff;
+            int lvl = Mathf.Clamp(level, 0, ItemStatCalculator.MAX_LEVEL);
+            if (UI.Loc.En)
+            {
+                switch (lvl)
+                {
+                    case 0: return "Plain";
+                    case 1: return wood ? "Simple" : t == ItemType.Armor || t == ItemType.Helmet || t == ItemType.Gloves || t == ItemType.Boots ? "Leather" : "Bronze";
+                    case 2: return "Iron";
+                    case 3: return "Steel";
+                    case 4: return "Blackened Steel";
+                    default: return "Gilded";
+                }
+            }
             string stem;
-            switch (Mathf.Clamp(level, 0, ItemStatCalculator.MAX_LEVEL))
+            switch (lvl)
             {
                 case 0: stem = "Звичайн"; break; // the hero's plain iron sword
                 case 1: stem = wood ? "Прост" : t == ItemType.Armor || t == ItemType.Helmet || t == ItemType.Gloves || t == ItemType.Boots ? "Шкірян" : "Бронзов"; break;
@@ -117,6 +130,20 @@ namespace BattleOfAges.Crafting
         public static string Describe(Item item)
         {
             int l = ItemStatCalculator.ClampLevel(item.Level);
+            if (UI.Loc.En)
+            {
+                switch (item.Type)
+                {
+                    case ItemType.Sword: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, fast strikes";
+                    case ItemType.Bow: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, range {ItemStatCalculator.BOW_RANGE:0} m";
+                    case ItemType.Staff: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage; mage attacks with a staff only";
+                    case ItemType.Axe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, chopping ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
+                    case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, mining ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
+                    case ItemType.Armor: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% incoming damage, +{Pct(ItemStatCalculator.HealthBonus(item))}% health";
+                    case ItemType.Gloves: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% incoming damage, strikes {Pct(1f - ItemStatCalculator.CooldownMultiplier(item))}% faster";
+                    default: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% incoming damage";
+                }
+            }
             switch (item.Type)
             {
                 case ItemType.Sword: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, швидкі удари";

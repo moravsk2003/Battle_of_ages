@@ -30,14 +30,42 @@ namespace BattleOfAges.UI
 
         private static string K(KeyAction a) => TipText.Key(HudTips.Key(a));
         /// <summary>"M (мапа) → B (будівництво) →": where every building starts.</summary>
-        private static string ToBuild() => $"{K(KeyAction.ToggleGameMode)} мапа → {K(KeyAction.BuildMenu)} будівництво →";
+        private static string ToBuild() => $"{K(KeyAction.ToggleGameMode)} {Loc.Pick("мапа", "map")} → {K(KeyAction.BuildMenu)} {Loc.Pick("будівництво", "build")} →";
         private static bool Has(BuildingType t) { foreach (BuildingNode b in BuildingNode.Active) if (b != null && b.Type == t) return true; return false; }
 
         /// <summary>The goals in order: (what to do, how, done?).</summary>
-        public static (string goal, Func<string> how, Func<bool> done)[] Goals => World.WorldSettings.Bounded ? CampaignGoals : FixedGoals;
+        public static (string goal, Func<string> how, Func<bool> done)[] Goals => World.WorldSettings.Bounded ? (Loc.En ? CampaignGoalsEn : CampaignGoals) : (Loc.En ? FixedGoalsEn : FixedGoals);
 
         /// <summary>A campaign: most buildings grow from marked zones (M5).</summary>
-        private static string ToZones() => $"{K(KeyAction.ToggleGameMode)} мапа → «Будівництво» угорі:";
+        private static string ToZones() => $"{K(KeyAction.ToggleGameMode)} {Loc.Pick("мапа", "map")} → {Loc.Pick("«Будівництво» угорі:", "\"Build\" at top:")}";
+
+        private static readonly (string goal, Func<string> how, Func<bool> done)[] CampaignGoalsEn =
+        {
+            ("Build a Storage Chest", () => $"{ToBuild()} \"Storage Chest\", LMB to place. Auto workers build it themselves and haul wood and ore into it.", () => StorageChestNode.ActiveChests.Count > 0),
+            ("Gather 20 Wood", () => $"Yourself: {K(KeyAction.ChopTree)} near a tree. Or on the map: select workers and RMB a tree.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
+            ("Mark a Mining Zone", () => $"{ToZones()} \"Mining\", drag LMB to paint. Workers build a mine and work there when ore is needed; RMB it for permanent miners, or set haulers to Mine / Auto.", () => MineNode.ActiveMines.Count > 0),
+            ("Mark Farm Fields", () => $"{ToZones()} \"Fields\". Food is consumed daily; when low, free villagers farm automatically. Or select workers and RMB a field.", () => Has(BuildingType.Field)),
+            ("Craft Your First Item", () => $"Workbench: on the map, select a worker and RMB the workbench; LMB it to open, pick a recipe → \"Craft\". Add benches via the \"Crafts\" zone.", () => Armory.Instance.Items.Count > 0),
+            ("Equip a Worker", () => $"On the map, select workers, {K(KeyAction.Equipment)} for Equipment: click a weapon or armor piece in the armory to issue one to each. Knight & General ranks come from combat.", () => ArmedVillager()),
+            ("Build a Town Hall", () => $"{ToBuild()} \"Town Hall\": population only grows once you have one. Its level sets the cap; houses speed growth.", () => TownHall.Current != null),
+            ("Mark a Housing Zone", () => $"{ToZones()} \"Housing\". Each house speeds up population growth.", () => Has(BuildingType.WorkerHouse)),
+            ("Upgrade Town Hall to II", () => $"On the map, hover the Town Hall → \"Upgrade\". Requires {Combat.GameBalance.TownHallWood[2]} wood and {Combat.GameBalance.TownHallOre[2]} ore I+: found in mines or smelted at the workbench (10 → 1).", () => TownHall.Current != null && TownHall.Current.Level >= 2),
+            ("Build Walls with a Gate", () => $"{ToBuild()} \"Wall\" and \"Gate\". Select workers and RMB a wall to post guards; {K(KeyAction.Alarm)} sounds the alarm.", () => Has(BuildingType.WallGate)),
+        };
+
+        private static readonly (string goal, Func<string> how, Func<bool> done)[] FixedGoalsEn =
+        {
+            ("Build a Storage Chest", () => $"{ToBuild()} \"Storage Chest\", LMB to place. Workers bring wood and ore into chests.", () => StorageChestNode.ActiveChests.Count > 0),
+            ("Gather 20 Wood", () => $"Yourself: {K(KeyAction.ChopTree)} near a tree to chop, {K(KeyAction.InteractGather)} to pick branches. Or on the map: select workers and RMB a tree.", () => ResourceManager.Instance != null && ResourceManager.Instance.WoodCount >= 20),
+            ("Build a Mine", () => $"{ToBuild()} \"Mine\". Select workers (LMB or box) and RMB the mine to work inside. Set others to \"Mine\" or \"Auto\" to haul ore to chests.", () => MineNode.ActiveMines.Count > 0),
+            ("Build a Workbench", () => $"{ToBuild()} \"Workbench\". A worker crafts weapons and armor here for everyone.", () => WorkbenchNode.Instance != null),
+            ("Craft Your First Item", () => $"On the map: select a worker, RMB the workbench to assign; LMB the workbench to open, pick a recipe → \"Craft\". (In first person: {K(KeyAction.InteractGather)} near it.)", () => Armory.Instance.Items.Count > 0),
+            ("Equip a Worker", () => $"On the map, select workers, {K(KeyAction.Equipment)} for Equipment: click a sword or armor in the armory to issue one to each. Knight & General ranks come from combat.", () => ArmedVillager()),
+            ("Build a Town Hall", () => $"{ToBuild()} \"Town Hall\". Raises population cap; new villagers spawn automatically.", () => TownHall.Current != null),
+            ("Reach 10 Villagers", () => $"{ToBuild()} \"House\": each spawns a worker. Population keeps growing while under the cap.", () => TownHall.Population >= 10),
+            ("Upgrade Town Hall to II", () => $"On the map ({K(KeyAction.ToggleGameMode)}), hover the Town Hall → \"Upgrade\". Requires {Combat.GameBalance.TownHallWood[2]} wood and {Combat.GameBalance.TownHallOre[2]} ore I+: found in mines or smelted at the workbench (10 → 1).", () => TownHall.Current != null && TownHall.Current.Level >= 2),
+            ("Build Walls with a Gate", () => $"{ToBuild()} \"Wall\" and \"Gate\". Select workers and RMB a wall to post guards; {K(KeyAction.Alarm)} sounds the alarm.", () => Has(BuildingType.WallGate)),
+        };
 
         private static readonly (string goal, Func<string> how, Func<bool> done)[] CampaignGoals =
         {
@@ -131,9 +159,11 @@ namespace BattleOfAges.UI
             Refresh();
         }
 
-        private string shownGoal;
+        private int shownIndex = -1;
         private float bornAt;
 
+        private void OnEnable() => Loc.Changed += Refresh;
+        private void OnDisable() => Loc.Changed -= Refresh;
         private void Start() => bornAt = Time.unscaledTime;
 
         private void Refresh()
@@ -144,8 +174,8 @@ namespace BattleOfAges.UI
             if (!show) return;
             count.text = $"{DoneCount} / {Goals.Length}";
             // (not in the first seconds: a scene or a save fills in and several goals tick at once)
-            if (shownGoal != Goals[i].goal && shownGoal != null && Time.unscaledTime - bornAt > 4f) { StrategyHud.Notify("Ціль виконано!"); UiSound.Play(UiSound.Kind.Success); }
-            shownGoal = Goals[i].goal;
+            if (shownIndex >= 0 && i > shownIndex && Time.unscaledTime - bornAt > 4f) { StrategyHud.Notify("Ціль виконано!"); UiSound.Play(UiSound.Kind.Success); }
+            shownIndex = i;
             title.text = Goals[i].goal;
             hint.text = Goals[i].how();
         }

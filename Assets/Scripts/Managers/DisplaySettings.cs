@@ -113,7 +113,7 @@ namespace BattleOfAges.Managers
             PlayerPrefs.SetInt(VsyncKey, VSync ? 1 : 0);
         }
 
-        public static string FrameCapName => FrameCap > 0 ? FrameCap + " FPS" : "без обмеження";
+        public static string FrameCapName => FrameCap > 0 ? FrameCap + " FPS" : UI.Loc.Pick("без обмеження", "Unlimited");
 
         public static void CycleFrameCap()
         {

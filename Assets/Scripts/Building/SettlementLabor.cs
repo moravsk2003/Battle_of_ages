@@ -51,21 +51,37 @@ namespace BattleOfAges.Building
         {
             switch (job)
             {
-                case LaborJob.Fields: return "Поля";
-                case LaborJob.Forest: return "Лісопилки";
-                case LaborJob.Mining: return "Шахти";
-                case LaborJob.Crafts: return "Верстаки";
-                case LaborJob.Building: return "Будівництво";
-                case LaborJob.Branches: return "Збирати гілки";
-                case LaborJob.Chop: return "Рубати дерева";
-                case LaborJob.Pebbles: return "Збирати руду з землі";
-                case LaborJob.Haul: return "Носити руду з шахт";
-                default: return "Стояти, без роботи";
+                case LaborJob.Fields: return UI.Loc.Pick("Поля", "Fields");
+                case LaborJob.Forest: return UI.Loc.Pick("Лісопилки", "Sawmills");
+                case LaborJob.Mining: return UI.Loc.Pick("Шахти", "Mines");
+                case LaborJob.Crafts: return UI.Loc.Pick("Верстаки", "Workbenches");
+                case LaborJob.Building: return UI.Loc.Pick("Будівництво", "Construction");
+                case LaborJob.Branches: return UI.Loc.Pick("Збирати гілки", "Gather Branches");
+                case LaborJob.Chop: return UI.Loc.Pick("Рубати дерева", "Chop Trees");
+                case LaborJob.Pebbles: return UI.Loc.Pick("Збирати руду з землі", "Gather Surface Ore");
+                case LaborJob.Haul: return UI.Loc.Pick("Носити руду з шахт", "Haul Ore from Mines");
+                default: return UI.Loc.Pick("Стояти, без роботи", "Idle / Standing");
             }
         }
 
         public static string TipOf(LaborJob job)
         {
+            if (UI.Loc.En)
+            {
+                switch (job)
+                {
+                    case LaborJob.Fields: return "Produce food while supplies are low. Free workers come here automatically.";
+                    case LaborJob.Forest: return "Sawmills produce wood without clearing the forest. Free workers join when wood is low.";
+                    case LaborJob.Mining: return "Mine ore underground. Without haulers, ore stays inside the mine.";
+                    case LaborJob.Crafts: return "Work at a bench, crafting queued gear and ingots.";
+                    case LaborJob.Building: return "Construct placed sites. More builders finish faster.";
+                    case LaborJob.Branches: return "Shake trees without cutting them down.";
+                    case LaborJob.Chop: return "Fell trees for logs: yields more wood, thins the forest.";
+                    case LaborJob.Pebbles: return "Collect ore pebbles on the ground and carry them to a chest.";
+                    case LaborJob.Haul: return "Haul mined ore from mines to a storage chest.";
+                    default: return "Stand ready for combat until given a task.";
+                }
+            }
             switch (job)
             {
                 case LaborJob.Fields: return "Дають їжу, поки її бракує. Вільні люди приходять самі.";
@@ -236,7 +252,7 @@ namespace BattleOfAges.Building
             return best;
         }
 
-        private const string NoOneFree = "Вільних людей немає: приберіть когось з іншої роботи";
+        private static string NoOneFree => UI.Loc.Pick("Вільних людей немає: приберіть когось з іншої роботи", "No free workers: remove someone from another job");
 
         /// <summary>One more on this job in this settlement; what went wrong in words, or null.</summary>
         public static string Add(LaborJob job, TownHall hall)
@@ -249,25 +265,25 @@ namespace BattleOfAges.Building
                     WorkPlace place = null;
                     foreach (WorkPlace p in WorkPlace.All)
                         if (p != null && IsMine(job, p) && !BuildGhost.Is(p) && Belongs(p.transform.position, hall) && p.WorkerCount < p.Slots && (place == null || p.WorkerCount < place.WorkerCount)) place = p;
-                    if (place == null) return RowOf(job, hall).Buildings == 0 ? $"{NameOf(job)}: спершу збудуйте" : $"{NameOf(job)}: усі місця зайняті";
+                    if (place == null) return RowOf(job, hall).Buildings == 0 ? $"{NameOf(job)}: {UI.Loc.Pick("спершу збудуйте", "build one first")}" : $"{NameOf(job)}: {UI.Loc.Pick("усі місця зайняті", "all slots full")}";
                     return AddTo(place.gameObject, hall, job);
                 case LaborJob.Mining:
                     MineNode mine = null;
                     foreach (MineNode m in MineNode.ActiveMines)
                         if (m != null && !BuildGhost.Is(m) && Belongs(m.transform.position, hall) && !m.IsFullWorkers && (mine == null || m.AssignedWorkerCount < mine.AssignedWorkerCount)) mine = m;
-                    if (mine == null) return RowOf(job, hall).Buildings == 0 ? "Шахти: спершу збудуйте" : "Шахти: усі місця зайняті";
+                    if (mine == null) return RowOf(job, hall).Buildings == 0 ? UI.Loc.Pick("Шахти: спершу збудуйте", "Mines: build one first") : UI.Loc.Pick("Шахти: усі місця зайняті", "Mines: all slots full");
                     return AddTo(mine.gameObject, hall, job);
                 case LaborJob.Crafts:
                     WorkbenchNode bench = null;
                     foreach (WorkbenchNode b in WorkbenchNode.ActiveWorkbenches)
                         if (b != null && !BuildGhost.Is(b) && Belongs(b.transform.position, hall) && !b.IsWorkerFull && (bench == null || b.CalledWorkerCount < bench.CalledWorkerCount)) bench = b;
-                    if (bench == null) return RowOf(job, hall).Buildings == 0 ? "Верстаки: спершу збудуйте" : "Верстаки: усі місця зайняті";
+                    if (bench == null) return RowOf(job, hall).Buildings == 0 ? UI.Loc.Pick("Верстаки: спершу збудуйте", "Workbenches: build one first") : UI.Loc.Pick("Верстаки: усі місця зайняті", "Workbenches: all slots full");
                     return AddTo(bench.gameObject, hall, job);
                 case LaborJob.Building:
                     ConstructionSite site = null;
                     foreach (ConstructionSite s in ConstructionSite.All)
                         if (s != null && Belongs(s.transform.position, hall) && s.NeedsHands && (site == null || s.BuilderCount < site.BuilderCount)) site = s;
-                    if (site == null) return RowOf(job, hall).Buildings == 0 ? "Зараз нічого не будується" : "На ділянках усі місця зайняті";
+                    if (site == null) return RowOf(job, hall).Buildings == 0 ? UI.Loc.Pick("Зараз нічого не будується", "Nothing is being built right now") : UI.Loc.Pick("На ділянках усі місця зайняті", "All construction slots are full");
                     return AddTo(site.gameObject, hall, job);
                 default:
                     GatherDirective d = DirectiveOf(job);
@@ -288,7 +304,7 @@ namespace BattleOfAges.Building
             ConstructionSite site = building.GetComponent<ConstructionSite>();
             if (site != null)
             {
-                if (!site.NeedsHands) return "На ділянці всі місця зайняті";
+                if (!site.NeedsHands) return UI.Loc.Pick("На ділянці всі місця зайняті", "All builder slots on this site are full");
                 w.LeavePlace(null);
                 done = w.AssignToSite(site);
             }
@@ -299,7 +315,7 @@ namespace BattleOfAges.Building
             }
             else if (building.TryGetComponent(out MineNode mine))
             {
-                if (mine.IsFullWorkers) return "У шахті всі місця зайняті";
+                if (mine.IsFullWorkers) return UI.Loc.Pick("У шахті всі місця зайняті", "This mine is full");
                 w.LeavePlace(null);
                 w.AssignToWorkInMine(mine);
                 done = true;
@@ -309,8 +325,8 @@ namespace BattleOfAges.Building
                 w.LeavePlace(null);
                 done = bench.AssignWorker(w.GetComponent<RtsUnit>());
             }
-            else return "Тут людям нема чого робити";
-            if (!done) return "Тут усі місця зайняті";
+            else return UI.Loc.Pick("Тут людям нема чого робити", "There is nothing to do here");
+            if (!done) return UI.Loc.Pick("Тут усі місця зайняті", "All slots here are full");
             if (HasLimit(job) && limits.TryGetValue(Key(hall, job), out int max)) limits[Key(hall, job)] = max + 1;
             return null;
         }
@@ -437,10 +453,10 @@ namespace BattleOfAges.Building
         public static bool CanDemolish(BuildingNode node, out string why)
         {
             why = null;
-            if (node == null) { why = "Її вже немає"; return false; }
+            if (node == null) { why = UI.Loc.Pick("Її вже немає", "It is already gone"); return false; }
             if (node.GetComponent<ConstructionSite>() != null) return true;
-            if (node.Type == BuildingType.TownHall) { why = "Ратушу не знести: це серце поселення"; return false; }
-            if (node.Type == BuildingType.StorageChest && Resources.StorageChestNode.ActiveChests.Count <= 1) { why = "Це остання скриня: людям нікуди носити"; return false; }
+            if (node.Type == BuildingType.TownHall) { why = UI.Loc.Pick("Ратушу не знести: це серце поселення", "Cannot demolish Town Hall: it is the heart of the settlement"); return false; }
+            if (node.Type == BuildingType.StorageChest && Resources.StorageChestNode.ActiveChests.Count <= 1) { why = UI.Loc.Pick("Це остання скриня: людям нікуди носити", "Cannot demolish the last storage chest"); return false; }
             return true;
         }
 
@@ -488,8 +504,9 @@ namespace BattleOfAges.Building
             bool zoned = World.WorldSettings.Bounded && World.ZoneMap.At(go.transform.position) != World.ZoneType.None;
             Destroy(go);
             UI.GameSound.At(UI.GameSound.Kind.Place, go.transform.position);
-            string back = wood > 0 || ore > 0 ? $": повернуто {wood} дерева й {ore} руди" : "";
-            UI.StrategyHud.Notify(zoned ? $"{name} знесено{back}. Зітріть розмітку, інакше тут зведуть нову" : $"{name} знесено{back}");
+            string back = wood > 0 || ore > 0 ? UI.Loc.Pick($": повернуто {wood} дерева й {ore} руди", $": refunded {wood} wood and {ore} ore") : "";
+            UI.StrategyHud.Notify(zoned ? UI.Loc.Pick($"{name} знесено{back}. Зітріть розмітку, інакше тут зведуть нову", $"{name} demolished{back}. Erase the zone or workers will rebuild here")
+                                        : UI.Loc.Pick($"{name} знесено{back}", $"{name} demolished{back}"));
         }
 
         private static void Destroy(GameObject go)

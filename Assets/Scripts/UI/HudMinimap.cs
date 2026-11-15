@@ -52,7 +52,7 @@ namespace BattleOfAges.UI
             image.raycastTarget = true; // clicks: MinimapInput
             view.gameObject.AddComponent<MinimapInput>().Pressed = OnPressed;
             Tooltip.Set(view.gameObject, () => GameContext.MapOpen
-                ? TipText.Title("Мапа", UiTheme.Gold) + "\nЛКМ — камера туди (можна вести), ПКМ — обрані йдуть туди." + "\n" + TipText.Dim("Сині — свої, червоні — вороги, жовті — обрані, кільця — напад. Червоне кільце з краю — бік найближчого ворожого королівства.")
+                ? TipText.Title(Loc.Pick("Мапа", "Map"), UiTheme.Gold) + Loc.Pick("\nЛКМ — камера туди (можна вести), ПКМ — обрані йдуть туди.", "\nLMB — move camera (drag to pan), RMB — order selected units.") + "\n" + TipText.Dim(Loc.Pick("Сині — свої, червоні — вороги, жовті — обрані, кільця — напад. Червоне кільце з краю — бік найближчого ворожого королівства.", "Blue — allies, red — enemies, yellow — selected, rings — attacks. Red edge ring points toward nearest enemy kingdom."))
                 : null);
             dots = UiTheme.Rect(view, "Dots", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(Px, Px));
             heading = UiTheme.Rect(dots, "Heading", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(3f, 16f));
@@ -66,6 +66,7 @@ namespace BattleOfAges.UI
             RectTransform under = UiTheme.Rect(frame, "KingdomWay", new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(Px, 26f));
             UiTheme.PanelImage(under, UiTheme.ButtonSprite);
             kingdomLabel = UiTheme.Label(under, "Text", "", 15, TextAnchor.MiddleCenter, UiTheme.Gold, FontStyle.Normal);
+            LocText.Detach(kingdomLabel);
             kingdomMark.gameObject.SetActive(false);
             under.gameObject.SetActive(false);
             RectTransform title = UiTheme.Rect(frame, "Title", new Vector2(0.5f, 1f), new Vector2(0f, 16f), new Vector2(120f, 30f));
@@ -91,8 +92,19 @@ namespace BattleOfAges.UI
             image.texture = texture;
         }
 
-        private void OnEnable() => AttackAlerts.Raised += OnAttackAlert;
-        private void OnDisable() => AttackAlerts.Raised -= OnAttackAlert;
+        private void OnEnable()
+        {
+            AttackAlerts.Raised += OnAttackAlert;
+            Loc.Changed += OnLanguageChanged;
+        }
+
+        private void OnDisable()
+        {
+            AttackAlerts.Raised -= OnAttackAlert;
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        private void OnLanguageChanged() => kingdomTimer = 0f;
         private void OnDestroy() { if (texture != null) texture.Release(); }
 
         private void Update()
@@ -198,7 +210,7 @@ namespace BattleOfAges.UI
             kingdomTimer = 0.6f;
             Vector3 way = rememberedAt - from;
             way.y = 0f;
-            kingdomLabel.text = $"{rememberedName}: {Mathf.RoundToInt(way.magnitude / 10f) * 10} м";
+            kingdomLabel.text = $"{Loc.Tr(rememberedName)}: {Mathf.RoundToInt(way.magnitude / 10f) * 10}{Loc.Pick(" м", " m")}";
         }
 
         private string rememberedName;

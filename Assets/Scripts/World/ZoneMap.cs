@@ -88,16 +88,16 @@ namespace BattleOfAges.World
         {
             Vector3 p = CenterOf(c);
             TownHall hall = TownHall.Nearest(p);
-            if (type == ZoneType.Trade && (hall == null || hall.Level < 2)) return "Торгівля — від ратуші II";
-            if (!WorldSettings.Inside(p, CellSize)) return "Тут край світу";
+            if (type == ZoneType.Trade && (hall == null || hall.Level < 2)) return UI.Loc.Pick("Торгівля — від ратуші II", "Trade requires Town Hall II");
+            if (!WorldSettings.Inside(p, CellSize)) return UI.Loc.Pick("Тут край світу", "Edge of the world");
             Vector3 flat = p - (hall != null ? hall.transform.position : Vector3.zero); flat.y = 0f;
-            if (flat.magnitude > Reach(hall)) return "Надто далеко від поселення: покращте ратушу";
-            if (Lakes.InWater(p.x, p.z, CellSize * 0.5f)) return "На воді не можна";
+            if (flat.magnitude > Reach(hall)) return UI.Loc.Pick("Надто далеко від поселення: покращте ратушу", "Too far from settlement: upgrade Town Hall");
+            if (Lakes.InWater(p.x, p.z, CellSize * 0.5f)) return UI.Loc.Pick("На воді не можна", "Cannot build on water");
             float half = CellSize * 0.5f;
             float rise = Mathf.Max(
                 Mathf.Abs(InfiniteWorldManager.GetSampledTerrainHeight(p.x + half, p.z) - InfiniteWorldManager.GetSampledTerrainHeight(p.x - half, p.z)),
                 Mathf.Abs(InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z + half) - InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z - half))) / CellSize;
-            return rise > MaxSlope ? "Надто круто" : null;
+            return rise > MaxSlope ? UI.Loc.Pick("Надто круто", "Too steep") : null;
         }
 
         /// <summary>Sets a cell without the checks (a save, tests); None clears it.</summary>
@@ -167,18 +167,31 @@ namespace BattleOfAges.World
         {
             switch (t)
             {
-                case ZoneType.Housing: return "Житло";
-                case ZoneType.Fields: return "Поля";
-                case ZoneType.Forest: return "Ліс";
-                case ZoneType.Crafts: return "Ремесла";
-                case ZoneType.Mining: return "Рудня";
-                case ZoneType.Trade: return "Торгівля";
+                case ZoneType.Housing: return UI.Loc.Pick("Житло", "Housing");
+                case ZoneType.Fields: return UI.Loc.Pick("Поля", "Fields");
+                case ZoneType.Forest: return UI.Loc.Pick("Ліс", "Forest");
+                case ZoneType.Crafts: return UI.Loc.Pick("Ремесла", "Crafts");
+                case ZoneType.Mining: return UI.Loc.Pick("Рудня", "Mining");
+                case ZoneType.Trade: return UI.Loc.Pick("Торгівля", "Trade");
                 default: return "—";
             }
         }
 
         public static string Description(ZoneType t)
         {
+            if (UI.Loc.En)
+            {
+                switch (t)
+                {
+                    case ZoneType.Housing: return "Houses: each speeds up population growth";
+                    case ZoneType.Fields: return "Fields and farmers: food";
+                    case ZoneType.Forest: return "Sawmills: wood, more in dense forest. Chopped trees regrow here";
+                    case ZoneType.Crafts: return "Workbenches: weapons, armor, smelting. Crafters auto-produce when stock allows";
+                    case ZoneType.Mining: return "Mines: ore, richer on mineral veins";
+                    case ZoneType.Trade: return "Market: trade resources (requires Town Hall II)";
+                    default: return "";
+                }
+            }
             switch (t)
             {
                 case ZoneType.Housing: return "Хати: кожна прискорює приріст населення";

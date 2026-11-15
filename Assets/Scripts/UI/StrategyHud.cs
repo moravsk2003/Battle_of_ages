@@ -51,7 +51,7 @@ namespace BattleOfAges.UI
         public static void Notify(string message)
         {
             HudToasts t = HudToasts.Active;
-            if (t != null) t.Show("msg:" + message, 1, n => n > 1 ? message + "  ×" + n : message);
+            if (t != null) t.Show("msg:" + message, 1, n => n > 1 ? Loc.Tr(message) + "  ×" + n : Loc.Tr(message));
         }
 
         // ------------------------------------------------------------------ layout
@@ -147,7 +147,7 @@ namespace BattleOfAges.UI
         /// <summary>The numbers at the top; a text is made again only when its number changes (no garbage per frame).</summary>
         private void UpdateTopBar(bool map)
         {
-            if (clockShown.Changed((long)Combat.WorldClock.GameHours)) clockText.text = HudTips.ClockShort();
+            if (clockShown.Changed((long)Combat.WorldClock.GameHours + (Loc.En ? 1000000000L : 0L))) clockText.text = HudTips.ClockShort();
             ResourceManager res = ResourceManager.Instance;
             int wood = res != null ? res.WoodCount : 0, ore = res != null ? res.OreCount : 0;
             if (woodShown.Changed(wood)) woodText.text = wood.ToString();
@@ -172,7 +172,7 @@ namespace BattleOfAges.UI
             if (armyShown.Changed(army)) armyText.text = army.ToString();
             BuildingPlacementSystem placer = BuildingPlacementSystem.Instance;
             bool placing = map && placer != null && placer.IsPlacing;
-            string mText = placing ? placer.Hint : map ? "M — від першої особи  ·  N — світ  ·  F1 — довідка" : "M — мапа  ·  N — мапа світу  ·  F1 — довідка";
+            string mText = placing ? Loc.Tr(placer.Hint) : map ? Loc.Pick("M — від першої особи  ·  N — світ  ·  F1 — довідка", "M — first person  ·  N — world  ·  F1 — help") : Loc.Pick("M — мапа  ·  N — мапа світу  ·  F1 — довідка", "M — map  ·  N — world map  ·  F1 — help");
             if (modeText.text != mText) modeText.text = mText;
             Vector2 mSize = placing ? new Vector2(600f, 70f) : new Vector2(map ? 510f : 470f, 44f); // the placing hint takes two lines
             if (mode.sizeDelta != mSize) mode.sizeDelta = mSize;
@@ -216,7 +216,7 @@ namespace BattleOfAges.UI
             if (on == alarmShown && alarmText.text.Length > 0) return;
             alarmShown = on;
             string key = HudTips.Key(InputKey.Alarm);
-            alarmText.text = on ? $"Відбій ({key})" : $"Тривога: до зброї ({key})";
+            alarmText.text = on ? Loc.Pick($"Відбій ({key})", $"Stand down ({key})") : Loc.Pick($"Тривога: до зброї ({key})", $"Alarm: to arms ({key})");
             alarmText.color = on ? UiTheme.Bad : UiTheme.Ink;
         }
 
@@ -227,7 +227,7 @@ namespace BattleOfAges.UI
             if (idleTimer > 0f) return;
             idleTimer = 0.5f;
             int n = IdleWorkers.Count;
-            idleText.text = $"Без діла: {n}  ({HudTips.Key(InputKey.IdleWorker)})";
+            idleText.text = Loc.Pick($"Без діла: {n}  ({HudTips.Key(InputKey.IdleWorker)})", $"Idle: {n}  ({HudTips.Key(InputKey.IdleWorker)})");
             idleText.color = n > 0 ? UiTheme.Gold : UiTheme.InkDim;
         }
 
@@ -235,7 +235,8 @@ namespace BattleOfAges.UI
         public void SelectNextIdle()
         {
             NpcResourceGatherer w = IdleWorkers.Next();
-            if (w == null) { Notify("Усі робітники при ділі"); return; }
+            if (w == null) { UiSound.Play(UiSound.Kind.Error); Notify("Усі робітники при ділі"); return; }
+            UiSound.Play(UiSound.Kind.Click);
             RtsUnit u = w.GetComponent<RtsUnit>();
             RtsUnitCommander commander = GameContext.Commander;
             if (commander != null && u != null) commander.SelectOnly(u);

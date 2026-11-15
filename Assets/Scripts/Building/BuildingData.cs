@@ -142,6 +142,59 @@ namespace BattleOfAges.Building
             new BuildingDefinition { Type = BuildingType.Market, DisplayName = "Ринок", Description = "Обмін дерева, їжі й руди", WoodCost = 12, OreCost = 4, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(9f, 3f, 9f), MaxHealth = 500 }
         };
 
+        private static BuildingDefinition Localize(BuildingDefinition def)
+        {
+            if (!UI.Loc.En) return def;
+            switch (def.Type)
+            {
+                case BuildingType.WorkerHouse:
+                    def.DisplayName = "House";
+                    def.Description = "Another worker (and a home in your population limit)";
+                    break;
+                case BuildingType.StorageChest:
+                    def.DisplayName = "Storage Chest";
+                    def.Description = "Drop-off point and resource stockpile";
+                    break;
+                case BuildingType.Mine:
+                    def.DisplayName = "Mine";
+                    def.Description = "Up to 10 workers mine 1 ore/s (more with a pickaxe); haulers carry it to a chest";
+                    break;
+                case BuildingType.Workbench:
+                    def.DisplayName = "Workbench";
+                    def.Description = "Weapons, armor, and tools; ore smelting (up to 4 workers)";
+                    break;
+                case BuildingType.CastleWall:
+                    def.DisplayName = "Wall";
+                    def.Description = "Wall segment with a walkway; strength scales with ore tier";
+                    break;
+                case BuildingType.WallStairs:
+                    def.DisplayName = "Wall with Stairs";
+                    def.Description = "Wall segment; stairs on the inside up to the walkway";
+                    break;
+                case BuildingType.WallGate:
+                    def.DisplayName = "Gate";
+                    def.Description = "Passage in the wall: opens only for allies";
+                    break;
+                case BuildingType.TownHall:
+                    def.DisplayName = "Town Hall";
+                    def.Description = "Main building: population cap (I–V)";
+                    break;
+                case BuildingType.Field:
+                    def.DisplayName = "Field";
+                    def.Description = "Villagers working here produce food";
+                    break;
+                case BuildingType.Sawmill:
+                    def.DisplayName = "Sawmill";
+                    def.Description = "Sawyers produce wood, more in dense forest";
+                    break;
+                case BuildingType.Market:
+                    def.DisplayName = "Market";
+                    def.Description = "Trade wood, food, and ore";
+                    break;
+            }
+            return def;
+        }
+
         public static BuildingDefinition GetDefinition(BuildingType type)
         {
             for (int i = 0; i < definitions.Length; i++)
@@ -155,15 +208,18 @@ namespace BattleOfAges.Building
                         def.WoodCost = GameBalance.FoundingWood;
                         def.OreCost = GameBalance.FoundingOre;
                     }
-                    return def;
+                    return Localize(def);
                 }
             }
-            return definitions[0];
+            return Localize(definitions[0]);
         }
 
         public static BuildingDefinition[] GetAllDefinitions()
         {
-            return definitions;
+            if (!UI.Loc.En) return definitions;
+            var copy = new BuildingDefinition[definitions.Length];
+            for (int i = 0; i < definitions.Length; i++) copy[i] = Localize(definitions[i]);
+            return copy;
         }
 
         /// <summary>Does this building grow from a zone in a campaign (not placed by hand there; §10.1)?</summary>
@@ -177,7 +233,7 @@ namespace BattleOfAges.Building
             foreach (BuildingDefinition d in definitions)
             {
                 bool zoneOnly = d.Type == BuildingType.Field || d.Type == BuildingType.Sawmill || d.Type == BuildingType.Market;
-                if (World.WorldSettings.Bounded ? !GrowsFromZone(d.Type) : !zoneOnly) list.Add(d);
+                if (World.WorldSettings.Bounded ? !GrowsFromZone(d.Type) : !zoneOnly) list.Add(Localize(d));
             }
             return list.ToArray();
         }
