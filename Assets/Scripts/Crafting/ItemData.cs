@@ -138,7 +138,7 @@ namespace BattleOfAges.Crafting
                     case ItemType.Bow: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, range {ItemStatCalculator.BOW_RANGE:0} m";
                     case ItemType.Staff: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage; mage attacks with a staff only";
                     case ItemType.Axe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, chopping ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
-                    case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, mining ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
+                    case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% damage, mining ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}" + (l >= 3 ? ", ×2 ore from surface pebbles" : "");
                     case ItemType.Armor: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% incoming damage, +{Pct(ItemStatCalculator.HealthBonus(item))}% health";
                     case ItemType.Gloves: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% incoming damage, strikes {Pct(1f - ItemStatCalculator.CooldownMultiplier(item))}% faster";
                     default: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% incoming damage";
@@ -150,7 +150,7 @@ namespace BattleOfAges.Crafting
                 case ItemType.Bow: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, дальність {ItemStatCalculator.BOW_RANGE:0} м";
                 case ItemType.Staff: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди; маг б'є лише з посохом";
                 case ItemType.Axe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, рубка ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
-                case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, видобуток ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}";
+                case ItemType.Pickaxe: return $"+{Pct(ItemStatCalculator.WeaponDamageMultiplier(item) - 1f)}% шкоди, видобуток ×{ItemStatCalculator.CalculateToolEfficiency(l):0.##}" + (l >= 3 ? ", камінці на землі ×2" : "");
                 case ItemType.Armor: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% шкоди, +{Pct(ItemStatCalculator.HealthBonus(item))}% здоров'я";
                 case ItemType.Gloves: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% шкоди, удари швидші на {Pct(1f - ItemStatCalculator.CooldownMultiplier(item))}%";
                 default: return $"-{Pct(ItemStatCalculator.DamageReduction(item))}% шкоди";
@@ -225,7 +225,7 @@ namespace BattleOfAges.Crafting
                 case ItemType.Shield: baseCost = 6; break;
                 default: baseCost = 5; break; // axe, pickaxe
             }
-            return baseCost + (lvl - 1) * 2;
+            return (baseCost + (lvl - 1) * 2) * Combat.GameBalance.WoodPrice; // (wood doubled for everything, GameBalance.WoodPrice)
         }
 
         public static int CalculateOreCost(ItemType type, int level)

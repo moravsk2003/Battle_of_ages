@@ -240,7 +240,7 @@ namespace BattleOfAges.Building
 
                 bool validLoc = level && CheckLocationValid(pos, rot, def);
                 bool affordable = CanAfford(def) && IsAllowed(currentBuildingType, out _);
-                string now = !level ? "надто круто" : World.Lakes.InWater(pos.x, pos.z, 3f) ? "вода" : !validLoc ? "зайнято" : !affordable ? "бракує ресурсів" : null;
+                string now = !level ? "надто круто" : World.Lakes.InWater(pos.x, pos.z, 3f) ? "вода" : TownHall.ForeignLand(pos) != null ? "чужа земля" : !validLoc ? "зайнято" : !affordable ? "бракує ресурсів" : null;
                 if (now != whyNot) { whyNot = now; hintKey = long.MinValue; }
 
                 Color ghostColor = (validLoc && affordable)
@@ -333,6 +333,7 @@ namespace BattleOfAges.Building
         {
             if (World.Lakes.InWater(position.x, position.z, 3f)) return false; // the ghost turns red over water
             if (def.Type == BuildingType.TownHall && World.WorldSettings.Bounded && TownHall.FoundingForbidden(position) != null) return false;
+            if (TownHall.ForeignLand(position) != null) return false; // a king's land
             CheckBox(def, out Vector3 local, out Vector3 size);
             Vector3 center = position + rot * local;
             Vector3 halfExtents = size * 0.5f;
@@ -414,6 +415,12 @@ namespace BattleOfAges.Building
             {
                 UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(foundingNo);
+                return;
+            }
+            if (TownHall.ForeignLand(buildPos) is string foreign)
+            {
+                UiSound.Play(UiSound.Kind.Error);
+                StrategyHud.Notify(foreign);
                 return;
             }
             if (!CheckLocationValid(buildPos, buildRot, def))

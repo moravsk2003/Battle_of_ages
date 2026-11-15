@@ -18,10 +18,14 @@ namespace BattleOfAges.RTS
         private const float RingMetres = 1.3f, BadgeMetres = 0.45f;
 
         public static readonly Color Own = new Color(0.25f, 0.55f, 1f), Selected = new Color(0.55f, 1f, 0.45f), Camp = new Color(0.9f, 0.18f, 0.15f);
+        /// <summary>
+        /// Other kingdoms: warm colours only (orange, crimson, yellow, magenta, rust, gold), each far from the own blue and
+        /// the selected green, so own and foreign never look alike (a teal and a violet kingdom passed for own in a fight).
+        /// </summary>
         private static readonly Color[] Kingdoms =
         {
-            new Color(1f, 0.55f, 0.1f), new Color(0.7f, 0.3f, 0.95f), new Color(1f, 0.9f, 0.2f),
-            new Color(0.1f, 0.85f, 0.8f), new Color(0.95f, 0.4f, 0.7f), new Color(0.6f, 0.45f, 0.25f)
+            new Color(1f, 0.55f, 0.1f), new Color(0.85f, 0.1f, 0.35f), new Color(1f, 0.9f, 0.2f),
+            new Color(0.95f, 0.3f, 0.85f), new Color(0.75f, 0.35f, 0.12f), new Color(0.95f, 0.75f, 0.45f)
         };
         private static readonly Color[] RankColours = { Color.clear, new Color(0.8f, 0.82f, 0.88f), new Color(1f, 0.78f, 0.2f), new Color(0.75f, 0.35f, 1f) };
         private static readonly Color HeroBadge = new Color(1f, 0.95f, 0.6f);

@@ -19,6 +19,22 @@ namespace BattleOfAges.Tests
         }
 
         [Test]
+        public void NoForeignSide_LooksLikeOwn_OrTheSelection()
+        {
+            Color.RGBToHSV(TeamMarkers.Own, out float own, out _, out _);
+            Color.RGBToHSV(TeamMarkers.Selected, out float chosen, out _, out _);
+            float Apart(float a, float b) { float d = Mathf.Abs(a - b); return Mathf.Min(d, 1f - d); }
+            var foreign = new System.Collections.Generic.List<int> { UnitSpatialGrid.TeamHostile };
+            for (int t = UnitSpatialGrid.TeamKingdomFirst; t < UnitSpatialGrid.TeamKingdomFirst + 6; t++) foreign.Add(t);
+            foreach (int t in foreign)
+            {
+                Color.RGBToHSV(TeamMarkers.SideColour(t), out float hue, out _, out _);
+                Assert.Greater(Apart(hue, own), 0.2f, $"side {t} is far from the own blue");
+                Assert.Greater(Apart(hue, chosen), 0.12f, $"side {t} is far from the selection green");
+            }
+        }
+
+        [Test]
         public void ARing_KeepsItsPixels_ZoomedOut_AndItsMetres_Close()
         {
             Assert.AreEqual(1.3f, TeamMarkers.WorldSize(1.3f, TeamMarkers.RingPixels, 10f, 1080f), 1e-4f, "close up: its own size");

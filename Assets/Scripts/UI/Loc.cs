@@ -327,6 +327,7 @@ namespace BattleOfAges.UI
             { "надто круто", "too steep" },
             { "вода", "water" },
             { "зайнято", "occupied" },
+            { "чужа земля", "foreign land" },
             { "бракує ресурсів", "not enough resources" },
             { "Тут надто круто для будівлі", "Too steep for building here" },
             { "На воді не збудувати", "Cannot build on water" },

@@ -108,7 +108,7 @@ namespace BattleOfAges.PlayModeTests
             GameObject firstSite = BuildingPlacementSystem.CreateBuilding(BuildingType.TownHall);
             firstSite.transform.position = new Vector3(40f, RtsUnit.GetTerrainHeight(new Vector3(40f, 0f, -44f)), -44f);
             ConstructionSite founding = ConstructionSite.Begin(firstSite, BuildingType.TownHall);
-            Assert.AreEqual(GameBalance.BuildBaseSeconds + GameBalance.BuildSecondsPerResource * (GameBalance.TownHallWood[1] + GameBalance.TownHallOre[1]), founding.WorkSeconds, 1e-3f,
+            Assert.AreEqual(GameBalance.BuildBaseSeconds + GameBalance.BuildSecondsPerResource * ((float)GameBalance.TownHallWood[1] / GameBalance.WoodPrice + GameBalance.TownHallOre[1]), founding.WorkSeconds, 1e-3f,
                 "the first hall's site does not take itself for a second settlement");
             Object.Destroy(firstSite);
             yield return null;

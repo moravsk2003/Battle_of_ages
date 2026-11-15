@@ -445,10 +445,18 @@ namespace BattleOfAges.Net
     [Serializable]
     public sealed class TradeCommand : GameCommand
     {
+        /// <summary>The settlement whose market it is (0: the first one).</summary>
+        public int Hall;
         public TradeUI.Good Give, Take;
         public int GiveAmount, TakeAmount;
 
-        public override void Execute() => TradeUI.Trade(Give, GiveAmount, Take, TakeAmount);
+        public override void Execute()
+        {
+            TownHall hall = Hall != 0 ? WorldEntity.Find<TownHall>(Hall) : null;
+            Resources.SettlementStock stock = hall != null && hall.Stock != null ? hall.Stock : Resources.ResourceManager.Instance?.Main;
+            if (!World.WorldSettings.Bounded) stock = Resources.ResourceManager.Instance?.Main;
+            TradeUI.Trade(stock, Give, GiveAmount, Take, TakeAmount, ByLocalPlayer);
+        }
     }
 
     [Serializable]

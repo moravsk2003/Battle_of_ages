@@ -44,8 +44,8 @@ namespace BattleOfAges.Building
             {
                 Type = BuildingType.WorkerHouse,
                 DisplayName = "Будинок",
-                Description = "Ще один робітник (і місце для нього в населенні)",
-                WoodCost = 1,
+                Description = "Новий робітник (у межах ліміту ратуші); у кампанії +0,1 народжень/год",
+                WoodCost = 2,
                 OreCost = 1,
                 OreTierRequired = 0,
                 NpcSpawnCount = 1,
@@ -57,7 +57,7 @@ namespace BattleOfAges.Building
                 Type = BuildingType.StorageChest,
                 DisplayName = "Скриня-склад",
                 Description = "Точка збору та сховище ресурсів",
-                WoodCost = 2,
+                WoodCost = 4,
                 OreCost = 1,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
@@ -69,7 +69,7 @@ namespace BattleOfAges.Building
                 Type = BuildingType.Mine,
                 DisplayName = "Шахта",
                 Description = "До 10 робітників копають 1 руду/с (з кайлом більше); носії несуть її в скриню",
-                WoodCost = 4,
+                WoodCost = 8,
                 OreCost = 2,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
@@ -81,7 +81,7 @@ namespace BattleOfAges.Building
                 Type = BuildingType.Workbench,
                 DisplayName = "Верстак",
                 Description = "Зброя, броня й інструменти; переплавка руди (до 4 робітників)",
-                WoodCost = 3,
+                WoodCost = 6,
                 OreCost = 1,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
@@ -93,7 +93,7 @@ namespace BattleOfAges.Building
                 Type = BuildingType.CastleWall,
                 DisplayName = "Стіна",
                 Description = "Сегмент муру з хідником; міцність від руди",
-                WoodCost = 2,
+                WoodCost = 4,
                 OreCost = 4,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
@@ -105,7 +105,7 @@ namespace BattleOfAges.Building
                 Type = BuildingType.WallStairs,
                 DisplayName = "Стіна зі сходами",
                 Description = "Сегмент муру; сходи зсередини на хідник",
-                WoodCost = 3,
+                WoodCost = 6,
                 OreCost = 6,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
@@ -118,7 +118,7 @@ namespace BattleOfAges.Building
                 Type = BuildingType.WallGate,
                 DisplayName = "Ворота",
                 Description = "Прохід у мурі: відчиняються лише своїм",
-                WoodCost = 8,
+                WoodCost = 16,
                 OreCost = 6,
                 OreTierRequired = 0,
                 NpcSpawnCount = 0,
@@ -137,9 +137,9 @@ namespace BattleOfAges.Building
                 Size = new Vector3(5.6f, 5.0f, 5.6f),
                 MaxHealth = GameBalance.TownHallHealth[1] // grows with the level (TownHall)
             },
-            new BuildingDefinition { Type = BuildingType.Field, DisplayName = "Поле", Description = "Селяни на ньому дають їжу", WoodCost = 2, OreCost = 0, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(13f, 0.6f, 13f), MaxHealth = 100 },
-            new BuildingDefinition { Type = BuildingType.Sawmill, DisplayName = "Лісопилка", Description = "Пилярі дають дерево, більше в густому лісі", WoodCost = 6, OreCost = 1, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(7f, 3.4f, 6f), MaxHealth = 400 },
-            new BuildingDefinition { Type = BuildingType.Market, DisplayName = "Ринок", Description = "Обмін дерева, їжі й руди", WoodCost = 12, OreCost = 4, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(9f, 3f, 9f), MaxHealth = 500 }
+            new BuildingDefinition { Type = BuildingType.Field, DisplayName = "Поле", Description = "Селяни на ньому дають їжу", WoodCost = 4, OreCost = 0, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(13f, 0.6f, 13f), MaxHealth = 100 },
+            new BuildingDefinition { Type = BuildingType.Sawmill, DisplayName = "Лісопилка", Description = "Пилярі дають дерево, більше в густому лісі", WoodCost = 12, OreCost = 1, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(7f, 3.4f, 6f), MaxHealth = 400 },
+            new BuildingDefinition { Type = BuildingType.Market, DisplayName = "Ринок", Description = "Обмін дерева, їжі й звичайної руди (0); каравани між поселеннями", WoodCost = 24, OreCost = 4, OreTierRequired = 0, NpcSpawnCount = 0, Size = new Vector3(9f, 3f, 9f), MaxHealth = 500 }
         };
 
         private static BuildingDefinition Localize(BuildingDefinition def)
@@ -149,7 +149,7 @@ namespace BattleOfAges.Building
             {
                 case BuildingType.WorkerHouse:
                     def.DisplayName = "House";
-                    def.Description = "Another worker (and a home in your population limit)";
+                    def.Description = "Spawns a worker (within Town Hall cap); +0.1 births/h in campaigns";
                     break;
                 case BuildingType.StorageChest:
                     def.DisplayName = "Storage Chest";
@@ -189,7 +189,7 @@ namespace BattleOfAges.Building
                     break;
                 case BuildingType.Market:
                     def.DisplayName = "Market";
-                    def.Description = "Trade wood, food, and ore";
+                    def.Description = "Trade wood, food, and common ore (0); caravans between settlements";
                     break;
             }
             return def;

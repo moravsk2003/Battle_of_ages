@@ -36,17 +36,17 @@ namespace BattleOfAges.Tests
             e.Tick(2f, 5, 5);
             Assert.AreEqual(5 * 2 * GameBalance.KingdomWoodPerWorkerHour, e.Wood, 1e-3);
             Assert.AreEqual(5 * 2 * GameBalance.KingdomOrePerWorkerHour, e.Ore, 1e-3);
-            Assert.IsTrue(e.TryUpgrade(), "hall I: 10 wood, 5 ore");
+            Assert.IsTrue(e.TryUpgrade(), "hall I: 20 wood, 5 ore");
             Assert.AreEqual(1, e.HallLevel);
             Assert.AreEqual(15, e.Cap);
-            Assert.IsFalse(e.TryUpgrade(), "hall II needs 30 wood and 10 ore");
+            Assert.IsFalse(e.TryUpgrade(), "hall II needs 60 wood and 10 ore");
             Assert.AreEqual(0, e.Tick(10f, 0, 15), "no births over the cap");
         }
 
         [Test]
         public void Found_KingIsAGeneralHero_WithPeople()
         {
-            NpcKingdom k = NpcKingdom.Found(new Vector3(100f, 0f, 0f), "Test", 5, 10, HeroClass.Tank);
+            NpcKingdom k = NpcKingdom.Found(new Vector3(100f, 0f, 0f), "Test", 5, GameBalance.KingdomStartWood, HeroClass.Tank);
             Assert.AreEqual(5, k.Population);
             Assert.IsNotNull(k.King);
             Assert.AreEqual((int)UnitRank.General, Rank(k.King));

@@ -57,7 +57,7 @@ namespace BattleOfAges.PlayModeTests
             miner.EnterMineNow(mine);
             Assert.IsTrue(miner.IsInsideMine);
 
-            WorkerRegistry.ApplyJobDistribution(5, 0, 0, 0, 0); // everyone onto branches
+            WorkerRegistry.ApplyJobDistribution(WorkerRegistry.ActiveWorkers.Count, 0, 0, 0, 0); // everyone onto branches (a scene an earlier test loaded may have left its own workers)
             yield return null;
             Assert.IsTrue(miner.IsInsideMine, "the job window does not pull a miner out of the mine");
             Assert.AreEqual(1, mine.AssignedWorkerCount);

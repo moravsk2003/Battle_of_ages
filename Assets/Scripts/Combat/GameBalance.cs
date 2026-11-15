@@ -237,7 +237,7 @@ namespace BattleOfAges.Combat
         /// <summary>Population cap without a hall (index 0) and for hall levels I..V.</summary>
         public static int[] TownHallCaps = { 6, 15, 25, 40, 60, 85 };
         /// <summary>Wood to build the hall (level I) and to upgrade to levels II..V.</summary>
-        public static int[] TownHallWood = { 0, 10, 30, 60, 100, 160 };
+        public static int[] TownHallWood = { 0, 20, 60, 120, 200, 320 };
         /// <summary>Ore pieces for the same steps; the minimum ore tier is level - 1.</summary>
         public static int[] TownHallOre = { 0, 5, 10, 12, 15, 20 };
         /// <summary>HP of the hall of level I..V, the player's and an NPC king's alike (index 0: no hall; an NPC camp cannot be destroyed).</summary>
@@ -252,7 +252,7 @@ namespace BattleOfAges.Combat
         /// <summary>A new segment snaps to a free end of a wall within this of the cursor; turns go in these steps.</summary>
         public static float WallSnapRadius = 4.2f, WallTurnStep = 15f;
         /// <summary>Wood and ore pieces to raise the settlement's walls to levels II..V; the minimum ore tier is level - 1.</summary>
-        public static int[] WallLevelWood = { 0, 0, 20, 45, 80, 130 };
+        public static int[] WallLevelWood = { 0, 0, 40, 90, 160, 260 };
         public static int[] WallLevelOre = { 0, 0, 8, 12, 16, 24 };
         /// <summary>Extra damage of a unit fighting from a wall of level I..V (on top of the height bonus).</summary>
         public static float[] WallLevelDamageBonus = { 0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f };
@@ -286,6 +286,12 @@ namespace BattleOfAges.Combat
         /// <summary>Food an animal killed by the player's side brings in (to the nearest settlement's stock).</summary>
         public static float FoodPerAnimal = 1f;
         /// <summary>Building by workers (ConstructionSite): one worker's seconds for a building, and more per wood or ore it costs; how far Auto workers come from.</summary>
+        /// <summary>
+        /// Wood prices were doubled for everything (the author's word, 2026-11-15: a settlement made ~48 times the wood it
+        /// spent): buildings, the hall, the walls, a new settlement and every crafted thing, tools first of all. The time
+        /// to build counts the old wood price (WoodCost / WoodPrice), so the dearer wood does not slow the builders.
+        /// </summary>
+        public const int WoodPrice = 2;
         public static float BuildBaseSeconds = 8f, BuildSecondsPerResource = 2f, BuildersComeFrom = 400f;
         /// <summary>How far from its hall a settlement marks zones at hall I (§5.3; +60% each hall level).</summary>
         public static float ZoneReachBase = 300f;
@@ -303,8 +309,13 @@ namespace BattleOfAges.Combat
         /// A new settlement (M5 step 7): a hall of this level at home, this far from the player's halls and from any
         /// king's; it costs FoundingWood and FoundingOre at the settlement that pays, and starts with FoundingStart* (settlers' load).
         /// </summary>
-        public static int FoundingHallLevel = 2, FoundingWood = 200, FoundingOre = 30, FoundingStartWood = 60, FoundingStartFood = 20;
+        public static int FoundingHallLevel = 2, FoundingWood = 400, FoundingOre = 30, FoundingStartWood = 60, FoundingStartFood = 20;
         public static float FoundingFromOwn = 500f, FoundingFromKing = 300f;
+        /// <summary>
+        /// A settlement's land (§5.3): round a king's home no one else builds anything, round one's own hall no king does.
+        /// Half the least distance between a hall and a king's home (FoundingFromKing), so two lands never overlap.
+        /// </summary>
+        public static float TerritoryRadius => FoundingFromKing * 0.5f;
         /// <summary>...and this many chunks (64 m) clear of a raiders' camp.</summary>
         public static int FoundingFromCampChunks = 3;
 
@@ -333,7 +344,7 @@ namespace BattleOfAges.Combat
         public static float ArmyMeetsRealRadius = 150f;
         public static float KingdomDistance = 600f;
         /// <summary>The start of every NPC king: a hero (a general, like the player) and this many people and wood, no hall.</summary>
-        public static int KingdomStartPeople = 5, KingdomStartWood = 10;
+        public static int KingdomStartPeople = 5, KingdomStartWood = 20; // (wood doubled: a king builds hall I at once, as before)
         /// <summary>What one person of an NPC kingdom brings in per game hour of work at home (no walking to the trees).</summary>
         public static float KingdomWoodPerWorkerHour = 2f, KingdomOrePerWorkerHour = 0.5f;
         /// <summary>People within this of the hall work; enemies within DefendRadius are fought by everyone at home.</summary>

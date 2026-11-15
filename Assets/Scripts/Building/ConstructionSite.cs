@@ -9,13 +9,17 @@ namespace BattleOfAges.Building
 {
     /// <summary>
     /// A building going up (docs/GAME_DESIGN.md §10.2, §18.3, M5 step 2): paid for when placed, it grows by stages —
-    /// foundation, frame, done — only while workers stand at it (up to MaxBuilders; each adds its hands). Till then its
+    /// foundation, frame, walls, rafters, done (Stages) — only while workers stand at it (up to MaxBuilders; each adds its hands). Till then its
     /// model is hidden and its working parts are off (a mine does not dig, a hall gives no cap). Workers on their own come
     /// by themselves, others are sent with a right click. In a campaign only: the seed-0 world builds at once.
     /// </summary>
     public sealed class ConstructionSite : MonoBehaviour
     {
         public const int MaxBuilders = 4;
+        /// <summary>What a site shows as it goes: footing, posts, the frame, walls half up, walls and rafters.</summary>
+        public const int Stages = 5;
+        /// <summary>A builder this near its place swings the hammer; one still walking there does not.</summary>
+        public const float AtSpot = 1.2f;
         private const float FootingDepth = 4f;
         private const float BuilderReach = 2.2f, SpotClearance = 1f, HammerEvery = 0.8f, HandsEvery = 2f;
 
@@ -33,6 +37,9 @@ namespace BattleOfAges.Building
         public string DisplayName => BuildingData.GetDefinition(Type).DisplayName;
 
         private readonly List<NpcResourceGatherer> builders = new List<NpcResourceGatherer>(MaxBuilders);
+        /// <summary>Each builder's side (0 +x, 1 -x, 2 +z, 3 -z), taken when it joins and kept: a builder does not walk round the site when another leaves.</summary>
+        private readonly Dictionary<NpcResourceGatherer, int> sides = new Dictionary<NpcResourceGatherer, int>();
+        private Vector2 halfSize;
         private readonly List<Behaviour> switchedOff = new List<Behaviour>();
         private readonly List<Renderer> hidden = new List<Renderer>();
         private GameObject stageModel;
@@ -44,7 +51,7 @@ namespace BattleOfAges.Building
 
         /// <summary>Seconds of one worker's work: a base and more the dearer the building.</summary>
         public static float SecondsFor(BuildingDefinition def) =>
-            GameBalance.BuildBaseSeconds + GameBalance.BuildSecondsPerResource * (def.WoodCost + def.OreCost);
+            GameBalance.BuildBaseSeconds + GameBalance.BuildSecondsPerResource * ((float)def.WoodCost / GameBalance.WoodPrice + def.OreCost);
 
         /// <summary>A placed building becomes a site (progress: from a save).</summary>
         public static ConstructionSite Begin(GameObject building, BuildingType type, float progress = 0f)
@@ -96,6 +103,7 @@ namespace BattleOfAges.Building
             BuildingDefinition def = BuildingData.GetDefinition(type); // (after: a hall that stands no more does not count itself as the first)
             WorkSeconds = SecondsFor(def);
             half = Mathf.Max(def.Size.x, def.Size.z) * 0.5f;
+            halfSize = new Vector2(def.Size.x, def.Size.z) * 0.5f;
             if (type == BuildingType.Field) World.GrassFieldRenderer.ForgetTiles(); // the plough takes the grass from the start
             foreach (Renderer r in GetComponentsInChildren<Renderer>())
             {
@@ -114,27 +122,66 @@ namespace BattleOfAges.Building
             if (worker == null || builders.Contains(worker)) return worker != null;
             if (!NeedsHands) return false;
             builders.Add(worker);
+            sides[worker] = NearestFreeSide(worker.transform.position);
             return true;
         }
 
-        public void Leave(NpcResourceGatherer worker) => builders.Remove(worker);
-
-        /// <summary>A worker's place round the site.</summary>
-        public Vector3 SpotFor(NpcResourceGatherer worker)
+        public void Leave(NpcResourceGatherer worker)
         {
-            int i = Mathf.Max(0, builders.IndexOf(worker));
-            float a = i * Mathf.PI * 0.5f + 0.6f, c = Mathf.Cos(a), s = Mathf.Sin(a);
-            // On the square round the footprint: on a circle of a wide building's half side the place lay inside it, the
-            // worker stopped at its edge and never counted as there
-            float reach = (half + SpotClearance) / Mathf.Max(Mathf.Abs(c), Mathf.Abs(s));
-            Vector3 p = transform.position + transform.rotation * new Vector3(c * reach, 0f, s * reach);
+            builders.Remove(worker);
+            if (worker != null) sides.Remove(worker);
+        }
+
+        /// <summary>The free side nearest to where the worker comes from: it does not cross or walk round the site.</summary>
+        private int NearestFreeSide(Vector3 from)
+        {
+            int best = 0;
+            float bestSqr = float.MaxValue;
+            for (int side = 0; side < MaxBuilders; side++)
+            {
+                if (sides.ContainsValue(side)) continue;
+                float d = (SidePlace(side) - from).sqrMagnitude;
+                if (d < bestSqr) { bestSqr = d; best = side; }
+            }
+            return best;
+        }
+
+        /// <summary>The middle of one side of the footprint, a step out from it.</summary>
+        private Vector3 SidePlace(int side)
+        {
+            Vector3 local = side == 0 ? new Vector3(halfSize.x + SpotClearance, 0f, 0f)
+                          : side == 1 ? new Vector3(-halfSize.x - SpotClearance, 0f, 0f)
+                          : side == 2 ? new Vector3(0f, 0f, halfSize.y + SpotClearance)
+                          : new Vector3(0f, 0f, -halfSize.y - SpotClearance);
+            Vector3 p = transform.position + transform.rotation * local;
             p.y = RtsUnit.GetTerrainHeight(p);
             return p;
         }
 
+        /// <summary>A worker's place round the site: the middle of its own side.</summary>
+        public Vector3 SpotFor(NpcResourceGatherer worker)
+        {
+            if (worker == null || !sides.TryGetValue(worker, out int side)) side = 0;
+            return SidePlace(side);
+        }
+
+        /// <summary>This builder stands at its place (and swings the hammer).</summary>
+        public bool AtItsSpot(NpcResourceGatherer worker)
+        {
+            if (worker == null) return false;
+            Vector3 off = worker.transform.position - SpotFor(worker);
+            off.y = 0f;
+            return off.sqrMagnitude <= AtSpot * AtSpot;
+        }
+
         private void Update()
         {
-            builders.RemoveAll(b => b == null);
+            if (builders.RemoveAll(b => b == null) > 0)
+            {
+                var gone = new List<NpcResourceGatherer>();
+                foreach (NpcResourceGatherer k in sides.Keys) if (k == null) gone.Add(k);
+                foreach (NpcResourceGatherer k in gone) sides.Remove(k);
+            }
             int present = 0;
             foreach (NpcResourceGatherer b in builders)
             {
@@ -155,7 +202,8 @@ namespace BattleOfAges.Building
             {
                 hammerClock = HammerEvery;
                 GameSound.At(GameSound.Kind.Hammer, transform.position);
-                foreach (NpcResourceGatherer b in builders) b.GetComponent<CombatUnit>()?.TriggerAttackAnimation(); // the swing of a hammer
+                foreach (NpcResourceGatherer b in builders)
+                    if (AtItsSpot(b)) b.GetComponent<CombatUnit>()?.TriggerAttackAnimation(); // the swing of a hammer, standing at the work
             }
             Work(present * Time.deltaTime);
         }
@@ -206,10 +254,16 @@ namespace BattleOfAges.Building
             Destroy(this);
         }
 
-        /// <summary>Foundation under a third of the work, then the frame rising.</summary>
+        /// <summary>The stage the work has come to: 0 at the start, Stages - 1 near the end.</summary>
+        public static int StageOf(float progress) => Mathf.Clamp(Mathf.FloorToInt(progress * Stages), 0, Stages - 1);
+
+        /// <summary>The stage shown now (tests).</summary>
+        public int Stage => stage;
+
+        /// <summary>Footing first, then the posts, the frame, the walls going up and the rafters (StageMesh).</summary>
         private void ShowStage()
         {
-            int now = Progress < 1f / 3f ? 0 : 1;
+            int now = StageOf(Progress);
             if (now == stage) return;
             stage = now;
             if (stageModel != null) Destroy(stageModel);
@@ -223,7 +277,10 @@ namespace BattleOfAges.Building
             r.sharedMaterial = look;
         }
 
-        /// <summary>A plank floor on stones; the frame adds corner posts and beams round the footprint.</summary>
+        /// <summary>
+        /// The site at a stage: 0 a plank floor on stones; 1 corner posts half up; 2 the whole frame with its top beams;
+        /// 3 plank walls half up, a doorway in the front; 4 the walls up and the rafters. Each keeps all of the one before.
+        /// </summary>
         public static Mesh StageMesh(Vector3 size, int stage)
         {
             var kit = new MeshKit();
@@ -232,15 +289,52 @@ namespace BattleOfAges.Building
             // Deep: on a slope a site sits on its highest corner, and its footing goes down into the ground instead of hanging over it
             kit.Box(Matrix4x4.Translate(new Vector3(0f, 0.2f - FootingDepth * 0.5f, 0f)), new Vector3(w + 0.3f, FootingDepth, d + 0.3f), 0.03f, Vector3.zero, _ => stone);
             kit.Box(Matrix4x4.Translate(new Vector3(0f, 0.27f, 0f)), new Vector3(w, 0.1f, d), 0.02f, Vector3.zero, _ => plank);
+            const float floor = 0.32f;
+            Color board = new Color(0.68f, 0.52f, 0.33f);
             if (stage >= 1)
             {
+                float postH = stage == 1 ? h * 0.5f : h;
                 foreach (float x in new[] { -0.5f, 0.5f })
                     foreach (float z in new[] { -0.5f, 0.5f })
-                        kit.Box(Matrix4x4.Translate(new Vector3(x * w, h * 0.5f, z * d)), new Vector3(0.2f, h, 0.2f), 0.02f, Vector3.zero, _ => post);
+                        kit.Box(Matrix4x4.Translate(new Vector3(x * w, floor + postH * 0.5f, z * d)), new Vector3(0.2f, postH, 0.2f), 0.02f, Vector3.zero, _ => post);
+            }
+            if (stage >= 2)
+            {
                 foreach (float z in new[] { -0.5f, 0.5f })
-                    kit.Box(Matrix4x4.Translate(new Vector3(0f, h, z * d)), new Vector3(w + 0.2f, 0.16f, 0.16f), 0.02f, Vector3.zero, _ => post);
+                    kit.Box(Matrix4x4.Translate(new Vector3(0f, floor + h, z * d)), new Vector3(w + 0.2f, 0.16f, 0.16f), 0.02f, Vector3.zero, _ => post);
                 foreach (float x in new[] { -0.5f, 0.5f })
-                    kit.Box(Matrix4x4.Translate(new Vector3(x * w, h, 0f)), new Vector3(0.16f, 0.16f, d + 0.2f), 0.02f, Vector3.zero, _ => post);
+                    kit.Box(Matrix4x4.Translate(new Vector3(x * w, floor + h, 0f)), new Vector3(0.16f, 0.16f, d + 0.2f), 0.02f, Vector3.zero, _ => post);
+                // A middle post on the front and the back: the frame is not a bare box
+                foreach (float z in new[] { -0.5f, 0.5f })
+                    kit.Box(Matrix4x4.Translate(new Vector3(0f, floor + h * 0.5f, z * d)), new Vector3(0.16f, h, 0.16f), 0.02f, Vector3.zero, _ => post);
+            }
+            if (stage >= 3)
+            {
+                // Plank walls, half up, then whole; a doorway left in the front (-z)
+                float wallH = stage == 3 ? h * 0.5f : h * 0.92f, y = floor + wallH * 0.5f, t = 0.08f;
+                float door = Mathf.Min(1.1f, w * 0.3f), piece = (w - door) * 0.5f;
+                kit.Box(Matrix4x4.Translate(new Vector3(-(door + piece) * 0.5f, y, -0.5f * d)), new Vector3(piece, wallH, t), 0.01f, Vector3.zero, _ => board);
+                kit.Box(Matrix4x4.Translate(new Vector3((door + piece) * 0.5f, y, -0.5f * d)), new Vector3(piece, wallH, t), 0.01f, Vector3.zero, _ => board);
+                kit.Box(Matrix4x4.Translate(new Vector3(0f, y, 0.5f * d)), new Vector3(w, wallH, t), 0.01f, Vector3.zero, _ => board);
+                foreach (float x in new[] { -0.5f, 0.5f })
+                    kit.Box(Matrix4x4.Translate(new Vector3(x * w, y, 0f)), new Vector3(t, wallH, d), 0.01f, Vector3.zero, _ => board);
+            }
+            if (stage >= 4)
+            {
+                // Rafters: pairs leaning to a ridge along x
+                float rise = Mathf.Min(1.4f, d * 0.45f), top = floor + h;
+                float slope = Mathf.Atan2(rise, d * 0.5f) * Mathf.Rad2Deg, length = Mathf.Sqrt(rise * rise + d * d * 0.25f) + 0.2f;
+                int pairs = Mathf.Max(3, Mathf.RoundToInt(w / 1.1f));
+                for (int i = 0; i < pairs; i++)
+                {
+                    float x = Mathf.Lerp(-0.5f * w, 0.5f * w, i / (float)(pairs - 1));
+                    foreach (float sideZ in new[] { -1f, 1f })
+                    {
+                        Matrix4x4 m = Matrix4x4.TRS(new Vector3(x, top + rise * 0.5f, sideZ * d * 0.25f), Quaternion.Euler(sideZ * slope, 0f, 0f), Vector3.one);
+                        kit.Box(m, new Vector3(0.12f, 0.12f, length), 0.01f, Vector3.zero, _ => post);
+                    }
+                }
+                kit.Box(Matrix4x4.Translate(new Vector3(0f, top + rise, 0f)), new Vector3(w + 0.2f, 0.14f, 0.14f), 0.01f, Vector3.zero, _ => post);
             }
             return kit.ToMesh("ConstructionStage");
         }

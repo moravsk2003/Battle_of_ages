@@ -212,5 +212,90 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(ConstructionSite.MaxBuilders - 1, site.BuilderCount);
             Assert.IsTrue(site.NeedsHands, "its place is free again");
         }
+
+        [Test]
+        public void TheSite_GoesUpByFiveStages_EachKeepingTheOneBefore()
+        {
+            Assert.AreEqual(0, ConstructionSite.StageOf(0f));
+            Assert.AreEqual(ConstructionSite.Stages - 1, ConstructionSite.StageOf(0.99f));
+            Assert.AreEqual(ConstructionSite.Stages - 1, ConstructionSite.StageOf(1f));
+            Vector3 house = BuildingData.GetDefinition(BuildingType.WorkerHouse).Size;
+            int before = 0;
+            float topBefore = float.MinValue;
+            for (int s = 0; s < ConstructionSite.Stages; s++)
+            {
+                Mesh m = ConstructionSite.StageMesh(house, s);
+                Assert.Greater(m.vertexCount, before, $"stage {s} adds to the one before");
+                Assert.GreaterOrEqual(m.bounds.max.y, topBefore - 1e-3f, $"stage {s} is no lower");
+                before = m.vertexCount;
+                topBefore = m.bounds.max.y;
+            }
+            Assert.Greater(topBefore, house.y, "the last stage has the rafters over the walls");
+        }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator EachBuilder_TakesTheSideItComesFrom_KeepsIt_AndSwingsOnlyThere()
+        {
+            GameObject house = BuildingNode.CreateWorkerHousePrefab("SiteHouse");
+            house.transform.position = at;
+            spawned.Add(house);
+            ConstructionSite site = ConstructionSite.Begin(house, BuildingType.WorkerHouse);
+            Vector3 half = BuildingData.GetDefinition(BuildingType.WorkerHouse).Size * 0.5f;
+            var from = new[] { Vector3.right, Vector3.forward, Vector3.left, Vector3.back };
+            var crew = new List<NpcResourceGatherer>();
+            ClearWorkers();
+            yield return null;
+            foreach (Vector3 dir in from)
+            {
+                NpcResourceGatherer w = Worker(at + dir * 14f, "NPC_Side" + crew.Count);
+                w.SetGatherDirective(GatherDirective.Idle);
+                crew.Add(w);
+            }
+            yield return null;
+            for (int i = 0; i < crew.Count; i++) Assert.IsTrue(crew[i].AssignToSite(site));
+            var spots = new Vector3[crew.Count];
+            for (int i = 0; i < crew.Count; i++)
+            {
+                spots[i] = site.SpotFor(crew[i]);
+                Vector3 off = spots[i] - at;
+                off.y = 0f;
+                Assert.Greater(Vector3.Dot(off.normalized, from[i]), 0.9f, $"builder {i} stands on the side it came from, not across the site");
+                Assert.Greater(Mathf.Max(Mathf.Abs(off.x) - half.x, Mathf.Abs(off.z) - half.z), 0.5f, "outside the footprint");
+            }
+            crew[0].LeaveSite(null);
+            for (int i = 1; i < crew.Count; i++) Assert.AreEqual(spots[i], site.SpotFor(crew[i]), "the others keep their places when one leaves");
+
+            // On the way none swings; standing at its place each does
+            var swung = new int[crew.Count];
+            for (int i = 1; i < crew.Count; i++)
+            {
+                int k = i;
+                crew[i].GetComponent<CombatUnit>().OnAttackStarted += () => swung[k]++;
+            }
+            for (int i = 1; i < crew.Count; i++) Assert.IsFalse(site.AtItsSpot(crew[i]), "14 m off it is still on its way");
+            yield return new WaitForSeconds(1.0f);
+            int early = 0;
+            for (int i = 1; i < crew.Count; i++) if (!site.AtItsSpot(crew[i])) early += swung[i];
+            Assert.AreEqual(0, early, "no hammer while walking");
+            float end = Time.time + 20f;
+            while (Time.time < end)
+            {
+                bool all = true;
+                for (int i = 1; i < crew.Count; i++) all &= site.AtItsSpot(crew[i]);
+                if (all) break;
+                yield return null;
+            }
+            for (int i = 1; i < crew.Count; i++) Assert.IsTrue(site.AtItsSpot(crew[i]), $"builder {i} reaches its place");
+            for (int i = 1; i < crew.Count; i++) swung[i] = 0;
+            yield return new WaitForSeconds(2f);
+            for (int i = 1; i < crew.Count; i++)
+            {
+                Assert.Greater(swung[i], 0, $"builder {i} works the hammer at its place");
+                Vector3 look = at - crew[i].transform.position;
+                look.y = 0f;
+                Assert.Greater(Vector3.Dot(crew[i].transform.forward, look.normalized), 0.8f, $"builder {i} faces the building");
+            }
+            Assert.Greater(site.Stage, -1);
+        }
     }
 }

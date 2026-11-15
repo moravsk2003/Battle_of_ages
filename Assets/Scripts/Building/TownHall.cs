@@ -169,6 +169,22 @@ namespace BattleOfAges.Building
             return null;
         }
 
+        /// <summary>
+        /// Why nothing of the player's may stand here (null: it may): a king's land, GameBalance.TerritoryRadius round its
+        /// home (§5.3). A king's own town stands well inside it and never reaches a player's hall (FoundingFromKing).
+        /// </summary>
+        public static string ForeignLand(Vector3 at)
+        {
+            foreach (AI.NpcKingdom k in AI.NpcKingdom.All)
+            {
+                if (k == null) continue;
+                Vector3 off = k.Home - at;
+                off.y = 0f;
+                if (off.magnitude < GameBalance.TerritoryRadius) return UI.Loc.Pick($"Чужа земля: ближче ніж {GameBalance.TerritoryRadius:0} м до королівства", $"Foreign land: within {GameBalance.TerritoryRadius:0} m of a kingdom");
+            }
+            return null;
+        }
+
         /// <summary>Built: another hall is a new settlement, with a chest beside it and what the settlers brought.</summary>
         public void Founded()
         {

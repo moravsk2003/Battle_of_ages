@@ -456,6 +456,9 @@ namespace BattleOfAges.RTS
             OrderOnGround(kind, what, hit.point);
         }
 
+        /// <summary>The chosen units' order, as a right click gives it (tests, buttons).</summary>
+        public void OrderSelected(Net.UnitOrderCommand.Kind kind, Component what, Vector3 point) => OrderOnGround(kind, what, point);
+
         /// <summary>An order with the modifiers held (a move with Ctrl fights its way, with Shift goes after the others), and a ring where it goes.</summary>
         private void OrderOnGround(Net.UnitOrderCommand.Kind kind, Component what, Vector3 point)
         {
@@ -470,9 +473,17 @@ namespace BattleOfAges.RTS
             if (tempUnitsBuffer.Count == 0) return;
             Net.CommandBus.Submit(Net.UnitOrderCommand.For(kind, tempUnitsBuffer, what, point));
             tempUnitsBuffer.Clear();
+            // Sent to work, they go off it by themselves: a held (selected) worker waits on the player, so the hold ends here
+            if (IsWorkOrder(kind)) DeselectAll();
             Vector3 at = kind == Net.UnitOrderCommand.Kind.Attack && what != null ? what.transform.position : point;
             TeamMarkers.Flash(at, MarkOf(kind));
         }
+
+        /// <summary>An order to a job (a field, a site, a mine, a bench, a tree, a stone, the chest), done by the worker's own work loop.</summary>
+        public static bool IsWorkOrder(Net.UnitOrderCommand.Kind kind) =>
+            kind == Net.UnitOrderCommand.Kind.Place || kind == Net.UnitOrderCommand.Kind.Site || kind == Net.UnitOrderCommand.Kind.Mine
+            || kind == Net.UnitOrderCommand.Kind.Bench || kind == Net.UnitOrderCommand.Kind.Tree || kind == Net.UnitOrderCommand.Kind.Pebble
+            || kind == Net.UnitOrderCommand.Kind.Chest;
 
         private static Color MarkOf(Net.UnitOrderCommand.Kind kind)
         {

@@ -100,13 +100,14 @@ namespace BattleOfAges.Tests
             int[] caps = { 6, 15, 25, 40, 60, 85 };
             for (int l = 0; l <= TownHall.MaxLevel; l++) Assert.AreEqual(caps[l], TownHall.CapForLevel(l), $"Cap at level {l}.");
 
-            int[] wood = { 0, 0, 30, 60, 100, 160 };
+            int[] wood = { 0, 0, 60, 120, 200, 320 }; // (wood doubled, GameBalance.WoodPrice)
             for (int to = 2; to <= TownHall.MaxLevel; to++)
             {
                 TownHall.UpgradeCost(to, out int w, out _, out _);
                 Assert.AreEqual(wood[to], w, $"Wood to reach level {to}.");
             }
-            Assert.AreEqual(10, BuildingData.GetDefinition(BuildingType.TownHall).WoodCost, "Building the hall costs 10 wood.");
+            Assert.AreEqual(GameBalance.TownHallWood[1], BuildingData.GetDefinition(BuildingType.TownHall).WoodCost, "Building the hall costs its level I wood.");
+            Assert.AreEqual(20, GameBalance.TownHallWood[1], "10 wood, doubled (GameBalance.WoodPrice).");
         }
     }
 }
