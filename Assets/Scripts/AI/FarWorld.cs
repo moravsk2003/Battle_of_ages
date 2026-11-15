@@ -34,7 +34,7 @@ namespace BattleOfAges.AI
             for (int i = s.Armies.Count - 1; i >= 0; i--) MoveArmy(s, s.Armies[i], world, hours, rng, player, realHome);
             if (s.Defeated) return;
             if (s.Free) Wander(s, hours, rng, keepOutOf);
-            else ConsiderRaid(s, world, player);
+            else if (!s.Guardian) ConsiderRaid(s, world, player); // a guest's kingdom kept by a bot only guards
         }
 
         private static float FirstRaidAt(KingdomState s) => GameBalance.KingdomFirstRaidHours * (1f + Mathf.Repeat(KingdomTown.Seed(s.Name) * 0.618034f, 1f));
@@ -234,7 +234,8 @@ namespace BattleOfAges.AI
 
             // Nobody left to stop them: they break the hall, a hall lost ends the kingdom (NpcKingdom.OnHallDestroyed)
             bool clear = target.Subjects.Count == 0 && !target.HasKing;
-            if (!army.Returning && clear && target.Hall > 0)
+            if (target.Guardian) { if (clear) army.Returning = true; } // an absent player's buildings stand till it is back (§14.4)
+            else if (!army.Returning && clear && target.Hall > 0)
             {
                 float damage = DpsOf(s, army.Units, army.WithHero && s.HasKing) * hours * GameBalance.GameHourSeconds;
                 target.HallHealth = Mathf.Max(0, target.HallHealth - Mathf.RoundToInt(damage));
@@ -259,6 +260,7 @@ namespace BattleOfAges.AI
         private static void KingDied(KingdomState s, System.Random rng)
         {
             s.HasKing = false;
+            if (s.Guardian) return; // its player's hero: no heir, nobody leaves (it comes back with its player)
             if (s.Empire) { Fall(s); return; }
             s.Interregnum = GameBalance.InterregnumSeconds;
             // About half the people leave (NpcKingdom.Desert)

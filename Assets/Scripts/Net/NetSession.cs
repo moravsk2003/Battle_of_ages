@@ -301,7 +301,9 @@ namespace BattleOfAges.Net
             // Those of the lobby, and those of the save who came back while it was starting (already in guestOf)
             foreach (KeyValuePair<int, GuestRecord> g in lobby.Here) guestOf[g.Key] = g.Value;
             Lobby = null;
-            foreach (KeyValuePair<int, GuestRecord> g in new List<KeyValuePair<int, GuestRecord>>(guestOf)) SendWelcome(g.Key, g.Value);
+            foreach (KeyValuePair<int, GuestRecord> g in new List<KeyValuePair<int, GuestRecord>>(guestOf)) { RetireBot(g.Value); SendWelcome(g.Key, g.Value); }
+            // Those of the save who did not come: their kingdoms are kept by bots (§14.4)
+            foreach (GuestRecord absent in GuestBook.All) if (!guestOf.ContainsValue(absent)) RaiseBot(absent);
             TellRoster("Гра почалася");
             TellWorldMap();
         }
@@ -426,6 +428,7 @@ namespace BattleOfAges.Net
             if (name.Length > 0) record.Name = name;
             guestOf[peer] = record;
             if (!basePlaced) return; // the game is starting: its world comes with everyone's (WelcomeWhenIn)
+            RetireBot(record);
             SendWelcome(peer, record);
             TellRoster($"{LobbyHost.NameOf(record)} зайшов у гру");
             TellWorldMap();
@@ -495,7 +498,12 @@ namespace BattleOfAges.Net
                 bool wasIn = guestOf.TryGetValue(peer, out GuestRecord left);
                 guestOf.Remove(peer);
                 foreach (Vector2Int freed in claims.ReleaseAll(peer)) TellFree(freed);
-                if (wasIn && basePlaced) TellRoster($"{LobbyHost.NameOf(left)} вийшов із гри");
+                if (wasIn && basePlaced)
+                {
+                    bool kept = RaiseBot(left);
+                    TellRoster(kept ? $"{LobbyHost.NameOf(left)} вийшов із гри: його королівство стереже бот" : $"{LobbyHost.NameOf(left)} вийшов із гри");
+                    if (kept) TellWorldMap();
+                }
                 return;
             }
             string why = joined ? "Зв'язок із хостом втрачено" : seated ? "Хост закрив лобі" : "Не вдалося приєднатися";
@@ -882,6 +890,7 @@ namespace BattleOfAges.Net
                 if (at + HitBytes > length) return;
                 int owner = data[at];
                 if (owner == playerId) { ApplyRow(data, at); continue; }
+                if (owner >= GuestBot.BotOwnerFirst) continue; // an absent player's building kept by a bot: it stands till its player is back
                 Array.Copy(data, at, one, 3, HitBytes);
                 link.Send(owner, NetChannel.Reliable, one, one.Length);
             }
@@ -969,6 +978,48 @@ namespace BattleOfAges.Net
                 return;
             }
             if (known == null) shownBuildings[b] = ShowBuilding(b);
+        }
+
+        // ------------------------------------------------------------------ an absent player's kingdom (§14.4)
+
+        /// <summary>The bots' shown buildings, by their player's token.</summary>
+        private readonly Dictionary<string, List<NetBuilding>> botBuildings = new Dictionary<string, List<NetBuilding>>();
+
+        /// <summary>The host: a bot keeps this absent guest's kingdom, its buildings shown to everyone. False: nothing to keep (no save yet).</summary>
+        private bool RaiseBot(GuestRecord guest)
+        {
+            if (!link.IsHost || guest == null || string.IsNullOrEmpty(guest.Save)) return false;
+            GuestBot.Raise(guest); // (none if the host's save kept it already)
+            if (!GuestBot.Has(guest.Token)) return false;
+            if (botBuildings.ContainsKey(guest.Token)) return true;
+            SaveData save = JsonUtility.FromJson<SaveData>(guest.Save);
+            var shown = new List<NetBuilding>();
+            for (int i = 0; save != null && i < save.Buildings.Count; i++)
+            {
+                BuildingSave b = save.Buildings[i];
+                if (!string.IsNullOrEmpty(b.SceneKey)) continue; // (the scene's own: everyone has them)
+                var view = new NetBuilding { Owner = GuestBot.BuildingOwner(guest.Number), Id = i, Type = b.Type, Position = b.Position, Yaw = b.Yaw };
+                shownBuildings[view] = ShowBuilding(view);
+                shown.Add(view); // (not told to those here: they still show the guest's own; newcomers get them in SendWelcome)
+            }
+            botBuildings[guest.Token] = shown;
+            return true;
+        }
+
+        /// <summary>The host: the guest is back, so its bot gives the kingdom up (its losses go into the guest's save) and its shown buildings go.</summary>
+        private void RetireBot(GuestRecord guest)
+        {
+            if (!link.IsHost || guest == null) return;
+            GuestBot.Retire(guest);
+            if (!botBuildings.TryGetValue(guest.Token, out List<NetBuilding> shown)) return;
+            botBuildings.Remove(guest.Token);
+            foreach (NetBuilding view in shown)
+            {
+                if (shownBuildings.TryGetValue(view, out GameObject go) && go != null) Destroy(go);
+                shownBuildings.Remove(view);
+                view.Gone = true;
+                Broadcast(view);
+            }
         }
 
         private void ForgetBuildingsOf(int owner)

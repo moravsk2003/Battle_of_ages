@@ -33,6 +33,16 @@ namespace BattleOfAges.AI
         /// <summary>Forgets every far kingdom (a new campaign, back to the menu): the next campaign founds its own.</summary>
         public static void Clear() => far.Clear();
 
+        /// <summary>A kingdom joins the far ones (it turns real on the next look if it should).</summary>
+        public static void AddFar(KingdomState s)
+        {
+            Ensure();
+            far.Add(s.EnsureIds());
+        }
+
+        /// <summary>Takes this far kingdom out of the world (it has gone back to its player).</summary>
+        public static bool RemoveFar(KingdomState s) => far.Remove(s);
+
         private static void Ensure()
         {
             if (instance == null) instance = new GameObject("KingdomRealm").AddComponent<KingdomRealm>();
@@ -313,6 +323,7 @@ namespace BattleOfAges.AI
         {
             if (s.Defeated || hours <= 0f) return;
             s.Age += hours;
+            if (s.Guardian) return; // a player's kingdom kept by a bot: it guards and waits, it does not grow (§14.4)
             if (!s.HasKing)
             {
                 s.Interregnum -= hours * GameBalance.GameHourSeconds;

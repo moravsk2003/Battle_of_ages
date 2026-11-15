@@ -38,6 +38,12 @@ namespace BattleOfAges.AI
         public bool AgainstPlayer => Team != UnitSpatialGrid.TeamPlayer;
         /// <summary>A free hero's band (§7.4): it camps, it grows to a camp's cap, it builds no hall and sends no raids.</summary>
         public bool Free { get; private set; }
+        /// <summary>A player's kingdom kept by a bot while the player is away (§14.4): the player's token. Net.GuestBot.</summary>
+        public string GuestToken { get; private set; }
+        /// <summary>Only guards: works on, defends its home, never grows, builds, raids or falls (its player comes back to it).</summary>
+        public bool Guardian => !string.IsNullOrEmpty(GuestToken);
+        /// <summary>A guest's unit's place in its save (UnitState.Origin), so its losses go back to it.</summary>
+        private readonly Dictionary<HostileMobAI, int> origins = new Dictionary<HostileMobAI, int>();
         private static int nextTeam = UnitSpatialGrid.TeamKingdomFirst;
         /// <summary>A side of its own for a new NPC kingdom.</summary>
         private static int NewSide() => nextTeam++;
@@ -208,7 +214,7 @@ namespace BattleOfAges.AI
             if (hallModel != null) Kill(hallModel);
             hallModel = new GameObject("Hall");
             hallModel.transform.SetParent(transform, false);
-            if (Application.isPlaying)
+            if (Application.isPlaying && !Guardian) // (an absent player's own buildings are shown in its place)
             {
                 GameObject house = WorkerHouseBuilder.Attach(hallModel.transform);
                 float s = 0.8f + 0.2f * Economy.HallLevel; // a chief's hut that grows into a great hall
@@ -222,8 +228,8 @@ namespace BattleOfAges.AI
                 col.center = new Vector3(0f, 3f, 0f);
                 col.size = new Vector3(5f, 6f, 5f);
             }
-            GetComponent<BoxCollider>().enabled = Economy.HallLevel > 0; // a camp has nothing to storm
-            if (Economy.HallLevel > 0)
+            GetComponent<BoxCollider>().enabled = Economy.HallLevel > 0 && !Guardian; // a camp has nothing to storm, nor an absent player's base
+            if (Economy.HallLevel > 0 && !Guardian)
             {
                 float share = Hall.MaxHealth > 0 && Hall.CurrentHealth > 0 ? (float)Hall.CurrentHealth / Hall.MaxHealth : 1f;
                 Hall.InitializeHealth(GameBalance.TownHallHealth[Economy.HallLevel]);
@@ -288,6 +294,7 @@ namespace BattleOfAges.AI
             if (count) Prune();
             Age += hours;
 
+            if (Guardian) { GuardOnly(seconds); return; }
             if (InInterregnum)
             {
                 InterregnumLeft -= seconds;
@@ -324,11 +331,21 @@ namespace BattleOfAges.AI
             }
         }
 
+        /// <summary>A bot keeping an absent player's kingdom: its hero's skills in a fight, and everyone at home goes for an enemy near it.</summary>
+        private void GuardOnly(float seconds)
+        {
+            if (King != null && King.Health.IsAlive) HeroAutoPilot.UseSkills(King.Combat, King.Health, King.CurrentCombatTarget);
+            secondClock += seconds;
+            if (secondClock < 1f) return;
+            secondClock = 0f;
+            Defend();
+        }
+
         /// <summary>The once-a-game-hour decisions: raise the hall, send a raid.</summary>
         public void Think()
         {
             if (IsDefeated) return;
-            if (Free) return; // a free hero camps: no hall, no raids
+            if (Free || Guardian) return; // a free hero camps: no hall, no raids; a bot only guards
             if (Economy.HallLevel == 0 || Population >= Economy.Cap - GameBalance.KingdomHallRoom) TryUpgradeHall(); // only when it needs the room
             if (!Raiding && !InInterregnum && Age >= FirstRaidAt && !UnderRaid() && Age >= LastRaidEnd + GameBalance.KingdomRaidCooldownHours) ConsiderRaid();
         }
@@ -746,7 +763,7 @@ namespace BattleOfAges.AI
             {
                 Id = stateIds.Id, Name = KingdomName, Home = Home, Hall = Economy.HallLevel, HallHealth = Hall != null ? Hall.CurrentHealth : 0,
                 Wood = Economy.Wood, Ore = Economy.Ore, Births = Economy.BirthCarry, Age = Age, Interregnum = InterregnumLeft, Defeated = IsDefeated,
-                Free = Free, Team = Team, Empire = IsEmpire, LastRaidEnd = float.IsInfinity(LastRaidEnd) ? -1000f : LastRaidEnd
+                Free = Free, Team = Team, Empire = IsEmpire, GuestToken = GuestToken, LastRaidEnd = float.IsInfinity(LastRaidEnd) ? -1000f : LastRaidEnd
             };
             s.Hero.Id = stateIds.Hero;
             s.Capital.Id = stateIds.Settlement;
@@ -754,7 +771,7 @@ namespace BattleOfAges.AI
             s.EnsureIds();
             stateIds = (s.Id, s.Hero.Id, s.Capital.Id, s.Capital.Garrison.Id); // (a kingdom founded here gets its numbers the first time)
             if (IsDefeated) return s;
-            foreach (HostileMobAI m in subjects) if (!raiders.Contains(m)) s.Subjects.Add(SaveOf(m));
+            foreach (HostileMobAI m in subjects) if (!raiders.Contains(m)) s.Subjects.Add(OriginOf(m, SaveOf(m)));
             s.Subjects.AddRange(arriving); // not in the scene yet: still its people
             if (Raiding) s.Armies.Add(RaidAsArmy());
             s.EnsureIds();
@@ -803,6 +820,7 @@ namespace BattleOfAges.AI
             s.EnsureIds();
             k.stateIds = (s.Id, s.Hero.Id, s.Capital.Id, s.Capital.Garrison.Id);
             k.Free = s.Free;
+            k.GuestToken = s.GuestToken;
             k.IsEmpire = s.Empire;
             k.Economy.Free = s.Empire;
             k.Team = s.Team >= UnitSpatialGrid.TeamKingdomFirst ? s.Team : NewSide();
@@ -814,11 +832,11 @@ namespace BattleOfAges.AI
             k.FirstRaidAt = GameBalance.KingdomFirstRaidHours * (1f + Mathf.Repeat(KingdomTown.Seed(s.Name) * 0.618034f, 1f));
             k.BuildHall();
             if (s.Hall > 0 && s.HallHealth > 0) k.Hall.SetCurrentHealth(s.HallHealth);
-            if (Application.isPlaying && !s.Free) k.Town = KingdomTown.Attach(k);
+            if (Application.isPlaying && !s.Free && !s.Guardian) k.Town = KingdomTown.Attach(k);
             if (s.Defeated) { k.IsDefeated = true; return k; }
             k.RaiseArmies(s, gradual);
             if (gradual) k.arriving.AddRange(s.Subjects); // a few a frame (ArriveMore): a grown kingdom was a hitch of hundreds of ms
-            else foreach (SaveLoad.UnitState u in s.Subjects) Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
+            else foreach (SaveLoad.UnitState u in s.Subjects) k.Restore(k.AddSubject((UnitRank)u.Rank, u.Position), u);
             if (s.HasKing)
             {
                 bool leadsArmy = s.Armies.Count > 0 && s.Armies[0].WithHero;
@@ -889,8 +907,15 @@ namespace BattleOfAges.AI
             return Arriving > 0;
         }
 
-        private static void Restore(HostileMobAI m, SaveLoad.UnitState u)
+        private SaveLoad.UnitState OriginOf(HostileMobAI m, SaveLoad.UnitState u)
         {
+            if (origins.TryGetValue(m, out int origin)) u.Origin = origin;
+            return u;
+        }
+
+        private void Restore(HostileMobAI m, SaveLoad.UnitState u)
+        {
+            if (u.Origin > 0) origins[m] = u.Origin;
             UnitProgress p = m.GetComponent<UnitProgress>();
             if (p != null) p.AddBattleXp(u.BattleXp);
             if (u.Health > 0) m.Health.SetCurrentHealth(Mathf.Min(u.Health, m.Health.MaxHealth));
@@ -908,6 +933,7 @@ namespace BattleOfAges.AI
                 Fall("імператор загинув");
                 return;
             }
+            if (Guardian) { StrategyHud.Notify($"Героя {KingdomName} вбито"); return; } // no heir, nobody leaves: it is its player's
             if (Raiding) EndRaid(retreat: true);
             InterregnumLeft = GameBalance.InterregnumSeconds;
             StrategyHud.Notify($"Король {KingdomName} загинув! Міжцарів'я");
@@ -966,7 +992,7 @@ namespace BattleOfAges.AI
         /// <summary>The kingdom falls: its people and king are a free band now (§7.3).</summary>
         public void Fall(string why)
         {
-            if (IsDefeated) return;
+            if (IsDefeated || Guardian) return;
             IsDefeated = true;
             if (IsEmpire) CentralEmpire.NpcEmpireFell();
             if (Raiding) EndRaid(retreat: false);

@@ -54,6 +54,41 @@ namespace BattleOfAges.PlayModeTests
             return hp;
         }
 
+        /// <summary>An absent player's kingdom kept by a bot (§14.4): real, it shows no town of its own, has no hall to storm,
+        /// defends its home, never raids; given back, the guest's save loses whom it lost.</summary>
+        [UnityTest]
+        public IEnumerator AGuestsKingdom_KeptByABot_OnlyGuards_AndGivesItsLossesBack()
+        {
+            var save = new SaveLoad.SaveData();
+            save.Player.Health = 400;
+            save.Buildings.Add(new SaveLoad.BuildingSave { Type = (int)Building.BuildingType.TownHall, Position = Far, Level = 3, Health = 900 });
+            for (int i = 0; i < 6; i++) save.Units.Add(new SaveLoad.UnitSave { Name = "W" + i, Rank = (int)UnitRank.Warrior, Health = 120, Position = Far + new Vector3(i, 0f, 4f) });
+            var guest = new Net.GuestRecord { Token = "bot-test", Number = 3, Save = JsonUtility.ToJson(save) };
+            SaveLoad.KingdomState s = Net.GuestBot.FromSave(save, guest);
+            NpcKingdom k = NpcKingdom.FromState(s);
+            Assert.IsTrue(k.Guardian);
+            Assert.IsNull(k.Town, "the player's own buildings stand there, not a town of the bot's");
+            Assert.IsFalse(k.GetComponent<BoxCollider>().enabled, "no hall of its own to storm");
+            Assert.AreEqual(6, k.Population);
+            Assert.IsNotNull(k.King, "its hero waits at home");
+
+            k.Age = 500f;
+            k.Think();
+            Assert.IsFalse(k.Raiding, "a bot does not raid");
+
+            HealthComponent enemy = PlayerSide(Far + new Vector3(8f, 0f, 8f), UnitRank.Warrior, "Intruder");
+            yield return Until(() => !enemy.IsAlive, 30f);
+            Assert.IsFalse(enemy.IsAlive, "its people go for an enemy at home");
+
+            // Two of them fall
+            int fallen = 0;
+            foreach (HostileMobAI m in k.Subjects) if (fallen < 2 && m != null) { m.Health.TakeDamage(int.MaxValue / 2, ignoreArmor: true); fallen++; }
+            yield return null;
+            Assert.IsTrue(Net.GuestBot.Retire(guest));
+            Assert.IsNull(Net.GuestBot.RealOf("bot-test"), "the bot has given it up");
+            Assert.AreEqual(4, JsonUtility.FromJson<SaveLoad.SaveData>(guest.Save).Units.Count, "the fallen are gone from the player's save");
+        }
+
         private static IEnumerator Until(System.Func<bool> done, float gameSeconds)
         {
             float end = Time.time + gameSeconds;

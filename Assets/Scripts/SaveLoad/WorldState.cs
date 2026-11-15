@@ -50,6 +50,8 @@ namespace BattleOfAges.SaveLoad
     {
         public int Rank, BattleXp, Health;
         public Vector3 Position;
+        /// <summary>A guest's unit kept by its bot: its place in the guest's save, plus one (0: none). Net.GuestBot.</summary>
+        public int Origin;
     }
 
     /// <summary>A hero as data (§6.2): the unit it is, its class, what it has learned. Alive: false while its kingdom has no hero (the interregnum, §7.2).</summary>
@@ -103,6 +105,9 @@ namespace BattleOfAges.SaveLoad
         public bool Free;
         /// <summary>The world's Central Empire (§9.1.1).</summary>
         public bool Empire;
+        /// <summary>A player's kingdom kept by a bot while the player is away (§14.4): only guards, never grows. Net.GuestBot.</summary>
+        public string GuestToken;
+        public bool Guardian => !string.IsNullOrEmpty(GuestToken);
         public int Team;
         public float Age, Interregnum;
         /// <summary>Its age when its last raid ended (the next waits for the cooldown).</summary>
