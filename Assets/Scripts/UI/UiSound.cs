@@ -64,22 +64,30 @@ namespace BattleOfAges.UI
             float[] d;
             switch (kind)
             {
-                case Kind.Click: // a wooden tick: a short noise burst through a resonance, and a click tone
+                case Kind.Click: // warm wooden-parchment tap: resonant wood modes and gentle touch noise
                 {
-                    d = new float[(int)(Rate * 0.06f)];
+                    d = new float[(int)(Rate * 0.055f)];
                     float lp = 0f;
                     for (int i = 0; i < d.Length; i++)
                     {
-                        float t = i / (float)Rate, env = Mathf.Exp(-t * 90f);
-                        lp += (Noise() - lp) * 0.35f;
-                        d[i] = (lp * 0.6f + Mathf.Sin(2f * Mathf.PI * 1250f * t) * 0.5f) * env;
+                        float t = i / (float)Rate;
+                        float tapEnv = Mathf.Clamp01(t / 0.002f) * Mathf.Exp(-t * 85f);
+                        lp += (Noise() - lp) * 0.25f;
+                        float wood = Mathf.Sin(2f * Mathf.PI * 480f * t) * 0.55f + Mathf.Sin(2f * Mathf.PI * 1180f * t) * 0.30f;
+                        d[i] = (lp * 0.45f + wood) * tapEnv * 0.85f;
                     }
                     break;
                 }
-                case Kind.Hover:
+                case Kind.Hover: // gentle low-mid wood/parchment touch
                 {
-                    d = new float[(int)(Rate * 0.03f)];
-                    for (int i = 0; i < d.Length; i++) { float t = i / (float)Rate; d[i] = Mathf.Sin(2f * Mathf.PI * 2600f * t) * Mathf.Exp(-t * 160f); }
+                    d = new float[(int)(Rate * 0.038f)];
+                    float lp = 0f;
+                    for (int i = 0; i < d.Length; i++)
+                    {
+                        float t = i / (float)Rate, u = t / 0.038f;
+                        lp += (Noise() - lp) * 0.18f;
+                        d[i] = (Mathf.Sin(2f * Mathf.PI * 680f * t) * 0.55f + lp * 0.35f) * Mathf.Sin(Mathf.PI * u) * Mathf.Exp(-t * 60f) * 0.7f;
+                    }
                     break;
                 }
                 case Kind.Open: // a paper swish: band noise rising and falling
@@ -96,14 +104,25 @@ namespace BattleOfAges.UI
                     }
                     break;
                 }
-                case Kind.Error: // two low buzzes
+                case Kind.Error: // dull double wooden knock (no electronic buzz)
                 {
-                    d = new float[(int)(Rate * 0.22f)];
+                    d = new float[(int)(Rate * 0.26f)];
+                    float lp = 0f;
                     for (int i = 0; i < d.Length; i++)
                     {
-                        float t = i / (float)Rate, local = t % 0.11f;
-                        float tone = Mathf.Sign(Mathf.Sin(2f * Mathf.PI * 170f * t)) * 0.35f + Mathf.Sin(2f * Mathf.PI * 170f * t) * 0.4f;
-                        d[i] = tone * Mathf.Clamp01(local / 0.005f) * Mathf.Exp(-local * 22f) * 0.6f;
+                        float t = i / (float)Rate;
+                        lp += (Noise() - lp) * 0.12f;
+                        float s = 0f;
+                        for (int k = 0; k < 2; k++)
+                        {
+                            float tt = t - k * 0.11f;
+                            if (tt < 0f) continue;
+                            float pitch = k == 0 ? 210f : 145f;
+                            float thud = (Mathf.Sin(2f * Mathf.PI * pitch * tt) * 0.65f + Mathf.Sin(2f * Mathf.PI * pitch * 1.48f * tt) * 0.25f + lp * 0.35f)
+                                         * Mathf.Clamp01(tt / 0.002f) * Mathf.Exp(-tt * 28f);
+                            s += thud;
+                        }
+                        d[i] = s * 0.8f;
                     }
                     break;
                 }

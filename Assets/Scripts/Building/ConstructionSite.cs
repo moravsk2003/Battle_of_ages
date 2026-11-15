@@ -202,7 +202,7 @@ namespace BattleOfAges.Building
             GetComponent<BuildingNode>()?.OnBuilt();
             GetComponent<TownHall>()?.Founded();
             StrategyHud.Notify("Збудовано: " + DisplayName);
-            GameSound.At(GameSound.Kind.Place, transform.position);
+            GameSound.At(GameSound.Kind.BuildingFinished, transform.position);
             Destroy(this);
         }
 

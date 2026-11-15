@@ -68,6 +68,7 @@ namespace BattleOfAges.Combat
             Changed?.Invoke(this);
             if (secondWorld)
             {
+                UI.GameSound.At(UI.GameSound.Kind.MeteorImpact, transform.position);
                 UI.StrategyHud.Notify("Два світозмінні артефакти — герой вибухнув!");
                 GetComponent<HealthComponent>()?.TakeDamage(int.MaxValue / 2, ignoreArmor: true);
             }

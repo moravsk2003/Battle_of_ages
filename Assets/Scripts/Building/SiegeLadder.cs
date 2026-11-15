@@ -80,6 +80,7 @@ namespace BattleOfAges.Building
             r.sharedMaterial = MeshKit.PropMaterial();
             l.model = m.transform;
             l.Pose(0f);
+            BattleOfAges.UI.GameSound.At(BattleOfAges.UI.GameSound.Kind.Place, foot);
             return l;
         }
 

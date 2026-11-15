@@ -20,7 +20,10 @@ namespace BattleOfAges.UI
             LevelUp, Promote, HeroDeath,
             StepGrass, StepSplash, Jump,
             AlarmBell, StandDown, Coins, Gate, ZonePaint,
-            AnimalHurt, RaiderHorn
+            AnimalHurt, RaiderHorn,
+            OrePickup, TreeFall, Land, HeroHurt, ShieldBlock,
+            BuildingFinished, UpgradeBuilding, CraftComplete, EquipGear,
+            MagicHit, ZoneErase, AnimalSmallHurt
         }
 
         public const int Rate = 44100, Variants = 3;
@@ -95,6 +98,9 @@ namespace BattleOfAges.UI
                 case Kind.Lightning:
                 case Kind.CritHit:
                 case Kind.PiercingShot:
+                case Kind.HeroHurt:
+                case Kind.ShieldBlock:
+                case Kind.MagicHit:
                     return true;
                 default:
                     return false;
@@ -112,6 +118,8 @@ namespace BattleOfAges.UI
                 case Kind.HeroDeath:
                 case Kind.AlarmBell:
                 case Kind.RaiderHorn:
+                case Kind.BuildingFinished:
+                case Kind.UpgradeBuilding:
                     return true;
                 default:
                     return false;
@@ -124,11 +132,14 @@ namespace BattleOfAges.UI
             {
                 case Kind.SelectPerson: case Kind.SelectWarrior: case Kind.SelectKnight: case Kind.SelectHero: return 0.45f;
                 case Kind.OrderMove: case Kind.OrderAttack: case Kind.OrderWork: return 0.4f;
-                case Kind.Branches: case Kind.Pick: case Kind.ZonePaint: return 0.24f;
+                case Kind.Branches: case Kind.Pick: case Kind.ZonePaint: case Kind.ZoneErase: case Kind.Land: return 0.24f;
                 case Kind.StepGrass: return 0.20f;
                 case Kind.StepSplash: case Kind.Jump: return 0.28f;
                 case Kind.BowShot: case Kind.ArrowHit: case Kind.Swing: case Kind.Dash: return 0.30f;
-                case Kind.Place: case Kind.Fanfare: case Kind.LevelUp: case Kind.Promote: case Kind.Artifact: return 0.52f;
+                case Kind.OrePickup: case Kind.EquipGear: case Kind.MagicHit: case Kind.ShieldBlock: return 0.36f;
+                case Kind.HeroHurt: case Kind.TreeFall: case Kind.CraftComplete: case Kind.AnimalSmallHurt: return 0.45f;
+                case Kind.Place: case Kind.Fanfare: case Kind.LevelUp: case Kind.Promote: case Kind.Artifact:
+                case Kind.BuildingFinished: case Kind.UpgradeBuilding: return 0.52f;
                 case Kind.Collapse: case Kind.MeteorImpact: case Kind.Lightning: case Kind.HeroDeath: case Kind.AlarmBell: return 0.65f;
                 case Kind.FireFan: case Kind.CritHit: case Kind.PiercingShot: case Kind.Heal: case Kind.StandDown: case Kind.RaiderHorn: return 0.48f;
                 default: return 0.34f;
@@ -138,8 +149,8 @@ namespace BattleOfAges.UI
         /// <summary>Voices of a kind at once (the rest of a battle's clatter is dropped and handled by the crowd layer).</summary>
         private static int Cap(Kind k) =>
             k == Kind.Sword ? 4 :
-            k == Kind.Thud || k == Kind.BowShot || k == Kind.ArrowHit || k == Kind.Chop ? 3 :
-            k <= Kind.OrderWork || k == Kind.Fanfare || k == Kind.LevelUp || k == Kind.HeroDeath || k == Kind.AlarmBell || k == Kind.StandDown || k == Kind.RaiderHorn ? 1 : 2;
+            k == Kind.Thud || k == Kind.BowShot || k == Kind.ArrowHit || k == Kind.Chop || k == Kind.MagicHit ? 3 :
+            k <= Kind.OrderWork || k == Kind.Fanfare || k == Kind.LevelUp || k == Kind.HeroDeath || k == Kind.AlarmBell || k == Kind.StandDown || k == Kind.RaiderHorn || k == Kind.UpgradeBuilding || k == Kind.BuildingFinished ? 1 : 2;
 
         /// <summary>A sound not in the world (a reply to the player's click, a fanfare).</summary>
         public static void Play2D(Kind kind, float volume = 1f) => Start(kind, volume, 0f, 22000f);
@@ -168,9 +179,10 @@ namespace BattleOfAges.UI
         public static void Hit(HealthComponent target)
         {
             if (target == null || !Enabled) return;
-            if (target.TryGetComponent<AI.PeacefulAnimalAI>(out _))
+            if (target.TryGetComponent<AI.PeacefulAnimalAI>(out AI.PeacefulAnimalAI animal))
             {
-                At(Kind.AnimalHurt, target.transform.position, 0.85f);
+                Kind hurtKind = animal.Type == AI.AnimalType.Boar ? Kind.AnimalHurt : Kind.AnimalSmallHurt;
+                At(hurtKind, target.transform.position, 0.85f);
             }
             At(target.DamageReduction > 0.05f ? Kind.Sword : Kind.Thud, target.transform.position);
         }
@@ -319,11 +331,12 @@ namespace BattleOfAges.UI
                     s.Rustle(d, 0f, 0.12f, 650f, 0.38f);
                     s.Jingle(d, 0f, 0.17f, 11, 0.52f, v);
                     break;
-                case Kind.SelectKnight: // a plate clank, then mail
+                case Kind.SelectKnight: // a firm plate clank, then mail
                     d = Buf(0.45f);
-                    s.Click(d, 0f, 0.008f, 0.5f);
-                    s.Modes(d, 0f, Ratios(260f * (1f + 0.06f * v), 1f, 2.32f, 4.25f, 6.63f), new[] { 0.6f, 0.4f, 0.3f, 0.15f }, new[] { 9f, 14f, 20f, 28f });
-                    s.Jingle(d, 0.04f, 0.14f, 7, 0.35f, v);
+                    s.Click(d, 0f, 0.008f, 0.55f);
+                    s.Drop(d, 0f, 130f * (1f + 0.06f * v), 65f, 0.45f, 22f);
+                    s.Modes(d, 0f, Ratios(280f * (1f + 0.06f * v), 1f, 2.32f, 4.25f, 6.63f), new[] { 0.6f, 0.4f, 0.3f, 0.15f }, new[] { 9f, 14f, 20f, 28f });
+                    s.Jingle(d, 0.05f, 0.16f, 9, 0.42f, v);
                     break;
                 case Kind.SelectHero: // a soft clank and a rising horn call
                     d = Buf(0.62f);
@@ -331,10 +344,10 @@ namespace BattleOfAges.UI
                     s.Horn(d, 0.03f, 0.14f, 392f * (1f + 0.03f * v), 0.48f);
                     s.Horn(d, 0.16f, 0.44f, 587f * (1f + 0.03f * v), 0.55f, vibrato: true);
                     break;
-                case Kind.OrderMove: // two steps on earth
-                    d = Buf(0.3f);
-                    s.Step(d, 0f, 1f, v);
-                    s.Step(d, 0.13f, 0.8f, v);
+                case Kind.OrderMove: // two crisp marching steps on earth
+                    d = Buf(0.32f);
+                    s.Step(d, 0f, 1.0f, v);
+                    s.Step(d, 0.14f, 0.85f, v);
                     break;
                 case Kind.OrderAttack: // a sword drawn: rising scrape, a ring at the end
                     d = Buf(0.5f);
@@ -366,8 +379,8 @@ namespace BattleOfAges.UI
                     s.Band(d, 0f, 0.03f, 1200f, 1.5f, 0.4f, 90f);
                     break;
                 case Kind.Swing: // the whoosh of a swing
-                    d = Buf(0.26f);
-                    s.Sweep(d, 0f, 0.24f, 600f * (1f + 0.1f * v), 1800f, 1.5f, 0.7f, arch: true);
+                    d = Buf(0.28f);
+                    s.Sweep(d, 0f, 0.26f, 600f * (1f + 0.1f * v), 1850f, 1.5f, 0.72f, arch: true);
                     break;
                 case Kind.BowShot: // Karplus-Strong plucked bowstring + arrow hiss
                 {
@@ -376,24 +389,26 @@ namespace BattleOfAges.UI
                     s.Sweep(d, 0.015f, 0.22f, 2600f, 1450f, 1.2f, 0.25f, arch: true);
                     break;
                 }
-                case Kind.ArrowHit: // an arrow thunks in
-                    d = Buf(0.18f);
-                    s.Click(d, 0f, 0.004f, 0.5f);
-                    s.Modes(d, 0f, new[] { 240f * (1f + 0.07f * v), 610f }, new[] { 0.6f, 0.3f }, new[] { 35f, 50f });
-                    s.Drop(d, 0f, 110f, 80f, 0.4f, 30f);
+                case Kind.ArrowHit: // an arrow thunks in with shaft vibration
+                    d = Buf(0.22f);
+                    s.Click(d, 0f, 0.004f, 0.6f);
+                    s.Modes(d, 0f, new[] { 240f * (1f + 0.07f * v), 610f, 960f }, new[] { 0.6f, 0.35f, 0.18f }, new[] { 32f, 45f, 60f });
+                    s.Drop(d, 0f, 120f, 75f, 0.45f, 28f);
+                    s.Pluck(d, 0.01f, 0.16f, 310f * (1f + 0.06f * v), 0.28f, 0.982f);
                     break;
-                case Kind.Magic: // a shimmer rising, with sparkles
+                case Kind.Magic: // a shimmer rising, with sparkles and airy whoosh
                 {
                     d = Buf(0.55f);
-                    float b = 900f * (1f + 0.05f * v);
+                    float b = 900f * (1f + 0.06f * v);
                     float[] ph = new float[5];
                     for (int i = 0; i < d.Length; i++)
                     {
                         float t = i / (float)Rate, u = t / 0.55f, x = 0f;
                         for (int n = 0; n < 5; n++) { ph[n] += 2f * Mathf.PI * b * (1f + 0.5f * n) * (1f + 0.6f * u) / Rate; x += Mathf.Sin(ph[n]) / (n + 1); }
-                        d[i] += x * (0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 18f * t)) * Mathf.Clamp01(t / 0.03f) * Mathf.Exp(-t * 5f) * 0.5f;
+                        d[i] += x * (0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 18f * t)) * Mathf.Clamp01(t / 0.03f) * Mathf.Exp(-t * 4.5f) * 0.55f;
                     }
-                    for (int p = 0; p < 8; p++) s.Modes(d, s.Range(0.02f, 0.35f), new[] { s.Range(4000f, 8000f) }, new[] { 0.15f }, new[] { 40f });
+                    s.Sweep(d, 0f, 0.42f, 1200f * (1f + 0.05f * v), 3600f, 1.8f, 0.3f, arch: true);
+                    for (int p = 0; p < 8; p++) s.Modes(d, s.Range(0.02f, 0.35f), new[] { s.Range(4000f, 8000f) }, new[] { 0.18f }, new[] { 38f });
                     break;
                 }
                 case Kind.Chop: // an axe bites wood: a crack and the trunk's hollow knock
@@ -449,30 +464,33 @@ namespace BattleOfAges.UI
                     s.Sweep(d, 0f, 0.55f, 450f, 1600f * (1f + 0.05f * v), 0.9f, 0.7f, arch: true);
                     for (int p = 0; p < 12; p++) s.Click(d, s.Range(0.03f, 0.5f), 0.003f, 0.35f);
                     break;
-                case Kind.MeteorDrop: // falling whistle from the sky
+                case Kind.MeteorDrop: // falling whistle and roaring flame from the sky
                     d = Buf(0.85f);
-                    s.Sweep(d, 0f, 0.82f, 2200f * (1f + 0.05f * v), 320f, 3.5f, 0.65f, arch: true);
-                    s.Low(d, 0.2f, 0.62f, 260f, 0.5f, 3f);
+                    s.Sweep(d, 0f, 0.82f, 2200f * (1f + 0.05f * v), 320f, 3.2f, 0.68f, arch: true);
+                    s.Low(d, 0.15f, 0.68f, 280f * (1f + 0.05f * v), 0.58f, 2.5f);
                     break;
-                case Kind.MeteorImpact: // tectonic explosion and rock shatter
-                    d = Buf(1.25f);
-                    s.Click(d, 0f, 0.008f, 0.9f);
-                    s.Drop(d, 0f, 130f * (1f + 0.06f * v), 34f, 0.95f, 3.2f);
-                    s.Low(d, 0f, 1.2f, 240f, 0.9f, 2.8f);
-                    for (int p = 0; p < 14; p++)
-                        s.Band(d, s.Range(0.02f, 0.75f), 0.06f, s.Range(450f, 1800f), 1.8f, 0.45f, 35f);
-                    break;
-                case Kind.Lightning: // sharp electric crack followed by rolling thunder
-                    d = Buf(1.1f);
+                case Kind.MeteorImpact: // tectonic explosion, debris shatter and flame roar
+                    d = Buf(1.35f);
                     s.Click(d, 0f, 0.01f, 0.95f);
-                    s.Band(d, 0f, 0.14f, 3800f * (1f + 0.06f * v), 0.8f, 0.8f, 22f);
-                    s.Drop(d, 0.02f, 180f, 42f, 0.85f, 3.8f);
-                    s.Low(d, 0.04f, 1.0f, 320f * (1f + 0.05f * v), 0.8f, 3.2f);
+                    s.Drop(d, 0f, 135f * (1f + 0.06f * v), 32f, 0.98f, 2.8f);
+                    s.Low(d, 0f, 1.3f, 250f, 0.92f, 2.4f);
+                    for (int p = 0; p < 16; p++)
+                        s.Band(d, s.Range(0.02f, 0.82f), 0.07f, s.Range(450f, 1900f), 1.8f, 0.48f, 32f);
                     break;
-                case Kind.Heal: // warm harmonic chord and crystalline chimes
-                    d = Buf(0.7f);
-                    s.Modes(d, 0f, new[] { 523.25f * (1f + 0.03f * v), 659.25f, 783.99f, 1046.5f }, new[] { 0.4f, 0.35f, 0.3f, 0.22f }, new[] { 4.5f, 5f, 5.5f, 6.5f });
-                    s.Modes(d, 0.12f, new[] { 1567.98f * (1f + 0.04f * v), 2093f }, new[] { 0.2f, 0.15f }, new[] { 12f, 15f });
+                case Kind.Lightning: // sharp electric arc crack followed by rolling thunder
+                    d = Buf(1.15f);
+                    s.Click(d, 0f, 0.012f, 0.98f);
+                    s.Sweep(d, 0f, 0.16f, 6200f * (1f + 0.05f * v), 1800f, 1.4f, 0.7f);
+                    s.Band(d, 0f, 0.16f, 3900f * (1f + 0.06f * v), 0.8f, 0.85f, 20f);
+                    s.Drop(d, 0.02f, 185f, 40f, 0.88f, 3.4f);
+                    s.Low(d, 0.04f, 1.05f, 320f * (1f + 0.05f * v), 0.82f, 2.9f);
+                    break;
+                case Kind.Heal: // warm harp chord and crystalline chimes
+                    d = Buf(0.75f);
+                    s.Pluck(d, 0f, 0.68f, 523.25f * (1f + 0.03f * v), 0.45f, 0.994f);
+                    s.Pluck(d, 0.05f, 0.65f, 659.25f * (1f + 0.03f * v), 0.42f, 0.994f);
+                    s.Modes(d, 0f, new[] { 523.25f * (1f + 0.03f * v), 659.25f, 783.99f, 1046.5f }, new[] { 0.38f, 0.32f, 0.28f, 0.20f }, new[] { 4.2f, 4.8f, 5.2f, 6.2f });
+                    s.Modes(d, 0.12f, new[] { 1567.98f * (1f + 0.04f * v), 2093f }, new[] { 0.22f, 0.16f }, new[] { 10f, 13f });
                     break;
                 case Kind.Dash: // swift air rush and low impulse
                     d = Buf(0.28f);
@@ -481,51 +499,56 @@ namespace BattleOfAges.UI
                     break;
                 case Kind.CritHit: // heavy metallic cleave and deep impact
                 {
-                    d = Buf(0.55f);
+                    d = Buf(0.45f);
                     float f0 = 540f * (1f + 0.06f * v);
-                    s.Click(d, 0f, 0.006f, 0.9f);
-                    s.Drop(d, 0f, 170f, 52f, 0.85f, 14f);
-                    s.Modes(d, 0f, Ratios(f0, 1f, 2.41f, 4.78f, 7.9f), new[] { 0.6f, 0.45f, 0.35f, 0.2f }, new[] { 6.5f, 8.5f, 12f, 16f });
+                    s.Click(d, 0f, 0.006f, 0.95f);
+                    s.Drop(d, 0f, 175f, 48f, 0.9f, 12f);
+                    s.Band(d, 0f, 0.025f, 3400f, 1f, 0.65f, 140f);
+                    s.Modes(d, 0f, Ratios(f0, 1f, 2.41f, 4.78f, 7.9f), new[] { 0.62f, 0.45f, 0.35f, 0.2f }, new[] { 6.5f, 8.5f, 12f, 16f });
+                    s.Modes(d, 0f, Ratios(f0 * 1.005f, 1f, 2.41f), new[] { 0.32f, 0.22f }, new[] { 8f, 10f });
                     break;
                 }
                 case Kind.PiercingShot: // high-tension bowstring and supersonic whistle
                     d = Buf(0.45f);
                     s.Pluck(d, 0f, 0.35f, 220f * (1f + 0.06f * v), 0.8f, 0.991f);
-                    s.Sweep(d, 0.01f, 0.38f, 3800f * (1f + 0.05f * v), 1400f, 2.5f, 0.5f, arch: true);
+                    s.Sweep(d, 0.01f, 0.40f, 4100f * (1f + 0.05f * v), 1350f, 2.6f, 0.58f, arch: true);
                     break;
                 case Kind.Artifact: // mystical resonant bell and plucked harp triad
-                    d = Buf(0.75f);
-                    s.Pluck(d, 0f, 0.65f, 440f * (1f + 0.04f * v), 0.55f, 0.994f);
-                    s.Pluck(d, 0.07f, 0.60f, 659.25f * (1f + 0.04f * v), 0.5f, 0.994f);
-                    s.Modes(d, 0.14f, new[] { 880f * (1f + 0.04f * v), 1760f, 2640f }, new[] { 0.4f, 0.25f, 0.15f }, new[] { 4f, 6f, 9f });
+                    d = Buf(0.78f);
+                    s.Pluck(d, 0f, 0.68f, 440f * (1f + 0.04f * v), 0.55f, 0.994f);
+                    s.Pluck(d, 0.07f, 0.64f, 659.25f * (1f + 0.04f * v), 0.5f, 0.994f);
+                    s.Modes(d, 0.14f, new[] { 880f * (1f + 0.04f * v), 1760f, 2640f }, new[] { 0.42f, 0.28f, 0.16f }, new[] { 3.6f, 5.5f, 8.5f });
                     break;
-                case Kind.LevelUp: // triumphant brass and chime flourish
-                    d = Buf(0.95f);
-                    s.Horn(d, 0f, 0.18f, 440f * (1f + 0.02f * v), 0.48f);
-                    s.Horn(d, 0.16f, 0.18f, 554.37f * (1f + 0.02f * v), 0.52f);
-                    s.Horn(d, 0.32f, 0.58f, 659.25f * (1f + 0.02f * v), 0.62f, vibrato: true);
-                    s.Pluck(d, 0.32f, 0.58f, 1318.5f, 0.35f, 0.994f);
+                case Kind.LevelUp: // noble medieval brass & harp fanfare
+                    d = Buf(1.05f);
+                    s.Horn(d, 0f, 0.18f, 440f * (1f + 0.02f * v), 0.50f);
+                    s.Horn(d, 0.17f, 0.18f, 554.37f * (1f + 0.02f * v), 0.54f);
+                    s.Horn(d, 0.34f, 0.65f, 659.25f * (1f + 0.02f * v), 0.65f, vibrato: true);
+                    s.Pluck(d, 0.34f, 0.65f, 1318.5f * (1f + 0.02f * v), 0.38f, 0.994f);
+                    s.Modes(d, 0.34f, new[] { 659.25f * (1f + 0.02f * v), 1318.5f }, new[] { 0.22f, 0.15f }, new[] { 3.5f, 5f });
                     break;
-                case Kind.Promote: // armour clank and short proud horn note
-                    d = Buf(0.55f);
+                case Kind.Promote: // armour clank and proud double horn call
+                    d = Buf(0.62f);
                     s.Jingle(d, 0f, 0.18f, 8, 0.45f, v);
-                    s.Horn(d, 0.08f, 0.42f, 493.88f * (1f + 0.03f * v), 0.55f, vibrato: true);
+                    s.Horn(d, 0.05f, 0.15f, 392f * (1f + 0.03f * v), 0.48f);
+                    s.Horn(d, 0.19f, 0.40f, 493.88f * (1f + 0.03f * v), 0.58f, vibrato: true);
                     break;
-                case Kind.HeroDeath: // deep solemn tolling bell and low horn
-                    d = Buf(1.35f);
-                    s.Modes(d, 0f, new[] { 196f * (1f + 0.03f * v), 392f, 466.16f, 784f }, new[] { 0.65f, 0.4f, 0.3f, 0.18f }, new[] { 2.2f, 3.2f, 4.0f, 6.0f });
-                    s.Horn(d, 0.08f, 1.15f, 196f * (1f + 0.02f * v), 0.45f);
+                case Kind.HeroDeath: // deep solemn castle tolling bell and mournful low horn
+                    d = Buf(1.45f);
+                    s.Modes(d, 0f, new[] { 174.61f * (1f + 0.03f * v), 349.23f, 415.30f, 698.46f }, new[] { 0.68f, 0.42f, 0.32f, 0.18f }, new[] { 2.0f, 2.8f, 3.6f, 5.2f });
+                    s.Horn(d, 0.08f, 1.25f, 174.61f * (1f + 0.02f * v), 0.48f);
                     break;
                 case Kind.StepGrass: // soft earth step and grass brush
                     d = Buf(0.18f);
                     s.Step(d, 0f, 0.85f, v);
                     s.Rustle(d, 0.01f, 0.12f, 2400f * (1f + 0.06f * v), 0.35f);
                     break;
-                case Kind.StepSplash: // water splash and droplets
-                    d = Buf(0.32f);
-                    s.Band(d, 0f, 0.24f, 1100f * (1f + 0.07f * v), 0.8f, 0.65f, 14f);
+                case Kind.StepSplash: // crisp shallow water splash and droplets
+                    d = Buf(0.28f);
+                    s.Band(d, 0f, 0.22f, 1150f * (1f + 0.07f * v), 0.85f, 0.7f, 16f);
+                    s.Drop(d, 0f, 180f, 90f, 0.35f, 24f);
                     for (int p = 0; p < 6; p++)
-                        s.Modes(d, s.Range(0.02f, 0.22f), new[] { s.Range(900f, 2400f) }, new[] { 0.25f }, new[] { 45f });
+                        s.Modes(d, s.Range(0.02f, 0.20f), new[] { s.Range(950f, 2500f) }, new[] { 0.25f }, new[] { 48f });
                     break;
                 case Kind.Jump: // quick cloth rustle and springy push-off
                     d = Buf(0.22f);
@@ -547,11 +570,11 @@ namespace BattleOfAges.UI
                     for (int c = 0; c < 5; c++)
                         s.Modes(d, c * 0.055f + s.Range(0f, 0.015f), new[] { (2800f + c * 320f) * (1f + 0.04f * v), 5800f + c * 410f }, new[] { 0.45f, 0.28f }, new[] { 28f, 42f });
                     break;
-                case Kind.Gate: // heavy timber creak and iron latch
+                case Kind.Gate: // heavy castle timber gate and iron bolt
                     d = Buf(0.55f);
-                    s.Sweep(d, 0f, 0.42f, 260f * (1f + 0.06f * v), 180f, 4f, 0.55f, arch: true);
-                    s.Drop(d, 0.38f, 110f, 58f, 0.7f, 18f);
-                    s.Modes(d, 0.38f, new[] { 420f, 980f }, new[] { 0.4f, 0.25f }, new[] { 24f, 36f });
+                    s.Sweep(d, 0f, 0.42f, 230f * (1f + 0.06f * v), 150f, 4f, 0.58f, arch: true);
+                    s.Drop(d, 0.36f, 115f, 55f, 0.78f, 16f);
+                    s.Modes(d, 0.36f, new[] { 420f * (1f + 0.04f * v), 980f }, new[] { 0.45f, 0.28f }, new[] { 22f, 34f });
                     break;
                 case Kind.ZonePaint: // soft parchment brush and wooden peg tap
                     d = Buf(0.18f);
@@ -563,10 +586,89 @@ namespace BattleOfAges.UI
                     s.Horn(d, 0f, 0.26f, 115f * (1f + 0.08f * v), 0.55f);
                     s.Band(d, 0f, 0.26f, 340f * (1f + 0.06f * v), 1.8f, 0.6f, 12f);
                     break;
-                case Kind.RaiderHorn: // low menacing war-horn blast
-                    d = Buf(0.95f);
-                    s.Horn(d, 0f, 0.88f, 146.83f * (1f + 0.04f * v), 0.7f, vibrato: true);
-                    s.Low(d, 0f, 0.5f, 220f, 0.35f, 4f);
+                case Kind.RaiderHorn: // low menacing war-horn blast with brass fifth resonance
+                    d = Buf(1.15f);
+                    s.Horn(d, 0f, 1.08f, 146.83f * (1f + 0.04f * v), 0.72f, vibrato: true);
+                    s.Horn(d, 0.04f, 1.00f, 220f * (1f + 0.04f * v), 0.32f);
+                    s.Low(d, 0f, 0.6f, 220f, 0.32f, 3.5f);
+                    break;
+                case Kind.OrePickup: // stony crystal clink dropped into pouch
+                    d = Buf(0.26f);
+                    s.Click(d, 0f, 0.003f, 0.65f);
+                    s.Modes(d, 0f, new[] { 1450f * (1f + 0.07f * v), 2900f * (1f + 0.07f * v), 4350f }, new[] { 0.48f, 0.34f, 0.22f }, new[] { 24f, 36f, 52f });
+                    s.Step(d, 0.05f, 0.55f, v);
+                    s.Modes(d, 0.09f, new[] { 1720f * (1f + 0.06f * v), 3440f }, new[] { 0.35f, 0.22f }, new[] { 30f, 44f });
+                    break;
+                case Kind.TreeFall: // wood splits, branches swoosh, heavy trunk hits earth
+                    d = Buf(1.25f);
+                    for (int k = 0; k < 5; k++)
+                        s.Band(d, k * 0.09f + s.Range(0f, 0.03f), 0.04f, s.Range(900f, 2100f) * (1f + 0.06f * v), 2.2f, 0.58f, 65f);
+                    s.Sweep(d, 0.16f, 0.68f, 1900f * (1f + 0.05f * v), 520f, 1.3f, 0.65f, arch: true);
+                    s.Drop(d, 0.62f, 95f * (1f + 0.06f * v), 36f, 0.96f, 4.5f);
+                    s.Low(d, 0.62f, 0.58f, 260f, 0.80f, 4.0f);
+                    s.Rustle(d, 0.64f, 0.42f, 1350f, 0.40f);
+                    break;
+                case Kind.Land: // weighted landing thud with cloth rustle
+                    d = Buf(0.20f);
+                    s.Drop(d, 0f, 115f * (1f + 0.06f * v), 52f, 0.78f, 22f);
+                    s.Step(d, 0f, 0.9f, v);
+                    s.Rustle(d, 0f, 0.14f, 1400f, 0.35f);
+                    break;
+                case Kind.HeroHurt: // blunt impact on hero armour/flesh and sharp exhale
+                    d = Buf(0.30f);
+                    s.Drop(d, 0f, 155f * (1f + 0.07f * v), 64f, 0.85f, 18f);
+                    s.Band(d, 0f, 0.18f, 460f * (1f + 0.06f * v), 1.6f, 0.65f, 14f);
+                    s.Modes(d, 0.01f, new[] { 190f * (1f + 0.05f * v), 380f }, new[] { 0.42f, 0.2f }, new[] { 12f, 18f });
+                    break;
+                case Kind.ShieldBlock: // crisp shield parry (iron boss + hardwood absorb)
+                    d = Buf(0.36f);
+                    s.Click(d, 0f, 0.005f, 0.85f);
+                    s.Drop(d, 0f, 185f * (1f + 0.06f * v), 82f, 0.75f, 20f);
+                    s.Modes(d, 0f, new[] { 440f * (1f + 0.06f * v), 1020f, 1680f, 2490f }, new[] { 0.55f, 0.42f, 0.30f, 0.18f }, new[] { 12f, 16f, 22f, 30f });
+                    break;
+                case Kind.BuildingFinished: // final hammer taps + warm wooden/brass completion chord
+                    d = Buf(0.85f);
+                    for (int tap = 0; tap < 2; tap++)
+                        s.Modes(d, tap * 0.12f, new[] { 820f * (1f + 0.04f * v), 1950f }, new[] { 0.45f, 0.25f }, new[] { 35f, 50f });
+                    s.Horn(d, 0.20f, 0.22f, 392f * (1f + 0.03f * v), 0.48f);
+                    s.Horn(d, 0.36f, 0.44f, 587.33f * (1f + 0.03f * v), 0.56f, vibrato: true);
+                    s.Pluck(d, 0.36f, 0.44f, 1174.66f, 0.32f, 0.993f);
+                    break;
+                case Kind.UpgradeBuilding: // masonry set + triumphant brass & harp upgrade fanfare
+                    d = Buf(1.05f);
+                    s.Modes(d, 0f, new[] { 480f * (1f + 0.05f * v), 1240f }, new[] { 0.48f, 0.26f }, new[] { 25f, 38f });
+                    s.Horn(d, 0.08f, 0.18f, 440f * (1f + 0.03f * v), 0.48f);
+                    s.Horn(d, 0.25f, 0.18f, 554.37f * (1f + 0.03f * v), 0.52f);
+                    s.Horn(d, 0.42f, 0.58f, 659.25f * (1f + 0.03f * v), 0.62f, vibrato: true);
+                    s.Pluck(d, 0.42f, 0.58f, 880f, 0.38f, 0.994f);
+                    break;
+                case Kind.CraftComplete: // anvil bell strike + quenching steam hiss
+                    d = Buf(0.65f);
+                    s.Click(d, 0f, 0.004f, 0.7f);
+                    s.Modes(d, 0f, new[] { 1150f * (1f + 0.05f * v), 2480f, 3920f }, new[] { 0.58f, 0.40f, 0.24f }, new[] { 8f, 12f, 18f });
+                    s.Band(d, 0.14f, 0.46f, 3200f * (1f + 0.06f * v), 0.9f, 0.55f, 6f);
+                    break;
+                case Kind.EquipGear: // leather strap pull, buckle snap and mail clink
+                    d = Buf(0.32f);
+                    s.Rustle(d, 0f, 0.18f, 950f * (1f + 0.06f * v), 0.48f);
+                    s.Jingle(d, 0.04f, 0.18f, 7, 0.46f, v);
+                    s.Modes(d, 0.08f, new[] { 360f * (1f + 0.06f * v), 860f }, new[] { 0.45f, 0.30f }, new[] { 24f, 36f });
+                    break;
+                case Kind.MagicHit: // crystalline arcane impact and spark discharge
+                    d = Buf(0.34f);
+                    s.Drop(d, 0f, 220f * (1f + 0.07f * v), 72f, 0.65f, 18f);
+                    s.Sweep(d, 0f, 0.28f, 2500f * (1f + 0.06f * v), 620f, 1.8f, 0.58f, arch: true);
+                    s.Modes(d, 0f, new[] { 1320f * (1f + 0.06f * v), 2640f, 3960f }, new[] { 0.42f, 0.28f, 0.18f }, new[] { 16f, 24f, 32f });
+                    break;
+                case Kind.ZoneErase: // descending parchment brush swipe
+                    d = Buf(0.18f);
+                    s.Sweep(d, 0f, 0.16f, 1850f * (1f + 0.07f * v), 680f, 1.3f, 0.55f, arch: true);
+                    s.Modes(d, 0.02f, new[] { 410f * (1f + 0.06f * v), 920f }, new[] { 0.45f, 0.20f }, new[] { 55f, 75f });
+                    break;
+                case Kind.AnimalSmallHurt: // high-pitched wildlife squeak / startled cry (deer/rabbit)
+                    d = Buf(0.26f);
+                    s.Sweep(d, 0f, 0.22f, 1550f * (1f + 0.08f * v), 820f, 2.2f, 0.62f, arch: true);
+                    s.Modes(d, 0.01f, new[] { 960f * (1f + 0.08f * v), 1920f * (1f + 0.08f * v) }, new[] { 0.48f, 0.28f }, new[] { 18f, 26f });
                     break;
                 default: // Fanfare: three rising notes on a brass horn
                     d = Buf(1.15f);

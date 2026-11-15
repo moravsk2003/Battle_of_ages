@@ -153,6 +153,7 @@ namespace BattleOfAges.Resources
                 {
                     fellingChopProgress = 0f;
                     ConvertToWoodPile();
+                    BattleOfAges.UI.GameSound.At(BattleOfAges.UI.GameSound.Kind.TreeFall, transform.position);
                     
                     // Yield initial 4 wood on tree fell
                     int fellYield = Mathf.Min(4, currentWoodRemaining);

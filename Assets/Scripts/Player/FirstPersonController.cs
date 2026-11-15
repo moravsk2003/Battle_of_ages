@@ -150,7 +150,7 @@ namespace BattleOfAges.Player
             }
             else if (isGrounded && !wasGrounded && velocity.y <= GROUND_STICK_FORCE)
             {
-                GameSound.Play2D(GameSound.Kind.StepGrass, 0.5f);
+                GameSound.Play2D(GameSound.Kind.Land, 0.55f);
             }
             wasGrounded = isGrounded;
 

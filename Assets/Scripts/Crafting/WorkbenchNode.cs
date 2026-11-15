@@ -265,11 +265,13 @@ namespace BattleOfAges.Crafting
             if (task.IsSmelt)
             {
                 ResourceManager.Instance?.For(transform.position).AddOre(task.SmeltTier + 1, task.SmeltCount);
+                GameSound.At(GameSound.Kind.CraftComplete, transform.position);
                 StrategyHud.Notify($"Переплавлено: руда {CraftingTask.Tier(task.SmeltTier + 1)} ×{task.SmeltCount}");
                 return;
             }
             var item = new Item(task.Type, task.Level);
             Armory.Instance.Add(item);
+            GameSound.At(GameSound.Kind.CraftComplete, transform.position);
             OnItemCrafted?.Invoke(item);
             StrategyHud.Notify("Виготовлено: " + item);
         }

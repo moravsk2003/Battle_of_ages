@@ -68,6 +68,7 @@ namespace BattleOfAges.Managers
         public void ToggleMode()
         {
             GameMode nextMode = (CurrentMode == GameMode.FirstPerson) ? GameMode.RtsMap : GameMode.FirstPerson;
+            BattleOfAges.UI.UiSound.Play(BattleOfAges.UI.UiSound.Kind.Open);
             SetGameMode(nextMode);
         }
 

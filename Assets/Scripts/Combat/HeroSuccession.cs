@@ -75,10 +75,12 @@ namespace BattleOfAges.Combat
             if (heir == null)
             {
                 IsGameOver = true;
+                UI.GameSound.Play2D(UI.GameSound.Kind.HeroDeath);
                 GameOver?.Invoke(this);
                 return;
             }
             TakeOver(heir);
+            UI.GameSound.Play2D(UI.GameSound.Kind.Fanfare);
             NewHero?.Invoke(this);
         }
 

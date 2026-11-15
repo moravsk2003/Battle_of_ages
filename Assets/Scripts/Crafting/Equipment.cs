@@ -271,6 +271,7 @@ namespace BattleOfAges.Crafting
                 if (i.IsEmpty) continue;
                 if (pick-- > 0) continue;
                 Armory.Instance.Add(i);
+                GameSound.At(GameSound.Kind.EquipGear, transform.position);
                 StrategyHud.Notify("Трофей: " + i);
                 return;
             }

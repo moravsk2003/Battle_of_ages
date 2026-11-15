@@ -47,6 +47,7 @@ namespace BattleOfAges.Building
         {
             if (!CanUpgrade(out string reason))
             {
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(reason);
                 return false;
             }
@@ -58,6 +59,7 @@ namespace BattleOfAges.Building
                 rm.ConsumeOreAtLeast(tier, ore);
             }
             level++;
+            GameSound.Play2D(GameSound.Kind.UpgradeBuilding);
             StrategyHud.Notify($"Стіни {ItemTypeNames.Roman(level)}: +{Mathf.RoundToInt(DamageBonus * 100f)}% шкоди зі стін");
             return true;
         }

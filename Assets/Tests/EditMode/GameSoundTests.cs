@@ -106,6 +106,10 @@ namespace BattleOfAges.Tests
                 Assert.Greater(Math.Sqrt(sum / loop.Length), 0.02);
             }
 
+            float[] w8 = Ambience.Water(8f, 33);
+            Assert.AreEqual(8 * GameSound.Rate, w8.Length);
+            Assert.LessOrEqual(Mathf.Abs(w8[w8.Length - 1] - w8[0]), 0.05f, "water loop seam");
+
             for (int s = 70; s < 73; s++)
             {
                 float[] owl = Ambience.Owl(s);
@@ -142,6 +146,16 @@ namespace BattleOfAges.Tests
                 float[] d = UiSound.Synth(kind);
                 Assert.Greater(d.Length, GameSound.Rate / 40, kind + ": length");
                 Assert.Less(Mathf.Abs(d[d.Length - 1]), 0.01f, kind + ": ends quietly");
+                double sum = 0;
+                float peak = 0f;
+                foreach (float x in d)
+                {
+                    Assert.IsFalse(float.IsNaN(x) || float.IsInfinity(x), kind + ": NaN/Inf");
+                    peak = Mathf.Max(peak, Mathf.Abs(x));
+                    sum += x * x;
+                }
+                Assert.Greater(peak, 0.1f, kind + ": peak");
+                Assert.Greater(Math.Sqrt(sum / d.Length), 0.01, kind + ": RMS");
             }
         }
 
@@ -153,7 +167,10 @@ namespace BattleOfAges.Tests
             Directory.CreateDirectory(dir);
             foreach (GameSound.Kind kind in Enum.GetValues(typeof(GameSound.Kind)))
                 for (int v = 0; v < GameSound.Variants; v++) Wav(Path.Combine(dir, $"{kind}_{v}.wav"), GameSound.Synth(kind, v));
+            foreach (UiSound.Kind kind in Enum.GetValues(typeof(UiSound.Kind)))
+                Wav(Path.Combine(dir, $"Ui_{kind}.wav"), UiSound.Synth(kind));
             Wav(Path.Combine(dir, "Ambience_Wind.wav"), Ambience.Wind(10f, 11));
+            Wav(Path.Combine(dir, "Ambience_WaterLoop.wav"), Ambience.Water(8f, 33));
             for (int s = 0; s < 6; s++) Wav(Path.Combine(dir, $"Ambience_Bird_{s}.wav"), Ambience.Bird(40 + s));
         }
 

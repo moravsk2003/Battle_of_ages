@@ -24,11 +24,13 @@ namespace BattleOfAges.Combat
             {
                 if (hero != null) Outfit(hero, GameBalance.EmpireHeroGear);
                 foreach (RtsUnit u in UnitRegistry.ActiveUnits) if (u != null) ApplyTo(u.gameObject);
+                UI.GameSound.Play2D(UI.GameSound.Kind.Fanfare);
                 UI.StrategyHud.Notify("Центральна імперія: усе військо в спорядженні, будівництво безкоштовне");
             }
             else
             {
                 WorldEpoch++;
+                UI.GameSound.Play2D(UI.GameSound.Kind.RaiderHorn);
                 UI.StrategyHud.Notify($"Центральну імперію знищено — настала нова епоха світу ({WorldEpoch})");
             }
         }
@@ -58,6 +60,7 @@ namespace BattleOfAges.Combat
         public static void NpcEmpireFell()
         {
             WorldEpoch++;
+            UI.GameSound.Play2D(UI.GameSound.Kind.RaiderHorn);
             UI.StrategyHud.Notify($"Центральну імперію знищено — настала нова епоха світу ({WorldEpoch})");
         }
 

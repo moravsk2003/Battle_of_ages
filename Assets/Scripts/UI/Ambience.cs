@@ -12,7 +12,7 @@ namespace BattleOfAges.UI
     /// </summary>
     public sealed class Ambience : MonoBehaviour
     {
-        private const float WindLoopSeconds = 10f, CricketLoopSeconds = 6f, WaterLoopSeconds = 5f, CampfireLoopSeconds = 5f, BattleLoopSeconds = 4f;
+        private const float WindLoopSeconds = 10f, CricketLoopSeconds = 6f, WaterLoopSeconds = 8f, CampfireLoopSeconds = 5f, BattleLoopSeconds = 4f;
         private const int BirdVariants = 6, OwlVariants = 3;
 
         private AudioSource wind, crickets, water, campfire, battle, birds;
@@ -194,23 +194,27 @@ namespace BattleOfAges.UI
             return CrossfadeLoop(d, n, fade, 0.75f);
         }
 
-        /// <summary>Gentle lake shore water lapping loop.</summary>
+        /// <summary>Gentle lake shore water lapping loop with soft droplet texture.</summary>
         public static float[] Water(float seconds, int seed)
         {
             var r = new System.Random(seed);
-            int rate = GameSound.Rate, n = (int)(seconds * rate), fade = rate / 2;
+            int rate = GameSound.Rate, n = (int)(seconds * rate), fade = rate;
             var d = new float[n + fade];
             var bq = new GameSound.Biquad();
-            GameSound.Biquad lp = GameSound.Biquad.LowPass(1100f);
+            GameSound.Biquad lp = GameSound.Biquad.LowPass(1250f), shimmer = GameSound.Biquad.BandPass(2200f, 3f);
+            float bubble = 0f, ph = 0f, bf = 900f;
             for (int i = 0; i < d.Length; i++)
             {
                 float t = i / (float)rate, w = 2f * Mathf.PI / seconds;
-                float wave = 0.5f + 0.35f * Mathf.Sin(2f * w * t) + 0.15f * Mathf.Sin(5f * w * t + 0.8f);
-                if (i % 64 == 0) bq.SetBand(380f + 520f * wave, 2.2f);
+                float wave = 0.52f + 0.30f * Mathf.Sin(2f * w * t) + 0.14f * Mathf.Sin(5f * w * t + 0.8f) + 0.04f * Mathf.Sin(9f * w * t + 2.1f);
+                if (i % 64 == 0) bq.SetBand(340f + 560f * wave, 1.9f);
                 float white = (float)r.NextDouble() * 2f - 1f;
-                d[i] = lp.Run(bq.Run(white)) * wave;
+                if (r.NextDouble() < 0.0005) { bubble = 0.25f + (float)r.NextDouble() * 0.35f; bf = 750f + (float)r.NextDouble() * 900f; }
+                bubble *= 0.996f;
+                ph += 2f * Mathf.PI * bf / rate;
+                d[i] = (lp.Run(bq.Run(white)) * wave + shimmer.Run(white) * 0.12f * wave + Mathf.Sin(ph) * bubble * 0.15f);
             }
-            return CrossfadeLoop(d, n, fade, 0.75f);
+            return CrossfadeLoop(d, n, fade, 0.78f);
         }
 
         /// <summary>Warm hearth / campfire crackle loop near settlements.</summary>

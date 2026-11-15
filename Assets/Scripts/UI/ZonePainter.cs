@@ -135,6 +135,7 @@ namespace BattleOfAges.UI
             {
                 lastRefusal = refused;
                 refusalAt = Time.unscaledTime;
+                UiSound.Play(UiSound.Kind.Error);
                 StrategyHud.Notify(refused);
             }
         }
@@ -156,7 +157,9 @@ namespace BattleOfAges.UI
         public static void EraseStroke(Vector3 from, Vector3 to, float radius)
         {
             int steps = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(from, to) / (radius * 0.5f)));
-            for (int i = 1; i <= steps; i++) ZoneMap.Erase(Vector3.Lerp(from, to, i / (float)steps), radius);
+            int erased = 0;
+            for (int i = 1; i <= steps; i++) erased += ZoneMap.Erase(Vector3.Lerp(from, to, i / (float)steps), radius);
+            if (erased > 0) GameSound.Play2D(GameSound.Kind.ZoneErase, 0.5f);
         }
 
         private Material Material()

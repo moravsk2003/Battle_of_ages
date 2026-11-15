@@ -92,8 +92,8 @@ namespace BattleOfAges.Combat
         public void TakeDamage(int damage, bool ignoreArmor = false)
         {
             if (!IsAlive || damage <= 0) return;
-            if (Time.time < InvulnerableUntil) return; // the Full heal artifact's moment
-            if (IgnoreEveryNthHit > 0 && ++hitCounter >= IgnoreEveryNthHit) { hitCounter = 0; return; }
+            if (Time.time < InvulnerableUntil) { UI.GameSound.At(UI.GameSound.Kind.ShieldBlock, transform.position); return; } // the Full heal artifact's moment
+            if (IgnoreEveryNthHit > 0 && ++hitCounter >= IgnoreEveryNthHit) { hitCounter = 0; UI.GameSound.At(UI.GameSound.Kind.ShieldBlock, transform.position); return; }
             if (!ignoreArmor && DamageReduction > 0f) damage = Mathf.Max(1, Mathf.RoundToInt(damage * (1f - Mathf.Min(DamageReduction, GameBalance.MaxDamageReduction))));
 
             currentHealth = Mathf.Max(0, currentHealth - damage);
@@ -108,6 +108,10 @@ namespace BattleOfAges.Combat
             {
                 UI.GameSound.Died(this);
                 OnDeath?.Invoke();
+            }
+            else if (Managers.GameContext.Player == gameObject)
+            {
+                UI.GameSound.Play2D(UI.GameSound.Kind.HeroHurt, 0.65f);
             }
         }
 

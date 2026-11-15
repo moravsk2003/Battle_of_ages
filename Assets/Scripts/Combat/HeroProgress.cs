@@ -96,6 +96,7 @@ namespace BattleOfAges.Combat
             Equipment gear = GetComponent<Equipment>();
             if (c == HeroClass.Mage && gear != null && gear[EquipSlot.Weapon].Equals(new Item(ItemType.Sword, 0))) gear.Equip(new Item(ItemType.Staff, 0));
             ApplyStats();
+            if (combat == null || combat.Team == RTS.UnitSpatialGrid.TeamPlayer) UI.GameSound.Play2D(UI.GameSound.Kind.Promote);
             Changed?.Invoke(this);
             return true;
         }
@@ -149,6 +150,7 @@ namespace BattleOfAges.Combat
             attributePoints--;
             bucket++;
             ApplyStats();
+            if (combat == null || combat.Team == RTS.UnitSpatialGrid.TeamPlayer) UI.UiSound.Play(UI.UiSound.Kind.Success);
             Changed?.Invoke(this);
             return true;
         }

@@ -74,6 +74,7 @@ namespace BattleOfAges.Combat
             Vector3 to = aim - transform.position;
             if (to.magnitude <= HitDistance)
             {
+                UI.GameSound.At(UI.GameSound.Kind.MagicHit, target.transform.position, 0.65f);
                 if (caster != null) caster.DeliverHit(target, damage, ignoreArmor: true);
                 else target.TakeDamage(damage, ignoreArmor: true);
                 Destroy(gameObject);
