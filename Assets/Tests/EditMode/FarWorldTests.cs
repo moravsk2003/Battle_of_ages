@@ -285,17 +285,32 @@ namespace BattleOfAges.Tests
                 world.Add(Kingdom("Світ " + i, new Vector3(Mathf.Cos(a) * 3000f, 0f, Mathf.Sin(a) * 3000f), 3, 200, 300));
             }
             Run(world, 5); // armies out, in the worst of it
+            // Each kingdom over three hours, its median: one garbage collection in the middle of a single sample failed the
+            // build now and then (4.8 ms once, 1.25 ms three times in a row alone; KNOWN_ISSUES 49)
+            System.GC.Collect();
+            System.GC.WaitForPendingFinalizers();
+            const int Hours = 3;
+            var samples = new double[world.Count, Hours];
             var watch = Stopwatch.StartNew();
+            for (int h = 0; h < Hours; h++)
+                for (int k = 0; k < world.Count; k++)
+                {
+                    KingdomState s = world[k];
+                    double t0 = watch.Elapsed.TotalMilliseconds;
+                    s.Age += 1f;
+                    KingdomRealm.Advance(s, 1f);
+                    FarWorld.Hour(s, world, 1f, rng);
+                    samples[k, h] = watch.Elapsed.TotalMilliseconds - t0;
+                }
             double worst = 0;
-            foreach (KingdomState s in world)
+            for (int k = 0; k < world.Count; k++)
             {
-                double t0 = watch.Elapsed.TotalMilliseconds;
-                s.Age += 1f;
-                KingdomRealm.Advance(s, 1f);
-                FarWorld.Hour(s, world, 1f, rng);
-                worst = System.Math.Max(worst, watch.Elapsed.TotalMilliseconds - t0);
+                var one = new double[Hours];
+                for (int h = 0; h < Hours; h++) one[h] = samples[k, h];
+                System.Array.Sort(one);
+                worst = System.Math.Max(worst, one[Hours / 2]);
             }
-            TestContext.WriteLine($"30 kingdoms of 500: {watch.Elapsed.TotalMilliseconds:0.00} ms in all, the slowest {worst:0.00} ms");
+            TestContext.WriteLine($"30 kingdoms of 500, 3 hours: {watch.Elapsed.TotalMilliseconds:0.00} ms in all, the slowest kingdom's median {worst:0.00} ms");
             Assert.Less(worst, GameBalance.FarTickBudgetMs * 2f, "one kingdom fits a frame's budget (twice over for the editor's noise)");
         }
     }

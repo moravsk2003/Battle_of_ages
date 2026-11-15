@@ -121,13 +121,14 @@ namespace BattleOfAges.PlayModeTests
             NpcKingdom k = NpcKingdom.Found(Far, "Test", 4, 10, HeroClass.Tank);
             yield return null;
             HealthComponent intruder = PlayerSide(k.Home + new Vector3(30f, 0f, 0f), UnitRank.General, "Intruder"); // (the kingdom settles on level ground near Far)
-            yield return Until(() => intruder.CurrentHealth < intruder.MaxHealth, 30f);
+            // People think in turns (CrowdSim): at the first blow only one or two may have picked the intruder yet, so wait for
+            // three as well, not only for the first blow (it failed a full run in three that way; KNOWN_ISSUES 36)
+            int Fighting() { int n = 0; foreach (HostileMobAI m in k.Subjects) if (m.CurrentCombatTarget == intruder) n++; return n; }
+            yield return Until(() => intruder.CurrentHealth < intruder.MaxHealth && Fighting() >= 3, 30f);
             var why = new System.Text.StringBuilder($"home {k.Home}, intruder at {intruder.transform.position}, world {World.WorldSettings.Size}, king {(k.King != null ? k.King.CurrentStateType.ToString() : "-")};");
             foreach (HostileMobAI m in k.Subjects) why.Append($" [{m.CurrentStateType} {intruder.DistanceFrom(m.transform.position):0.0} m, range {m.AttackRange:0.0}, target {(m.CurrentCombatTarget != null ? m.CurrentCombatTarget.name : "-")}, dest {m.HasDestination}, can {m.Combat.CanAttack}]");
             Assert.Less(intruder.CurrentHealth, intruder.MaxHealth, "the kingdom fought the intruder at 30 m: " + why);
-            int fighting = 0;
-            foreach (HostileMobAI m in k.Subjects) if (m.CurrentCombatTarget == intruder) fighting++;
-            Assert.GreaterOrEqual(fighting, 3, "the people too");
+            Assert.GreaterOrEqual(Fighting(), 3, "the people too: " + why);
         }
     }
 }

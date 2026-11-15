@@ -54,7 +54,7 @@ namespace BattleOfAges.PlayModeTests
             for (int i = UnityEngine.SceneManagement.SceneManager.sceneCount - 1; i >= 0; i--)
             {
                 UnityEngine.SceneManagement.Scene scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
-                if (scene != empty && scene.isLoaded) yield return UnityEngine.SceneManagement.SceneManager.UnloadSceneAsync(scene);
+                if (scene != empty && scene.isLoaded && !scene.name.StartsWith("InitTestScene")) yield return UnityEngine.SceneManagement.SceneManager.UnloadSceneAsync(scene);
             }
         }
 

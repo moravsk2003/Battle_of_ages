@@ -53,12 +53,14 @@ namespace BattleOfAges.Net
         private NetworkPipeline reliable, fast, bulk;
         private readonly Dictionary<int, NetworkConnection> peers = new Dictionary<int, NetworkConnection>();
         private readonly List<int> gone = new List<int>();
+        /// <summary>Connections let go: what they still send is read and dropped till they are gone (left in the queue, the
+        /// transport logged "Resetting event queue with pending events" when they went).</summary>
+        private readonly List<NetworkConnection> leaving = new List<NetworkConnection>();
         private readonly Queue<(int peer, byte[] data)> reliableBacklog = new Queue<(int, byte[])>();
         private readonly Queue<(int peer, byte[] data)> bulkBacklog = new Queue<(int, byte[])>();
         private double bulkAllowance = BulkPiece + 1;
         private long bulkTicks = System.Diagnostics.Stopwatch.GetTimestamp();
         private int nextPeer = 1;
-        private byte[] buffer = new byte[4096];
         private readonly Dictionary<(int, NetChannel), System.IO.MemoryStream> assembling = new Dictionary<(int, NetChannel), System.IO.MemoryStream>();
         private bool disposed;
 
@@ -113,6 +115,11 @@ namespace BattleOfAges.Net
             gone.Clear();
             foreach (KeyValuePair<int, NetworkConnection> p in peers) Drain(p.Key, p.Value);
             foreach (int id in gone) if (peers.Remove(id)) Disconnected?.Invoke(id);
+            for (int i = leaving.Count - 1; i >= 0; i--)
+            {
+                Discard(leaving[i]);
+                if (driver.GetConnectionState(leaving[i]) == NetworkConnection.State.Disconnected) leaving.RemoveAt(i);
+            }
             FlushBacklog();
             FlushBulk();
         }
@@ -120,40 +127,60 @@ namespace BattleOfAges.Net
         /// <summary>Bulk pieces waiting to go (tests).</summary>
         public int BulkWaiting => bulkBacklog.Count;
 
+        private readonly List<(NetworkEvent.Type type, NetworkPipeline pipeline, byte[] data)> drained = new List<(NetworkEvent.Type, NetworkPipeline, byte[])>();
+
+        /// <summary>
+        /// Reads what came for one peer. A player gone and another come in the same update share the transport's number for a
+        /// connection: the one gone can no longer read its queue, so its last data and its goodbye turn up in the newcomer's.
+        /// A goodbye on a connection still up is such a stranger's: it and all before it are dropped (taken for the newcomer's,
+        /// it lost the newcomer, kept the one gone as a ghost, and the newcomer's data stayed unread: "Resetting event queue").
+        /// A connection down is gone once its queue is read (its last data, a guest's save going away, is still delivered).
+        /// </summary>
         private void Drain(int peer, NetworkConnection connection)
         {
+            drained.Clear();
+            int from = 0;
             NetworkEvent.Type type;
             while ((type = driver.PopEventForConnection(connection, out DataStreamReader stream, out NetworkPipeline pipeline)) != NetworkEvent.Type.Empty)
             {
-                switch (type)
+                if (type == NetworkEvent.Type.Disconnect && driver.GetConnectionState(connection) != NetworkConnection.State.Disconnected)
                 {
-                    case NetworkEvent.Type.Connect:
-                        Connected?.Invoke(peer);
-                        break;
-                    case NetworkEvent.Type.Disconnect:
-                        gone.Add(peer);
-                        return;
-                    case NetworkEvent.Type.Data:
-                        int length = stream.Length;
-                        if (buffer.Length < length) buffer = new byte[length * 2];
-                        var bytes = new NativeArray<byte>(length, Allocator.Temp);
-                        stream.ReadBytes(bytes);
-                        NativeArray<byte>.Copy(bytes, buffer, length);
-                        bytes.Dispose();
-                        BytesReceived += length;
-                        if (pipeline == fast) Received?.Invoke(peer, NetChannel.Fast, buffer, length);
-                        else Piece(peer, pipeline == bulk ? NetChannel.Bulk : NetChannel.Reliable, length);
-                        break;
+                    from = drained.Count + 1; // a stranger's goodbye: it and what came before it are not this peer's
+                    drained.Add((type, pipeline, null));
+                    continue;
+                }
+                byte[] data = null;
+                if (type == NetworkEvent.Type.Data)
+                {
+                    data = new byte[stream.Length];
+                    var bytes = new NativeArray<byte>(stream.Length, Allocator.Temp);
+                    stream.ReadBytes(bytes);
+                    NativeArray<byte>.Copy(bytes, data, data.Length);
+                    bytes.Dispose();
+                }
+                drained.Add((type, pipeline, data));
+            }
+            for (int i = from; i < drained.Count; i++)
+            {
+                (NetworkEvent.Type kind, NetworkPipeline line, byte[] data) = drained[i];
+                if (kind == NetworkEvent.Type.Connect) Connected?.Invoke(peer);
+                else if (kind == NetworkEvent.Type.Disconnect) { gone.Add(peer); return; }
+                else if (kind == NetworkEvent.Type.Data)
+                {
+                    BytesReceived += data.Length;
+                    if (line == fast) Received?.Invoke(peer, NetChannel.Fast, data, data.Length);
+                    else Piece(peer, line == bulk ? NetChannel.Bulk : NetChannel.Reliable, data);
                 }
             }
+            if (driver.GetConnectionState(connection) == NetworkConnection.State.Disconnected) gone.Add(peer); // its goodbye went to the one after it
         }
 
-        /// <summary>One piece of a reliable message is in the buffer: the whole message goes out when its last piece has come.</summary>
-        private void Piece(int peer, NetChannel channel, int length)
+        /// <summary>One piece of a reliable message: the whole message goes out when its last piece has come.</summary>
+        private void Piece(int peer, NetChannel channel, byte[] piece)
         {
             if (!assembling.TryGetValue((peer, channel), out System.IO.MemoryStream whole)) assembling[(peer, channel)] = whole = new System.IO.MemoryStream();
-            bool more = buffer[0] != 0;
-            whole.Write(buffer, 1, length - 1);
+            bool more = piece[0] != 0;
+            whole.Write(piece, 1, piece.Length - 1);
             if (more) return;
             Received?.Invoke(peer, channel, whole.GetBuffer(), (int)whole.Length);
             whole.SetLength(0);
@@ -233,15 +260,22 @@ namespace BattleOfAges.Net
         public void Drop(int peer)
         {
             if (disposed || !peers.TryGetValue(peer, out NetworkConnection connection)) return;
+            Discard(connection);
             driver.Disconnect(connection);
             peers.Remove(peer);
+            leaving.Add(connection);
+        }
+
+        private void Discard(NetworkConnection connection)
+        {
+            while (driver.PopEventForConnection(connection, out DataStreamReader _, out NetworkPipeline _) != NetworkEvent.Type.Empty) { }
         }
 
         public void Dispose()
         {
             if (disposed) return;
             disposed = true;
-            foreach (NetworkConnection connection in peers.Values) if (driver.IsCreated) driver.Disconnect(connection);
+            foreach (NetworkConnection connection in peers.Values) if (driver.IsCreated) { Discard(connection); driver.Disconnect(connection); }
             peers.Clear();
             if (driver.IsCreated)
             {

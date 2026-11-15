@@ -159,5 +159,34 @@ namespace BattleOfAges.PlayModeTests
             float took = Time.realtimeSinceStartup - sent;
             Assert.Greater(took, big.Length / (float)NetLink.BulkBytesPerSecond * 0.6f, "at its pace, not at once");
         }
+
+        [UnityTest, Timeout(30000)]
+        public IEnumerator OneLeavingAndAnotherComing_InOneUpdate_AreBothSeen()
+        {
+            // The transport gives the newcomer the number of the one gone, and the goodbye of the one gone turned up in the
+            // newcomer's queue: the newcomer was taken for gone, the one gone stayed a ghost, the newcomer's data went unread
+            yield return Connect();
+            var left = new List<int>();
+            var came = new List<int>();
+            var said = new List<string>();
+            host.Disconnected += p => left.Add(p);
+            host.Connected += p => came.Add(p);
+            host.Received += (p, ch, b, n) => said.Add(p + ":" + Encoding.UTF8.GetString(b, 0, n));
+
+            client.Dispose(); // the goodbye goes out
+            client = NetLink.Join("127.0.0.1", Port);
+            bool in2 = false;
+            client.Connected += _ => in2 = true;
+            for (int i = 0; i < 5; i++) { client.Poll(); yield return null; } // knocking, while the host does not read
+            yield return Until(() => in2 && left.Count > 0 && came.Count > 0);
+            byte[] hello = Encoding.UTF8.GetBytes("я тут");
+            client.Send(0, NetChannel.Reliable, hello, hello.Length);
+            yield return Until(() => said.Count > 0);
+
+            CollectionAssert.AreEqual(new[] { 1 }, left, "the one gone is gone, and only it");
+            CollectionAssert.AreEqual(new[] { 2 }, came, "the newcomer is in");
+            Assert.AreEqual(1, host.PeerCount, "no ghost");
+            CollectionAssert.AreEqual(new[] { "2:я тут" }, said, "its word is read, as its own");
+        }
     }
 }
