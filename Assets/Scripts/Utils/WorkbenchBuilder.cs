@@ -212,9 +212,19 @@ namespace BattleOfAges.Utils
             B(new Vector3(x, TopY * 0.55f, z - 0.02f), new Vector3(0.12f, TopY * 1.1f, 0.06f), OakDark, WoodS, 0.012f);
             B(new Vector3(x, TopY + 0.12f, z + 0.04f), new Vector3(0.2f, 0.14f, 0.05f), Iron, IronS, 0.01f);
             B(new Vector3(x, TopY + 0.12f, z - 0.03f), new Vector3(0.2f, 0.14f, 0.05f), Iron, IronS, 0.01f);
-            Round(new Vector3(x, TopY - 0.06f, z), Quaternion.Euler(90f, 0f, 0f), Cylinder(0.022f, 0.24f), 8, IronBright, WornS);
-            Round(new Vector3(x - 0.17f, TopY - 0.06f, z + 0.24f), Quaternion.Euler(0f, 0f, 90f), Cylinder(0.012f, 0.34f), 6, Iron, IronS);
-            Round(new Vector3(x - 0.17f, TopY - 0.06f, z + 0.24f), Quaternion.Euler(0f, 0f, 90f), new[] { new Vector2(0f, -0.02f), new Vector2(0.022f, -0.02f), new Vector2(0.022f, 0f), new Vector2(0f, 0f) }, 6, Iron, IronS);
+            // The front chop: oak from the iron jaw down past the screw, so the screw has something to go through
+            B(new Vector3(x, TopY - 0.04f, z + 0.085f), new Vector3(0.13f, 0.32f, 0.045f), OakDark, WoodS, 0.01f);
+            // The screw: through the post and the chop, its head a step in front with a boss
+            float screwY = TopY - 0.08f, head = z + 0.2f;
+            Round(new Vector3(x, screwY, z - 0.05f), Quaternion.Euler(90f, 0f, 0f), Cylinder(0.022f, head - (z - 0.05f)), 8, IronBright, WornS);
+            Round(new Vector3(x, screwY, head - 0.035f), Quaternion.Euler(90f, 0f, 0f), Cylinder(0.034f, 0.05f), 8, Iron, IronS);
+            // The tommy bar: through the head, slid down till its upper knob rests on it, hanging aslant
+            Vector3 down = new Vector3(Mathf.Sin(25f * Mathf.Deg2Rad), -Mathf.Cos(25f * Mathf.Deg2Rad), 0f);
+            Quaternion barRot = Quaternion.FromToRotation(Vector3.up, down);
+            Vector3 top = new Vector3(x, screwY, head - 0.01f) - down * 0.05f;
+            Round(top, barRot, Cylinder(0.012f, 0.34f), 6, Iron, IronS);
+            foreach (Vector3 end in new[] { top, top + down * 0.34f })
+                Round(end - down * 0.012f, barRot, new[] { new Vector2(0f, 0f), new Vector2(0.021f, 0.004f), new Vector2(0.021f, 0.02f), new Vector2(0f, 0.024f) }, 6, Iron, IronS);
         }
 
         private static void Anvil(Vector3 at)
