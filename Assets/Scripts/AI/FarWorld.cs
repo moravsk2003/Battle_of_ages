@@ -63,10 +63,16 @@ namespace BattleOfAges.AI
         {
             var counts = new int[GameBalance.RankHealth.Length];
             foreach (UnitState u in units) counts[Mathf.Clamp(u.Rank, 0, counts.Length - 1)]++;
-            if (hero) counts[Mathf.Clamp(s.King.Rank, 0, counts.Length - 1)]++;
             var groups = new List<UnitGroup>();
             for (int r = 0; r < counts.Length; r++)
-                if (counts[r] > 0) groups.Add(new UnitGroup((UnitRank)r, Gear(s, (UnitRank)r), counts[r]));
+            {
+                if (counts[r] == 0) continue;
+                // Every third warrior a kingdom makes is an archer (NpcKingdom.AddSubject); the Empire's are all swords
+                int archers = r == (int)UnitRank.Warrior && !s.Empire && GameBalance.KingdomArcherEvery > 0 ? counts[r] / GameBalance.KingdomArcherEvery : 0;
+                if (counts[r] - archers > 0) groups.Add(new UnitGroup((UnitRank)r, Gear(s, (UnitRank)r), counts[r] - archers));
+                if (archers > 0) groups.Add(new UnitGroup((UnitRank)r, Gear(s, (UnitRank)r), archers, 1f, archers: true));
+            }
+            if (hero) groups.Add(UnitGroup.Hero((UnitRank)Mathf.Clamp(s.King.Rank, 0, counts.Length - 1), Gear(s, (UnitRank)s.King.Rank), (HeroClass)s.KingClass));
             return groups;
         }
 
@@ -76,8 +82,8 @@ namespace BattleOfAges.AI
             float health = 0f, dps = 0f;
             foreach (UnitGroup g in Groups(s, units, hero))
             {
-                UnitStats st = UnitStats.Of((UnitRank)g.Rank, g.Gear);
-                health += st.Health * g.Count;
+                UnitStats st = UnitStats.Of(g);
+                health += st.EffectiveHealth * g.Count;
                 dps += st.Dps * g.Count;
             }
             return KingdomEconomy.Power(health, dps);
@@ -86,7 +92,7 @@ namespace BattleOfAges.AI
         private static float DpsOf(KingdomState s, List<UnitState> units, bool hero)
         {
             float dps = 0f;
-            foreach (UnitGroup g in Groups(s, units, hero)) dps += UnitStats.Of((UnitRank)g.Rank, g.Gear).Dps * g.Count;
+            foreach (UnitGroup g in Groups(s, units, hero)) dps += UnitStats.Of(g).Dps * g.Count;
             return dps;
         }
 
@@ -258,7 +264,10 @@ namespace BattleOfAges.AI
             bool defended = b.Count > 0;
             if (defended && a.Count > 0)
             {
-                AbstractBattle.Outcome o = AbstractBattle.Resolve(a, b);
+                // Its town's wall, if it stands (no more than a quarter of it in ruins), keeps the swords to the ways; a raid gives
+                // up at the losses a real one does (NpcKingdom's raid, KingdomRaidRetreatLosses)
+                var terms = new AbstractBattle.Terms { BWalled = Walled(target), RetreatA = GameBalance.KingdomRaidRetreatLosses, RetreatB = 1f };
+                AbstractBattle.Outcome o = AbstractBattle.Resolve(a, b, terms);
                 Kill(army.Units, o.LossA, rng);
                 Kill(target.Subjects, o.LossB, rng);
                 if (attackerHero && HeroFalls(o.LossA, rng)) { army.WithHero = false; KingDied(s, rng); }
@@ -305,6 +314,15 @@ namespace BattleOfAges.AI
                     damage -= health;
                 }
             }
+        }
+
+        /// <summary>A kingdom whose town has its ring of walls up (hall III on, most of the ring standing).</summary>
+        public static bool Walled(KingdomState s)
+        {
+            if (s.Hall < GameBalance.TownWallHall || s.Free || s.Guardian) return false;
+            int down = 0;
+            if (s.Capital.Ruins != null) foreach (int code in s.Capital.Ruins) if (KingdomTown.KindOf(code) == KingdomTown.Kind.Wall) down++;
+            return down * 4 < KingdomTown.RingSegments;
         }
 
         /// <summary>The side's lost share of its health, in dead: with the group's health spread evenly the same share of people fall.</summary>

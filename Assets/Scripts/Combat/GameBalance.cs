@@ -26,7 +26,17 @@ namespace BattleOfAges.Combat
         /// The abstract battle (§6.2), fitted to real ones (AbstractBattleCalibration, AbstractBattleTests): how many can strike
         /// at once (Base + PerRoot x root of the larger side) and the share of their damage per second that lands.
         /// </summary>
-        public static float AbstractFrontBase = 1f, AbstractFrontPerRoot = 6f, AbstractDamageShare = 0.7f;
+        public static float AbstractFrontBase = 0f, AbstractFrontPerRoot = 6f, AbstractDamageShare = 0.8f;
+        /// <summary>
+        /// Also fitted: the share of a shooter's damage per second that lands (some arrows miss), the seconds the sides close in
+        /// before swords meet (only shots till then), how many swords a town's ways hold, and a hero's skills on top of its blows.
+        /// Fitted 2026-11-15 (AbstractBattleFit on 38 battles, 2 runs each): losses 6% off, the winner right in 35 of 36, the
+        /// length 28% off (even fights: the real ones tip over by chance and end sooner). The town's ways hold 24: a real town's
+        /// people go out through them to fight, so its wall narrows the battle little.
+        /// </summary>
+        public static float AbstractRangedShare = 0.8f, AbstractApproachSeconds = 4f, AbstractGateFront = 24f, AbstractHeroSkillFactor = 0.8f;
+        /// <summary>Fitted too: a side down to this many units is beaten (units die whole: the last few fall at once, not in a long tail).</summary>
+        public static float AbstractLastUnits = 0.5f;
         /// <summary>Hero XP for killing a person, warrior, knight, general (§8).</summary>
         public static int[] RankKillXp = { 2, 4, 10, 50 };
         /// <summary>A hero has this many times the HP and strength of its rank (§7.1).</summary>

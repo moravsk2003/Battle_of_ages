@@ -24,7 +24,8 @@ namespace BattleOfAges.AI
 
         private const int MaxHouses = 24, MaxFields = 8, MaxSawmills = 2, MaxMines = 2, RaisedPerFrame = 3;
         /// <summary>The ring: whole wall segments from pier to pier, a way through on each of the four axes, GateSegments each side of it.</summary>
-        private const int RingSegments = 96, GateSegments = 2;
+        public const int RingSegments = 96;
+        private const int GateSegments = 2;
         private const float RingStep = 360f / RingSegments;
         /// <summary>From the hall to the piers; the segments are WallBuilder.Length long, so nothing shows between them.</summary>
         public static readonly float WallRingRadius = WallBuilder.Length * 0.5f / Mathf.Sin(RingStep * 0.5f * Mathf.Deg2Rad);
