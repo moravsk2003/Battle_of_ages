@@ -434,13 +434,14 @@ namespace BattleOfAges.Utils
             var prof = new[] { new Vector2(0.62f, -0.15f), new Vector2(0.55f, 0.02f), new Vector2(0.44f, 0.14f), new Vector2(0.38f, 0.28f), new Vector2(0.36f, 0.44f) };
             kit.Lathe(Matrix4x4.identity, prof, 14, BarkS, (i, a) => bark * Mathf.Lerp(0.7f, 1.05f, Mathf.Abs(Mathf.Sin(a * 4.5f + i * 0.4f))),
                       (i, a) => 1f + (i < 2 ? 0.25f * Mathf.Pow(Mathf.Max(0f, Mathf.Cos(a * 5f)), 2f) : 0f) + 0.04f * Mathf.Sin(a * 9f));
-            // The cut: slightly slanted, a little ragged at the hinge
+            // The cut: on the bark's top ring itself (same height, same wobble, a hair wider so no seam shows). It was slanted
+            // and a little narrower while the bark's top is level, so a gap showed the grass through on one side.
             var cut = new List<Vector3>();
             for (int j = 0; j < 14; j++)
             {
                 float a = j * Mathf.PI * 2f / 14f;
-                float r = 0.36f * (1f + 0.04f * Mathf.Sin(a * 9f)) * 0.98f;
-                cut.Add(new Vector3(Mathf.Cos(a) * r, 0.44f + Mathf.Cos(a) * 0.04f, Mathf.Sin(a) * r));
+                float r = 0.36f * (1f + 0.04f * Mathf.Sin(a * 9f)) * 1.01f;
+                cut.Add(new Vector3(Mathf.Cos(a) * r, 0.44f, Mathf.Sin(a) * r));
             }
             kit.Polygon(cut, new Vector3(0f, 0f, 0f), CutS, q => CutWood(new Vector2(q.x, q.z).magnitude, 0.36f));
             return kit.ToMesh("TreeStump");

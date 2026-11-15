@@ -296,6 +296,7 @@ namespace BattleOfAges.PlayModeTests
                 ("crown_from_below", () => (Ground(trees[2].transform.position) + fwd * 4.5f + right * 1f + Vector3.up * 1.3f, Ground(trees[2].transform.position) + Vector3.up * 4.2f)),
                 ("crown_from_above", () => Look(trees[1], -0.3f, 0.9f, 1.1f, 0.7f)),
                 ("felled", () => (fp + fwd * 3.2f + right * 1.2f + Vector3.up * 1.6f, fp + Vector3.up * 0.3f)),
+                ("stump_close", () => (fp + fwd * 1.1f + right * 0.3f + Vector3.up * 1.5f, fp + Vector3.up * 0.35f)),
                 ("forest_far", () => (Ground(origin) + fwd * 8f + Vector3.up * 9f, Ground(origin - fwd * 85f) + Vector3.up * 3f)),
             };
             var capture = new CaptureRenderer(dir, views.Count, 50f, drawGrass: true);
