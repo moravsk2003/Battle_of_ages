@@ -354,7 +354,7 @@ namespace BattleOfAges.Net
         {
             if (Current == null) return;
             NetSession s = Current;
-            s.SendOwnSave(); // the last of it, going away properly
+            s.SendOwnSave(leaving: true); // the last of it, going away properly
             s.StopListening();
             ZoneMap.ClearForeign();
             WorldMapData.Tell(new List<WorldMapEntry>());
@@ -514,6 +514,7 @@ namespace BattleOfAges.Net
                 ForgetBuildingsOf(peer);
                 bool wasIn = guestOf.TryGetValue(peer, out GuestRecord left);
                 guestOf.Remove(peer);
+                saveParts.Remove(peer);
                 foreach (Vector2Int freed in claims.ReleaseAll(peer)) TellFree(freed);
                 if (wasIn && basePlaced) OnGuestLeft(left); // (a bot at once, or a pause for the host's word: NetPause)
                 return;
@@ -535,6 +536,7 @@ namespace BattleOfAges.Net
                 return;
             }
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
+            if (data[0] == GuestSaveMessage) { ReceiveGuestSave(peer, data, length); return; }
             if (data[0] == KillMessage) { RouteKill(data, length); return; }
             if (data[0] >= HelloMessage && data[0] <= LobbyChoiceMessage) { ReceiveWorld(peer, data, length); return; }
             if (data[0] >= PauseMessage && data[0] <= LobbyReturnMessage) { ReceivePause(peer, data[0], Encoding.UTF8.GetString(data, 1, length - 1)); return; }
@@ -765,16 +767,44 @@ namespace BattleOfAges.Net
             if (cells.Cells.Count > 0) BroadcastText(ZonesMessage, JsonUtility.ToJson(cells));
         }
 
-        /// <summary>A guest's whole game to its host, to come back to. Its size in bytes (0: none sent).</summary>
-        private int SendOwnSave()
+        /// <summary>The parts of this guest's save its host has (GuestSaveParts; none at the start of a session).</summary>
+        private string[] savePartsSent;
+        /// <summary>A host's parts of each guest's save, by peer.</summary>
+        private readonly Dictionary<int, GuestSaveParts.Assembly> saveParts = new Dictionary<int, GuestSaveParts.Assembly>();
+
+        /// <summary>
+        /// A guest's game to its host, to come back to: the parts that changed since the last (GuestSaveParts), on the Bulk
+        /// line (a late settlement's save does not hold blows and orders up). Going away, on the reliable line at once. The
+        /// bytes sent (0: none).
+        /// </summary>
+        private int SendOwnSave(bool leaving = false)
         {
             if (link == null || link.IsHost || !basePlaced || !SaveSystem.InGame) return 0;
             SaveData own = SaveSystem.Capture();
             own.Guests.Clear();
             own.KingdomStates.Clear();
-            string json = JsonUtility.ToJson(own);
-            Send(0, GuestSaveMessage, json);
-            return Encoding.UTF8.GetByteCount(json);
+            string[] parts = GuestSaveParts.Split(own);
+            // Going away: whole, in case the last parts are still waiting on the Bulk line and will never go
+            byte[] message = GuestSaveParts.Encode(GuestSaveMessage, parts, leaving ? null : savePartsSent);
+            if (message == null) return 0;
+            link.Send(0, leaving ? NetChannel.Reliable : NetChannel.Bulk, message, message.Length);
+            savePartsSent = parts;
+            LastGuestSaveBytes = message.Length;
+            return message.Length;
+        }
+
+        /// <summary>The size of this guest's last save message (NetDemo).</summary>
+        public static int LastGuestSaveBytes;
+
+        /// <summary>The host: parts of a guest's save; the guest's record gets the whole once every part has come.</summary>
+        private void ReceiveGuestSave(int peer, byte[] data, int length)
+        {
+            if (!link.IsHost || !guestOf.TryGetValue(peer, out GuestRecord record)) return;
+            if (!saveParts.TryGetValue(peer, out GuestSaveParts.Assembly parts)) saveParts[peer] = parts = new GuestSaveParts.Assembly();
+            string whole = parts.Take(data, length);
+            if (whole == null) return;
+            record.Save = whole;
+            record.Hero = null;
         }
 
         private void ReceiveWorld(int peer, byte[] data, int length)
@@ -785,9 +815,6 @@ namespace BattleOfAges.Net
             {
                 case HelloMessage:
                     if (link.IsHost) Greet(peer, JsonUtility.FromJson<NetHello>(text));
-                    return;
-                case GuestSaveMessage:
-                    if (link.IsHost && guestOf.TryGetValue(peer, out GuestRecord record)) { record.Save = text; record.Hero = null; }
                     return;
                 case LobbyMessage:
                     if (link.IsHost || joined) return;

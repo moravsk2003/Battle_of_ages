@@ -11,7 +11,12 @@ namespace BattleOfAges.Net
         /// <summary>Arrives, in order, whatever its size: commands, joining, the world's changes.</summary>
         Reliable,
         /// <summary>May be lost, the newest wins: snapshots of units. At most MaxUnreliableBytes a message.</summary>
-        Fast
+        Fast,
+        /// <summary>
+        /// Arrives, in order, on a reliable line of its own: big things that may take seconds (a guest's save). Fed to the wire
+        /// at BulkBytesPerSecond in small pieces, so it never holds Reliable up, not even while its lost packets are resent.
+        /// </summary>
+        Bulk
     }
 
     /// <summary>
@@ -26,7 +31,13 @@ namespace BattleOfAges.Net
         /// A reliable message goes in pieces this size, each with one byte saying whether more follow: the transport's window is
         /// 64 fragments, and a single message larger than that would never fit it and would stop the queue for good.
         /// </summary>
-        private const int ReliablePiece = 16 * 1024, ReliableWindow = 64;
+        private const int ReliablePiece = 16 * 1024, ReliableWindow = 64, BulkPiece = 4 * 1024;
+
+        /// <summary>
+        /// How fast Bulk goes out: a tenth of a weak upload (1 Mbit/s), gameplay keeps the rest (§14.4; NetSession.GuestSaveInterval
+        /// spaces the guest's saves by the same figure).
+        /// </summary>
+        public const int BulkBytesPerSecond = 12800;
 
         public event Action<int> Connected;
         public event Action<int> Disconnected;
@@ -39,13 +50,16 @@ namespace BattleOfAges.Net
         public long BytesReceived { get; private set; }
 
         private NetworkDriver driver;
-        private NetworkPipeline reliable, fast;
+        private NetworkPipeline reliable, fast, bulk;
         private readonly Dictionary<int, NetworkConnection> peers = new Dictionary<int, NetworkConnection>();
         private readonly List<int> gone = new List<int>();
         private readonly Queue<(int peer, byte[] data)> reliableBacklog = new Queue<(int, byte[])>();
+        private readonly Queue<(int peer, byte[] data)> bulkBacklog = new Queue<(int, byte[])>();
+        private double bulkAllowance = BulkPiece + 1;
+        private long bulkTicks = System.Diagnostics.Stopwatch.GetTimestamp();
         private int nextPeer = 1;
         private byte[] buffer = new byte[4096];
-        private readonly Dictionary<int, System.IO.MemoryStream> assembling = new Dictionary<int, System.IO.MemoryStream>();
+        private readonly Dictionary<(int, NetChannel), System.IO.MemoryStream> assembling = new Dictionary<(int, NetChannel), System.IO.MemoryStream>();
         private bool disposed;
 
         private NetLink() { }
@@ -58,6 +72,7 @@ namespace BattleOfAges.Net
             driver = NetworkDriver.Create(settings);
             reliable = driver.CreatePipeline(typeof(FragmentationPipelineStage), typeof(ReliableSequencedPipelineStage));
             fast = driver.CreatePipeline(typeof(UnreliableSequencedPipelineStage));
+            bulk = driver.CreatePipeline(typeof(FragmentationPipelineStage), typeof(ReliableSequencedPipelineStage)); // its own sequence and resends
         }
 
         /// <summary>Starts listening; null when the port cannot be taken.</summary>
@@ -99,7 +114,11 @@ namespace BattleOfAges.Net
             foreach (KeyValuePair<int, NetworkConnection> p in peers) Drain(p.Key, p.Value);
             foreach (int id in gone) if (peers.Remove(id)) Disconnected?.Invoke(id);
             FlushBacklog();
+            FlushBulk();
         }
+
+        /// <summary>Bulk pieces waiting to go (tests).</summary>
+        public int BulkWaiting => bulkBacklog.Count;
 
         private void Drain(int peer, NetworkConnection connection)
         {
@@ -123,20 +142,20 @@ namespace BattleOfAges.Net
                         bytes.Dispose();
                         BytesReceived += length;
                         if (pipeline == fast) Received?.Invoke(peer, NetChannel.Fast, buffer, length);
-                        else Piece(peer, length);
+                        else Piece(peer, pipeline == bulk ? NetChannel.Bulk : NetChannel.Reliable, length);
                         break;
                 }
             }
         }
 
         /// <summary>One piece of a reliable message is in the buffer: the whole message goes out when its last piece has come.</summary>
-        private void Piece(int peer, int length)
+        private void Piece(int peer, NetChannel channel, int length)
         {
-            if (!assembling.TryGetValue(peer, out System.IO.MemoryStream whole)) assembling[peer] = whole = new System.IO.MemoryStream();
+            if (!assembling.TryGetValue((peer, channel), out System.IO.MemoryStream whole)) assembling[(peer, channel)] = whole = new System.IO.MemoryStream();
             bool more = buffer[0] != 0;
             whole.Write(buffer, 1, length - 1);
             if (more) return;
-            Received?.Invoke(peer, NetChannel.Reliable, whole.GetBuffer(), (int)whole.Length);
+            Received?.Invoke(peer, channel, whole.GetBuffer(), (int)whole.Length);
             whole.SetLength(0);
         }
 
@@ -145,15 +164,17 @@ namespace BattleOfAges.Net
         {
             if (disposed || !peers.ContainsKey(peer)) return false;
             if (channel == NetChannel.Fast) return length <= MaxUnreliableBytes && TrySend(peer, channel, data, length);
-            for (int at = 0; at == 0 || at < length; at += ReliablePiece)
+            int size = channel == NetChannel.Bulk ? BulkPiece : ReliablePiece;
+            Queue<(int, byte[])> queue = channel == NetChannel.Bulk ? bulkBacklog : reliableBacklog;
+            for (int at = 0; at == 0 || at < length; at += size)
             {
-                int n = Math.Min(ReliablePiece, length - at);
+                int n = Math.Min(size, length - at);
                 var piece = new byte[n + 1];
                 piece[0] = at + n < length ? (byte)1 : (byte)0;
                 Array.Copy(data, at, piece, 1, n);
-                reliableBacklog.Enqueue((peer, piece));
+                queue.Enqueue((peer, piece));
             }
-            FlushBacklog();
+            if (channel == NetChannel.Bulk) FlushBulk(); else FlushBacklog();
             return true;
         }
 
@@ -171,7 +192,8 @@ namespace BattleOfAges.Net
         private bool TrySend(int peer, NetChannel channel, byte[] data, int length)
         {
             if (!peers.TryGetValue(peer, out NetworkConnection connection)) return true; // gone: nothing to wait for
-            if (driver.BeginSend(channel == NetChannel.Fast ? fast : reliable, connection, out DataStreamWriter writer, length) != 0) return false;
+            NetworkPipeline line = channel == NetChannel.Fast ? fast : channel == NetChannel.Bulk ? bulk : reliable;
+            if (driver.BeginSend(line, connection, out DataStreamWriter writer, length) != 0) return false;
             var bytes = new NativeArray<byte>(length, Allocator.Temp);
             NativeArray<byte>.Copy(data, bytes, length);
             bool wrote = writer.WriteBytes(bytes);
@@ -180,6 +202,21 @@ namespace BattleOfAges.Net
             if (driver.EndSend(writer) < 0) return false;
             BytesSent += length;
             return true;
+        }
+
+        /// <summary>Bulk pieces as the pace allows (no burst over a piece after a quiet spell).</summary>
+        private void FlushBulk()
+        {
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            bulkAllowance = Math.Min(bulkAllowance + (now - bulkTicks) / (double)System.Diagnostics.Stopwatch.Frequency * BulkBytesPerSecond, BulkPiece + 1);
+            bulkTicks = now;
+            while (bulkBacklog.Count > 0)
+            {
+                (int peer, byte[] data) = bulkBacklog.Peek();
+                if (bulkAllowance < data.Length || !TrySend(peer, NetChannel.Bulk, data, data.Length)) return;
+                bulkAllowance -= data.Length;
+                bulkBacklog.Dequeue();
+            }
         }
 
         private void FlushBacklog()

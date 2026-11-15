@@ -131,5 +131,33 @@ namespace BattleOfAges.PlayModeTests
             Assert.AreEqual(2, arrived.Issuer);
             Assert.AreEqual(World.ZoneType.Mining, ((PaintZoneCommand)arrived).Zone);
         }
+
+        [UnityTest, Timeout(30000)]
+        public IEnumerator ABigBulkMessage_DoesNotHoldAnOrderUp_AndArrivesWhole()
+        {
+            // A guest's save goes on its own paced line: an order sent after it is there at once, the save a few seconds later
+            yield return Connect();
+            var big = new byte[30 * 1024];
+            for (int i = 0; i < big.Length; i++) big[i] = (byte)(i * 31 + 7);
+            var got = new List<(NetChannel channel, byte[] data)>();
+            host.Received += (_, ch, b, n) => { var c = new byte[n]; System.Array.Copy(b, c, n); got.Add((ch, c)); };
+
+            client.Send(0, NetChannel.Bulk, big, big.Length);
+            byte[] order = Encoding.UTF8.GetBytes("наказ");
+            client.Send(0, NetChannel.Reliable, order, order.Length);
+            float sent = Time.realtimeSinceStartup;
+            yield return Until(() => got.Exists(g => g.channel == NetChannel.Reliable));
+            Assert.IsTrue(got.Exists(g => g.channel == NetChannel.Reliable), "the order came");
+            Assert.Less(Time.realtimeSinceStartup - sent, 1f, "and did not wait for the save");
+            Assert.IsFalse(got.Exists(g => g.channel == NetChannel.Bulk), "the save is still on its way (paced)");
+            Assert.Greater(client.BulkWaiting, 0);
+
+            yield return Until(() => got.Exists(g => g.channel == NetChannel.Bulk), 10f);
+            (NetChannel _, byte[] save) = got.Find(g => g.channel == NetChannel.Bulk);
+            Assert.IsNotNull(save, "the save came");
+            CollectionAssert.AreEqual(big, save, "whole and in order");
+            float took = Time.realtimeSinceStartup - sent;
+            Assert.Greater(took, big.Length / (float)NetLink.BulkBytesPerSecond * 0.6f, "at its pace, not at once");
+        }
     }
 }

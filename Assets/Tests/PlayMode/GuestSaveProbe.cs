@@ -36,10 +36,13 @@ namespace BattleOfAges.PlayModeTests
             Vector3 home = Managers.GameContext.Player != null ? Managers.GameContext.Player.transform.position : Vector3.zero;
 
             Measure("start");
+            yield return Delta();
             yield return Grow(home, people: 40, houses: 10, cells: 200, trees: 500);
             Measure("mid (40 more people, 10 houses, 200 zone cells, 500 felled trees)");
+            yield return Delta();
             yield return Grow(home, people: 60, houses: 20, cells: 400, trees: 2500);
             Measure("late (100 more people, 30 houses, 600 zone cells, 3000 felled trees)");
+            yield return Delta();
 
             string dir = Environment.GetEnvironmentVariable("CAPTURE_DIR");
             if (!string.IsNullOrEmpty(dir)) { Directory.CreateDirectory(dir); File.WriteAllText(Path.Combine(dir, "report.txt"), report.ToString()); }
@@ -47,6 +50,27 @@ namespace BattleOfAges.PlayModeTests
         }
 
         private int grown;
+
+        /// <summary>What goes 5 s of play after a save (Net.GuestSaveParts): the parts that changed, in bytes, and the split's cost.</summary>
+        private IEnumerator Delta()
+        {
+            SaveData a = SaveSystem.Capture();
+            a.Guests.Clear(); a.KingdomStates.Clear();
+            string[] before = Net.GuestSaveParts.Split(a);
+            byte[] whole = Net.GuestSaveParts.Encode(6, before, null);
+            yield return new WaitForSeconds(5f);
+            var sw = Stopwatch.StartNew();
+            SaveData b = SaveSystem.Capture();
+            b.Guests.Clear(); b.KingdomStates.Clear();
+            string[] after = Net.GuestSaveParts.Split(b);
+            byte[] delta = Net.GuestSaveParts.Encode(6, after, before);
+            sw.Stop();
+            var changed = new List<string>();
+            string[] names = { "units", "buildings", "zones", "world", "rest" };
+            for (int i = 0; i < names.Length; i++)
+                if (delta != null && (delta[1] & (1 << i)) != 0) changed.Add($"{names[i]} {System.Text.Encoding.UTF8.GetByteCount(after[i]) / 1024f:0.0} KB");
+            report.AppendLine($"  5 s later: {(delta != null ? delta.Length : 0) / 1024f:0.0} KB of the whole {whole.Length / 1024f:0.0} KB ({string.Join(", ", changed)}); capture + split + compare {sw.Elapsed.TotalMilliseconds:0.00} ms");
+        }
 
         private IEnumerator Grow(Vector3 home, int people, int houses, int cells, int trees)
         {
