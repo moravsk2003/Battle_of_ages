@@ -90,6 +90,35 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest, Timeout(90000)]
+        public IEnumerator TheDistrictsButton_SendsTheChosen_ToAFreePlace_AndLetsThemGo()
+        {
+            yield return OpenMap();
+            Vector3 at = GameContext.Player.transform.position + new Vector3(-20f, 0f, 20f);
+            at.y = RtsUnit.GetTerrainHeight(at);
+            GameObject worker = BuildingNode.CreateWorkerNpc(at, "TestDistrictWorker");
+            made.Add(worker);
+            GameObject sawmill = ZoneBuildingBuilder.CreateSawmill("TestDistrictSawmill");
+            made.Add(sawmill);
+            Vector3 millAt = at + new Vector3(-15f, 0f, 0f);
+            millAt.y = RtsUnit.GetTerrainHeight(millAt);
+            sawmill.transform.position = millAt;
+            yield return null;
+
+            RtsUnit unit = worker.GetComponent<RtsUnit>();
+            NpcResourceGatherer job = worker.GetComponent<NpcResourceGatherer>();
+            RtsUnitCommander commander = GameContext.Commander;
+            commander.SelectOnly(unit);
+            yield return new WaitForSeconds(0.6f); // the panel slides in and lays its buttons out
+            Button districts = null;
+            foreach (Button b in Object.FindObjectsByType<Button>(FindObjectsSortMode.None)) if (b.name == "DistrictsBtn" && b.gameObject.activeInHierarchy) districts = b;
+            Assert.IsNotNull(districts, "the unit panel has the districts button");
+            GameObject got = ClickAt((RectTransform)districts.transform);
+            yield return null;
+            Assert.IsTrue(job.AtPlace, $"sent to a district's place (the click went to '{got.name}')");
+            Assert.IsFalse(unit.IsSelected, "and let go to do it");
+        }
+
+        [UnityTest, Timeout(90000)]
         public IEnumerator AWorker_SentToAJob_IsLetGo_AndGoesAtOnce()
         {
             yield return OpenMap();

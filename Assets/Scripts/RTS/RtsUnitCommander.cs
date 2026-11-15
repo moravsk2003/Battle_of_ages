@@ -420,6 +420,17 @@ namespace BattleOfAges.RTS
         }
 
         /// <summary>Those chosen stand where they are, and stop working (X, the "Стій" button).</summary>
+        /// <summary>The chosen workers go to the districts' places (fields, sawmills, benches, markets); they are let go to do it.</summary>
+        public void OrderDistricts()
+        {
+            if (selectedUnits.Count == 0) return;
+            tempUnitsBuffer.Clear();
+            tempUnitsBuffer.AddRange(selectedUnits);
+            Net.CommandBus.Submit(Net.UnitOrderCommand.For(Net.UnitOrderCommand.Kind.Districts, tempUnitsBuffer, null, Vector3.zero));
+            tempUnitsBuffer.Clear();
+            DeselectAll();
+        }
+
         public void OrderStop()
         {
             if (selectedUnits.Count == 0) return;
@@ -483,7 +494,7 @@ namespace BattleOfAges.RTS
         public static bool IsWorkOrder(Net.UnitOrderCommand.Kind kind) =>
             kind == Net.UnitOrderCommand.Kind.Place || kind == Net.UnitOrderCommand.Kind.Site || kind == Net.UnitOrderCommand.Kind.Mine
             || kind == Net.UnitOrderCommand.Kind.Bench || kind == Net.UnitOrderCommand.Kind.Tree || kind == Net.UnitOrderCommand.Kind.Pebble
-            || kind == Net.UnitOrderCommand.Kind.Chest;
+            || kind == Net.UnitOrderCommand.Kind.Chest || kind == Net.UnitOrderCommand.Kind.Districts;
 
         private static Color MarkOf(Net.UnitOrderCommand.Kind kind)
         {

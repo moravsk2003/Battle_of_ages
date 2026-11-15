@@ -57,6 +57,20 @@ namespace BattleOfAges.Building
             return best;
         }
 
+        /// <summary>The nearest place in reach with a free slot, wanted or not (a worker sent to the districts), or null.</summary>
+        public static WorkPlace NearestWithRoom(Vector3 from, float reach)
+        {
+            WorkPlace best = null;
+            float bestSqr = reach * reach;
+            foreach (WorkPlace p in all)
+            {
+                if (p == null || p.workers.Count >= p.Slots || !SettlementLabor.RoomFor(p)) continue;
+                float d = (p.transform.position - from).sqrMagnitude;
+                if (d < bestSqr) { bestSqr = d; best = p; }
+            }
+            return best;
+        }
+
         public bool Join(NpcResourceGatherer worker)
         {
             if (worker == null) return false;

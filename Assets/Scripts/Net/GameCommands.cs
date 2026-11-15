@@ -172,7 +172,7 @@ namespace BattleOfAges.Net
     [Serializable]
     public sealed class UnitOrderCommand : GameCommand
     {
-        public enum Kind { Move, Attack, Wall, Mine, Bench, Site, Place, Tree, Pebble, Chest, AttackMove, QueueMove, Stop }
+        public enum Kind { Move, Attack, Wall, Mine, Bench, Site, Place, Tree, Pebble, Chest, AttackMove, QueueMove, Stop, Districts }
 
         public Kind Order;
         public int[] Units;
@@ -208,6 +208,18 @@ namespace BattleOfAges.Net
                     int hands = 0;
                     Gatherers(units, g => { if (g.AssignToPlace(toPlace, true)) hands++; });
                     if (hands == 0) Say("Тут усі місця зайняті");
+                    else Sound(GameSound.Kind.OrderWork);
+                    return;
+                case Kind.Districts:
+                    // To the zones' places: the nearest that wants hands, else the nearest with a free slot
+                    int placed = 0;
+                    Gatherers(units, g =>
+                    {
+                        Vector3 at = g.transform.position;
+                        WorkPlace to = WorkPlace.NearestWanting(at, GameBalance.BuildersComeFrom) ?? WorkPlace.NearestWithRoom(at, GameBalance.BuildersComeFrom);
+                        if (to != null && g.AssignToPlace(to, true)) placed++;
+                    });
+                    if (placed == 0) Say(Loc.Pick("У районах немає вільних місць: розмітьте поля, ліс, ремесла чи торгівлю", "No free places in the districts: paint fields, forest, crafts or trade"));
                     else Sound(GameSound.Kind.OrderWork);
                     return;
                 case Kind.Site:
