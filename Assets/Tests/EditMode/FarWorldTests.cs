@@ -313,5 +313,16 @@ namespace BattleOfAges.Tests
             TestContext.WriteLine($"30 kingdoms of 500, 3 hours: {watch.Elapsed.TotalMilliseconds:0.00} ms in all, the slowest kingdom's median {worst:0.00} ms");
             Assert.Less(worst, GameBalance.FarTickBudgetMs * 2f, "one kingdom fits a frame's budget (twice over for the editor's noise)");
         }
+
+        [Test]
+        public void RaidersNobodyStops_BurnTheTownAsWellAsTheHall()
+        {
+            KingdomState s = Kingdom("Палене", Vector3.zero, 3, 0);
+            int house = Building.BuildingData.GetDefinition(Building.BuildingType.WorkerHouse).MaxHealth;
+            FarWorld.Burn(s, house * 2.5f);
+            CollectionAssert.AreEqual(new[] { KingdomTown.RuinCode(KingdomTown.Kind.House, 0), KingdomTown.RuinCode(KingdomTown.Kind.House, 1) }, s.Capital.Ruins, "two houses' worth");
+            FarWorld.Burn(s, house * 1.2f);
+            Assert.AreEqual(3, s.Capital.Ruins.Count, "the next one, not those in ruins");
+        }
     }
 }

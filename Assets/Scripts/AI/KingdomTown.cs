@@ -10,8 +10,11 @@ namespace BattleOfAges.AI
     /// <summary>
     /// What an NPC kingdom's hall has round it: houses, fields, a sawmill, mines and from hall III a ring of walls with four
     /// ways through. How much stands follows its people and its hall (Wanted), where it stands follows its name, so the same
-    /// town comes back each time the kingdom turns real and nothing needs saving. For now they are its look and things in the
-    /// way; the kingdom's numbers still come from KingdomEconomy (docs/GAME_DESIGN.md §18.4).
+    /// town comes back each time the kingdom turns real and nothing needs saving. Houses, the sawmill, the mines and the ring's
+    /// segments can be broken (KingdomTownPart, the health of the player's like buildings; a segment only by those that can
+    /// harm walls): a ruin is kept in the kingdom's economy (KingdomEconomy.Ruins, so in its state near and far), holds its
+    /// work up and rises again in its turn. A standing segment stops a blow across it (Blocked): a sword goes round by a way
+    /// or through a breach (docs/GAME_DESIGN.md §18.4).
     /// </summary>
     public sealed class KingdomTown : MonoBehaviour
     {
@@ -39,6 +42,67 @@ namespace BattleOfAges.AI
         private Vector2 centre;
         private readonly bool[] segmentUp = new bool[RingSegments];
         private readonly List<Mesh> ownMeshes = new List<Mesh>();
+        /// <summary>What stands of each kind, by its place in the plan (null: not raised, or in ruins).</summary>
+        private readonly List<GameObject>[] built = { new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>(), new List<GameObject>() };
+        private int lastRuins = -1;
+
+        public static int RuinCode(Kind kind, int index) => (int)kind * 1000 + index;
+        public static Kind KindOf(int code) => (Kind)(code / 1000);
+        public static int IndexOf(int code) => code % 1000;
+
+        /// <summary>What a ruin of a kind takes to rise again: the wood of the player's like building.</summary>
+        public static int RepairWood(Kind kind) => Building.BuildingData.GetDefinition(LikeBuilding(kind)).WoodCost;
+
+        private static Building.BuildingType LikeBuilding(Kind kind) => kind switch
+        {
+            Kind.House => Building.BuildingType.WorkerHouse,
+            Kind.Sawmill => Building.BuildingType.Sawmill,
+            Kind.Mine => Building.BuildingType.Mine,
+            _ => Building.BuildingType.CastleWall
+        };
+
+        /// <summary>A kind that can be broken (fields are trodden, piers are part of the segments).</summary>
+        public static bool Breakable(Kind kind) => kind == Kind.House || kind == Kind.Sawmill || kind == Kind.Mine || kind == Kind.Wall;
+
+        /// <summary>A segment of a town's ring (only those that can harm walls break it, and a blow at it is no blow across it).</summary>
+        public static bool IsRingWall(Component c)
+        {
+            KingdomTownPart part = c != null ? c.GetComponent<KingdomTownPart>() : null;
+            return part != null && part.Kind == Kind.Wall;
+        }
+
+        /// <summary>
+        /// Whether a standing segment of a town's ring lies across the straight line between the two (a sword does not reach
+        /// over it; a way through or a breach lets it).
+        /// </summary>
+        public static bool Blocked(Vector3 from, Vector3 to)
+        {
+            if (towns.Count == 0) return false;
+            List<KingdomTown> near = Along(from, to);
+            for (int i = 0; i < near.Count; i++)
+            {
+                KingdomTown t = near[i];
+                if (t == null || !t.Walled) continue;
+                Vector2 a = new Vector2(from.x - t.centre.x, from.z - t.centre.y), d = new Vector2(to.x - from.x, to.z - from.z);
+                float R = WallRingRadius, qa = Vector2.Dot(d, d), qb = 2f * Vector2.Dot(a, d), qc = Vector2.Dot(a, a) - R * R;
+                float disc = qb * qb - 4f * qa * qc;
+                if (qa < 1e-6f || disc < 0f) continue;
+                float root = Mathf.Sqrt(disc);
+                for (int k = -1; k <= 1; k += 2)
+                {
+                    float u = (-qb + k * root) / (2f * qa);
+                    if (u <= 0f || u >= 1f) continue;
+                    Vector2 p = a + d * u;
+                    float degrees = Mathf.Atan2(p.y, p.x) * Mathf.Rad2Deg;
+                    if (!IsWay(degrees) && t.UpAt(degrees)) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>A melee blow from here at the target meets a ring's wall first (a blow at the wall itself does not).</summary>
+        public static bool MeleeBlocked(Vector3 from, Component target) =>
+            target != null && towns.Count > 0 && !IsRingWall(target) && Blocked(from, target.transform.position);
         private int lastHall = -1, lastPeople = -1;
 
         /// <summary>How many of a kind stand for this many people under a hall of this level.</summary>
@@ -250,7 +314,27 @@ namespace BattleOfAges.AI
         }
 
         /// <summary>How many stand now, of a kind.</summary>
-        public int Standing(Kind kind) => raised[(int)kind];
+        public int Standing(Kind kind)
+        {
+            int n = 0;
+            foreach (GameObject go in built[(int)kind]) if (go != null) n++;
+            return n;
+        }
+
+        /// <summary>The standing building of a kind at its place in the plan (null: none; tests).</summary>
+        public GameObject Built(Kind kind, int index) => index >= 0 && index < built[(int)kind].Count ? built[(int)kind][index] : null;
+
+        /// <summary>A building fell: it lies in ruins in the kingdom's books and comes down here.</summary>
+        private void Ruin(KingdomTownPart part)
+        {
+            if (part == null || kingdom == null) return;
+            int code = RuinCode(part.Kind, part.Index);
+            if (!kingdom.Economy.Ruins.Contains(code)) kingdom.Economy.Ruins.Add(code);
+            lastRuins = kingdom.Economy.Ruins.Count;
+            if (part.Kind == Kind.Wall && part.Index < plan[(int)Kind.Wall].Count) segmentUp[plan[(int)Kind.Wall][part.Index].Segment] = false;
+            built[(int)part.Kind][part.Index] = null;
+            Destroy(part.gameObject);
+        }
 
         /// <summary>A stable number from a name (string.GetHashCode changes between runs).</summary>
         public static int Seed(string name)
@@ -342,20 +426,25 @@ namespace BattleOfAges.AI
         public void Step()
         {
             if (kingdom == null) return;
-            int hall = kingdom.Economy.HallLevel, people = kingdom.PeopleListed;
-            if (hall == lastHall && people == lastPeople && !Unfinished) return;
+            int hall = kingdom.Economy.HallLevel, people = kingdom.PeopleListed, ruins = kingdom.Economy.Ruins.Count;
+            if (hall == lastHall && people == lastPeople && ruins == lastRuins && !Unfinished) return;
             lastHall = hall;
             lastPeople = people;
+            lastRuins = ruins;
             int budget = RaisedPerFrame;
             for (int i = 0; i < AllKinds.Length; i++)
             {
                 Kind kind = AllKinds[i];
+                // Ruins that have risen again in the kingdom's books
+                for (int n = 0; n < raised[(int)kind] && budget > 0; n++)
+                    if (built[(int)kind][n] == null && Breakable(kind) && !kingdom.Economy.Ruins.Contains(RuinCode(kind, n))) { Raise(plan[(int)kind][n], n); budget--; }
                 int want = Mathf.Min(Wanted(kind, hall, people), plan[(int)kind].Count);
                 while (raised[(int)kind] < want && budget > 0)
                 {
-                    Raise(plan[(int)kind][raised[(int)kind]]);
+                    int n = raised[(int)kind];
+                    built[(int)kind].Add(null);
+                    if (!kingdom.Economy.Ruins.Contains(RuinCode(kind, n))) { Raise(plan[(int)kind][n], n); budget--; } // (one in ruins stays down)
                     raised[(int)kind]++;
-                    budget--;
                 }
             }
             unfinished = budget == 0;
@@ -372,13 +461,20 @@ namespace BattleOfAges.AI
             {
                 Kind kind = AllKinds[i];
                 int want = Mathf.Min(Wanted(kind, hall, people), plan[(int)kind].Count);
-                while (raised[(int)kind] < want) { Raise(plan[(int)kind][raised[(int)kind]]); raised[(int)kind]++; }
+                while (raised[(int)kind] < want)
+                {
+                    int n = raised[(int)kind];
+                    built[(int)kind].Add(null);
+                    if (!kingdom.Economy.Ruins.Contains(RuinCode(kind, n))) Raise(plan[(int)kind][n], n);
+                    raised[(int)kind]++;
+                }
             }
         }
 
-        private void Raise(Spot s)
+        private void Raise(Spot s, int index)
         {
             var go = new GameObject("Town" + s.Kind);
+            built[(int)s.Kind][index] = go;
             go.transform.SetParent(transform, false);
             go.transform.SetPositionAndRotation(s.At, Quaternion.Euler(0f, s.Yaw, 0f));
             Vector3 colliderSize = Vector3.zero, colliderCentre = Vector3.zero;
@@ -420,6 +516,15 @@ namespace BattleOfAges.AI
                 BoxCollider col = go.AddComponent<BoxCollider>();
                 col.size = colliderSize;
                 col.center = colliderCentre;
+            }
+            if (Breakable(s.Kind))
+            {
+                KingdomTownPart part = go.AddComponent<KingdomTownPart>();
+                part.Kind = s.Kind;
+                part.Index = index;
+                HealthComponent health = go.AddComponent<HealthComponent>();
+                health.InitializeHealth(Building.BuildingData.GetDefinition(LikeBuilding(s.Kind)).MaxHealth);
+                health.OnDeath += () => Ruin(part);
             }
         }
 

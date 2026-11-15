@@ -154,5 +154,68 @@ namespace BattleOfAges.PlayModeTests
             Assert.Greater(high, low * 2, "a hall V trains more");
             Assert.Less(high, 200, "not everyone at once");
         }
+
+        [UnityTest, Timeout(60000)]
+        public IEnumerator AWall_StopsASword_TillItIsBroken_AndARuinIsKeptAndRises()
+        {
+            NpcKingdom k = Kingdom(3, 2);
+            k.Town.RaiseAllNow();
+            yield return null;
+            GameObject segment = k.Town.Built(KingdomTown.Kind.Wall, 0);
+            Assert.IsNotNull(segment, "the ring stands");
+            Vector3 home = k.Home, off = segment.transform.position - home;
+            off.y = 0f;
+            Vector3 Across(float radius)
+            {
+                Vector3 p = home + off.normalized * radius;
+                p.y = InfiniteWorldManager.GetSampledTerrainHeight(p.x, p.z);
+                return p;
+            }
+            Vector3 inside = Across(off.magnitude - 1.2f), outside = Across(off.magnitude + 1.2f);
+            Assert.IsTrue(KingdomTown.Blocked(outside, inside), "a standing segment between them");
+
+            var striker = new GameObject("Striker", typeof(HealthComponent), typeof(CombatUnit));
+            striker.transform.position = outside;
+            UnitProgress.Setup(striker, UnitRank.Knight);
+            var victim = new GameObject("Victim", typeof(HealthComponent));
+            victim.transform.position = inside;
+            HealthComponent hp = victim.GetComponent<HealthComponent>();
+            hp.InitializeHealth(100);
+            CombatUnit sword = striker.GetComponent<CombatUnit>();
+            try
+            {
+                Assert.IsFalse(sword.TryAttack(hp), "no sword reaches over a town's wall");
+
+                // Broken, it is a breach, and the kingdom's books keep the ruin
+                segment.GetComponent<HealthComponent>().TakeDamage(int.MaxValue / 2, ignoreArmor: true);
+                yield return null;
+                Assert.IsNull(k.Town.Built(KingdomTown.Kind.Wall, 0), "the segment is down");
+                CollectionAssert.Contains(k.Economy.Ruins, KingdomTown.RuinCode(KingdomTown.Kind.Wall, 0));
+                Assert.IsFalse(KingdomTown.Blocked(outside, inside), "through the breach");
+                Assert.IsTrue(sword.TryAttack(hp), "a blow through the breach");
+
+                // A house too: kept through the kingdom's state (near and far), it rises again in its turn
+                GameObject house = k.Town.Built(KingdomTown.Kind.House, 0);
+                Assert.IsNotNull(house);
+                int before = k.Town.Standing(KingdomTown.Kind.House);
+                house.GetComponent<HealthComponent>().TakeDamage(int.MaxValue / 2, ignoreArmor: true);
+                yield return null;
+                Assert.AreEqual(before - 1, k.Town.Standing(KingdomTown.Kind.House));
+                CollectionAssert.Contains(k.ToState().Capital.Ruins, KingdomTown.RuinCode(KingdomTown.Kind.House, 0), "in its state");
+                k.Economy.Wood = 200f;
+                k.Economy.Tick(GameBalance.TownRepairHours * 2.1f, 0, k.Population);
+                Assert.AreEqual(0, k.Economy.Ruins.Count, "both rebuilt");
+                k.Town.Step();
+                yield return null;
+                Assert.IsNotNull(k.Town.Built(KingdomTown.Kind.Wall, 0), "the segment is up again");
+                Assert.IsNotNull(k.Town.Built(KingdomTown.Kind.House, 0), "and the house");
+                Assert.IsTrue(KingdomTown.Blocked(outside, inside), "the breach is closed");
+            }
+            finally
+            {
+                Object.Destroy(striker);
+                Object.Destroy(victim);
+            }
+        }
     }
 }

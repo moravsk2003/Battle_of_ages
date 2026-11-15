@@ -364,7 +364,8 @@ namespace BattleOfAges.AI
                 if (s.Interregnum <= 0f) Crown(s);
                 return;
             }
-            var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births, Free = s.Empire };
+            if (s.Capital.Ruins == null) s.Capital.Ruins = new List<int>();
+            var economy = new KingdomEconomy { Wood = s.Wood, Ore = s.Ore, HallLevel = s.Hall, BirthCarry = s.Births, Free = s.Empire, Ruins = s.Capital.Ruins, RepairClock = s.Capital.RepairClock };
             int born = economy.Tick(hours, s.Empire ? 0 : s.Subjects.Count, s.Subjects.Count);
             var rng = new System.Random(s.Name.GetHashCode() ^ Mathf.FloorToInt(s.Age * 7f)); // (the same hour's draws: births, work, training)
             for (int i = 0; i < born; i++) s.Subjects.Add(new UnitState { Rank = (int)UnitRank.Person, Position = Around(s.Home, rng) });
@@ -381,6 +382,7 @@ namespace BattleOfAges.AI
             if (!s.Free && (economy.HallLevel == 0 || s.Subjects.Count >= economy.Cap - GameBalance.KingdomHallRoom) && economy.TryUpgrade())
                 s.HallHealth = GameBalance.TownHallHealth[economy.HallLevel];
             s.Wood = economy.Wood; s.Ore = economy.Ore; s.Hall = economy.HallLevel; s.Births = economy.BirthCarry;
+            s.Capital.RepairClock = economy.RepairClock;
         }
 
         /// <summary>The strongest one left reigns (§7.2); nobody left: the kingdom is gone.</summary>

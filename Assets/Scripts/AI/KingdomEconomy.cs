@@ -12,6 +12,13 @@ namespace BattleOfAges.AI
     public sealed class KingdomEconomy
     {
         public float Wood, Ore;
+        /// <summary>
+        /// Its town's buildings in ruins (KingdomTown.RuinCode: kind and place), rebuilt one at a time every
+        /// GameBalance.TownRepairHours for their wood. While they lie, the work they hold up is less: ruined sawmills cut its
+        /// wood, ruined mines its ore (down to GameBalance.TownRuinFloor: by hand), ruined houses its room for people.
+        /// </summary>
+        public System.Collections.Generic.List<int> Ruins = new System.Collections.Generic.List<int>();
+        public float RepairClock;
         /// <summary>0: no hall yet (a camp), 1..5: hall I..V.</summary>
         public int HallLevel;
         public float BirthCarry;
@@ -54,9 +61,46 @@ namespace BattleOfAges.AI
         /// <summary>Work and births over these game hours; returns how many are born.</summary>
         public int Tick(float hours, int workers, int population)
         {
-            Wood += workers * GameBalance.KingdomWoodPerWorkerHour * hours;
-            Ore += workers * GameBalance.KingdomOrePerWorkerHour * hours;
-            return TownHall.Births(ref BirthCarry, hours, population, Cap);
+            Wood += workers * GameBalance.KingdomWoodPerWorkerHour * hours * Share(KingdomTown.Kind.Sawmill, population);
+            Ore += workers * GameBalance.KingdomOrePerWorkerHour * hours * Share(KingdomTown.Kind.Mine, population);
+            Repair(hours);
+            return TownHall.Births(ref BirthCarry, hours, population, Room);
+        }
+
+        /// <summary>How many of a kind lie in ruins.</summary>
+        public int Ruined(KingdomTown.Kind kind)
+        {
+            int n = 0;
+            foreach (int code in Ruins) if (KingdomTown.KindOf(code) == kind) n++;
+            return n;
+        }
+
+        /// <summary>Room for people: the hall's cap less the houses in ruins.</summary>
+        public int Room => Mathf.Max(0, Cap - Ruined(KingdomTown.Kind.House) * GameBalance.TownPeoplePerHouse);
+
+        /// <summary>Of the work a kind of building holds up, the share still done (all of it with none in ruins).</summary>
+        public float Share(KingdomTown.Kind kind, int population)
+        {
+            int lost = Ruined(kind);
+            if (lost == 0) return 1f;
+            int wanted = KingdomTown.Wanted(kind, HallLevel, population);
+            float standing = wanted <= 0 ? 1f : Mathf.Clamp01(1f - lost / (float)wanted);
+            return Mathf.Lerp(GameBalance.TownRuinFloor, 1f, standing);
+        }
+
+        /// <summary>The oldest ruin rises again every TownRepairHours, if its wood is there.</summary>
+        private void Repair(float hours)
+        {
+            if (Ruins.Count == 0) { RepairClock = 0f; return; }
+            RepairClock += hours;
+            while (Ruins.Count > 0 && RepairClock >= GameBalance.TownRepairHours)
+            {
+                int wood = Free ? 0 : KingdomTown.RepairWood(KingdomTown.KindOf(Ruins[0]));
+                if (Wood < wood) break;
+                Wood -= wood;
+                Ruins.RemoveAt(0);
+                RepairClock -= GameBalance.TownRepairHours;
+            }
         }
 
         /// <summary>

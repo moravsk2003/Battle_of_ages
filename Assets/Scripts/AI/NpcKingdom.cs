@@ -771,6 +771,8 @@ namespace BattleOfAges.AI
             };
             s.Hero.Id = stateIds.Hero;
             s.Capital.Id = stateIds.Settlement;
+            s.Capital.Ruins = new List<int>(Economy.Ruins);
+            s.Capital.RepairClock = Economy.RepairClock;
             s.Capital.Garrison.Id = stateIds.Garrison;
             s.EnsureIds();
             stateIds = (s.Id, s.Hero.Id, s.Capital.Id, s.Capital.Garrison.Id); // (a kingdom founded here gets its numbers the first time)
@@ -830,6 +832,8 @@ namespace BattleOfAges.AI
             k.Team = s.Team >= UnitSpatialGrid.TeamKingdomFirst ? s.Team : NewSide();
             if (k.Team >= nextTeam) nextTeam = k.Team + 1;
             k.Economy.Wood = s.Wood; k.Economy.Ore = s.Ore; k.Economy.BirthCarry = s.Births; k.Economy.HallLevel = s.Hall;
+            k.Economy.Ruins = new List<int>(s.Capital.Ruins ?? new List<int>());
+            k.Economy.RepairClock = s.Capital.RepairClock;
             k.Age = s.Age;
             k.LastRaidEnd = s.LastRaidEnd;
             // Kings do not all set off at once, as a new one (a state does not keep it: the same hour for the same name)

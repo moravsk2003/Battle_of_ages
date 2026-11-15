@@ -90,6 +90,9 @@ namespace BattleOfAges.SaveLoad
         public int Hall, HallHealth;
         public float Wood, Ore, Births;
         public ArmyState Garrison = new ArmyState();
+        /// <summary>Its town's buildings in ruins (AI.KingdomTown.RuinCode) and the hours towards the next rising again.</summary>
+        public List<int> Ruins = new List<int>();
+        public float RepairClock;
     }
 
     /// <summary>

@@ -104,6 +104,7 @@ namespace BattleOfAges.Combat
             if (!CanAttack || NeedsStaff) return false;
 
             if (target.DistanceFrom(transform.position) > AttackRange + 1.0f) return false;
+            if (!IsRanged && AI.KingdomTown.MeleeBlocked(transform.position, target)) return false; // a town's wall between: no sword reaches over it
 
             nextAttackTime = Time.time + attackCooldown;
             // The swing lands after its wind-up (PendingHits), so the one walked up to can swing back (docs/GAME_DESIGN.md §11.1).
@@ -195,7 +196,7 @@ namespace BattleOfAges.Combat
         public void DeliverHit(HealthComponent target, int damage, bool ignoreArmor)
         {
             if (target == null || !target.IsAlive) return;
-            if (!CanHarmWalls && target.GetComponent<Building.WallSegment>() != null) return; // a wall is too much for it (§10.5)
+            if (!CanHarmWalls && (target.GetComponent<Building.WallSegment>() != null || AI.KingdomTown.IsRingWall(target))) return; // a wall is too much for it (§10.5)
             target.LastAttacker = this;
             int before = target.CurrentHealth;
             target.TakeDamage(damage, ignoreArmor);

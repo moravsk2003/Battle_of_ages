@@ -235,5 +235,33 @@ namespace BattleOfAges.Tests
             Assert.GreaterOrEqual(k.Economy.HallLevel, 3, log.ToString());
             Assert.GreaterOrEqual(k.Population, 25, log.ToString());
         }
+
+        [Test]
+        public void ATownsRuins_CutItsWorkAndRoom_AndRiseAgainInTurnForWood()
+        {
+            // A hall III of 60: three sawmills wanted (60 / 25 + 1)
+            var whole = new KingdomEconomy { HallLevel = 3 };
+            var broken = new KingdomEconomy { HallLevel = 3 };
+            for (int i = 0; i < 3; i++) broken.Ruins.Add(KingdomTown.RuinCode(KingdomTown.Kind.Sawmill, i));
+            broken.Ruins.Add(KingdomTown.RuinCode(KingdomTown.Kind.House, 0));
+            broken.Ruins.Add(KingdomTown.RuinCode(KingdomTown.Kind.House, 1));
+            whole.Tick(1f, 30, 60);
+            broken.Tick(1f, 30, 60);
+            Assert.AreEqual(GameBalance.TownRuinFloor, broken.Wood / whole.Wood, 1e-3f, "every sawmill down: wood by hand");
+            Assert.AreEqual(whole.Ore, broken.Ore, 1e-3f, "the mines stand");
+            Assert.AreEqual(whole.Cap - 2 * GameBalance.TownPeoplePerHouse, broken.Room, "two houses fewer: room for fewer");
+
+            // No wood: they stay down; wood: one every TownRepairHours, the oldest first
+            var poor = new KingdomEconomy { HallLevel = 3 };
+            poor.Ruins.Add(KingdomTown.RuinCode(KingdomTown.Kind.House, 0));
+            poor.Tick(GameBalance.TownRepairHours * 3f, 0, 10);
+            Assert.AreEqual(1, poor.Ruins.Count, "nothing to build with");
+            var rich = new KingdomEconomy { HallLevel = 3, Wood = 100f };
+            rich.Ruins.Add(KingdomTown.RuinCode(KingdomTown.Kind.Wall, 4));
+            rich.Ruins.Add(KingdomTown.RuinCode(KingdomTown.Kind.House, 2));
+            rich.Tick(GameBalance.TownRepairHours * 1.5f, 0, 10);
+            CollectionAssert.AreEqual(new[] { KingdomTown.RuinCode(KingdomTown.Kind.House, 2) }, rich.Ruins, "the wall first, in its turn");
+            Assert.AreEqual(100f - KingdomTown.RepairWood(KingdomTown.Kind.Wall), rich.Wood, 1e-3f, "for its wood");
+        }
     }
 }

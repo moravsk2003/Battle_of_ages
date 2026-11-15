@@ -274,12 +274,37 @@ namespace BattleOfAges.AI
             {
                 float damage = DpsOf(s, army.Units, army.WithHero && s.HasKing) * hours * GameBalance.GameHourSeconds;
                 target.HallHealth = Mathf.Max(0, target.HallHealth - Mathf.RoundToInt(damage));
+                Burn(target, damage);
                 if (target.HallHealth <= 0) Fall(target);
             }
             else if (clear && target.Hall <= 0 && !target.Defeated) Fall(target); // a camp with no one in it
 
             if (target.Defeated || (army.StartCount > 0 && army.Units.Count <= army.StartCount * (1f - GameBalance.KingdomRaidRetreatLosses))) army.Returning = true;
             if (army.Units.Count == 0 && !army.WithHero) { s.Armies.Remove(army); s.LastRaidEnd = s.Age; }
+        }
+
+        /// <summary>
+        /// Raiders nobody stops burn the town as well as the hall (KingdomTown): with as much again as the hall took, houses
+        /// first, then the sawmills and the mines, each for the health of the player's like building. The ruins hold the
+        /// kingdom's work up and rise again in turn (KingdomEconomy), as a real town's broken buildings do.
+        /// </summary>
+        public static void Burn(KingdomState target, float damage)
+        {
+            if (target.Capital.Ruins == null) target.Capital.Ruins = new List<int>();
+            int people = Mathf.Max(target.Subjects.Count, TownHall.CapForLevel(target.Hall)); // (the town stands for the people it had room for)
+            foreach (KingdomTown.Kind kind in new[] { KingdomTown.Kind.House, KingdomTown.Kind.Sawmill, KingdomTown.Kind.Mine })
+            {
+                int health = Building.BuildingData.GetDefinition(kind == KingdomTown.Kind.House ? Building.BuildingType.WorkerHouse
+                                                                 : kind == KingdomTown.Kind.Sawmill ? Building.BuildingType.Sawmill : Building.BuildingType.Mine).MaxHealth;
+                int wanted = KingdomTown.Wanted(kind, target.Hall, people);
+                for (int i = 0; i < wanted && damage >= health; i++)
+                {
+                    int code = KingdomTown.RuinCode(kind, i);
+                    if (target.Capital.Ruins.Contains(code)) continue;
+                    target.Capital.Ruins.Add(code);
+                    damage -= health;
+                }
+            }
         }
 
         /// <summary>The side's lost share of its health, in dead: with the group's health spread evenly the same share of people fall.</summary>

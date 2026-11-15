@@ -182,6 +182,9 @@ namespace BattleOfAges.Combat
         public static float SurvivalAwardWindow = 30f;
         /// <summary>An NPC kingdom's town: one house to so many people, one field to so many, walls from this hall.</summary>
         public static int TownPeoplePerHouse = 3, TownPeoplePerField = 10, TownWallHall = 3;
+        /// <summary>An NPC town's ruins (KingdomTown, KingdomEconomy): one rises again every this many game hours, for its wood;
+        /// with all of a kind in ruins its people still do this share of the work by hand.</summary>
+        public static float TownRepairHours = 2f, TownRuinFloor = 0.25f;
         /// <summary>
         /// Chance per game hour, by hall level, that an NPC kingdom's warrior trains into a knight, and from hall IV a knight
         /// into a general (they would otherwise rise only in battle, and a far kingdom fights none).

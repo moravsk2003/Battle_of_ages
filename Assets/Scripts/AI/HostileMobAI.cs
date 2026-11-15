@@ -545,7 +545,8 @@ namespace BattleOfAges.AI
             bool shootsOver = mob.Combat != null && mob.Combat.IsRanged; // arrows and bolts fly over walls
             if (dist <= mob.AttackRange && (shootsOver || !mob.IsClimbing))
             {
-                if (shootsOver || !Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false))
+                if (shootsOver || (!Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false)
+                                   && !KingdomTown.MeleeBlocked(mob.transform.position, mob.CurrentCombatTarget)))
                 {
                     mob.ChangeState(AIStateType.Attack);
                     return;
@@ -596,7 +597,8 @@ namespace BattleOfAges.AI
             if (mob.IsClimbing) return;
             float dist = mob.CurrentCombatTarget.DistanceFrom(mob.transform.position);
             bool melee = mob.Combat == null || !mob.Combat.IsRanged;
-            if (dist > mob.AttackRange + 1.8f || (melee && Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false)))
+            if (dist > mob.AttackRange + 1.8f || (melee && (Building.WallBarriers.Blocked(mob.transform.position, mob.CurrentCombatTarget.transform.position, false)
+                                                            || KingdomTown.MeleeBlocked(mob.transform.position, mob.CurrentCombatTarget))))
             {
                 mob.ChangeState(AIStateType.Chase); // out of reach, or a wall between (a sword does not reach over it)
                 return;
