@@ -20,7 +20,7 @@ namespace BattleOfAges.UI
             InventoryOpen || WorkbenchOpen || WorkersOpen || BuildMenuOpen || EquipmentOpen || SaveSlotsOpen || HeroOpen || HelpOpen || WorldMapOpen || EditorOpen;
 
         /// <summary>The player character should not move, look around or act.</summary>
-        public static bool BlockGameplay => AnyModalOpen || Paused;
+        public static bool BlockGameplay => AnyModalOpen || Paused || Net.NetSession.NetPaused;
 
         public static void CloseAllModals()
         {

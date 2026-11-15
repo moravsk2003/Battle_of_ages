@@ -31,6 +31,41 @@ namespace BattleOfAges.UI
             if (SettingsManager.Instance == null) new GameObject("SettingsManager").AddComponent<SettingsManager>();
             Build();
             RefreshContinue();
+            ResumeNetworkLobby();
+        }
+
+        /// <summary>Back from a game to its lobby (NetSession.HostBackToLobby): the host opens it with the autosave, a guest joins its host again.</summary>
+        private void ResumeNetworkLobby()
+        {
+            if (Net.NetSession.PendingLobbySave != null)
+            {
+                SaveData save = Net.NetSession.PendingLobbySave;
+                string name = Net.NetSession.PendingLobbyName ?? "";
+                Net.NetSession.PendingLobbySave = null;
+                HostLobby(null, save, name);
+                return;
+            }
+            string address = Net.NetSession.PendingRejoin;
+            if (string.IsNullOrEmpty(address)) return;
+            Net.NetSession.PendingRejoin = null;
+            StartCoroutine(Rejoin(address));
+        }
+
+        private System.Collections.IEnumerator Rejoin(string address)
+        {
+            ShowJoin(true);
+            joinAddress.text = address;
+            joinStatus.text = "Хост повертає всіх у лобі…";
+            // The host saves and opens its lobby a few seconds after; till then its old game still answers
+            yield return new WaitForSecondsRealtime(6f);
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                JoinGame();
+                float until = Time.realtimeSinceStartup + 16f;
+                while (joining && Time.realtimeSinceStartup < until) yield return null;
+                if (Net.NetSession.Current != null && Net.NetSession.Current.Seated) yield break;
+                yield return new WaitForSecondsRealtime(2f);
+            }
         }
 
         private void RefreshContinue()

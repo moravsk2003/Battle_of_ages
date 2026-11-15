@@ -199,6 +199,13 @@ namespace BattleOfAges.Net
                 frameCount++;
                 if (duelStart > 0f && frameNow > duelStart + 3f) frameWorst = Mathf.Max(frameWorst, frameMs);
                 NetSession now = NetSession.Current;
+                // "-netdemostep lobby": once the guest is in, the host sends everyone back to the lobby of an autosave; the guest joins it again
+                if (host && step == "lobby" && !stepDone && now != null && now.Players.Count > 1 && frameNow > 25f)
+                {
+                    stepDone = true;
+                    report.AppendLine($"t {frameNow:0}: the host sends everyone back to the lobby");
+                    NetSession.HostBackToLobby();
+                }
                 if (step == "duel" && now != null && duel == null)
                 {
                     GameObject mine = GameObject.Find("Player");
@@ -360,6 +367,8 @@ namespace BattleOfAges.Net
                 frameSum = 0f;
                 frameCount = 0;
                 frameWorst = 0f;
+                if (step == "lobby")
+                    report.AppendLine($"t {Time.realtimeSinceStartup:0}: lobby: session {(s != null)}, hosting a lobby {NetSession.HostingLobby}, seated {(s != null && s.Seated)}, in a game {(s != null && s.Welcome != null)}, seats {(s != null && s.Lobby != null ? s.Lobby.Seats.Count : 0)}, from a save {(s != null && s.Lobby != null && s.Lobby.FromSave)}");
                 report.AppendLine($"t {Time.realtimeSinceStartup:0}: player {NetSession.PlayerId}, number {(s != null ? s.Number : -1)}, in the game [{(s != null ? string.Join(",", s.Players) : "")}], on the world map {WorldMapData.Now().Count} kingdoms {(s != null ? s.PlayersOnMap().Count : 0)} players, seed {World.WorldSettings.Seed}, size {World.WorldSettings.Size}, kingdoms real {NpcKingdom.All.Count} far {KingdomRealm.Far.Count} bots {Bots()}, " +
                                   $"me at {(me != null ? $"{me.transform.position.x:0},{me.transform.position.z:0}" : "-")}, other hero {other}, my health {(me != null ? me.GetComponent<HealthComponent>().CurrentHealth : -1)}, blows struck {blows}, struck by another player {StruckByAnother()}, kills credited {NetSession.KillsCredited}, others' buildings {(s != null ? s.RemoteBuildingCount : -1)} the first at {(s != null ? s.StrikeShownBuilding(0, null) : "-")}, trees told {SaveLoad.WorldPersistence.Capture().Trees.Count}, others' zones {World.ZoneMap.ForeignCount}, guests {GuestBook.All.Count} save {(GuestBook.All.Count > 0 ? GuestBook.All[0].Save.Length : 0)}, life claims {(s != null ? s.LifeClaimCount : -1)}, clock {WorldClock.GameHours:0.00}, bodies {(s != null ? s.Remote.Count : -1)}, in {(s != null ? s.BytesIn / 1024 : 0)} KB out {(s != null ? s.BytesOut / 1024 : 0)} KB");
             }

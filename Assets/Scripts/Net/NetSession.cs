@@ -78,7 +78,7 @@ namespace BattleOfAges.Net
     /// animals and raiders have one owner, the first one there (LifeClaims). A guest's game is kept by the host (GuestBook) and comes
     /// back with it. Not yet: a swing shown, a player's kingdom going on without it.
     /// </summary>
-    public sealed class NetSession : MonoBehaviour
+    public sealed partial class NetSession : MonoBehaviour
     {
         public const byte WelcomeMessage = 2, HitsMessage = 3, BuildingMessage = 4, HelloMessage = 5, GuestSaveMessage = 6,
                           TreesMessage = 7, CampMessage = 8, AnimalMessage = 9, ZonesMessage = 10, ClockMessage = 11, LifeMessage = 12,
@@ -328,6 +328,7 @@ namespace BattleOfAges.Net
         public static bool Join(string address, ushort port = NetLink.DefaultPort)
         {
             NetSession s = Create();
+            LastAddress = address;
             s.link = NetLink.Join(address, port);
             if (s.link == null) { Stop(); return false; }
             s.connectDeadline = Time.realtimeSinceStartup + 15f;
@@ -432,6 +433,7 @@ namespace BattleOfAges.Net
             if (!basePlaced) return; // the game is starting: its world comes with everyone's (WelcomeWhenIn)
             RetireBot(record);
             SendWelcome(peer, record);
+            OnGuestBack(record);
             TellRoster($"{LobbyHost.NameOf(record)} зайшов у гру");
             TellWorldMap();
         }
@@ -500,12 +502,7 @@ namespace BattleOfAges.Net
                 bool wasIn = guestOf.TryGetValue(peer, out GuestRecord left);
                 guestOf.Remove(peer);
                 foreach (Vector2Int freed in claims.ReleaseAll(peer)) TellFree(freed);
-                if (wasIn && basePlaced)
-                {
-                    bool kept = RaiseBot(left);
-                    TellRoster(kept ? $"{LobbyHost.NameOf(left)} вийшов із гри: його королівство стереже бот" : $"{LobbyHost.NameOf(left)} вийшов із гри");
-                    if (kept) TellWorldMap();
-                }
+                if (wasIn && basePlaced) OnGuestLeft(left); // (a bot at once, or a pause for the host's word: NetPause)
                 return;
             }
             string why = joined ? "Зв'язок із хостом втрачено" : seated ? "Хост закрив лобі" : "Не вдалося приєднатися";
@@ -527,6 +524,7 @@ namespace BattleOfAges.Net
             if (data[0] == HitsMessage) { ReceiveHits(data, length); return; }
             if (data[0] == KillMessage) { RouteKill(data, length); return; }
             if (data[0] >= HelloMessage && data[0] <= LobbyChoiceMessage) { ReceiveWorld(peer, data, length); return; }
+            if (data[0] >= PauseMessage && data[0] <= LobbyReturnMessage) { ReceivePause(peer, data[0], Encoding.UTF8.GetString(data, 1, length - 1)); return; }
             if (data[0] == BuildingMessage)
             {
                 ReceiveBuilding(JsonUtility.FromJson<NetBuilding>(Encoding.UTF8.GetString(data, 1, length - 1)));
@@ -615,6 +613,8 @@ namespace BattleOfAges.Net
             if (link == null) return;
             link.Poll();
             if (link == null) return; // (it may have ended in Poll)
+            if (LeaveForLobbyIfAsked()) return;
+            HoldTime();
             if (refusedWhy != null)
             {
                 string why = refusedWhy;

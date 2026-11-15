@@ -185,6 +185,7 @@ namespace BattleOfAges.PlayModeTests
             public NetLobby Lobby;
             public NetWelcome Welcome;
             public string Refused;
+            public NetPauseState Pause;
 
             public WireGuest(ushort port, string token, string name)
             {
@@ -197,6 +198,7 @@ namespace BattleOfAges.PlayModeTests
                     if (data[0] == NetSession.LobbyMessage) Lobby = JsonUtility.FromJson<NetLobby>(text);
                     else if (data[0] == NetSession.WelcomeMessage) Welcome = JsonUtility.FromJson<NetWelcome>(text);
                     else if (data[0] == NetSession.RefusedMessage) Refused = JsonUtility.FromJson<NetText>(text).Text;
+                    else if (data[0] == NetSession.PauseMessage) Pause = JsonUtility.FromJson<NetPauseState>(text);
                 };
             }
 
@@ -285,6 +287,63 @@ namespace BattleOfAges.PlayModeTests
                 Assert.IsNull(back.Refused, "one of the lobby comes back at any time");
                 Assert.IsNotNull(back.Welcome);
                 Assert.AreEqual((int)Combat.HeroClass.Archer, back.Welcome.Class, "its hero kept, though it had not saved yet");
+            }
+        }
+
+        /// <summary>
+        /// The network pause (§14.1, §14.4): a guest pauses the game for everyone (three times a game), the host lifts it; a guest
+        /// leaving stops the game for everyone till the host's word, and the word "a bot" lets it go on.
+        /// </summary>
+        [UnityTest, Timeout(90000)]
+        public IEnumerator APause_StopsTheGameForAll_AndAPlayerLeaving_WaitsForTheHostsWord()
+        {
+            const ushort port = 27797;
+            NetSession.AlwaysBot = false;
+            Assert.IsTrue(NetSession.HostLobby(new CampaignSetup { Seed = 777, Size = 4000f, Heroes = 10 }, null, "", port));
+            var guest = new WireGuest(port, "pause-guest", "Гість");
+            try
+            {
+                yield return guest.Until(() => guest.Lobby != null);
+                Assert.IsNull(NetSession.StartLobbyGame(force: true));
+                yield return guest.Until(() => guest.Welcome != null, 60f);
+                Assert.IsNotNull(guest.Welcome);
+                yield return guest.Until(() => NetSession.PauseState != null, 10f);
+
+                for (int i = 0; i < NetSession.PausesPerPlayer; i++)
+                {
+                    guest.Say(NetSession.PauseRequestMessage, JsonUtility.ToJson(new NetPauseRequest { Pause = true }));
+                    yield return guest.Until(() => NetSession.NetPaused && guest.Pause != null && guest.Pause.On);
+                    Assert.IsTrue(NetSession.NetPaused, "the guest's pause stops the game");
+                    Assert.AreEqual(1, guest.Pause.By, "told to everyone, with whose it is");
+                    yield return null;
+                    Assert.AreEqual(0f, Time.timeScale, "time stands");
+                    Assert.IsTrue(NetSession.CanUnpause, "the host may always lift it");
+                    NetSession.RequestPause(false);
+                    yield return guest.Until(() => guest.Pause != null && !guest.Pause.On);
+                    Assert.IsFalse(NetSession.NetPaused);
+                }
+                yield return null;
+                Assert.AreEqual(1f, Time.timeScale, "time goes on");
+                guest.Say(NetSession.PauseRequestMessage, JsonUtility.ToJson(new NetPauseRequest { Pause = true }));
+                yield return guest.Until(() => NetSession.NetPaused, 2f);
+                Assert.IsFalse(NetSession.NetPaused, "no pauses left for it this game");
+
+                guest.Dispose();
+                guest = null;
+                float end = Time.realtimeSinceStartup + 20f;
+                while (!NetSession.NetPaused && Time.realtimeSinceStartup < end) yield return null;
+                Assert.IsTrue(NetSession.PauseState.AwaitingHost, "a player left: everyone waits for the host's word");
+                Assert.IsFalse(NetSession.CanUnpause, "it is not lifted as a pause is");
+                StringAssert.Contains("Гість", NetSession.WaitingNames);
+                NetSession.HostPutBots();
+                yield return null;
+                Assert.IsFalse(NetSession.NetPaused, "the word given, the game goes on");
+                Assert.AreEqual(1f, Time.timeScale);
+            }
+            finally
+            {
+                guest?.Dispose();
+                Time.timeScale = 1f;
             }
         }
 
