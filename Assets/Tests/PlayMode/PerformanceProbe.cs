@@ -215,7 +215,7 @@ namespace BattleOfAges.PlayModeTests
             yield return null;
             last = Time.realtimeSinceStartup;
             int gcCount = System.GC.CollectionCount(0);
-            while (Time.realtimeSinceStartup < end)
+            while (Time.realtimeSinceStartup < end || samples.Count == 0) // (a first frame compiling shaders can outlast a short phase)
             {
                 step?.Invoke(Time.deltaTime);
                 renderMs = RenderFrame();
