@@ -102,6 +102,11 @@ namespace BattleOfAges.Utils
         private static readonly Dictionary<Mesh, Rig> Rigs = new Dictionary<Mesh, Rig>();
         private static readonly Dictionary<string, Piece> Pieces = new Dictionary<string, Piece>();
         private static readonly Dictionary<string, Mesh> Composed = new Dictionary<string, Mesh>();
+        private static readonly Dictionary<Mesh, (BoneWeight[] w, int[] t)> BaseParts = new Dictionary<Mesh, (BoneWeight[], int[])>();
+        private static readonly List<Vector3> CVerts = new List<Vector3>(), CNormals = new List<Vector3>(), CSurface = new List<Vector3>(), CRest = new List<Vector3>();
+        private static readonly List<Color> CColors = new List<Color>();
+        private static readonly List<int> CTris = new List<int>();
+        private static readonly List<BoneWeight> CWeights = new List<BoneWeight>();
 
         /// <summary>Where a held tool's grip runs, from the wrist towards the middle knuckles (the sculpted fist closes round it).</summary>
         public const float GripAlongHand = 0.75f;
@@ -265,11 +270,21 @@ namespace BattleOfAges.Utils
             if (Composed.TryGetValue(key, out Mesh cached) && cached != null) return cached;
 
             Mesh b = baseMesh;
-            var verts = new List<Vector3>(); var normals = new List<Vector3>(); var colors = new List<Color>();
-            var surface = new List<Vector3>(); var rest = new List<Vector3>(); var tris = new List<int>();
+            // (into buffers kept between calls: a sculpted body is ~30k vertices, and fresh lists for every unit that dressed
+            // were megabytes of garbage in one frame)
+            List<Vector3> verts = CVerts, normals = CNormals, surface = CSurface, rest = CRest;
+            List<Color> colors = CColors; List<int> tris = CTris; List<BoneWeight> weights = CWeights;
+            verts.Clear(); normals.Clear(); colors.Clear(); surface.Clear(); rest.Clear(); tris.Clear(); weights.Clear();
             b.GetVertices(verts); b.GetNormals(normals); b.GetColors(colors); b.GetUVs(2, surface); b.GetUVs(3, rest);
-            var weights = new List<BoneWeight>(b.boneWeights);
-            for (int s = 0; s < b.subMeshCount; s++) tris.AddRange(b.GetTriangles(s));
+            if (!BaseParts.TryGetValue(b, out (BoneWeight[] w, int[] t) parts))
+            {
+                var all = new List<int>();
+                for (int s = 0; s < b.subMeshCount; s++) all.AddRange(b.GetTriangles(s));
+                parts = (b.boneWeights, all.ToArray());
+                BaseParts[b] = parts;
+            }
+            weights.AddRange(parts.w);
+            tris.AddRange(parts.t);
             int n0 = verts.Count;
             if (colors.Count != n0) { colors.Clear(); for (int i = 0; i < n0; i++) colors.Add(Color.gray); }
             if (surface.Count != n0) { surface.Clear(); for (int i = 0; i < n0; i++) surface.Add(new Vector3(1f, 0f, 0.3f)); }
@@ -290,7 +305,29 @@ namespace BattleOfAges.Utils
             mesh.SetVertices(verts); mesh.SetNormals(normals); mesh.SetColors(colors);
             mesh.SetUVs(2, surface); mesh.SetUVs(3, rest);
             mesh.SetTriangles(tris, 0);
-            mesh.boneWeights = weights.ToArray();
+            // Bone weights through native arrays (the BoneWeight[] setter wanted a fresh array the size of the body)
+            var perVertex = new Unity.Collections.NativeArray<byte>(weights.Count, Unity.Collections.Allocator.Temp);
+            var flat = new Unity.Collections.NativeArray<BoneWeight1>(weights.Count * 4, Unity.Collections.Allocator.Temp);
+            try
+            {
+                int k = 0;
+                for (int i = 0; i < weights.Count; i++)
+                {
+                    BoneWeight w = weights[i];
+                    int before = k;
+                    // (sorted by weight, the largest first, as Unity wants them)
+                    if (w.weight0 > 0f) flat[k++] = new BoneWeight1 { boneIndex = w.boneIndex0, weight = w.weight0 };
+                    if (w.weight1 > 0f) flat[k++] = new BoneWeight1 { boneIndex = w.boneIndex1, weight = w.weight1 };
+                    if (w.weight2 > 0f) flat[k++] = new BoneWeight1 { boneIndex = w.boneIndex2, weight = w.weight2 };
+                    if (w.weight3 > 0f) flat[k++] = new BoneWeight1 { boneIndex = w.boneIndex3, weight = w.weight3 };
+                    if (k == before) flat[k++] = new BoneWeight1 { boneIndex = w.boneIndex0, weight = 1f };
+                    for (int a = before + 1; a < k; a++)
+                        for (int c = a; c > before && flat[c].weight > flat[c - 1].weight; c--) { BoneWeight1 x = flat[c]; flat[c] = flat[c - 1]; flat[c - 1] = x; }
+                    perVertex[i] = (byte)(k - before);
+                }
+                mesh.SetBoneWeights(perVertex, flat.GetSubArray(0, k));
+            }
+            finally { perVertex.Dispose(); flat.Dispose(); }
             mesh.bindposes = b.bindposes;
             mesh.RecalculateBounds();
             Composed[key] = mesh;

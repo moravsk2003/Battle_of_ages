@@ -66,6 +66,8 @@ namespace BattleOfAges.Utils
                 Debug.Log($"[Smoke] arrow holder {holder != null}, arrow {arrow != null}, active {arrow != null && arrow.gameObject.activeInHierarchy}, at {(arrow != null ? arrow.position : Vector3.zero)}, scale {(arrow != null ? arrow.lossyScale.x : 0f)}, viewport {(arrow != null ? ViewCamera.Current.WorldToViewportPoint(arrow.position) : Vector3.zero)}");
             }
             ScreenCapture.CaptureScreenshot(path);
+            // The player's real managed heap (in the editor it counts the editor's own too)
+            Debug.Log($"[Smoke] memory: mono used {UnityEngine.Profiling.Profiler.GetMonoUsedSizeLong() / 1048576} MB of {UnityEngine.Profiling.Profiler.GetMonoHeapSizeLong() / 1048576}, total {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1048576} MB, gfx {UnityEngine.Profiling.Profiler.GetAllocatedMemoryForGraphicsDriver() / 1048576} MB");
             yield return new WaitForSecondsRealtime(1.5f);
             if (zones)
             {

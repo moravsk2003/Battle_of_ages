@@ -89,6 +89,9 @@ namespace BattleOfAges.Managers
         public static void Cycle() => Set((Level)(((int)Current + 1) % 3));
 
         /// <summary>Global shader float: how much of the surfaces' fine detail is cut (0 = all of it drawn, the default).</summary>
+        /// <summary>How far shadows reach on High (metres).</summary>
+        public const float HighShadowDistance = 170f;
+
         public static readonly int SurfaceDetailCutId = Shader.PropertyToID("_SurfaceDetailCut");
 
         public static void Apply(Level level)
@@ -134,8 +137,10 @@ namespace BattleOfAges.Managers
                     break;
                 default:
                     a.supportsHDR = original.supportsHDR;
-                    a.shadowDistance = original.shadowDistance;
-                    a.shadowCascadeCount = original.shadowCascadeCount;
+                    // (three cascades to 170 m instead of four to 200: every caster drawn once less, the last 30 m of shadows
+                    // were faint in the haze anyway)
+                    a.shadowDistance = Mathf.Min(original.shadowDistance, HighShadowDistance);
+                    a.shadowCascadeCount = Mathf.Min(original.shadowCascadeCount, 3);
                     a.mainLightShadowmapResolution = original.mainLightShadowmapResolution;
                     a.maxAdditionalLightsCount = original.maxAdditionalLightsCount;
                     QualitySettings.lodBias = lodBiasBefore;

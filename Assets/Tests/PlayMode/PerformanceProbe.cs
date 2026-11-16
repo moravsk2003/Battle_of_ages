@@ -48,6 +48,10 @@ namespace BattleOfAges.PlayModeTests
             LogAssert.ignoreFailingMessages = true; // (a known SkinnedMeshRenderer error must not abort the review)
             Application.targetFrameRate = -1;
             QualitySettings.vSyncCount = 0;
+            gcTrace = Environment.GetEnvironmentVariable("PERF_GC_TRACE") == "1"; // where a frame's big allocations come from
+#if UNITY_EDITOR
+            if (gcTrace) { UnityEditorInternal.ProfilerDriver.ClearAllFrames(); UnityEditorInternal.ProfilerDriver.enabled = true; UnityEngine.Profiling.Profiler.enabled = true; }
+#endif
             bool campaign = Environment.GetEnvironmentVariable("PERF_CAMPAIGN") == "1"; // M1: a new 16 km campaign (seed 777) instead of the fixed world
             if (campaign)
             {
@@ -106,6 +110,7 @@ namespace BattleOfAges.PlayModeTests
                 yield return Phase("two halls held, the hero away", 8f, null);
                 report.AppendLine(); report.AppendLine("Hitches:");
                 foreach (string h in pendingHitches) report.AppendLine(h);
+                if (gcTraces.Count > 0) { report.AppendLine(); report.AppendLine("## Where the big allocations came from (PERF_GC_TRACE)"); foreach (string t in gcTraces) report.AppendLine(t); }
                 File.WriteAllText(Path.Combine(dir, "perf_report.md"), report.ToString());
                 cam.targetTexture = null;
                 rt.Release();
@@ -151,6 +156,7 @@ namespace BattleOfAges.PlayModeTests
                 report.AppendLine(); report.AppendLine("Hitches:");
                 foreach (string h in pendingHitches) report.AppendLine(h);
                 if (pendingHitches.Count == 0) report.AppendLine("- none");
+                if (gcTraces.Count > 0) { report.AppendLine(); report.AppendLine("## Where the big allocations came from (PERF_GC_TRACE)"); foreach (string t in gcTraces) report.AppendLine(t); }
                 File.WriteAllText(Path.Combine(dir, "perf_report.md"), report.ToString());
                 Debug.Log("[Perf] report written\n" + report);
                 cam.targetTexture = null;
@@ -181,6 +187,7 @@ namespace BattleOfAges.PlayModeTests
             yield return Wait(2f);
             yield return Ablation(player);
 
+            if (gcTraces.Count > 0) { report.AppendLine(); report.AppendLine("## Where the big allocations came from (PERF_GC_TRACE)"); foreach (string t in gcTraces) report.AppendLine(t); }
             File.WriteAllText(Path.Combine(dir, "perf_report.md"), report.ToString());
             Debug.Log("[Perf] report written\n" + report);
             cam.targetTexture = null;
@@ -203,6 +210,52 @@ namespace BattleOfAges.PlayModeTests
             if (!noRender) cam.Render();
             return (float)sw.Elapsed.TotalMilliseconds;
         }
+
+        private bool gcTrace;
+        private int gcTraced;
+        private const long GcTraceBytes = 2 * 1024 * 1024;
+
+        /// <summary>
+        /// The profiler's last few frames: the one that allocated most, and down its call tree every sample that allocated
+        /// a good share of it (PERF_GC_TRACE=1, editor only). Goes into the report.
+        /// </summary>
+        private void TraceGc(string phase)
+        {
+#if UNITY_EDITOR
+            int last = UnityEditorInternal.ProfilerDriver.lastFrameIndex;
+            int best = -1; float bestGc = 0f;
+            for (int f = Mathf.Max(UnityEditorInternal.ProfilerDriver.firstFrameIndex, last - 4); f <= last; f++)
+                using (var v = UnityEditorInternal.ProfilerDriver.GetHierarchyFrameDataView(f, 0, UnityEditor.Profiling.HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, UnityEditor.Profiling.HierarchyFrameDataView.columnGcMemory, false))
+                {
+                    if (v == null || !v.valid) continue;
+                    float gc = v.GetItemColumnDataAsFloat(v.GetRootItemID(), UnityEditor.Profiling.HierarchyFrameDataView.columnGcMemory);
+                    if (gc > bestGc) { bestGc = gc; best = f; }
+                }
+            gcTraces.Add($"- **{phase}**, profiler frame {best}: {bestGc / 1024f / 1024f:0.0} MB");
+            if (best < 0) return;
+            using (var v = UnityEditorInternal.ProfilerDriver.GetHierarchyFrameDataView(best, 0, UnityEditor.Profiling.HierarchyFrameDataView.ViewModes.MergeSamplesWithTheSameName, UnityEditor.Profiling.HierarchyFrameDataView.columnGcMemory, false))
+            {
+                var children = new List<int>();
+                void Walk(int id, int depth, string indent)
+                {
+                    children.Clear();
+                    v.GetItemChildren(id, children);
+                    var mine = new List<int>(children);
+                    foreach (int c in mine)
+                    {
+                        float gc = v.GetItemColumnDataAsFloat(c, UnityEditor.Profiling.HierarchyFrameDataView.columnGcMemory);
+                        if (gc < bestGc * 0.05f || gc < 64 * 1024) continue;
+                        float ms = v.GetItemColumnDataAsFloat(c, UnityEditor.Profiling.HierarchyFrameDataView.columnTotalTime);
+                        gcTraces.Add($"  {indent}- {v.GetItemName(c)}: {gc / 1024f:0} KB, {ms:0.0} ms");
+                        if (depth < 14) Walk(c, depth + 1, indent + "  ");
+                    }
+                }
+                Walk(v.GetRootItemID(), 0, "");
+            }
+#endif
+        }
+
+        private readonly List<string> gcTraces = new List<string>();
 
         private IEnumerator Phase(string name, float seconds, Action<float> step)
         {
@@ -232,6 +285,7 @@ namespace BattleOfAges.PlayModeTests
                 animMs.Add(animators.LastValue * 1e-6f);
                 last = now;
                 samples.Add(s);
+                if (gcTrace && s.GcBytes > GcTraceBytes && gcTraced < 4) { gcTraced++; TraceGc(name); }
                 int gcNow = System.GC.CollectionCount(0);
                 s.Collected = gcNow != gcCount; gcCount = gcNow;
             }

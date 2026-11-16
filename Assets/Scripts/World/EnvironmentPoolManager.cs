@@ -60,7 +60,17 @@ namespace BattleOfAges.World
             var boar = new GameObject("Boar"); BoarModelBuilder.Build(boar.transform); Keep(boar);
             var rabbit = new GameObject("Rabbit"); RabbitModelBuilder.Build(rabbit.transform); Keep(rabbit);
             foreach (HumanoidModelBuilder.HumanType type in new[] { HumanoidModelBuilder.HumanType.Warlord, HumanoidModelBuilder.HumanType.Bandit, HumanoidModelBuilder.HumanType.Goblin })
-                Keep(HumanoidModelBuilder.CreateHumanoidModel(type, "Raider"));
+            {
+                GameObject raider = HumanoidModelBuilder.CreateHumanoidModel(type, "Raider");
+                Keep(raider);
+                // and dressed in their kits, archers' too: composing the gear onto a body was megabytes and ~10 ms when a
+                // camp streamed in (the composed meshes are cached by body and kit)
+                CharacterGear gear = raider.GetComponent<CharacterGear>();
+                if (gear == null) continue;
+                Crafting.Item[] kit = Crafting.StartingKits.For(type);
+                gear.Show(new List<Crafting.Item>(kit));
+                gear.Show(new List<Crafting.Item>(AI.UnitStats.ArcherKit(kit)));
+            }
             Destroy(warm);
         }
 
