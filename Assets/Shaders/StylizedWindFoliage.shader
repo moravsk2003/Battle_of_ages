@@ -106,6 +106,16 @@
                                  lerp(hash31(i + float3(0, 1, 1)), hash31(i + float3(1, 1, 1)), f.x), f.y), f.z);
             }
 
+            // Leaves at the crown's rim: the blob's outline is cut into leaves where the surface turns away from the eye (alpha
+            // clip; no depth priming here), less and less with distance so far trees do not shimmer. DepthNormals cuts the same.
+            float LeafRim(float3 p, float3 n, float3 view, float dist)
+            {
+                float leafN = noise3D(p * 9.0) * 0.55 + noise3D(p * 23.0 + 5.0) * 0.45;
+                float edge = 1.0 - abs(dot(n, view));
+                float nearby = 1.0 - smoothstep(40.0, 120.0, dist);
+                return leafN - (smoothstep(0.35, 0.95, edge) * 0.95 + 0.14) * nearby; // ragged rim, and gaps in the crown
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
                 // Top-to-bottom sunlight gradient. _TopColor/_BottomColor already contain the base colour
@@ -118,12 +128,23 @@
                 // Procedural leaf clumps: darker gaps between clusters of leaves, lighter leaf edges,
                 // so the faceted crowns read as foliage instead of flat polygons.
                 float3 p = input.positionWS;
+                float camDist = distance(_WorldSpaceCameraPos.xyz, p);
+                float3 view = (_WorldSpaceCameraPos.xyz - p) / max(camDist, 1e-4);
+                clip(LeafRim(p, normal, view, camDist));
                 float clumps = noise3D(p * 2.3);
                 float leaves = noise3D(p * 9.0 + 3.7);
-                float camDist = distance(_WorldSpaceCameraPos.xyz, p);
                 float detail = 1.0 - smoothstep(20.0, 80.0, camDist);
                 baseAlbedo *= lerp(0.70, 1.12, smoothstep(0.25, 0.75, clumps));
                 baseAlbedo *= lerp(1.0, lerp(0.82, 1.14, leaves), detail);
+                // Leaf by leaf: each a little yellower or bluer, lighter or darker, and turned its own way to the light
+                float leaf = noise3D(p * 16.0 + 1.1), hue = noise3D(p * 5.0 + 9.0);
+                float sprays = smoothstep(0.4, 0.62, noise3D(p * 11.0 + 2.0)); // sprays of leaves, shade between them
+                baseAlbedo *= lerp(1.0, lerp(0.55, 1.1, sprays), detail);
+                baseAlbedo *= lerp(1.0, lerp(0.8, 1.15, leaf), detail) * lerp(float3(0.94, 1.03, 0.92), float3(1.07, 1.0, 0.86), hue);
+                float bl = dot(baseAlbedo, float3(0.3, 0.59, 0.11));
+                baseAlbedo = lerp(bl.xxx, baseAlbedo, 0.85); // as the meadows: less poster green
+                float3 tilt = float3(noise3D(p * 18.0), noise3D(p * 18.0 + 3.0), noise3D(p * 18.0 + 7.0)) - 0.5;
+                normal = normalize(normal + tilt * 0.9 * detail);
 
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
 
@@ -235,7 +256,23 @@
             CBUFFER_END
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
-            struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; };
+            struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; float3 positionWS : TEXCOORD1; };
+
+            float hash31(float3 p) { p = frac(p * 0.3183099 + 0.1); p *= 17.0; return frac(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+            float noise3D(float3 x)
+            {
+                float3 i = floor(x), f = frac(x);
+                f = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(lerp(hash31(i), hash31(i + float3(1, 0, 0)), f.x), lerp(hash31(i + float3(0, 1, 0)), hash31(i + float3(1, 1, 0)), f.x), f.y),
+                            lerp(lerp(hash31(i + float3(0, 0, 1)), hash31(i + float3(1, 0, 1)), f.x), lerp(hash31(i + float3(0, 1, 1)), hash31(i + float3(1, 1, 1)), f.x), f.y), f.z);
+            }
+            float LeafRim(float3 p, float3 n, float3 view, float dist)
+            {
+                float leafN = noise3D(p * 9.0) * 0.55 + noise3D(p * 23.0 + 5.0) * 0.45;
+                float edge = 1.0 - abs(dot(n, view));
+                float nearby = 1.0 - smoothstep(40.0, 120.0, dist);
+                return leafN - (smoothstep(0.35, 0.95, edge) * 0.95 + 0.14) * nearby; // ragged rim, and gaps in the crown
+            }
 
             Varyings DepthNormalsVert(Attributes input)
             {
@@ -247,12 +284,15 @@
                 positionWS += float3(windGust * _WindStrength * heightWeight, 0, sin(windPhase * 1.3f) * _WindStrength * 0.6f * heightWeight);
                 o.positionCS = TransformWorldToHClip(positionWS);
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                o.positionWS = positionWS;
                 return o;
             }
 
             half4 DepthNormalsFrag(Varyings input) : SV_Target
             {
                 float3 n = NormalizeNormalPerPixel(input.normalWS);
+                float dist = distance(_WorldSpaceCameraPos.xyz, input.positionWS);
+                clip(LeafRim(input.positionWS, n, (_WorldSpaceCameraPos.xyz - input.positionWS) / max(dist, 1e-4), dist));
                 #if defined(_GBUFFER_NORMALS_OCT)
                     float2 oct = saturate(PackNormalOctQuadEncode(n) * 0.5 + 0.5);
                     return half4(PackFloat2To888(oct), 0.0);
