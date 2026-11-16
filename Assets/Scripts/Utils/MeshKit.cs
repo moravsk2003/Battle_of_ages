@@ -211,6 +211,7 @@ namespace BattleOfAges.Utils
             propMaterial.SetColor("_BaseColor", Color.white);
             propMaterial.SetFloat("_VertexSurface", 1f);
             propMaterial.SetFloat("_ObjectSpace", 1f);
+            propMaterial.SetFloat("_Weathering", 1f); // sun-greyed wood, moss, damp and mud at the foot
             return propMaterial;
         }
 

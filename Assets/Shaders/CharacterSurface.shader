@@ -15,6 +15,7 @@ Shader "Custom/CharacterSurface"
         _ObjectSpace ("Use Object Space (primitives)", Float) = 0
         _UseVertexColor ("Multiply By Vertex Color", Float) = 0
         _VertexSurface ("Per-Vertex Surface (colour, uv2 = pattern, metallic, smoothness)", Float) = 0
+        _Weathering ("Weathering (props and buildings: sun, rain, moss, mud)", Float) = 0
     }
 
     SubShader
@@ -26,7 +27,7 @@ Shader "Custom/CharacterSurface"
 
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseColor;
-            float _Metallic, _Smoothness, _Pattern, _PatternScale, _DetailStrength, _ObjectSpace, _UseVertexColor, _VertexSurface;
+            float _Metallic, _Smoothness, _Pattern, _PatternScale, _DetailStrength, _ObjectSpace, _UseVertexColor, _VertexSurface, _Weathering;
         CBUFFER_END
 
         float hash31(float3 p) { p = frac(p * 0.3183099 + 0.1); p *= 17.0; return frac(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -369,6 +370,39 @@ Shader "Custom/CharacterSurface"
                 s.metallic = i.surface.y;
                 s.smoothness = saturate(i.surface.z * lerp(1.0, pat.smooth, saturate(detail + 0.5)));
                 s.occlusion = pat.occ;
+
+                // Props and buildings stand out in the weather: wood greys where the sun and rain reach it and shows knots,
+                // stone and plaster grow moss on top and stay damp low down, iron rusts, and mud splashes the bottom
+                if (_Weathering > 0.5)
+                {
+                    float3 p = i.restPos;
+                    float up = saturate(n.y), low = saturate(1.0 - p.y / 0.45);
+                    float w1 = noise3D(p * 3.0 + 4.0), w2 = noise3D(p * 11.0 + 1.0);
+                    float lum = dot(s.albedo, float3(0.3, 0.59, 0.11));
+                    if (pattern > 3.5 && pattern < 4.5) // wood
+                    {
+                        float silver = saturate(0.25 + up * 0.45) * smoothstep(0.3, 0.75, w1);
+                        s.albedo = lerp(s.albedo, float3(0.62, 0.6, 0.56) * (lum * 1.6 + 0.12), silver * 0.55);
+                        float knot = 1.0 - smoothstep(0.03, 0.09, length(frac(p.xz * float2(2.3, 1.7) + noise3D(p * 2.0) * 0.6) - 0.5) + abs(frac(p.y * 1.3) - 0.5) * 0.2);
+                        s.albedo *= 1.0 - knot * 0.45 * detail;
+                        s.smoothness *= lerp(1.0, 0.6, silver);
+                    }
+                    else if (pattern > 7.5) // stone, plaster
+                    {
+                        float moss = smoothstep(0.55, 0.8, w1 * 0.6 + w2 * 0.4) * saturate(up * 1.5 + low * 0.8);
+                        s.albedo = lerp(s.albedo, float3(0.28, 0.34, 0.16) * lerp(0.8, 1.2, w2), moss * 0.6);
+                        s.albedo *= lerp(1.0, 0.78, low * smoothstep(0.3, 0.7, w2)); // damp
+                    }
+                    else if (pattern > 2.5 && pattern < 3.5) // iron
+                    {
+                        float rust = smoothstep(0.45, 0.75, w1 * 0.5 + w2 * 0.5);
+                        s.albedo = lerp(s.albedo, float3(0.36, 0.2, 0.11) * lerp(0.7, 1.2, w2), rust * 0.55);
+                        s.metallic *= 1.0 - rust * 0.7;
+                        s.smoothness *= 1.0 - rust * 0.6;
+                    }
+                    float mud = low * low * smoothstep(0.35, 0.65, w2);
+                    s.albedo = lerp(s.albedo, float3(0.3, 0.24, 0.17), mud * 0.5);
+                }
                 s.alpha = 1.0;
                 s.normalTS = half3(0, 0, 1);
 

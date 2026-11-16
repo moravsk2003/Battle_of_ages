@@ -122,9 +122,32 @@ namespace BattleOfAges.Utils
             return material;
         }
 
+        // Value noise on a lattice that wraps every `period` cells: the textures tile with no seams (Mathf.PerlinNoise does not wrap)
+        private static float Hash(int x, int y, int seed)
+        {
+            unchecked
+            {
+                uint h = (uint)(x * 374761393 + y * 668265263 + seed * 2147483647);
+                h = (h ^ (h >> 13)) * 1274126177u;
+                return ((h ^ (h >> 16)) & 0xFFFFFF) / 16777215f;
+            }
+        }
+
+        private static float TNoise(float u, float v, int fu, int fv, int seed)
+        {
+            float x = u * fu, y = v * fv;
+            int x0 = Mathf.FloorToInt(x), y0 = Mathf.FloorToInt(y);
+            float tx = x - x0, ty = y - y0;
+            tx = tx * tx * (3f - 2f * tx); ty = ty * ty * (3f - 2f * ty);
+            int Wrap(int i, int n) => ((i % n) + n) % n;
+            float a = Hash(Wrap(x0, fu), Wrap(y0, fv), seed), b = Hash(Wrap(x0 + 1, fu), Wrap(y0, fv), seed);
+            float c = Hash(Wrap(x0, fu), Wrap(y0 + 1, fv), seed), d = Hash(Wrap(x0 + 1, fu), Wrap(y0 + 1, fv), seed);
+            return Mathf.Lerp(Mathf.Lerp(a, b, tx), Mathf.Lerp(c, d, tx), ty);
+        }
+
         private static (Texture2D albedo, Texture2D normal) BuildTextures(Surface surface)
         {
-            const int size = 128;
+            const int size = 256;
             Texture2D albedo = new Texture2D(size, size, TextureFormat.RGBA32, true)
             {
                 name = "TEX_Albedo_" + surface,
@@ -143,9 +166,9 @@ namespace BattleOfAges.Utils
                 {
                     float u = (float)x / size;
                     float v = (float)y / size;
-                    float nLarge = Mathf.PerlinNoise(u * 4f + seed, v * 4f + seed * 0.5f);
-                    float nMed = Mathf.PerlinNoise(u * 12f + seed * 1.3f, v * 12f + seed * 0.7f);
-                    float nFine = Mathf.PerlinNoise(u * 32f + seed * 2.1f, v * 32f + seed * 1.9f);
+                    float nLarge = TNoise(u, v, 4, 4, seed);
+                    float nMed = TNoise(u, v, 12, 12, seed + 1);
+                    float nFine = TNoise(u, v, 32, 32, seed + 2);
 
                     float shade = Mathf.Lerp(0.88f, 1.12f, nLarge) + (nMed - 0.5f) * 0.12f + (nFine - 0.5f) * 0.06f;
                     float height = nLarge * 0.5f + nMed * 0.35f + nFine * 0.15f;
@@ -163,25 +186,38 @@ namespace BattleOfAges.Utils
                             height += grain;
                             break;
                         case Surface.Wood:
-                            float woodRing = Mathf.Sin(v * Mathf.PI * 18f + nLarge * 8f + u * 2f) * 0.045f + (nFine - 0.5f) * 0.05f; // subtle grain: stretched over big primitives strong rings read as zebra stripes
-                            shade += woodRing;
-                            height += woodRing * 0.6f;
+                        {
+                            // Planed wood: long fibres along v, soft growth rings bent round the odd knot (no crust of noise)
+                            float fibre = TNoise(u, v, 96, 4, seed + 3) * 0.6f + TNoise(u, v, 192, 8, seed + 4) * 0.4f;
+                            float bend = TNoise(u, v, 3, 2, seed + 5);
+                            float ring = Mathf.Sin((u + bend * 0.12f) * Mathf.PI * 2f * 7f) * 0.5f + 0.5f;
+                            float kx = Mathf.Repeat(u * 2f + 0.3f, 1f) - 0.5f, ky = Mathf.Repeat(v * 1f + 0.6f, 1f) - 0.5f;
+                            float knot = Mathf.Clamp01(1f - Mathf.Sqrt(kx * kx * 40f + ky * ky * 6f) * 2.2f);
+                            shade = Mathf.Lerp(0.9f, 1.08f, nLarge) * Mathf.Lerp(0.88f, 1.06f, fibre) * Mathf.Lerp(0.94f, 1.04f, ring) * (1f - knot * 0.45f);
+                            height = fibre * 0.08f + ring * 0.03f - knot * 0.15f;
                             break;
+                        }
                         case Surface.Bark:
-                            float furrow = Mathf.Abs(Mathf.Sin(v * Mathf.PI * 10f + nLarge * 6f)) * 0.12f;
-                            shade -= furrow * 0.5f;
-                            height += furrow * 2.0f;
+                        {
+                            // Ridged bark: deep furrows running up the trunk, plates between them
+                            float ridges = TNoise(u, v, 14, 3, seed + 6) * 0.7f + TNoise(u, v, 40, 6, seed + 7) * 0.3f;
+                            float furrow = Mathf.SmoothStep(0.35f, 0.6f, ridges);
+                            shade = Mathf.Lerp(0.74f, 1.05f, furrow) * Mathf.Lerp(0.9f, 1.06f, nFine) * Mathf.Lerp(0.9f, 1.06f, nLarge);
+                            height = furrow * 0.6f + nFine * 0.1f;
                             break;
+                        }
                         case Surface.Metal:
                             float brush = Mathf.Sin(u * Mathf.PI * 48f) * 0.04f;
                             shade += brush;
                             height += brush * 0.5f;
                             break;
                         case Surface.Stone:
-                            float facet = (nMed > 0.65f ? 0.15f : 0f) - (nFine > 0.7f ? 0.12f : 0f);
-                            shade += facet;
-                            height += facet * 2.0f;
+                        {
+                            float grit = TNoise(u, v, 96, 96, seed + 8);
+                            shade = Mathf.Lerp(0.85f, 1.1f, nLarge) * Mathf.Lerp(0.92f, 1.06f, nMed) * Mathf.Lerp(0.9f, 1.08f, grit);
+                            height = nMed * 0.35f + grit * 0.12f;
                             break;
+                        }
                         case Surface.Rope:
                             float strand = Mathf.Sin((u + v * 3f) * Mathf.PI * 16f) * 0.18f;
                             shade += strand;
@@ -214,7 +250,7 @@ namespace BattleOfAges.Utils
             };
 
             Color[] normPixels = new Color[size * size];
-            float bumpFactor = 3.5f;
+            float bumpFactor = surface == Surface.Wood ? 2f : 3.5f;
 
             for (int y = 0; y < size; y++)
             {
