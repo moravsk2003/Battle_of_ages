@@ -82,6 +82,14 @@ namespace BattleOfAges.Utils
             foreach (SkinnedMeshLod lod in Active) lod.Refresh(cam);
         }
 
+        /// <summary>New near and distant meshes (worn gear changed): the one in use now is swapped at once.</summary>
+        public void SetMeshes(Mesh nearMesh, Mesh farMesh)
+        {
+            Near = nearMesh; Far = farMesh;
+            if (Target != null && Target.sharedMesh != null) SetMesh(Target, near ? Near : Far);
+            else Apply();
+        }
+
         /// <summary>Picks the mesh now (after the fields were set on a new component).</summary>
         public void Apply() => Refresh(Viewer());
 

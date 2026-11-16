@@ -92,6 +92,7 @@ namespace BattleOfAges.Utils
             public Vector3 EyeMid;
             public bool HasEyes;
             public bool Knight;             // knight skeleton: the held weapon points along palm -X
+            public Vector3 GripL, GripR;    // where a held weapon's grip is (root space, rest)
             public int Id;
 
             public int Bone(string name) => Array.IndexOf(Names, name);
@@ -102,15 +103,20 @@ namespace BattleOfAges.Utils
         private static readonly Dictionary<string, Piece> Pieces = new Dictionary<string, Piece>();
         private static readonly Dictionary<string, Mesh> Composed = new Dictionary<string, Mesh>();
 
-        private static Rig RigFor(CharacterGear g)
+        /// <summary>Where a held tool's grip runs, from the wrist towards the middle knuckles (the sculpted fist closes round it).</summary>
+        public const float GripAlongHand = 0.75f;
+
+        /// <param name="baseMesh">The body the gear goes on: the imported bodies are measured on their source mesh, a sculpted
+        /// one (CharacterGear.OwnFit) on itself, near and distant apart.</param>
+        private static Rig RigFor(CharacterGear g, Mesh baseMesh)
         {
             CharacterModelLibrary lib = CharacterModelLibrary.Instance;
-            Mesh src = lib == null ? null : g.KnightRig ? lib.KnightMesh : lib.VillagerMesh;
-            if (src == null || !src.isReadable || g.Body == null || g.BaseMesh == null) return null;
+            Mesh src = g.OwnFit ? baseMesh : lib == null ? null : g.KnightRig ? lib.KnightMesh : lib.VillagerMesh;
+            if (src == null || !src.isReadable || g.Body == null || baseMesh == null || lib == null) return null;
             if (Rigs.TryGetValue(src, out Rig known)) return known;
 
             Transform[] bones = g.Body.bones;
-            Matrix4x4[] bind = g.BaseMesh.bindposes;
+            Matrix4x4[] bind = baseMesh.bindposes;
             if (bones == null || bind == null || bones.Length != bind.Length) return null;
 
             var r = new Rig
@@ -143,6 +149,21 @@ namespace BattleOfAges.Utils
                 r.Dominant[i] = w.Length == v.Length ? w[i].boneIndex0 : 0;
             }
             r.Knight = g.KnightRig;
+            // A sculpted fist holds the grip in it, not at the wrist joint (the knuckles' bone need not be among the skin's)
+            for (int side = 0; side < 2; side++)
+            {
+                string x = side == 0 ? ".L" : ".R";
+                int palm = r.Bone("Palm" + x);
+                if (palm < 0) continue;
+                Transform mid = g.OwnFit && bones[palm] != null ? bones[palm].Find("MiddleHand" + x) : null;
+                Vector3 at = r.BonePos[palm];
+                if (mid != null)
+                {
+                    Matrix4x4 palmRest = r.MeshToRoot * bind[palm].inverse; // palm space -> root, at rest
+                    at = Vector3.Lerp(at, palmRest.MultiplyPoint3x4(bones[palm].InverseTransformPoint(mid.position)), GripAlongHand);
+                }
+                if (side == 0) r.GripL = at; else r.GripR = at;
+            }
             r.Id = src.GetInstanceID();
             r.HasEyes = !g.KnightRig && lib.VillagerEyeLeft != Vector3.zero && lib.VillagerEyeRight != Vector3.zero;
             r.EyeMid = (lib.VillagerEyeLeft + lib.VillagerEyeRight) * 0.5f;
@@ -233,14 +254,17 @@ namespace BattleOfAges.Utils
 
         // ------------------------------------------------------------------ composing
 
-        public static Mesh Compose(CharacterGear g, IList<Item> items, string itemsKey)
+        public static Mesh Compose(CharacterGear g, IList<Item> items, string itemsKey) => Compose(g, g.BaseMesh, items, itemsKey);
+
+        /// <summary>The gear on one of the body's meshes (a sculpted body's distant one too).</summary>
+        public static Mesh Compose(CharacterGear g, Mesh baseMesh, IList<Item> items, string itemsKey)
         {
-            Rig r = RigFor(g);
-            if (r == null) return g.BaseMesh;
-            string key = g.BaseMesh.GetInstanceID() + "|" + itemsKey;
+            Rig r = RigFor(g, baseMesh);
+            if (r == null) return baseMesh;
+            string key = baseMesh.GetInstanceID() + "|" + itemsKey;
             if (Composed.TryGetValue(key, out Mesh cached) && cached != null) return cached;
 
-            Mesh b = g.BaseMesh;
+            Mesh b = baseMesh;
             var verts = new List<Vector3>(); var normals = new List<Vector3>(); var colors = new List<Color>();
             var surface = new List<Vector3>(); var rest = new List<Vector3>(); var tris = new List<int>();
             b.GetVertices(verts); b.GetNormals(normals); b.GetColors(colors); b.GetUVs(2, surface); b.GetUVs(3, rest);
@@ -403,7 +427,7 @@ namespace BattleOfAges.Utils
 
             // rows: bottom lip (inside), bottom edge (crease), belt, body ..., shoulders; then the collar onto the neck
             float[] body = { -0.06f, -0.06f, -0.03f, 0.04f, 0.10f, 0.22f, 0.36f, 0.50f, 0.63f, 0.74f, 0.83f };
-            HashSet<int> torsoSet = BoneSet(r, "Hips", "Torso", "Shoulder.L", "Shoulder.R", "Neck");
+            HashSet<int> torsoSet = BoneSet(r, "Hips", "Abdomen", "Torso", "Shoulder.L", "Shoulder.R", "Neck");
             float FrontRidge(float ang) => plate ? 0.012f * Mathf.Exp(-Sq(Mathf.DeltaAngle(ang * Mathf.Rad2Deg, FrontAngle(r, a, b)) / 22f)) : 0f;
             Vector3[,] ring = FitRings(r, torsoSet, a, b, body, Segs, 0.035f, (i, ang) => i == 0 ? margin - 0.012f : margin + (i >= 4 ? FrontRidge(ang) : 0f));
             Vector3[,] collar = FitRings(r, BoneSet(r, "Neck"), a, b, new[] { 0.93f, 0.93f }, Segs, 0.03f, (i, ang) => i == 0 ? margin + 0.004f : margin - 0.01f);
@@ -776,7 +800,7 @@ namespace BattleOfAges.Utils
             // As the role weapons: out of the fist along palm +X (villager rig) or -X (knight rig); built along +Y
             Vector3 blade = -r.BoneX[hand]; // (both skeletons: the bind matrices are mirrored relative to the attachment frames)
             if (blade.z < 0f) blade = -blade; // out of the fist forward, whatever the skeleton: villagers carried their axes behind them, head last
-            Matrix4x4 m = Matrix4x4.TRS(r.BonePos[hand], Quaternion.LookRotation(Vector3.ProjectOnPlane(r.BoneZ[hand], blade).normalized, blade), Vector3.one);
+            Matrix4x4 m = Matrix4x4.TRS(type == ItemType.Bow ? r.GripL : r.GripR, Quaternion.LookRotation(Vector3.ProjectOnPlane(r.BoneZ[hand], blade).normalized, blade), Vector3.one);
             Finish f = WeaponFinish(level);
             switch (type)
             {

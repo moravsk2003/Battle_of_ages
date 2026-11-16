@@ -9,7 +9,7 @@ using BattleOfAges.Utils;
 namespace BattleOfAges.EditorTools
 {
     /// <summary>
-    /// Sculpts the SdfCreature models (animals and the knight guard) once in the editor and saves their meshes, and the
+    /// Sculpts the SdfCreature models (animals, the knight guard and the people on the villager skeleton) once in the editor and saves their meshes, and the
     /// distant LOD meshes where a model has them, to Resources/Creatures, so the game loads them instead of sculpting on
     /// first spawn (one to several seconds each). File names carry a signature of the model code; if the code changes,
     /// the game sculpts at runtime and warns.
@@ -27,7 +27,18 @@ namespace BattleOfAges.EditorTools
             ("GeneralBow", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.General, n, bow: true)),
             ("Hero", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.HeroPlayer, n)),
             ("HeroBow", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.HeroPlayer, n, bow: true)),
+            ("Peasant", n => Villager(PeasantModelBuilder.Peasant, n)),
+            ("PeasantShaven", n => Villager(PeasantModelBuilder.PeasantShaven, n)),
+            ("Warrior", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.Soldier, n)),
+            ("Bandit", n => HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.Bandit, n)),
         };
+
+        private static GameObject Villager(PeasantModelBuilder.Style look, string name)
+        {
+            PeasantModelBuilder.Forced = look;
+            try { return HumanoidModelBuilder.CreateHumanoidModel(HumanoidModelBuilder.HumanType.Villager, name); }
+            finally { PeasantModelBuilder.Forced = null; }
+        }
 
         [MenuItem("Battle of Ages/Bake Creature Meshes")]
         public static void Bake()

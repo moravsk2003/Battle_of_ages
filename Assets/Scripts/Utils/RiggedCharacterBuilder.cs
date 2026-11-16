@@ -65,6 +65,22 @@ namespace BattleOfAges.Utils
                 return root;
             }
 
+            // The peasant, the warrior and the bandit are sculpted on the villager skeleton; their worn gear is fitted onto that body
+            PeasantModelBuilder.Style peasant = knight || Shader.Find("Custom/CharacterSurface") == null ? null : PeasantModelBuilder.For(type);
+            if (peasant != null && PeasantModelBuilder.Build(root, model.transform, peasant, out SkinnedMeshRenderer skin, out Mesh nearMesh, out Mesh farMesh))
+            {
+                animator.Rebind(); // (as the knight: the Animator must see the new skin, or culling never moves the bones)
+                CharacterGear worn = root.AddComponent<CharacterGear>();
+                worn.Type = type;
+                worn.Body = skin;
+                worn.BaseMesh = nearMesh;
+                worn.FarBaseMesh = farMesh;
+                worn.OwnFit = true;
+                model.AddComponent<FootIK>();
+                root.AddComponent<CharacterAnimationDriver>();
+                return root;
+            }
+
             // Weapon, shield and helmet are worn gear (Equipment -> CharacterGear) when the character can be baked
             // into one mesh; otherwise the role's fixed props are attached as before. The warlord's horned helm is
             // part of his outfit either way.

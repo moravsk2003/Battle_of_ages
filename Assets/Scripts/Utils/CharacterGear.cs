@@ -21,6 +21,9 @@ namespace BattleOfAges.Utils
         public bool FixedHelmet;
         /// <summary>Built on the knight skeleton (hero, warlord) rather than the villager one.</summary>
         public bool KnightRig;
+        /// <summary>A sculpted body (PeasantModelBuilder): the gear is fitted to it, and its distant mesh gets the gear too.</summary>
+        public bool OwnFit;
+        public Mesh FarBaseMesh;
 
         private string shown;
         private static readonly StringBuilder Key = new StringBuilder(64);
@@ -55,8 +58,20 @@ namespace BattleOfAges.Utils
             Worn.Clear();
             foreach (Item item in worn)
                 if (!item.IsEmpty && !(FixedHelmet && item.Type == ItemType.Helmet)) Worn.Add(item);
-            SkinnedMeshLod.SetMesh(Body, Worn.Count == 0 ? BaseMesh : GearMeshBuilder.Compose(this, Worn, key));
+            Put(key);
         }
+
+        private void Put(string key)
+        {
+            Mesh near = Worn.Count == 0 ? BaseMesh : GearMeshBuilder.Compose(this, BaseMesh, Worn, key);
+            if (FarBaseMesh == null) { SkinnedMeshLod.SetMesh(Body, near); return; }
+            if (lod == null) lod = GetComponent<SkinnedMeshLod>();
+            Mesh far = Worn.Count == 0 ? FarBaseMesh : GearMeshBuilder.Compose(this, FarBaseMesh, Worn, key);
+            if (lod != null) lod.SetMeshes(near, far);
+            else SkinnedMeshLod.SetMesh(Body, near);
+        }
+
+        private SkinnedMeshLod lod;
 
         public void Show(Equipment equipment)
         {
@@ -74,7 +89,7 @@ namespace BattleOfAges.Utils
             string key = Key.ToString();
             if (key == shown && Body.sharedMesh != null) return;
             shown = key;
-            SkinnedMeshLod.SetMesh(Body, Worn.Count == 0 ? BaseMesh : GearMeshBuilder.Compose(this, Worn, key));
+            Put(key);
         }
     }
 }
