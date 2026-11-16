@@ -100,6 +100,32 @@ namespace BattleOfAges.PlayModeTests
             Assert.Less(writer.RowsSent - rows, 10, "only what it simulates, not the bodies it shows");
         }
 
+        /// <summary>Testers: a hero's jump did not show, and one standing on another's head was inside him on the other machine.</summary>
+        [UnityTest, Timeout(60000)]
+        public IEnumerator AHeroAboveTheGround_IsSeenAboveIt()
+        {
+            yield return Connect();
+            var heroObj = new GameObject("LiftHero");
+            CharacterController cc = heroObj.AddComponent<CharacterController>();
+            cc.height = 2f; cc.center = new Vector3(0f, 1f, 0f);
+            HealthComponent hp = heroObj.AddComponent<HealthComponent>();
+            float ground = RtsUnit.GetTerrainHeight(Far);
+            heroObj.transform.position = Far + Vector3.up * (ground + 1.8f); // on a head
+            try
+            {
+                var writer = new UnitSnapshotWriter { Hero = hp };
+                yield return Run(writer, 1f);
+                Assert.IsTrue(remote.TryGet(0, UnitSnapshotWriter.HeroId, out Vector3 seen, out _), "the hero has come");
+                Assert.AreEqual(ground + 1.8f, seen.y, 0.1f, "up where it stands");
+
+                heroObj.transform.position = Far + Vector3.up * ground; // down again
+                yield return Run(writer, 1f);
+                Assert.IsTrue(remote.TryGet(0, UnitSnapshotWriter.HeroId, out seen, out _));
+                Assert.AreEqual(ground, seen.y, 0.05f, "on the ground");
+            }
+            finally { Object.Destroy(heroObj); }
+        }
+
         [UnityTest, Timeout(60000)]
         public IEnumerator UnitsAtRest_CostLittle_AndAMovingCrowd_FitsThePackets()
         {

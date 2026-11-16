@@ -77,6 +77,12 @@ namespace BattleOfAges.Net
         private HealthComponent heroCombatOf;
         private CombatUnit heroCombat;
         private Equipment heroWorn;
+        private CharacterController heroBody;
+
+        /// <summary>A hero's row has no team to tell (it is always its player's): its Team byte says how high its feet are above the
+        /// ground instead, in LiftStep metres, so that a jump, a wall or another's head shows on the other machines.</summary>
+        public const float LiftStep = 0.1f;
+        public static byte LiftByte(float metres) => metres < LiftStep * 1.5f ? (byte)0 : (byte)Mathf.Clamp(Mathf.RoundToInt(metres / LiftStep), 0, 255);
 
         public static ushort Quantize(float v) => (ushort)Mathf.Clamp(Mathf.RoundToInt((v + HalfExtent) / (2f * HalfExtent) * 65535f), 0, 65535);
         public static float Unquantize(ushort q) => q / 65535f * 2f * HalfExtent - HalfExtent;
@@ -112,16 +118,19 @@ namespace BattleOfAges.Net
             {
                 Id = HeroId, X = Quantize(p.x), Z = Quantize(p.z), Yaw = (byte)Mathf.RoundToInt(Mathf.Repeat(Hero.transform.eulerAngles.y, 360f) / 360f * 255f),
                 Health = Hero.IsAlive ? (byte)Mathf.Clamp(Mathf.CeilToInt((float)Hero.CurrentHealth / Mathf.Max(1, Hero.MaxHealth) * 200f), 1, 200) : (byte)0,
-                Rank = (byte)UnitRank.General, Team = UnitSpatialGrid.TeamPlayer
+                Rank = (byte)UnitRank.General
             };
             if (heroCombatOf != Hero)
             {
                 heroCombatOf = Hero;
                 heroCombat = Hero.GetComponent<CombatUnit>();
                 heroWorn = Hero.GetComponent<Equipment>();
+                heroBody = Hero.GetComponent<CharacterController>();
             }
+            float feet = heroBody != null ? Hero.transform.TransformPoint(heroBody.center).y - heroBody.height * 0.5f * Hero.transform.lossyScale.y : p.y;
+            row.Team = LiftByte(feet - RtsUnit.GetTerrainHeight(p));
             if (heroCombat != null && (heroCombat.AttacksStarted & 1) != 0) row.Rank |= SwingBit;
-            bool same = row.X == heroLast.X && row.Z == heroLast.Z && row.Yaw == heroLast.Yaw && row.Health == heroLast.Health && row.Rank == heroLast.Rank;
+            bool same = row.X == heroLast.X && row.Z == heroLast.Z && row.Yaw == heroLast.Yaw && row.Health == heroLast.Health && row.Rank == heroLast.Rank && row.Team == heroLast.Team;
             if (same && now - heroSentAt < RefreshSeconds) return false;
             row.Gear = GearOf(heroWorn);
             heroLast = row;
@@ -347,11 +356,22 @@ namespace BattleOfAges.Net
             return UnitSnapshotWriter.Read(data, length, onRow);
         }
 
+        /// <summary>A hero's row: how high it is (its Team byte), and its team put back.</summary>
+        private static float LiftOf(ref UnitRow row)
+        {
+            if (row.Id != UnitSnapshotWriter.HeroId) return 0f;
+            float lift = row.Team * UnitSnapshotWriter.LiftStep;
+            row.Team = UnitSpatialGrid.TeamPlayer;
+            return lift;
+        }
+
         private void OnRow(UnitRow row)
         {
             int key = Key(owner, row.Id);
             byte swing = (byte)(row.Rank & UnitSnapshotWriter.SwingBit);
             row.Rank &= unchecked((byte)~UnitSnapshotWriter.SwingBit);
+            UnitRow raw = row; // (a hero's lift still in it, for its spawn)
+            float lift = LiftOf(ref row);
             if (row.Health == 0)
             {
                 waiting.Remove(key);
@@ -362,7 +382,7 @@ namespace BattleOfAges.Net
             if (bodies.TryGetValue(key, out Body gone) && gone.Root == null) Remove(key); // (lost to a scene load)
             if (bodies.TryGetValue(key, out Body b) && b.Rank == row.Rank && b.Team == row.Team)
             {
-                Retarget(b, row);
+                Retarget(b, row, lift);
                 if (swing != b.Swing)
                 {
                     b.Swing = swing;
@@ -377,17 +397,17 @@ namespace BattleOfAges.Net
             else
             {
                 if (b != null) Remove(key); // the number has passed to another unit
-                waiting[key] = row; // a few a frame (a sudden army was a hitch)
+                waiting[key] = raw; // a few a frame (a sudden army was a hitch)
             }
         }
 
-        private void Retarget(Body b, UnitRow row)
+        private void Retarget(Body b, UnitRow row, float lift)
         {
             float now = Time.time;
             b.From = b.Root.position;
             b.FromYaw = b.Root.eulerAngles.y;
             b.FromAt = now;
-            b.To = PlaceOf(row);
+            b.To = PlaceOf(row, lift);
             b.ToYaw = row.Yaw / 255f * 360f;
             b.ToAt = now + RenderDelay;
             b.LastHeard = now;
@@ -396,19 +416,20 @@ namespace BattleOfAges.Net
             hp.SetCurrentHealth(Mathf.Max(1, Mathf.RoundToInt(row.Health / 200f * hp.MaxHealth)));
         }
 
-        private static Vector3 PlaceOf(UnitRow row)
+        private static Vector3 PlaceOf(UnitRow row, float lift = 0f)
         {
             float x = UnitSnapshotWriter.Unquantize(row.X), z = UnitSnapshotWriter.Unquantize(row.Z);
             // Its owner may have no such tree loaded (a kingdom far from the host walks where no chunk is): it shows beside it, not in it
             if (World.SolidProps.Inside(new Vector3(x, 0f, z), BodyRadius, out Vector3 way)) { x += way.x; z += way.z; }
-            return new Vector3(x, RtsUnit.GetTerrainHeight(new Vector3(x, 0f, z)), z);
+            return new Vector3(x, RtsUnit.GetTerrainHeight(new Vector3(x, 0f, z)) + lift, z);
         }
 
         private void Spawn(int key, UnitRow row)
         {
             // Each a root of its own: a thousand moving children of one parent all go through one hierarchy
+            float lift = LiftOf(ref row);
             var go = new GameObject("Remote_" + row.Id);
-            go.transform.SetPositionAndRotation(PlaceOf(row), Quaternion.Euler(0f, row.Yaw / 255f * 360f, 0f));
+            go.transform.SetPositionAndRotation(PlaceOf(row, lift), Quaternion.Euler(0f, row.Yaw / 255f * 360f, 0f));
             if (WithModels) DressBody(go, row);
             var b = new Body { Root = go.transform, Rank = row.Rank, Team = row.Team, Health = row.Health, Gear = row.Gear, LastHeard = Time.time };
             b.Driver = go.GetComponentInChildren<CharacterAnimationDriver>();
