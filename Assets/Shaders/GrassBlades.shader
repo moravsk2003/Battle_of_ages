@@ -106,7 +106,10 @@ Shader "Custom/GrassBlades"
                 float m1 = fbm3(uv * 0.012);
                 float m2 = fbm3(uv * 0.05 + float2(31.7, 7.3));
                 float m3 = noise2D(uv * 0.33 + float2(5.1, 9.9));
-                float3 ground = _BiomeTint.rgb * lerp(0.78, 1.10, m1);
+                float3 tint = _BiomeTint.rgb;
+                float tl = dot(tint, float3(0.3, 0.59, 0.11));
+                tint = lerp(tl.xxx, tint, 0.84) * float3(1.03, 1.0, 0.92); // as the terrain's Natural(): olive, not poster green
+                float3 ground = tint * lerp(0.78, 1.10, m1);
                 ground = lerp(ground, ground * float3(1.16, 1.07, 0.80), smoothstep(0.52, 0.78, m2) * 0.45);
                 ground *= lerp(0.86, 1.08, m3);
                 float dry = smoothstep(0.80, 0.97, hash21(floor(uv * 0.9) + 0.37)) * 0.55;

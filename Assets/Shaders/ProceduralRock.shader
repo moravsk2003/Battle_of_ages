@@ -91,6 +91,11 @@ Shader "Custom/ProceduralRock"
 
                 float3 albedo = _BaseColor.rgb * lerp(0.70, 1.18, big) * lerp(0.88, 1.08, med) * lerp(0.92, 1.06, fine);
                 albedo = lerp(albedo, albedo * _CrackDarkness, crack);
+                // Mineral grain up close: specks of dark and pale crystals, a little weathered staining down the faces
+                float near = 1.0 - smoothstep(6.0, 30.0, distance(_WorldSpaceCameraPos.xyz, p));
+                float grain = noise3D(p * 45.0 + 2.0), dark = smoothstep(0.72, 0.86, noise3D(p * 130.0)), pale = smoothstep(0.75, 0.9, noise3D(p * 110.0 + 7.0));
+                albedo *= lerp(1.0, lerp(0.9, 1.08, grain) * (1.0 - dark * 0.35) * (1.0 + pale * 0.25), near);
+                albedo *= lerp(1.0, lerp(0.86, 1.04, noise3D(float3(p.x * 6.0, p.y * 0.8, p.z * 6.0))), 1.0 - saturate(n.y)); // streaks where rain runs down
 
                 float up = saturate(n.y);
                 float growth = smoothstep(0.50, 0.85, up + (med - 0.5) * 0.45) * smoothstep(0.30, 0.65, big);

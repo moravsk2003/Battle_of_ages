@@ -56,6 +56,39 @@ Shader "Custom/StylizedTerrain"
         {
             return noise2D(p) * 0.55 + noise2D(p * 2.07 + 13.1) * 0.30 + noise2D(p * 4.13 + 71.7) * 0.15;
         }
+
+        // Real meadows are olive, not poster green: a little of the saturation off and a warmer cast (GrassBlades does the same)
+        float3 Natural(float3 c) { float l = dot(c, float3(0.3, 0.59, 0.11)); return lerp(l.xxx, c, 0.84) * float3(1.03, 1.0, 0.92); }
+
+        // Distance to the nearest jittered point (pebbles, stones)
+        float Cells(float2 q)
+        {
+            float2 i = floor(q), f = frac(q);
+            float d = 8.0;
+            for (int y = -1; y <= 1; y++)
+            for (int x = -1; x <= 1; x++)
+            {
+                float2 o = float2(x, y);
+                float2 h = float2(hash21(i + o), hash21(i + o + 17.3));
+                d = min(d, length(o + h * 0.8 + 0.1 - f));
+            }
+            return d;
+        }
+
+        float Ridge(float v, float width) { return 1.0 - smoothstep(0.0, width, abs(v * 2.0 - 1.0)); }
+
+        // Detail of this period (metres) fades to its mean once a pixel covers half of it
+        float Fade(float aa, float period) { return saturate(1.5 - 3.0 * aa / period); }
+
+        float3 BumpNormal(float3 n, float3 pos, float h)
+        {
+            float3 dpdx = ddx(pos), dpdy = ddy(pos);
+            float dhdx = ddx(h), dhdy = ddy(h);
+            float3 r1 = cross(dpdy, n), r2 = cross(n, dpdx);
+            float det = dot(dpdx, r1);
+            float3 grad = sign(det) * (dhdx * r1 + dhdy * r2);
+            return normalize(abs(det) * n - grad);
+        }
         ENDHLSL
 
         Pass
@@ -129,11 +162,20 @@ Shader "Custom/StylizedTerrain"
                 float3 materialGrass = lerp(_GrassDeep.rgb, _GrassMid.rgb, m1);
                 float3 biome = lerp(vc, materialGrass, isWhite);
 
-                float3 grass = biome * lerp(0.78, 1.10, m1);
+                float aa = length(fwidth(uv));
+                float f1 = noise2D(uv * 9.0 + float2(3.1, 0.7)), f2 = noise2D(uv * 31.0 + float2(7.7, 2.2)), f3 = noise2D(uv * 95.0 + float2(1.3, 5.5));
+                float fade9 = Fade(aa, 0.11), fade31 = Fade(aa, 0.032), fade95 = Fade(aa, 0.011);
+                f1 = lerp(0.5, f1, fade9); f2 = lerp(0.5, f2, fade31); f3 = lerp(0.5, f3, fade95);
+                float3 grass = Natural(biome) * lerp(0.78, 1.10, m1);
                 float dry = smoothstep(0.52, 0.78, m2);
                 grass = lerp(grass, grass * float3(1.16, 1.07, 0.80), dry * 0.45);   // sun-dried yellowish patches
                 grass *= lerp(0.86, 1.08, m3);
                 grass *= lerp(1.0, lerp(0.80, 1.14, m4), detailFade);              // blade speckle up close
+                // Up close: tufts and gaps, soil between the tufts, straw and last year's dead blades
+                grass *= lerp(0.82, 1.1, f1) * lerp(0.86, 1.1, f2) * lerp(0.88, 1.08, f3);
+                float soilShows = smoothstep(0.6, 0.85, f1 * 0.55 + f2 * 0.45) * fade31;
+                float straw = smoothstep(0.68, 0.9, f3 * 0.6 + f2 * 0.4) * fade31;
+                grass = lerp(grass, float3(0.52, 0.47, 0.30) * lerp(0.8, 1.1, f3), straw * 0.3);
 
                 // Sparse wildflowers up close
                 float flowers = smoothstep(0.80, 0.93, m3 * noise2D(uv * 1.7 + 4.4)) * detailFade;
@@ -143,14 +185,30 @@ Shader "Custom/StylizedTerrain"
 
                 // ---- Dirt and rock
                 float slope = 1.0 - saturate(N.y);
-                float3 dirt = _DirtColor.rgb * lerp(0.80, 1.15, m3) * lerp(0.92, 1.06, m4);
+                float3 dirt = _DirtColor.rgb * lerp(0.80, 1.15, m3) * lerp(0.92, 1.06, m4) * lerp(0.85, 1.1, f1) * lerp(0.9, 1.08, f3);
+                // Soil: clods, pebbles and stones, cracks where it dried
+                float pebble = 1.0 - smoothstep(0.12, 0.3, Cells(uv * 16.0));
+                float stone = 1.0 - smoothstep(0.08, 0.22, Cells(uv * 3.0 + 9.0));
+                float crack = Ridge(noise2D(uv * 5.0 + 2.0), 0.08) * smoothstep(0.5, 0.75, m2) * fade31;
+                pebble *= fade31; stone *= fade9;
+                dirt = lerp(dirt, float3(0.52, 0.49, 0.45) * lerp(0.75, 1.1, f2), max(pebble * 0.8, stone * 0.9));
+                dirt *= 1.0 - crack * 0.4;
+                grass = lerp(grass, dirt * 0.85, soilShows * 0.45);
                 float dirtPatch = smoothstep(0.66, 0.80, m2 * 0.65 + m3 * 0.35) * 0.7;
                 float dirtSlope = smoothstep(0.14, 0.28, slope + (m3 - 0.5) * 0.12);
                 float alpine = smoothstep(24.0, 60.0, P.y);                          // mountains show bare rock sooner
                 float rockSlope = smoothstep(lerp(0.30, 0.14, alpine), lerp(0.46, 0.28, alpine), slope + (m4 - 0.5) * 0.10);
 
                 float strata = noise2D(float2((uv.x + uv.y) * 0.21, P.y * 1.9)) * 0.6 + noise2D(float2(uv.x * 0.9 - uv.y * 0.7, P.y * 6.0)) * 0.4;
-                float3 rock = _RockColor.rgb * lerp(0.70, 1.18, strata) * lerp(0.88, 1.08, m4);
+                float3 rock = _RockColor.rgb * lerp(0.70, 1.18, strata) * lerp(0.88, 1.08, m4) * lerp(0.86, 1.08, f1) * lerp(0.92, 1.06, f2);
+                // Cracks along and across the strata, and crusts of lichen
+                // (on the rock face's own plane: the view from above stretched everything into streaks down a cliff)
+                float2 rq = abs(N.y) > 0.75 ? uv : (abs(N.x) > abs(N.z) ? float2(P.z, P.y) : float2(P.x, P.y));
+                float rockGrain = noise2D(rq * 1.1 + 3.0) * 0.5 + noise2D(rq * 3.3 + 8.0) * 0.3 + noise2D(rq * 9.0) * 0.2; // (drawn cracks looked like scribbles)
+                float rockCrack = 0.0;
+                float lichen = smoothstep(0.7, 0.86, noise2D(rq * 2.2 + 1.3) * 0.6 + noise2D(rq * 6.0) * 0.4) * smoothstep(0.35, 0.65, noise2D(rq * 0.4));
+                rock = lerp(rock, float3(0.58, 0.6, 0.45), lichen * 0.3);
+                rock *= lerp(0.85, 1.08, rockGrain);
                 rock = lerp(rock, rock * float3(0.92, 1.0, 0.90), smoothstep(0.4, 0.8, m2) * 0.5); // lichen tint
 
                 float3 albedo = lerp(grass, dirt, max(dirtPatch, dirtSlope));
@@ -167,12 +225,13 @@ Shader "Custom/StylizedTerrain"
                 albedo = lerp(albedo, _DirtColor.rgb * 0.9, campDirt * 0.8);
 
                 // ---- Micro relief: perturb the normal with the gradient of a small-scale height field
-                float e = 0.06;
-                float h0 = microHeight(uv);
-                float hx = microHeight(uv + float2(e, 0));
-                float hz = microHeight(uv + float2(0, e));
                 float reliefAmt = _DetailStrength * detailFade * lerp(0.35, 1.0, max(rockSlope, dirtSlope)) * (1.0 - snow * 0.6);
-                float3 Nd = normalize(N + float3(-(hx - h0) / e, 0.0, -(hz - h0) / e) * 0.18 * reliefAmt);
+                float bare = max(max(dirtPatch, dirtSlope), max(rockSlope, campDirt));
+                float h = microHeight(uv) * 0.012                                          // hummocks
+                        + (f1 * 0.006 + f2 * 0.002) * lerp(1.0, 0.5, bare)                   // tufts, clods
+                        + (pebble * 0.004 + stone * 0.025 - crack * 0.004) * (bare * (1.0 - rockSlope))
+                        + (strata * 0.03 + rockGrain * 0.06) * rockSlope;                  // ledges and cracks in rock
+                float3 Nd = BumpNormal(N, P, h * reliefAmt * 2.0);
 
                 // ---- URP PBR lighting
                 InputData inputData = (InputData)0;
@@ -191,7 +250,7 @@ Shader "Custom/StylizedTerrain"
                 surface.metallic = 0.0;
                 surface.specular = half3(0, 0, 0);
                 surface.smoothness = lerp(lerp(0.08, 0.18, rockSlope), 0.38, snow);
-                surface.occlusion = lerp(0.82, 1.0, m3);   // cheap cavity darkening in clumps
+                surface.occlusion = lerp(0.82, 1.0, m3) * lerp(0.8, 1.0, f1) * (1.0 - crack * 0.3) * (1.0 - rockCrack * 0.4);
                 surface.alpha = 1.0;
                 surface.normalTS = half3(0, 0, 1);
 
