@@ -63,6 +63,7 @@
                 float _WindStrength;
                 float _WindFrequency;
             CBUFFER_END
+            float _SurfaceDetailCut; // global, set by the graphics preset: 0 all fine detail, 1 none
 
             Varyings vert(Attributes input)
             {
@@ -110,9 +111,10 @@
             // clip; no depth priming here), less and less with distance so far trees do not shimmer. DepthNormals cuts the same.
             float LeafRim(float3 p, float3 n, float3 view, float dist)
             {
+                float nearby = (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - _SurfaceDetailCut);
+                if (nearby <= 0.0) return 1.0; // (far: whole crowns, and no noise to pay for)
                 float leafN = noise3D(p * 9.0) * 0.55 + noise3D(p * 23.0 + 5.0) * 0.45;
                 float edge = 1.0 - abs(dot(n, view));
-                float nearby = 1.0 - smoothstep(40.0, 120.0, dist);
                 return leafN - (smoothstep(0.35, 0.95, edge) * 0.95 + 0.14) * nearby; // ragged rim, and gaps in the crown
             }
 
@@ -131,20 +133,20 @@
                 float camDist = distance(_WorldSpaceCameraPos.xyz, p);
                 float3 view = (_WorldSpaceCameraPos.xyz - p) / max(camDist, 1e-4);
                 clip(LeafRim(p, normal, view, camDist));
-                float clumps = noise3D(p * 2.3);
-                float leaves = noise3D(p * 9.0 + 3.7);
-                float detail = 1.0 - smoothstep(20.0, 80.0, camDist);
-                baseAlbedo *= lerp(0.70, 1.12, smoothstep(0.25, 0.75, clumps));
-                baseAlbedo *= lerp(1.0, lerp(0.82, 1.14, leaves), detail);
-                // Leaf by leaf: each a little yellower or bluer, lighter or darker, and turned its own way to the light
-                float leaf = noise3D(p * 16.0 + 1.1), hue = noise3D(p * 5.0 + 9.0);
-                float sprays = smoothstep(0.4, 0.62, noise3D(p * 11.0 + 2.0)); // sprays of leaves, shade between them
-                baseAlbedo *= lerp(1.0, lerp(0.55, 1.1, sprays), detail);
-                baseAlbedo *= lerp(1.0, lerp(0.8, 1.15, leaf), detail) * lerp(float3(0.94, 1.03, 0.92), float3(1.07, 1.0, 0.86), hue);
+                float clumps = noise3D(p * 2.3), hue = noise3D(p * 5.0 + 9.0);
+                float detail = (1.0 - smoothstep(20.0, 80.0, camDist)) * (1.0 - _SurfaceDetailCut);
+                baseAlbedo *= lerp(0.70, 1.12, smoothstep(0.25, 0.75, clumps)) * lerp(float3(0.94, 1.03, 0.92), float3(1.07, 1.0, 0.86), hue);
+                // Leaf by leaf (near only): sprays with shade between them, each leaf lighter or darker and turned its own way
+                // to the light (the three leaf noises double as the tilt)
+                UNITY_BRANCH if (detail > 0.0)
+                {
+                    float leaves = noise3D(p * 9.0 + 3.7), leaf = noise3D(p * 16.0 + 1.1), sprayN = noise3D(p * 11.0 + 2.0);
+                    float sprays = smoothstep(0.4, 0.62, sprayN);
+                    baseAlbedo *= lerp(1.0, lerp(0.82, 1.14, leaves) * lerp(0.55, 1.1, sprays) * lerp(0.8, 1.15, leaf), detail);
+                    normal = normalize(normal + (float3(leaf, sprayN, leaves) - 0.5) * 0.9 * detail);
+                }
                 float bl = dot(baseAlbedo, float3(0.3, 0.59, 0.11));
                 baseAlbedo = lerp(bl.xxx, baseAlbedo, 0.85); // as the meadows: less poster green
-                float3 tilt = float3(noise3D(p * 18.0), noise3D(p * 18.0 + 3.0), noise3D(p * 18.0 + 7.0)) - 0.5;
-                normal = normalize(normal + tilt * 0.9 * detail);
 
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
 
@@ -254,6 +256,7 @@
                 float _WindStrength;
                 float _WindFrequency;
             CBUFFER_END
+            float _SurfaceDetailCut;
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
             struct Varyings { float4 positionCS : SV_POSITION; float3 normalWS : TEXCOORD0; float3 positionWS : TEXCOORD1; };
@@ -268,9 +271,10 @@
             }
             float LeafRim(float3 p, float3 n, float3 view, float dist)
             {
+                float nearby = (1.0 - smoothstep(40.0, 120.0, dist)) * (1.0 - _SurfaceDetailCut);
+                if (nearby <= 0.0) return 1.0; // (far: whole crowns, and no noise to pay for)
                 float leafN = noise3D(p * 9.0) * 0.55 + noise3D(p * 23.0 + 5.0) * 0.45;
                 float edge = 1.0 - abs(dot(n, view));
-                float nearby = 1.0 - smoothstep(40.0, 120.0, dist);
                 return leafN - (smoothstep(0.35, 0.95, edge) * 0.95 + 0.14) * nearby; // ragged rim, and gaps in the crown
             }
 

@@ -88,6 +88,9 @@ namespace BattleOfAges.Managers
 
         public static void Cycle() => Set((Level)(((int)Current + 1) % 3));
 
+        /// <summary>Global shader float: how much of the surfaces' fine detail is cut (0 = all of it drawn, the default).</summary>
+        public static readonly int SurfaceDetailCutId = Shader.PropertyToID("_SurfaceDetailCut");
+
         public static void Apply(Level level)
         {
             Current = level;
@@ -142,6 +145,8 @@ namespace BattleOfAges.Managers
                     break;
             }
             SetFeature("ScreenSpaceAmbientOcclusion", level == Level.High);
+            // The surfaces' fine procedural detail (weave, pores, pebbles, ragged leafy crowns): none on Low, half on Medium
+            Shader.SetGlobalFloat(SurfaceDetailCutId, level == Level.Low ? 1f : level == Level.Medium ? 0.5f : 0f);
             Scale = MaxScale;
             a.renderScale = Scale;
             a.upscalingFilter = UpscalingFilterSelection.FSR;

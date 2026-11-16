@@ -127,8 +127,16 @@ namespace BattleOfAges.Resources
             col.center = new Vector3(0, 0.35f, 0);
             col.radius = 1.2f;
 
+            // Hundreds of these, three renderers each, were drawn however far: gone once they are a speck (~65 m)
+            LODGroup lod = root.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(CullScreenHeight, visual.GetComponentsInChildren<Renderer>()) });
+            lod.RecalculateBounds();
+
             return root;
         }
+
+        /// <summary>Share of the screen height below which a pebble is not drawn.</summary>
+        public const float CullScreenHeight = 0.008f;
 
         private static void CreateGemShard(string name, Transform parent, Vector3 localPos, Vector3 localScale, Quaternion localRot, Material mat)
         {

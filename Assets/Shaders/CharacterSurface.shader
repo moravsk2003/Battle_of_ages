@@ -29,6 +29,7 @@ Shader "Custom/CharacterSurface"
             float4 _BaseColor;
             float _Metallic, _Smoothness, _Pattern, _PatternScale, _DetailStrength, _ObjectSpace, _UseVertexColor, _VertexSurface, _Weathering;
         CBUFFER_END
+        float _SurfaceDetailCut; // global, set by the graphics preset: 0 all fine detail, 1 none
 
         float hash31(float3 p) { p = frac(p * 0.3183099 + 0.1); p *= 17.0; return frac(p.x * p.y * p.z * (p.x + p.y + p.z)); }
         float noise3D(float3 x)
@@ -346,7 +347,7 @@ Shader "Custom/CharacterSurface"
             half4 frag(Varyings i) : SV_Target
             {
                 float3 n = normalize(i.normalWS);
-                float detail = (1.0 - smoothstep(4.0, 25.0, distance(_WorldSpaceCameraPos.xyz, i.positionWS))) * _DetailStrength;
+                float detail = (1.0 - smoothstep(4.0, 25.0, distance(_WorldSpaceCameraPos.xyz, i.positionWS))) * _DetailStrength * (1.0 - _SurfaceDetailCut);
                 float pattern = floor(i.surface.x + 0.5);
                 float3 restN = TransformWorldToObjectDir(n);
                 float aa = length(fwidth(i.restPos));

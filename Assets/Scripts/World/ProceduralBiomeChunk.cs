@@ -74,6 +74,8 @@ namespace BattleOfAges.World
 
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
+        /// <summary>A chunk whose ground rises less than this (metres) casts no shadow.</summary>
+        public const float FlatShadowless = 2.5f;
         private MeshCollider meshCollider;
         private Mesh sharedChunkMesh;
 
@@ -291,6 +293,10 @@ namespace BattleOfAges.World
             sharedChunkMesh.triangles = buf.Triangles;
             sharedChunkMesh.RecalculateNormals();
             sharedChunkMesh.RecalculateBounds();
+            // Near-flat ground shades nothing but itself, and only with the sun on the horizon: it stays out of the shadow
+            // maps (a few hundred thousand triangles drawn into four cascades); hills and mountains still cast
+            meshRenderer.shadowCastingMode = sharedChunkMesh.bounds.size.y < FlatShadowless
+                ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
 
             meshFilter.mesh = sharedChunkMesh;
             meshCollider.sharedMesh = sharedChunkMesh;

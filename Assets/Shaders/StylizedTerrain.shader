@@ -32,6 +32,7 @@ Shader "Custom/StylizedTerrain"
             float4 _DirtColor, _RockColor, _SnowColor;
             float _SnowHeight, _DetailStrength;
         CBUFFER_END
+        float _SurfaceDetailCut; // global, set by the graphics preset: 0 all fine detail, 1 none
 
         float hash21(float2 p)
         {
@@ -163,9 +164,19 @@ Shader "Custom/StylizedTerrain"
                 float3 biome = lerp(vc, materialGrass, isWhite);
 
                 float aa = length(fwidth(uv));
-                float f1 = noise2D(uv * 9.0 + float2(3.1, 0.7)), f2 = noise2D(uv * 31.0 + float2(7.7, 2.2)), f3 = noise2D(uv * 95.0 + float2(1.3, 5.5));
-                float fade9 = Fade(aa, 0.11), fade31 = Fade(aa, 0.032), fade95 = Fade(aa, 0.011);
-                f1 = lerp(0.5, f1, fade9); f2 = lerp(0.5, f2, fade31); f3 = lerp(0.5, f3, fade95);
+                float keep = 1.0 - _SurfaceDetailCut;
+                float fade9 = Fade(aa, 0.11) * keep, fade31 = Fade(aa, 0.032) * saturate(keep * 2.0 - 1.0), fade95 = Fade(aa, 0.011) * saturate(keep * 2.0 - 1.0);
+                // (each finer layer only where it is still bigger than a pixel: most of the ground on screen is far)
+                float f1 = 0.5, f2 = 0.5, f3 = 0.5;
+                UNITY_BRANCH if (fade9 > 0.0)
+                {
+                    f1 = lerp(0.5, noise2D(uv * 9.0 + float2(3.1, 0.7)), fade9);
+                    UNITY_BRANCH if (fade31 > 0.0)
+                    {
+                        f2 = lerp(0.5, noise2D(uv * 31.0 + float2(7.7, 2.2)), fade31);
+                        UNITY_BRANCH if (fade95 > 0.0) f3 = lerp(0.5, noise2D(uv * 95.0 + float2(1.3, 5.5)), fade95);
+                    }
+                }
                 float3 grass = Natural(biome) * lerp(0.78, 1.10, m1);
                 float dry = smoothstep(0.52, 0.78, m2);
                 grass = lerp(grass, grass * float3(1.16, 1.07, 0.80), dry * 0.45);   // sun-dried yellowish patches
@@ -178,38 +189,52 @@ Shader "Custom/StylizedTerrain"
                 grass = lerp(grass, float3(0.52, 0.47, 0.30) * lerp(0.8, 1.1, f3), straw * 0.3);
 
                 // Sparse wildflowers up close
-                float flowers = smoothstep(0.80, 0.93, m3 * noise2D(uv * 1.7 + 4.4)) * detailFade;
+                float flowers = detailFade > 0.0 ? smoothstep(0.80, 0.93, m3 * noise2D(uv * 1.7 + 4.4)) * detailFade : 0.0;
                 float flowerPick = hash21(floor(uv * 1.7));
                 float3 flowerCol = flowerPick < 0.45 ? _FlowerYellow.rgb : (flowerPick < 0.75 ? _FlowerBlue.rgb : _FlowerRed.rgb);
                 grass = lerp(grass, flowerCol * 0.85, flowers * 0.6);
 
-                // ---- Dirt and rock
+                // ---- Where the ground is bare: paths and patches, slopes, rock, the camp's clearing
                 float slope = 1.0 - saturate(N.y);
-                float3 dirt = _DirtColor.rgb * lerp(0.80, 1.15, m3) * lerp(0.92, 1.06, m4) * lerp(0.85, 1.1, f1) * lerp(0.9, 1.08, f3);
-                // Soil: clods, pebbles and stones, cracks where it dried
-                float pebble = 1.0 - smoothstep(0.12, 0.3, Cells(uv * 16.0));
-                float stone = 1.0 - smoothstep(0.08, 0.22, Cells(uv * 3.0 + 9.0));
-                float crack = Ridge(noise2D(uv * 5.0 + 2.0), 0.08) * smoothstep(0.5, 0.75, m2) * fade31;
-                pebble *= fade31; stone *= fade9;
-                dirt = lerp(dirt, float3(0.52, 0.49, 0.45) * lerp(0.75, 1.1, f2), max(pebble * 0.8, stone * 0.9));
-                dirt *= 1.0 - crack * 0.4;
-                grass = lerp(grass, dirt * 0.85, soilShows * 0.45);
                 float dirtPatch = smoothstep(0.66, 0.80, m2 * 0.65 + m3 * 0.35) * 0.7;
                 float dirtSlope = smoothstep(0.14, 0.28, slope + (m3 - 0.5) * 0.12);
                 float alpine = smoothstep(24.0, 60.0, P.y);                          // mountains show bare rock sooner
                 float rockSlope = smoothstep(lerp(0.30, 0.14, alpine), lerp(0.46, 0.28, alpine), slope + (m4 - 0.5) * 0.10);
+                float distFromCamp = length(uv - float2(1.5, 3.5));
+                float campDirt = 1.0 - smoothstep(1.8, 5.5, distFromCamp + (m3 - 0.5) * 1.5);
+                float soil = max(max(dirtPatch, dirtSlope), max(campDirt, soilShows)) * (1.0 - rockSlope);
 
-                float strata = noise2D(float2((uv.x + uv.y) * 0.21, P.y * 1.9)) * 0.6 + noise2D(float2(uv.x * 0.9 - uv.y * 0.7, P.y * 6.0)) * 0.4;
-                float3 rock = _RockColor.rgb * lerp(0.70, 1.18, strata) * lerp(0.88, 1.08, m4) * lerp(0.86, 1.08, f1) * lerp(0.92, 1.06, f2);
-                // Cracks along and across the strata, and crusts of lichen
-                // (on the rock face's own plane: the view from above stretched everything into streaks down a cliff)
-                float2 rq = abs(N.y) > 0.75 ? uv : (abs(N.x) > abs(N.z) ? float2(P.z, P.y) : float2(P.x, P.y));
-                float rockGrain = noise2D(rq * 1.1 + 3.0) * 0.5 + noise2D(rq * 3.3 + 8.0) * 0.3 + noise2D(rq * 9.0) * 0.2; // (drawn cracks looked like scribbles)
-                float rockCrack = 0.0;
-                float lichen = smoothstep(0.7, 0.86, noise2D(rq * 2.2 + 1.3) * 0.6 + noise2D(rq * 6.0) * 0.4) * smoothstep(0.35, 0.65, noise2D(rq * 0.4));
-                rock = lerp(rock, float3(0.58, 0.6, 0.45), lichen * 0.3);
-                rock *= lerp(0.85, 1.08, rockGrain);
-                rock = lerp(rock, rock * float3(0.92, 1.0, 0.90), smoothstep(0.4, 0.8, m2) * 0.5); // lichen tint
+                // ---- Dirt: clods, pebbles and stones, cracks where it dried (only where soil shows: not on the open meadow)
+                float3 dirt = _DirtColor.rgb * lerp(0.80, 1.15, m3) * lerp(0.92, 1.06, m4) * lerp(0.85, 1.1, f1) * lerp(0.9, 1.08, f3);
+                float pebble = 0.0, stone = 0.0, crack = 0.0;
+                UNITY_BRANCH if (soil > 0.01 && fade9 > 0.0)
+                {
+                    stone = (1.0 - smoothstep(0.08, 0.22, Cells(uv * 3.0 + 9.0))) * fade9;
+                    UNITY_BRANCH if (fade31 > 0.0)
+                    {
+                        pebble = (1.0 - smoothstep(0.12, 0.3, Cells(uv * 16.0))) * fade31;
+                        crack = Ridge(noise2D(uv * 5.0 + 2.0), 0.08) * smoothstep(0.5, 0.75, m2) * fade31;
+                    }
+                    dirt = lerp(dirt, float3(0.52, 0.49, 0.45) * lerp(0.75, 1.1, f2), max(pebble * 0.8, stone * 0.9));
+                    dirt *= 1.0 - crack * 0.4;
+                }
+                grass = lerp(grass, dirt * 0.85, soilShows * 0.45);
+
+                // ---- Rock: strata, grain on the face's own plane (the view from above stretched it into streaks down a
+                // cliff), lichen; only on rock
+                float strata = 0.0, rockGrain = 0.0;
+                float3 rock = _RockColor.rgb;
+                UNITY_BRANCH if (rockSlope > 0.001)
+                {
+                    strata = noise2D(float2((uv.x + uv.y) * 0.21, P.y * 1.9)) * 0.6 + noise2D(float2(uv.x * 0.9 - uv.y * 0.7, P.y * 6.0)) * 0.4;
+                    rock = _RockColor.rgb * lerp(0.70, 1.18, strata) * lerp(0.88, 1.08, m4) * lerp(0.86, 1.08, f1) * lerp(0.92, 1.06, f2);
+                    float2 rq = abs(N.y) > 0.75 ? uv : (abs(N.x) > abs(N.z) ? float2(P.z, P.y) : float2(P.x, P.y));
+                    rockGrain = noise2D(rq * 1.1 + 3.0) * 0.5 + noise2D(rq * 3.3 + 8.0) * 0.3 + noise2D(rq * 9.0) * 0.2; // (drawn cracks looked like scribbles)
+                    float lichen = smoothstep(0.7, 0.86, noise2D(rq * 2.2 + 1.3) * 0.6 + noise2D(rq * 6.0) * 0.4) * smoothstep(0.35, 0.65, noise2D(rq * 0.4));
+                    rock = lerp(rock, float3(0.58, 0.6, 0.45), lichen * 0.3);
+                    rock *= lerp(0.85, 1.08, rockGrain);
+                    rock = lerp(rock, rock * float3(0.92, 1.0, 0.90), smoothstep(0.4, 0.8, m2) * 0.5); // lichen tint
+                }
 
                 float3 albedo = lerp(grass, dirt, max(dirtPatch, dirtSlope));
                 albedo = lerp(albedo, rock, rockSlope);
@@ -220,8 +245,6 @@ Shader "Custom/StylizedTerrain"
                 albedo = lerp(albedo, _SnowColor.rgb * lerp(0.92, 1.03, m4), snow);
 
                 // ---- Base camp trampled clearing around the campfire
-                float distFromCamp = length(uv - float2(1.5, 3.5));
-                float campDirt = 1.0 - smoothstep(1.8, 5.5, distFromCamp + (m3 - 0.5) * 1.5);
                 albedo = lerp(albedo, _DirtColor.rgb * 0.9, campDirt * 0.8);
 
                 // ---- Micro relief: perturb the normal with the gradient of a small-scale height field
@@ -250,7 +273,7 @@ Shader "Custom/StylizedTerrain"
                 surface.metallic = 0.0;
                 surface.specular = half3(0, 0, 0);
                 surface.smoothness = lerp(lerp(0.08, 0.18, rockSlope), 0.38, snow);
-                surface.occlusion = lerp(0.82, 1.0, m3) * lerp(0.8, 1.0, f1) * (1.0 - crack * 0.3) * (1.0 - rockCrack * 0.4);
+                surface.occlusion = lerp(0.82, 1.0, m3) * lerp(0.8, 1.0, f1) * (1.0 - crack * 0.3);
                 surface.alpha = 1.0;
                 surface.normalTS = half3(0, 0, 1);
 
