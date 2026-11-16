@@ -38,47 +38,117 @@ Shader "Custom/CharacterSurface"
                         lerp(lerp(hash31(i + float3(0, 0, 1)), hash31(i + float3(1, 0, 1)), f.x), lerp(hash31(i + float3(0, 1, 1)), hash31(i + float3(1, 1, 1)), f.x), f.y), f.z);
         }
 
-        // Returns albedo multiplier (x), height for micro relief (y), smoothness multiplier (z), occlusion (w).
-        float4 PatternSample(float3 p, float pattern, float3 nrm)
+        // What a pattern gives a point: albedo multiplier (tinted), height in metres (relief: bumps the normal), smoothness
+        // multiplier, occlusion. aa = the pixel's footprint in metres: detail finer than it fades to its mean (no shimmer).
+        struct Pat { float3 albedo; float height; float smooth; float occ; };
+
+        float Fade(float aa, float period) { return saturate(1.5 - 1.5 * aa / (period * 0.5)); }
+
+        // The two coordinates across a surface facing the rest normal's main axis (woven or pebbled things)
+        float2 Across(float3 p, float3 nrm)
         {
-            float n1 = noise3D(p * 6.0), n2 = noise3D(p * 23.0 + 7.1), n3 = noise3D(p * 70.0 + 3.3);
-            if (pattern < 0.5) // skin: soft mottling, pores up close
-                return float4(lerp(0.93, 1.05, n1) * lerp(0.97, 1.02, n3), n3 * 0.15, lerp(0.8, 1.1, n2), 1.0);
-            if (pattern < 1.5) // woven cloth: warp/weft threads + fibres + fold shading
+            float3 a = abs(nrm);
+            return a.x > a.y && a.x > a.z ? p.zy : (a.y > a.z ? p.xz : p.xy);
+        }
+
+        // Distance to the nearest of jittered points on a grid (F1): pebbles, cells
+        float Cells(float2 q)
+        {
+            float2 i = floor(q), f = frac(q);
+            float d = 8.0;
+            for (int y = -1; y <= 1; y++)
+            for (int x = -1; x <= 1; x++)
             {
-                float k = 210.0;
-                float warp = sin(p.x * k + n2 * 2.0) * 0.5 + 0.5, weft = sin(p.y * k + n2 * 2.0) * 0.5 + 0.5;
-                float weave = lerp(warp, weft, step(0.5, frac((floor(p.x * k / 6.283) + floor(p.y * k / 6.283)) * 0.5)));
-                float folds = noise3D(p * float3(4.0, 1.5, 4.0));
-                float slub = noise3D(p * float3(40.0, 300.0, 40.0)); // uneven thread thickness
-                return float4(lerp(0.93, 1.03, weave) * lerp(0.94, 1.04, slub) * lerp(0.86, 1.06, folds) * lerp(0.96, 1.02, n3), weave * 0.35, 0.8, lerp(0.85, 1.0, folds));
+                float2 o = float2(x, y);
+                float2 h = float2(hash31(float3(i + o, 1.7)), hash31(float3(i + o, 5.3)));
+                d = min(d, length(o + h * 0.8 + 0.1 - f));
             }
-            if (pattern < 2.5) // leather: grain, creases, worn lighter patches
+            return d;
+        }
+
+        // A thin bright line where a noise crosses its middle: scratches, creases
+        float Ridge(float v, float width) { return 1.0 - smoothstep(0.0, width, abs(v * 2.0 - 1.0)); }
+
+        Pat PatternSample(float3 p, float pattern, float3 nrm, float aa)
+        {
+            Pat o;
+            o.albedo = 1.0; o.height = 0.0; o.smooth = 1.0; o.occ = 1.0;
+            float n1 = noise3D(p * 6.0), n2 = noise3D(p * 23.0 + 7.1);
+            if (pattern < 0.5) // skin: blotches and flush, fine wrinkles, pores up close
             {
-                float grain = noise3D(p * 120.0);
-                float crease = smoothstep(0.82, 0.97, 1.0 - abs(noise3D(p * float3(9.0, 28.0, 9.0)) * 2.0 - 1.0));
-                float wear = smoothstep(0.55, 0.8, n1);
-                return float4(lerp(0.88, 1.05, grain) * (1.0 - crease * 0.35) * lerp(1.0, 1.22, wear), grain * 0.6 + crease, lerp(0.7, 1.3, wear), 1.0 - crease * 0.4);
+                float blotch = noise3D(p * 18.0 + 2.3), fine = noise3D(p * 70.0 + 3.3);
+                o.albedo = lerp(float3(1.04, 0.96, 0.95), float3(0.97, 1.0, 1.01), blotch) * lerp(0.95, 1.03, fine) * lerp(0.96, 1.03, n1);
+                float pores = noise3D(p * 1100.0) * Fade(aa, 0.0009);
+                o.height = (fine - 0.5) * 0.0002 - pores * 0.00004;
+                o.smooth = lerp(0.75, 1.2, n2);
+                return o;
             }
-            if (pattern < 3.5) // metal: brushed streaks, scratches, dark patina in recesses
+            if (pattern < 1.5) // woven cloth: threads, uneven yarn, dye and fading, grime low down, soft folds and crinkles
             {
-                float brushed = noise3D(p * float3(4.0, 160.0, 4.0));
-                float scratch = smoothstep(0.93, 0.99, 1.0 - abs(noise3D(p * float3(60.0, 8.0, 60.0)) * 2.0 - 1.0));
-                float patina = smoothstep(0.55, 0.85, n1);
-                return float4(lerp(0.88, 1.06, brushed) * lerp(1.0, 0.72, patina) + scratch * 0.25, scratch * 0.4, lerp(1.0, 0.55, patina) * lerp(0.9, 1.05, brushed), lerp(1.0, 0.8, patina));
+                float2 q = Across(p, nrm) * 2500.0; // ~2.5 mm homespun threads
+                float warp = sin(q.x) * 0.5 + 0.5, weft = sin(q.y) * 0.5 + 0.5;
+                float weave = lerp(warp, weft, step(0.5, frac((floor(q.x / 6.283) + floor(q.y / 6.283)) * 0.5)));
+                float near = Fade(aa, 0.0025);
+                weave = lerp(0.5, weave, near);
+                float slub = noise3D(p * float3(70.0, 700.0, 70.0)) * Fade(aa, 0.003);
+                float dye = noise3D(p * 2.5 + 11.0), dye2 = noise3D(p * 11.0 + 4.0);
+                float folds = noise3D(p * float3(7.0, 2.6, 7.0)), crinkle = noise3D(p * 45.0 + 1.3);
+                float grime = saturate((0.8 - p.y) / 0.7) * lerp(0.5, 1.0, n2); // dust and mud towards the hem
+                o.albedo = lerp(0.86, 1.06, dye) * lerp(0.94, 1.04, dye2) * lerp(0.84, 1.06, weave) * lerp(0.95, 1.04, slub)
+                         * lerp(float3(1, 1, 1), float3(0.82, 0.76, 0.68), grime * 0.45);
+                o.height = (folds - 0.5) * 0.012 + (crinkle - 0.5) * 0.0012 + (weave - 0.5) * 0.0002 + slub * 0.00015;
+                o.smooth = lerp(0.7, 1.0, weave) * lerp(1.0, 0.7, grime);
+                o.occ = lerp(0.8, 1.0, folds) * lerp(0.9, 1.0, weave);
+                return o;
             }
-            if (pattern < 4.5) // hair: strands along the length + clumps
+            if (pattern < 2.5) // leather: pebbled grain, creases, scuffed lighter patches, darker oiled ones
             {
-                float strands = noise3D(p * float3(220.0, 12.0, 220.0));
-                float clumps = noise3D(p * float3(30.0, 6.0, 30.0));
-                return float4(lerp(0.7, 1.15, strands) * lerp(0.85, 1.05, clumps), strands, lerp(0.8, 1.4, strands), lerp(0.8, 1.0, clumps));
+                float2 q = Across(p, nrm);
+                float pebble = Cells(q * 420.0) * Fade(aa, 0.0025);
+                float crease = Ridge(noise3D(p * float3(30.0, 90.0, 30.0)), 0.1) * smoothstep(0.55, 0.75, noise3D(p * 12.0 + 8.0)); // short, in patches
+                float wear = smoothstep(0.55, 0.8, n1), oil = smoothstep(0.5, 0.8, noise3D(p * 14.0 + 6.0));
+                o.albedo = lerp(0.88, 1.05, noise3D(p * 40.0)) * lerp(0.92, 1.04, n2) * (1.0 - crease * 0.25) * lerp(1.0, 1.25, wear) * lerp(1.0, 0.85, oil);
+                o.height = pebble * 0.00018 - crease * 0.0003 + (n2 - 0.5) * 0.0015;
+                o.smooth = lerp(0.75, 1.25, oil) * lerp(1.0, 0.75, wear) * lerp(0.85, 1.05, pebble);
+                o.occ = 1.0 - crease * 0.4;
+                return o;
             }
-            if (pattern < 5.5) return float4(1, 0, 1.6, 1); // eyes: glossy
-            if (pattern > 7.5) // plaster / stone: soft blotches, fine grit and pits, no directional lines
+            if (pattern < 3.5) // metal: hammer marks, brushing, scratches, dull grime and rust spots
             {
-                float grit = noise3D(p * 140.0 + 1.7);
+                float dents = noise3D(p * 38.0 + 2.0), dents2 = noise3D(p * 90.0);
+                float brushed = noise3D(p * float3(500.0, 6.0, 500.0)) * Fade(aa, 0.003) + 0.5 * (1.0 - Fade(aa, 0.003));
+                float scratch = Ridge(noise3D(p * float3(70.0, 9.0, 70.0) + 5.0), 0.05) * Fade(aa, 0.003);
+                float scratch2 = Ridge(noise3D(p * float3(12.0, 55.0, 30.0) + 9.0), 0.04) * Fade(aa, 0.003);
+                float grime = smoothstep(0.5, 0.85, n1), rust = smoothstep(0.72, 0.9, noise3D(p * 19.0 + 3.0)) * grime;
+                o.albedo = lerp(0.95, 1.03, brushed) * lerp(1.0, 0.7, grime) * lerp(float3(1, 1, 1), float3(0.95, 0.62, 0.42), rust * 0.6)
+                         + (scratch + scratch2) * 0.22;
+                o.height = (dents - 0.5) * 0.0006 + (dents2 - 0.5) * 0.00012 - (scratch + scratch2) * 0.00004;
+                o.smooth = lerp(1.0, 0.5, grime) * lerp(0.9, 1.05, brushed) * lerp(1.0, 0.6, rust) * (1.0 - (scratch + scratch2) * 0.3);
+                o.occ = lerp(1.0, 0.82, grime);
+                return o;
+            }
+            if (pattern < 4.5) // hair and wood: fibres along the length, clumps and growth bands
+            {
+                float strands = noise3D(p * float3(260.0, 14.0, 260.0)), clumps = noise3D(p * float3(30.0, 5.0, 30.0));
+                float rings = sin((p.x + p.z) * 160.0 + clumps * 6.0) * 0.5 + 0.5;
+                o.albedo = lerp(0.72, 1.12, strands) * lerp(0.85, 1.05, clumps) * lerp(0.94, 1.03, rings);
+                o.height = (strands - 0.5) * 0.0002 * Fade(aa, 0.004) + (clumps - 0.5) * 0.001;
+                o.smooth = lerp(0.8, 1.3, strands);
+                o.occ = lerp(0.8, 1.0, clumps);
+                return o;
+            }
+            if (pattern < 5.5) { o.smooth = 1.6; return o; } // eyes: glossy
+            if (pattern > 7.5) // plaster / stone: blotches, grit and pits, lime wash worn off in places
+            {
+                float grit = noise3D(p * 140.0 + 1.7) * Fade(aa, 0.008);
                 float pits = smoothstep(0.78, 0.92, noise3D(p * 55.0 + 9.2));
-                return float4(lerp(0.88, 1.06, n1) * lerp(0.95, 1.04, n2) * lerp(0.94, 1.03, grit) * (1.0 - pits * 0.18), grit * 0.35 - pits * 0.6, lerp(0.8, 1.1, n2), 1.0 - pits * 0.25);
+                float stain = noise3D(p * float3(3.0, 0.8, 3.0) + 2.0);
+                o.albedo = lerp(0.86, 1.06, n1) * lerp(0.95, 1.04, n2) * lerp(0.94, 1.03, grit) * (1.0 - pits * 0.22)
+                         * lerp(float3(1, 1, 1), float3(0.86, 0.84, 0.78), saturate(stain * 1.4 - 0.5));
+                o.height = grit * 0.0003 - pits * 0.0012 + (n2 - 0.5) * 0.002;
+                o.smooth = lerp(0.8, 1.1, n2);
+                o.occ = 1.0 - pits * 0.3;
+                return o;
             }
             if (pattern > 6.5) // chain mail: staggered rows of rings in the plane facing the (rest) normal
             {
@@ -90,12 +160,32 @@ Shader "Custom/CharacterSurface"
                 float ring = smoothstep(0.16, 0.27, d) * (1.0 - smoothstep(0.40, 0.55, d));
                 float fade = saturate(1.5 - 1.5 * max(fwidth(g.x), fwidth(g.y)));
                 ring = lerp(0.62, ring, fade);
-                return float4(lerp(0.45, 1.12, ring) * lerp(0.9, 1.05, n2), ring * 0.8, lerp(0.55, 1.15, ring), lerp(0.7, 1.0, ring));
+                float grime = smoothstep(0.5, 0.85, n1);
+                o.albedo = lerp(0.45, 1.12, ring) * lerp(0.9, 1.05, n2) * lerp(1.0, 0.75, grime);
+                o.height = ring * 0.0012;
+                o.smooth = lerp(0.55, 1.15, ring) * lerp(1.0, 0.6, grime);
+                o.occ = lerp(0.65, 1.0, ring);
+                return o;
             }
             // fur: fine strands lying along the body (rest Z), clumps and soft tone variation
-            float strands = noise3D(p * float3(260.0, 260.0, 26.0));
-            float clump = noise3D(p * float3(40.0, 40.0, 9.0));
-            return float4(lerp(0.78, 1.12, strands) * lerp(0.88, 1.06, clump) * lerp(0.94, 1.04, n1), strands * 0.8, lerp(0.7, 1.2, strands), lerp(0.8, 1.0, clump));
+            float fs = noise3D(p * float3(260.0, 260.0, 26.0)), fc = noise3D(p * float3(40.0, 40.0, 9.0));
+            o.albedo = lerp(0.78, 1.12, fs) * lerp(0.88, 1.06, fc) * lerp(0.94, 1.04, n1);
+            o.height = (fs - 0.5) * 0.0003 * Fade(aa, 0.004) + (fc - 0.5) * 0.0015;
+            o.smooth = lerp(0.7, 1.2, fs);
+            o.occ = lerp(0.8, 1.0, fc);
+            return o;
+        }
+
+        // The surface's normal tilted by a height field (metres) through the screen-space derivatives: a normal map with no
+        // map or tangents (Mikkelsen's surface gradient); one pattern sample per pixel
+        float3 BumpNormal(float3 n, float3 pos, float h)
+        {
+            float3 dpdx = ddx(pos), dpdy = ddy(pos);
+            float dhdx = ddx(h), dhdy = ddy(h);
+            float3 r1 = cross(dpdy, n), r2 = cross(n, dpdx);
+            float det = dot(dpdx, r1);
+            float3 grad = sign(det) * (dhdx * r1 + dhdy * r2);
+            return normalize(abs(det) * n - grad);
         }
 
         float3 RestPosition(float3 uv3, float3 positionOS)
@@ -258,17 +348,9 @@ Shader "Custom/CharacterSurface"
                 float detail = (1.0 - smoothstep(4.0, 25.0, distance(_WorldSpaceCameraPos.xyz, i.positionWS))) * _DetailStrength;
                 float pattern = floor(i.surface.x + 0.5);
                 float3 restN = TransformWorldToObjectDir(n);
-                float4 pat = PatternSample(i.restPos, pattern, restN);
-
-                // Micro relief: gradient of the pattern height (rest space ~ world orientation for upright characters)
-                float e = 0.0025;
-                float hx = PatternSample(i.restPos + float3(e, 0, 0), pattern, restN).y;
-                float hy = PatternSample(i.restPos + float3(0, e, 0), pattern, restN).y;
-                float hz = PatternSample(i.restPos + float3(0, 0, e), pattern, restN).y;
-                float3 grad = float3(hx - pat.y, hy - pat.y, hz - pat.y) / e;
-                grad = TransformObjectToWorldDir(grad);
-                grad -= n * dot(grad, n);
-                float3 nd = normalize(n - grad * 0.0012 * detail);
+                float aa = length(fwidth(i.restPos));
+                Pat pat = PatternSample(i.restPos, pattern, restN, aa);
+                float3 nd = BumpNormal(n, i.positionWS, pat.height * detail);
 
                 InputData inputData = (InputData)0;
                 inputData.positionWS = i.positionWS;
@@ -283,14 +365,33 @@ Shader "Custom/CharacterSurface"
 
                 SurfaceData s = (SurfaceData)0;
                 float3 tint = (_UseVertexColor > 0.5 || _VertexSurface > 0.5) ? i.color.rgb : float3(1, 1, 1);
-                s.albedo = _BaseColor.rgb * tint * lerp(1.0, pat.x, saturate(detail + 0.35));
+                s.albedo = _BaseColor.rgb * tint * lerp(1.0, pat.albedo, saturate(detail + 0.5));
                 s.metallic = i.surface.y;
-                s.smoothness = saturate(i.surface.z * pat.z);
-                s.occlusion = pat.w;
+                s.smoothness = saturate(i.surface.z * lerp(1.0, pat.smooth, saturate(detail + 0.5)));
+                s.occlusion = pat.occ;
                 s.alpha = 1.0;
                 s.normalTS = half3(0, 0, 1);
 
                 half4 color = UniversalFragmentPBR(inputData, s);
+
+                // Metal: the sky and the ground in it (the procedural sky gives no reflection probe: without this steel looked matte)
+                if (s.metallic > 0.3)
+                {
+                    float3 r = reflect(-inputData.viewDirectionWS, nd);
+                    float3 skyLight = SampleSH(float3(0, 1, 0));
+                    float lum = dot(skyLight, float3(0.3, 0.5, 0.2));
+                    float3 horizon = float3(0.80, 0.84, 0.88), zenith = float3(0.36, 0.52, 0.78), ground = float3(0.22, 0.24, 0.18);
+                    float3 env = lerp(ground, lerp(horizon, zenith, saturate(r.y * 1.6)), smoothstep(-0.04, 0.06, r.y)) * lum * 1.6;
+                    float fres = lerp(0.55, 1.0, pow(1.0 - saturate(dot(nd, inputData.viewDirectionWS)), 4.0));
+                    color.rgb += env * s.albedo * s.metallic * s.smoothness * fres * s.occlusion * 0.7;
+                }
+
+                // Cloth: a soft sheen of fibres at grazing angles
+                if (pattern > 0.5 && pattern < 1.5)
+                {
+                    float rim = pow(1.0 - saturate(dot(nd, inputData.viewDirectionWS)), 3.0);
+                    color.rgb += s.albedo * rim * 0.18 * (SampleSH(nd) + GetMainLight().color * 0.3);
+                }
 
                 // Skin: soft wrap light so faces are not harshly shadowed (cheap subsurface)
                 if (pattern < 0.5)
