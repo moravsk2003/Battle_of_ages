@@ -68,7 +68,7 @@ namespace BattleOfAges.PlayModeTests
             GameObject walker = Spawn(HumanoidModelBuilder.HumanType.Villager, 4.5f, I(ItemType.Pickaxe, 2));
             yield return new WaitForSeconds(0.6f);
 
-            var capture = new CaptureRenderer(dir, 10, 40f, drawGrass: false);
+            var capture = new CaptureRenderer(dir, 16, 40f, drawGrass: false);
             Vector3 mid = c + Vector3.up * 1.0f;
             capture.Shoot(0, "front", c + new Vector3(0.75f, 1.5f, -7.5f), mid + Vector3.right * 0.75f);
             capture.Shoot(1, "three_quarter", c + new Vector3(-4.5f, 2.0f, -4.5f), mid);
@@ -78,6 +78,13 @@ namespace BattleOfAges.PlayModeTests
             capture.Shoot(4, "face_side", c + new Vector3(-0.1f, 1.62f, 0f), c + new Vector3(-1.5f, 1.58f, 0f));
             capture.Shoot(8, "face_other", c + new Vector3(-3f, 1.62f, -1.6f), c + new Vector3(-3f, 1.58f, 0f));
             capture.Shoot(9, "faces_warrior_bandit", c + new Vector3(0.75f, 1.62f, -2.6f), c + new Vector3(0.75f, 1.55f, 0f));
+            // Faces up close: each of the four, front; the two peasants three-quarter
+            capture.Camera.fieldOfView = 14f;
+            float[] heads = { -3f, -1.5f, 0f, 1.5f };
+            for (int i = 0; i < heads.Length; i++)
+                capture.Shoot(10 + i, "head_" + i, c + new Vector3(heads[i], 1.66f, -1.2f), c + new Vector3(heads[i], 1.65f, 0.04f));
+            capture.Shoot(14, "head_34_a", c + new Vector3(-3f - 0.8f, 1.68f, -0.85f), c + new Vector3(-3f, 1.65f, 0.04f));
+            capture.Shoot(15, "head_34_b", c + new Vector3(-1.5f + 0.8f, 1.68f, -0.85f), c + new Vector3(-1.5f, 1.65f, 0.04f));
             capture.Shoot(5, "warriors", c + new Vector3(0.75f, 1.3f, -3.2f), c + new Vector3(0.75f, 1.0f, 0f));
             capture.Shoot(6, "full_kit", c + new Vector3(3f, 1.2f, -3.4f), c + new Vector3(3f, 1.0f, 0f));
 

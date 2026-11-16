@@ -19,6 +19,8 @@ namespace BattleOfAges.Utils
             public string Key;
             public Color Tunic, Hose, Wraps, Belt, Shoes, Skin, Hair;
             public bool Beard, Gambeson, Hood;
+            /// <summary>How thick the beard is: 1 full, less a stubble.</summary>
+            public float BeardShade = 0.9f;
             /// <summary>The tunic's hem (root height): above the knee for a peasant, lower for the gambeson.</summary>
             public float Hem = 0.5f;
         }
@@ -29,7 +31,7 @@ namespace BattleOfAges.Utils
         public static readonly Style Peasant = new Style
         {
             Key = "Peasant", Tunic = new Color(0.40f, 0.50f, 0.28f), Hose = new Color(0.36f, 0.27f, 0.18f), Wraps = new Color(0.62f, 0.56f, 0.44f),
-            Belt = Leather, Shoes = DarkLeather, Skin = new Color(0.90f, 0.70f, 0.55f), Hair = new Color(0.33f, 0.22f, 0.13f), Beard = true
+            Belt = Leather, Shoes = DarkLeather, Skin = new Color(0.90f, 0.70f, 0.55f), Hair = new Color(0.40f, 0.27f, 0.15f), Beard = true
         };
 
         public static readonly Style PeasantShaven = new Style
@@ -41,15 +43,15 @@ namespace BattleOfAges.Utils
         public static readonly Style Warrior = new Style
         {
             Key = "Warrior", Tunic = new Color(0.64f, 0.56f, 0.40f), Hose = new Color(0.26f, 0.20f, 0.14f), Wraps = new Color(0.45f, 0.38f, 0.28f),
-            Belt = DarkLeather, Shoes = DarkLeather, Skin = new Color(0.88f, 0.68f, 0.53f), Hair = new Color(0.22f, 0.15f, 0.10f),
+            Belt = DarkLeather, Shoes = DarkLeather, Skin = new Color(0.88f, 0.68f, 0.53f), Hair = new Color(0.30f, 0.20f, 0.12f),
             Beard = true, Gambeson = true, Hem = 0.44f
         };
 
         public static readonly Style Bandit = new Style
         {
             Key = "Bandit", Tunic = new Color(0.45f, 0.14f, 0.11f), Hose = new Color(0.17f, 0.15f, 0.13f), Wraps = new Color(0.30f, 0.26f, 0.22f),
-            Belt = DarkLeather, Shoes = DarkLeather, Skin = new Color(0.80f, 0.60f, 0.46f), Hair = new Color(0.20f, 0.16f, 0.13f),
-            Beard = true, Hood = true
+            Belt = DarkLeather, Shoes = DarkLeather, Skin = new Color(0.80f, 0.60f, 0.46f), Hair = new Color(0.30f, 0.21f, 0.14f),
+            Beard = true, BeardShade = 0.55f, Hood = true
         };
 
         /// <summary>A villager made while this is set gets this look rather than a random one (the bake tool).</summary>
@@ -68,10 +70,9 @@ namespace BattleOfAges.Utils
         }
 
         // Surface = (CharacterSurface pattern, metallic, smoothness)
-        private static readonly Vector3 SkinS = new Vector3(0f, 0f, 0.32f);
+        private static readonly Vector3 SkinS = new Vector3(0f, 0f, 0.22f);
         private static readonly Vector3 ClothS = new Vector3(1f, 0f, 0.14f);
         private static readonly Vector3 LeatherS = new Vector3(2f, 0f, 0.32f);
-        private static readonly Vector3 HairS = new Vector3(4f, 0f, 0.28f);
 
         // What the paint does where (the shapes' paintable weight)
         private const float TunicMark = 1f, HoseMark = 0.6f, HairMark = 0.3f, PlainMark = 0f, EarMark = 0.15f;
@@ -181,50 +182,46 @@ namespace BattleOfAges.Utils
             Vector3 eyeMid = (r.EyeL + r.EyeR) * 0.5f;
             float eyeY = eyeMid.y, front = eyeMid.z; // the face's front at the eyes
             eyeLine = eyeY; faceFront = front;
+            // The eyes closer together and back in the face, under the brow (the imported face was flatter and wider)
+            r.EyeL = new Vector3(-0.033f, eyeY, front - 0.005f);
+            r.EyeR = new Vector3(0.033f, eyeY, front - 0.005f);
             Color skin = style.Skin, hair = style.Hair, lip = Color.Lerp(style.Skin, new Color(0.62f, 0.30f, 0.26f), 0.4f);
 
             sdf.SurfaceBrush = SkinS;
-            // Neck, skull, jaw and chin
-            sdf.Cone(r.Neck, new Vector3(0f, 1.45f, 0.005f), new Vector3(0f, eyeY - 0.07f, front - 0.11f), 0.06f, 0.054f, skin, 0.02f, null, PlainMark);
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.002f, front - 0.105f), new Vector3(0.079f, 0.108f, 0.1f), Vector3.zero, skin, 0.02f, PlainMark);
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.066f, front - 0.062f), new Vector3(0.067f, 0.048f, 0.068f), Vector3.zero, skin, 0.03f, PlainMark);
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.097f, front - 0.026f), new Vector3(0.032f, 0.022f, 0.026f), Vector3.zero, skin, 0.02f, PlainMark); // chin
-            // Brow ridge, cheekbones, nose, lips
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY + 0.024f, front - 0.014f), new Vector3(0.066f, 0.014f, 0.022f), Vector3.zero, skin, 0.012f, PlainMark);
-            for (int s = -1; s <= 1; s += 2)
-                sdf.Ellipsoid(r.Head, new Vector3(s * 0.044f, eyeY - 0.028f, front - 0.032f), new Vector3(0.024f, 0.017f, 0.02f), Vector3.zero, skin, 0.015f, PlainMark);
-            sdf.Cone(r.Head, new Vector3(0f, eyeY + 0.004f, front + 0.002f), new Vector3(0f, eyeY - 0.041f, front + 0.018f), 0.009f, 0.014f, skin, 0.012f, new Vector3(1f, 1f, 0.9f), PlainMark);
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.044f, front + 0.006f), new Vector3(0.02f, 0.011f, 0.011f), Vector3.zero, skin, 0.01f, PlainMark); // nostril wings
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.07f, front - 0.009f), new Vector3(0.023f, 0.0065f, 0.01f), Vector3.zero, lip, 0.006f, PlainMark);
-            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.08f, front - 0.012f), new Vector3(0.02f, 0.007f, 0.01f), Vector3.zero, lip, 0.006f, PlainMark);
-            sdf.CarveEllipsoid(r.Head, new Vector3(0f, eyeY - 0.075f, front + 0.0f), new Vector3(0.022f, 0.002f, 0.012f), Vector3.zero, 0.002f, new Color(0.35f, 0.15f, 0.12f));
-            // Eye sockets, eyes (white, iris), brows
+            // Neck, skull, jaw and chin: broad soft forms, nothing smaller than the sculpt's cells (small things are crisp kits below)
+            sdf.Cone(r.Neck, new Vector3(0f, 1.45f, 0.005f), new Vector3(0f, eyeY - 0.07f, front - 0.11f), 0.067f, 0.058f, skin, 0.02f, null, PlainMark);
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY + 0.004f, front - 0.103f), new Vector3(0.078f, 0.104f, 0.098f), Vector3.zero, skin, 0.02f, PlainMark);
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.06f, front - 0.06f), new Vector3(0.064f, 0.05f, 0.066f), Vector3.zero, skin, 0.03f, PlainMark);
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.094f, front - 0.03f), new Vector3(0.03f, 0.022f, 0.026f), Vector3.zero, skin, 0.022f, PlainMark); // chin
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY + 0.022f, front - 0.024f), new Vector3(0.064f, 0.016f, 0.022f), Vector3.zero, skin, 0.016f, PlainMark); // brow ridge
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.012f, front - 0.042f), new Vector3(0.06f, 0.06f, 0.034f), Vector3.zero, skin, 0.02f, PlainMark); // the face's front, flatter than the skull
+            // Nose: bridge, tip, wings
+            sdf.Cone(r.Head, new Vector3(0f, eyeY + 0.002f, front - 0.005f), new Vector3(0f, eyeY - 0.036f, front + 0.013f), 0.0085f, 0.011f, skin, 0.012f, new Vector3(1f, 1f, 0.9f), PlainMark);
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.038f, front + 0.011f), new Vector3(0.012f, 0.011f, 0.011f), Vector3.zero, skin, 0.008f, PlainMark);
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.043f, front + 0.0f), new Vector3(0.019f, 0.009f, 0.01f), Vector3.zero, skin, 0.01f, PlainMark);
+            sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.081f, front - 0.004f), new Vector3(0.018f, 0.0075f, 0.01f), Vector3.zero, lip, 0.008f, PlainMark); // lower lip
             for (int s = 0; s < 2; s++)
             {
                 Vector3 eye = s == 0 ? r.EyeL : r.EyeR;
                 float side = s == 0 ? -1f : 1f;
-                sdf.CarveEllipsoid(r.Head, eye + new Vector3(0f, 0.001f, 0.002f), new Vector3(0.017f, 0.011f, 0.011f), Vector3.zero, 0.007f);
-                sdf.GlossSphere(r.Head, eye + new Vector3(0f, 0f, -0.0145f), 0.0108f, new Color(0.80f, 0.77f, 0.72f));
-                sdf.GlossSphere(r.Head, eye + new Vector3(side * -0.001f, -0.0005f, -0.0068f), 0.0056f, new Color(0.20f, 0.14f, 0.09f));
-                sdf.Ellipsoid(r.Head, eye + new Vector3(0f, 0.0065f, -0.0065f), new Vector3(0.0165f, 0.0072f, 0.0115f), new Vector3(-10f, 0f, 0f), skin, 0.004f, PlainMark); // upper lid
-                sdf.Ellipsoid(r.Head, eye + new Vector3(0f, -0.0085f, -0.008f), new Vector3(0.015f, 0.005f, 0.01f), Vector3.zero, skin, 0.004f, PlainMark); // lower lid
-                sdf.SurfaceBrush = HairS;
-                sdf.Ellipsoid(r.Head, eye + new Vector3(side * 0.003f, 0.02f, 0.006f), new Vector3(0.019f, 0.0045f, 0.007f), new Vector3(0f, 0f, side * -8f), hair, 0.004f, PlainMark);
-                sdf.SurfaceBrush = SkinS;
+                sdf.CarveEllipsoid(r.Head, eye + new Vector3(0f, 0.001f, 0.003f), new Vector3(0.017f, 0.012f, 0.012f), Vector3.zero, 0.006f); // socket
                 // Ears
-                sdf.Ellipsoid(r.Head, new Vector3(side * 0.08f, eyeY - 0.012f, front - 0.118f), new Vector3(0.012f, 0.03f, 0.02f), new Vector3(0f, side * -15f, 0f), skin, 0.008f, EarMark);
-                sdf.CarveEllipsoid(r.Head, new Vector3(side * 0.09f, eyeY - 0.01f, front - 0.116f), new Vector3(0.006f, 0.018f, 0.011f), Vector3.zero, 0.004f);
+                sdf.Ellipsoid(r.Head, new Vector3(side * 0.079f, eyeY - 0.012f, front - 0.118f), new Vector3(0.012f, 0.03f, 0.02f), new Vector3(0f, side * -15f, 0f), skin, 0.008f, EarMark);
+                sdf.CarveEllipsoid(r.Head, new Vector3(side * 0.089f, eyeY - 0.01f, front - 0.116f), new Vector3(0.004f, 0.015f, 0.009f), Vector3.zero, 0.004f);
             }
+            sdf.RigidMesh(r.Head, Face(r, eyeY, front, true), Face(r, eyeY, front, false));
 
-            sdf.SurfaceBrush = HairS;
+            // (the hair keeps the skin's surface: surfaces blend between shapes, and between skin 0 and hair 4 the rounding
+            // painted bands of cloth, leather and metal across the face; the hair's colour is painted by where it grows)
+            sdf.SurfaceBrush = SkinS;
             if (style.Hood)
             {
                 // A cloth hood framing the face, its cowl down over the shoulders
-                Color hood = new Color(0.40f, 0.35f, 0.27f);
+                Color hood = new Color(0.50f, 0.44f, 0.34f);
                 sdf.SurfaceBrush = ClothS;
                 sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY + 0.012f, front - 0.125f), new Vector3(0.097f, 0.118f, 0.118f), Vector3.zero, hood, 0.015f, PlainMark);
                 sdf.Cone(r.Neck, new Vector3(0f, eyeY - 0.07f, front - 0.15f), new Vector3(0f, 1.43f, -0.01f), 0.085f, 0.15f, hood, 0.03f, new Vector3(1f, 1f, 0.8f), PlainMark);
-                sdf.CarveEllipsoid(r.Head, new Vector3(0f, eyeY - 0.03f, front + 0.02f), new Vector3(0.066f, 0.1f, 0.06f), Vector3.zero, 0.012f);
+                sdf.CarveEllipsoid(r.Head, new Vector3(0f, eyeY - 0.03f, front + 0.02f), new Vector3(0.074f, 0.105f, 0.065f), Vector3.zero, 0.012f);
                 sdf.Cone(r.Head, new Vector3(0f, eyeY + 0.07f, front - 0.19f), new Vector3(0f, eyeY - 0.02f, front - 0.33f), 0.045f, 0.012f, hood, 0.03f, null, PlainMark); // the hood's tail
             }
             else
@@ -236,12 +233,93 @@ namespace BattleOfAges.Utils
             if (style.Beard)
             {
                 // A short full beard round the jaw and chin, and a moustache
-                sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.083f, front - 0.036f), new Vector3(0.071f, 0.055f, 0.063f), Vector3.zero, hair, 0.012f, PlainMark);
-                sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.112f, front - 0.012f), new Vector3(0.034f, 0.03f, 0.03f), Vector3.zero, hair, 0.012f, PlainMark);
-                sdf.Cone(r.Head, new Vector3(-0.028f, eyeY - 0.072f, front + 0.004f), new Vector3(0.028f, eyeY - 0.072f, front + 0.004f), 0.0075f, 0.0075f, hair, 0.006f, null, PlainMark);
-                sdf.CarveEllipsoid(r.Head, new Vector3(0f, eyeY - 0.08f, front + 0.008f), new Vector3(0.02f, 0.012f, 0.012f), Vector3.zero, 0.004f, lip);
+                // (hugging the jaw, a centimetre thick: not a muzzle)
+                sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.074f, front - 0.06f), new Vector3(0.069f, 0.05f, 0.07f), Vector3.zero, skin, 0.012f, PlainMark);
+                sdf.Ellipsoid(r.Head, new Vector3(0f, eyeY - 0.1f, front - 0.03f), new Vector3(0.035f, 0.03f, 0.032f), Vector3.zero, skin, 0.012f, PlainMark);
+                sdf.Cone(r.Head, new Vector3(-0.026f, eyeY - 0.067f, front + 0.005f), new Vector3(0.026f, eyeY - 0.067f, front + 0.005f), 0.0055f, 0.0055f, skin, 0.005f, null, PlainMark);
+                sdf.CarveEllipsoid(r.Head, new Vector3(0f, eyeY - 0.08f, front + 0.008f), new Vector3(0.02f, 0.012f, 0.012f), Vector3.zero, 0.004f);
             }
             sdf.SurfaceBrush = SkinS;
+        }
+
+        /// <summary>
+        /// The face's small parts, crisp (they are smaller than the sculpt's cells): eyeballs with iris and pupil, upper and lower
+        /// lids meeting at the corners (an almond, the iris touching both: a calm look, not a stare), brows on the brow ridge,
+        /// and the line of the mouth along the jaw's curve.
+        /// </summary>
+        private static MeshKit Face(Rig r, float eyeY, float front, bool near)
+        {
+            var kit = new MeshKit();
+            Color skin = style.Skin, brow = Color.Lerp(style.Hair, style.Skin, 0.15f);
+            const float R = 0.0105f;
+            int seg = near ? 20 : 6;
+            for (int s = 0; s < 2; s++)
+            {
+                Vector3 eye = s == 0 ? r.EyeL : r.EyeR;
+                float side = s == 0 ? -1f : 1f;
+                Vector3 c = eye + new Vector3(0f, 0f, -R);
+                // Eyeball round the forward axis, iris and pupil painted on it (rows doubled at their edges: crisp)
+                float[] rows = near ? new[] { 0f, 9f, 14f, 14f, 25f, 31f, 31f, 50f, 75f, 100f, 140f, 180f } : new[] { 0f, 31f, 31f, 90f, 180f };
+                var prof = new Vector2[rows.Length];
+                for (int i = 0; i < prof.Length; i++) prof[i] = new Vector2(R * Mathf.Sin(rows[i] * Mathf.Deg2Rad), R * Mathf.Cos(rows[i] * Mathf.Deg2Rad));
+                Color Ball(int i)
+                {
+                    bool second = i > 0 && rows[i] == rows[i - 1];
+                    float a = rows[i];
+                    if (a < 14f || (a == 14f && !second)) return near ? new Color(0.06f, 0.05f, 0.05f) : new Color(0.16f, 0.11f, 0.08f);
+                    if (a < 31f || (a == 31f && !second)) return new Color(0.27f, 0.19f, 0.12f);
+                    return new Color(0.86f, 0.83f, 0.78f);
+                }
+                kit.Lathe(Matrix4x4.TRS(c, Quaternion.FromToRotation(Vector3.up, Vector3.forward), Vector3.one), prof, seg, new Vector3(5f, 0f, 0.6f), (i, a) => Ball(i));
+
+                // Lids: shells over the ball, their edges an almond (high at the middle, meeting at the corners)
+                Lid(kit, c, R * 1.13f, true, 23f, skin, near);
+                Lid(kit, c, R * 1.1f, false, 24f, skin, near);
+
+                // Brow on the ridge, its outer end back with the head's curve and a little lower
+                Matrix4x4 m = Matrix4x4.TRS(eye + new Vector3(side * 0.003f, 0.019f, -0.002f), Quaternion.Euler(0f, side * 18f, side * 3f), Vector3.one);
+                kit.Box(m, new Vector3(0.029f, 0.0058f, 0.005f), 0.0022f, new Vector3(0f, 0f, 0.15f), _ => brow);
+            }
+            if (!near) return kit;
+            // The mouth: a thin dark line round the jaw (whose front is at front + 0.006 there), the corners a touch lower
+            int n = 11;
+            var line = new Vector3[n, 6];
+            for (int i = 0; i < n; i++)
+            {
+                float x = Mathf.Lerp(-0.021f, 0.021f, i / (float)(n - 1));
+                float z = front - 0.06f + 0.066f * Mathf.Sqrt(Mathf.Max(0f, 1f - Sq(x / 0.064f))) - 0.0008f;
+                Vector3 at = new Vector3(x, eyeY - 0.0735f - 0.0025f * Sq(x / 0.021f), z);
+                float t = 1f - Sq(x / 0.021f) * 0.6f;
+                for (int j = 0; j < 6; j++)
+                {
+                    float a = j * Mathf.PI * 2f / 6f;
+                    line[i, j] = at + new Vector3(0f, Mathf.Cos(a) * 0.0014f * t, Mathf.Sin(a) * 0.0018f);
+                }
+            }
+            kit.Grid(line, true, new Vector3(0f, 0f, 0.2f), (i, j) => new Color(0.30f, 0.15f, 0.12f));
+            return kit;
+        }
+
+        /// <summary>An eyelid: a shell round the eyeball from its top (or bottom) down to an edge that is open most at the front.</summary>
+        private static void Lid(MeshKit kit, Vector3 c, float radius, bool upper, float open, Color skin, bool near)
+        {
+            int rows = near ? 7 : 3, cols = near ? 24 : 8;
+            var p = new Vector3[rows + 1, cols + 1];
+            Vector3 axis = upper ? Vector3.up : Vector3.down;
+            for (int j = 0; j <= cols; j++)
+            {
+                float phi = Mathf.Lerp(-Mathf.PI * 0.5f, Mathf.PI * 0.5f, j / (float)cols); // round the front, corner to corner
+                float ahead = Mathf.Max(0f, Mathf.Cos(phi));                                               // 1 at the front, 0 at the corners
+                float edge = (90f - open * Mathf.Pow(ahead, 0.8f)) * Mathf.Deg2Rad;         // from the axis down to the lid's edge
+                for (int i = 0; i <= rows; i++)
+                {
+                    float th = edge * i / rows;
+                    float rr = i == rows ? radius * 0.97f : radius; // the edge turns in a little: the lid has a rim
+                    Vector3 dir = axis * Mathf.Cos(th) + (Vector3.forward * Mathf.Cos(phi) + Vector3.right * Mathf.Sin(phi)) * Mathf.Sin(th);
+                    p[i, j] = c + dir * rr;
+                }
+            }
+            kit.Grid(p, false, SkinS, (i, j) => i == rows ? skin * 0.8f : skin, axis + Vector3.forward);
         }
 
         // ------------------------------------------------------------------ tunic and belt
@@ -361,15 +439,29 @@ namespace BattleOfAges.Utils
         private static Color Paint(Vector3 p, Vector3 n, Color c, float paintable)
         {
             float grime = 0.94f + 0.1f * SdfCreature.Noise(p * 15f);
-            if (!style.Hood && paintable < 0.45f && paintable > 0.2f || (!style.Hood && paintable < 0.1f && p.y > eyeLine - 0.09f))
+            if (paintable < 0.45f && !(paintable > 0.1f && paintable < 0.2f) && p.y > eyeLine - 0.14f && p.y < eyeLine + 0.15f)
             {
-                // The hairline: over the forehead, above the ears, low on the nape; a little ragged
-                float y = p.y - eyeLine, dz = p.z - (faceFront - 0.105f);
-                float line = Mathf.Lerp(-0.075f, 0.05f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.05f, 0.085f, dz)));
-                line += 0.006f * SdfCreature.Noise(p * 60f);
-                float hairy = Mathf.Clamp01((y - line) / 0.006f);
-                if (Mathf.Abs(p.x) < 0.05f && dz > 0.07f && y < 0.04f) hairy = 0f; // (the brows are their own shapes)
-                if (hairy > 0f) c = Color.Lerp(c, style.Hair * (0.85f + 0.3f * SdfCreature.Noise(new Vector3(p.x * 300f, p.y * 40f, p.z * 300f))), hairy);
+                // Hair and beard are painted by where they grow (soft edges), not by the shapes' colours (blocky patches)
+                float y = p.y - eyeLine, dz = p.z - (faceFront - 0.105f), ax = Mathf.Abs(p.x);
+                Color strands = style.Hair * (0.85f + 0.3f * SdfCreature.Noise(new Vector3(p.x * 300f, p.y * 40f, p.z * 300f)));
+                if (!style.Hood)
+                {
+                    // The hairline: over the forehead, above the ears, low on the nape
+                    float line = Mathf.Lerp(-0.075f, 0.036f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.05f, 0.085f, dz)));
+                    line += 0.003f * SdfCreature.Noise(p * 40f);
+                    float hairy = Mathf.Clamp01((y - line) / 0.01f + 0.5f);
+                    float groove = 0.5f + 0.5f * Mathf.Sin(Mathf.Atan2(p.x, dz + 0.02f) * 14f + SdfCreature.Noise(p * 25f) * 1.5f);
+                    if (hairy > 0f) c = Color.Lerp(c, strands * (0.82f + 0.22f * groove), hairy);
+                }
+                if (style.Beard && dz > -0.035f && y < 0.005f)
+                {
+                    // Sideburns down into a full short beard: below a line from the ear's front across the cheek to under the
+                    // nose; the lips bare, a moustache over them
+                    float top = Mathf.Lerp(0f, -0.048f, Mathf.InverseLerp(0f, 0.08f, dz));
+                    if (ax < 0.03f && dz > 0.07f) top = -0.056f; // the moustache under the nose
+                    float beard = Mathf.Clamp01((top - y) / 0.01f + 0.5f) * Mathf.Clamp01((dz + 0.035f) / 0.012f) * Mathf.Clamp01((y + 0.132f) / 0.012f) * style.BeardShade;
+                    if (beard > 0f) c = Color.Lerp(c, strands, beard);
+                }
                 return c * grime;
             }
             if (paintable > 0.8f) // the tunic
