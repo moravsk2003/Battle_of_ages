@@ -573,16 +573,17 @@ namespace BattleOfAges.RTS
             bool leftHit = Physics.SphereCast(rayOrigin, 0.35f, leftDir, out RaycastHit hitLeft, 2.5f);
             bool rightHit = Physics.SphereCast(rayOrigin, 0.35f, rightDir, out RaycastHit hitRight, 2.5f);
 
-            bool centerBlocked = centerHit && IsValidObstacle(hitCenter);
-            // Walked right up to a solid prop next to the destination (tree being chopped, chest, building): arrived.
+            float targetDist = hasTarget && attackTarget == null ? FlatDistance(currentPos, targetPosition) : float.MaxValue;
+            bool centerBlocked = centerHit && IsValidObstacle(hitCenter) && hitCenter.distance < targetDist - 0.1f;
+            // Walked right up to a solid prop containing the destination (tree being chopped, chest): arrived.
             // The CharacterController used to stop the unit here; kinematic movement must do it explicitly.
             // (the window covers the distance walked until the next probe, so faster units cannot step past it)
-            // Only when the destination is at that prop: one round the corner of a house is still to be walked to (it used to
-            // stop there, against the wall, for good)
+            // Only when the destination is inside or right against that prop (TargetIsInside): a spot beside a building
+            // or a point round its corner is still to be walked to (it used to stop there, against the wall, for good).
             touchingSolidNearTarget = !isPlayerControlled && centerHit && hitCenter.distance < 0.35f + MoveSpeed * SteerInterval && IsSolid(hitCenter)
-                                      && Vector3.Distance(currentPos, targetPosition) < 4f && TargetIsAt(hitCenter.collider);
-            bool leftBlocked = leftHit && IsValidObstacle(hitLeft);
-            bool rightBlocked = rightHit && IsValidObstacle(hitRight);
+                                      && Vector3.Distance(currentPos, targetPosition) < 4f && TargetIsInside(hitCenter.collider);
+            bool leftBlocked = leftHit && IsSideObstacle(hitLeft, centerBlocked, targetDist);
+            bool rightBlocked = rightHit && IsSideObstacle(hitRight, centerBlocked, targetDist);
 
             if (centerBlocked)
             {
@@ -641,20 +642,36 @@ namespace BattleOfAges.RTS
         {
             if (!IsSolid(hit)) return false;
 
-            // If hit object is our attack target or within 2.5m of target destination, do not steer away!
+            // If hit object is our attack target or contains target destination, do not steer away!
             if (attackTarget != null && (hit.transform.root == attackTarget.transform || hit.transform == attackTarget.transform)) return false;
-            if (hasTarget && TargetIsAt(hit.collider)) return false;
+            if (hasTarget && TargetIsInside(hit.collider)) return false;
             return true;
         }
 
-        /// <summary>The destination is in this prop or right by it (flat: a slope does not count).</summary>
-        private bool TargetIsAt(Collider prop)
+        private bool IsSideObstacle(RaycastHit hit, bool centerBlocked, float targetDist)
+        {
+            if (!IsValidObstacle(hit)) return false;
+            if (!centerBlocked && hasTarget && attackTarget == null)
+            {
+                if (hit.distance >= targetDist || TargetIsAt(hit.collider)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Flat squared distance from the destination to this prop's bounds (a slope does not count).</summary>
+        private float TargetSqrDistance(Collider prop)
         {
             Bounds b = prop.bounds;
             Vector3 p = targetPosition;
             p.y = b.center.y;
-            return b.SqrDistance(p) < 1f;
+            return b.SqrDistance(p);
         }
+
+        /// <summary>The destination is inside this prop or within unit radius of it (a tree trunk, a chest).</summary>
+        private bool TargetIsInside(Collider prop) => TargetSqrDistance(prop) < 0.25f;
+
+        /// <summary>The destination is beside this prop (a builder's spot, a bench slot, a mine's door).</summary>
+        private bool TargetIsAt(Collider prop) => TargetSqrDistance(prop) < 4f;
 
         /// <summary>A prop the unit cannot walk through (not ground, not a unit, not itself).</summary>
         private bool IsSolid(RaycastHit hit)

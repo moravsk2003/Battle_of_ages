@@ -297,5 +297,62 @@ namespace BattleOfAges.PlayModeTests
             }
             Assert.Greater(site.Stage, -1);
         }
+
+        [Category("Slow")]
+        [UnityTest, Timeout(120000)]
+        public IEnumerator FourBuildersFromOneSide_RaiseATownHall_AndDoNotOrbitIt()
+        {
+            ClearWorkers();
+            yield return null;
+            GameObject hall = TownHall.CreatePrefab("SiteTownHall");
+            hall.transform.position = at;
+            spawned.Add(hall);
+            ConstructionSite site = ConstructionSite.Begin(hall, BuildingType.TownHall);
+
+            var crew = new List<NpcResourceGatherer>();
+            for (int i = 0; i < ConstructionSite.MaxBuilders; i++)
+                crew.Add(Worker(at + new Vector3(12f, 0f, -3f + i * 2f), "NPC_HallBuilder_" + i));
+            yield return null;
+
+            var swung = new int[crew.Count];
+            for (int i = 0; i < crew.Count; i++)
+            {
+                int k = i;
+                crew[i].GetComponent<CombatUnit>().OnAttackStarted += () => swung[k]++;
+            }
+
+            Time.timeScale = 4f;
+            try
+            {
+                float joinEnd = Time.time + 8f;
+                while (Time.time < joinEnd && site.BuilderCount < ConstructionSite.MaxBuilders) yield return null;
+                Assert.AreEqual(ConstructionSite.MaxBuilders, site.BuilderCount, "all four workers join the town hall site");
+
+                float reachEnd = Time.time + 25f;
+                while (Time.time < reachEnd)
+                {
+                    bool all = true;
+                    foreach (NpcResourceGatherer b in crew) all &= site.AtItsSpot(b);
+                    if (all) break;
+                    yield return null;
+                }
+                for (int i = 0; i < crew.Count; i++)
+                    Assert.IsTrue(site.AtItsSpot(crew[i]), $"builder {i} reached its spot at {site.SpotFor(crew[i])}, now at {crew[i].transform.position}");
+                Assert.AreEqual(ConstructionSite.MaxBuilders, site.PresentBuilders, "all four builders stand at the town hall");
+
+                for (int i = 0; i < crew.Count; i++) swung[i] = 0;
+                yield return new WaitForSeconds(2f);
+                for (int i = 0; i < crew.Count; i++)
+                    Assert.Greater(swung[i], 0, $"builder {i} swings the hammer at the town hall");
+
+                float buildEnd = Time.time + 60f;
+                while (Time.time < buildEnd && site != null) yield return null;
+                Assert.IsTrue(site == null, "the town hall finishes building");
+            }
+            finally
+            {
+                Time.timeScale = 1f;
+            }
+        }
     }
 }

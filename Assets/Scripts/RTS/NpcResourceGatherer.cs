@@ -220,7 +220,11 @@ namespace BattleOfAges.RTS
             Vector3 spot = assignedPlace.SpotFor(this);
             Vector3 off = transform.position - spot;
             off.y = 0f;
-            if (off.sqrMagnitude <= 1f) return;
+            if (off.sqrMagnitude <= 1f)
+            {
+                if (rtsUnit != null && rtsUnit.HasMoveTarget) rtsUnit.StopHere();
+                return;
+            }
             siteMoveTimer -= Time.deltaTime;
             if (siteMoveTimer <= 0f && rtsUnit != null) { siteMoveTimer = 1f; rtsUnit.IssueMoveCommand(spot); }
         }
@@ -272,6 +276,7 @@ namespace BattleOfAges.RTS
                 if (siteMoveTimer <= 0f && rtsUnit != null) { siteMoveTimer = 1f; rtsUnit.IssueMoveCommand(spot); }
                 return;
             }
+            if (rtsUnit != null && rtsUnit.HasMoveTarget) rtsUnit.StopHere();
             Vector3 look = assignedSite.transform.position - transform.position;
             look.y = 0f;
             if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(look), 360f * Time.deltaTime);
