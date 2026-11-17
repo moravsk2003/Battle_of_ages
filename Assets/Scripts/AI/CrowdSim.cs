@@ -33,9 +33,11 @@ namespace BattleOfAges.AI
         public static int LastByHand { get; private set; }
         /// <summary>Since the game began: units moved by the job, by the old code, AI turns taken, probes ahead, frames.</summary>
         public static long TotalGlided, TotalByHand, TotalThinks, TotalProbes, TotalFrames;
+        /// <summary>Stopwatch ticks the main thread spent since the game began: telling bodies their look, moving by the old code, thinking (probes).</summary>
+        public static long TicksLook, TicksByHand, TicksThink;
         private static int slots;
 
-        private const byte Arrived = 1, ByHand = 2, SteerDue = 4, Dropped = 8, ThinkDue = 16, NeedGround = 32, Glided = 64, ColliderFlip = 128;
+        private const ushort Arrived = 1, ByHand = 2, SteerDue = 4, Dropped = 8, ThinkDue = 16, NeedGround = 32, Glided = 64, ColliderFlip = 128, RouteDue = 256;
         /// <summary>
         /// A unit's collider is for the hero to run into, the player's blows and clicks: past this from the viewer it is
         /// switched off (on again nearer than ColliderOn). Ten thousand moving character controllers cost the physics 8 ms a
@@ -51,13 +53,25 @@ namespace BattleOfAges.AI
         {
             public float Radius, Stop, RotSpeed, CapBottom, CapTop, CapRadius, Close, Mid, Far;
             public int GridId, Team, Slot;
+            /// <summary>Its place in the batch that draws the distant crowd (Utils.CrowdDraw; -1: none), and the baked rows of its idle, walk and run: (first row, frames).</summary>
+            public int DrawSlot;
+            public float2 Idle, Walk, Run;
         }
 
         private struct Mind
         {
             public float3 Dest;
             public float Speed;
+            public int RouteRing;
             public byte HasDest, Fast;
+        }
+
+        /// <summary>A town's ring of walls as the job reads it: which segments stand (a bit each), four ways through.</summary>
+        private struct Ring
+        {
+            public float2 Centre;
+            public ulong Low, High;
+            public byte Walled;
         }
 
         private struct State
@@ -79,7 +93,8 @@ namespace BattleOfAges.AI
         private static NativeArray<Mind> minds;
         private static NativeArray<State> states;
         private static NativeArray<float3> steer, outDesired;
-        private static NativeArray<byte> outFlags, outLook, outWhy;
+        private static NativeArray<ushort> outFlags;
+        private static NativeArray<byte> outLook, outWhy;
         private static NativeArray<float> outDt, outThink, outProbe, outSpeed;
         private static TransformAccessArray transforms;
 
@@ -91,7 +106,10 @@ namespace BattleOfAges.AI
 
         private static NativeParallelMultiHashMap<long, float3> props;
         private static NativeParallelHashMap<long, byte> cellClass;
-        private static NativeParallelHashMap<long, int> tileAt;
+        private static NativeParallelHashMap<long, int> tileAt, cellRing;
+        private static NativeList<Ring> rings;
+        private static readonly List<KingdomTown> ringOwner = new List<KingdomTown>();
+        private static int ringsVersion = -1;
         private static NativeList<float> tileData;
         private static readonly HashSet<long> wantedCells = new HashSet<long>(), wantedTiles = new HashSet<long>();
         private static int wallsVersion = -1, worldSeed = int.MinValue;
@@ -131,6 +149,10 @@ namespace BattleOfAges.AI
             transforms = new TransformAccessArray(capacity);
             fronts = new NativeArray<float3>(64, Allocator.Persistent);
             cellClass = new NativeParallelHashMap<long, byte>(4096, Allocator.Persistent);
+            cellRing = new NativeParallelHashMap<long, int>(1024, Allocator.Persistent);
+            rings = new NativeList<Ring>(64, Allocator.Persistent);
+            ringOwner.Clear();
+            ringsVersion = -1;
             if (!props.IsCreated) props = new NativeParallelMultiHashMap<long, float3>(4096, Allocator.Persistent);
             tileAt = new NativeParallelHashMap<long, int>(1024, Allocator.Persistent);
             tileData = new NativeList<float>(TileSide * TileSide * 256, Allocator.Persistent);
@@ -160,6 +182,10 @@ namespace BattleOfAges.AI
             Free(ref gridAlive); Free(ref outLook); Free(ref outWhy); Free(ref fronts); Free(ref casts); Free(ref castHits);
             if (transforms.isCreated) transforms.Dispose();
             if (cellClass.IsCreated) cellClass.Dispose();
+            if (cellRing.IsCreated) cellRing.Dispose();
+            if (rings.IsCreated) rings.Dispose();
+            foreach (KingdomTown t in ringOwner) if (t != null) t.RingSlot = -1;
+            ringOwner.Clear();
             if (props.IsCreated) props.Dispose();
             if (tileAt.IsCreated) tileAt.Dispose();
             if (tileData.IsCreated) tileData.Dispose();
@@ -181,6 +207,7 @@ namespace BattleOfAges.AI
             int i = count++;
             agents[i] = a;
             a.crowdIndex = i;
+            bodies[i] = new Body { DrawSlot = -1 };
             transforms.Add(a.transform);
             states[i] = new State { DetourSide = 1, Tick = UnityEngine.Random.value * 0.05f };
             steer[i] = float3.zero;
@@ -188,6 +215,7 @@ namespace BattleOfAges.AI
             outLook[i] = 0;
             outSpeed[i] = 0f;
             Refresh(a);
+            TellLook(a);
             if (a.CrowdWantsEveryFrame) everyFrame.Add(a);
             if (driver == null)
             {
@@ -202,11 +230,56 @@ namespace BattleOfAges.AI
             int i = a.crowdIndex;
             if (i < 0 || !created) { a.crowdIndex = -1; return; }
             a.crowdIndex = -1;
+            TellLook(a); // (its body in the batch is followed by its transform from here)
             everyFrame.Remove(a);
             UnitSpatialGrid.SetFed(a.GridId, false);
             if (states[i].ColliderOff != 0 && a.Health != null && a.Health.IsAlive && a.CharacterCtrl != null) a.CharacterCtrl.enabled = true; // as it came
-            if (iterating) { agents[i] = null; holes = true; Mind m = minds[i]; m.Fast = 0; m.HasDest = 0; minds[i] = m; Body b = bodies[i]; b.GridId = -1; bodies[i] = b; return; }
+            if (iterating) { agents[i] = null; holes = true; Mind m = minds[i]; m.Fast = 0; m.HasDest = 0; minds[i] = m; Body b = bodies[i]; b.GridId = -1; b.DrawSlot = -1; bodies[i] = b; return; }
             TakeOut(i);
+        }
+
+        private static void TellLook(AIBaseController a)
+        {
+            Utils.GpuSkinnedCharacter look = a.crowdLook;
+            if ((object)look != null && look != null) look.CrowdMembershipChanged();
+        }
+
+        /// <summary>
+        /// The unit's body has a place in the batch that draws the distant crowd (-1: no more): the job writes where it stands
+        /// there, and the clip its pace asks for (the baked rows of its idle, walk and run: first row, frames).
+        /// </summary>
+        internal static void SetDraw(AIBaseController a, int slot, Vector2 idle, Vector2 walk, Vector2 run)
+        {
+            int i = a.crowdIndex;
+            if (i < 0 || !created) return;
+            Body b = bodies[i];
+            b.DrawSlot = slot;
+            b.Idle = idle; b.Walk = walk; b.Run = run;
+            bodies[i] = b;
+        }
+
+        /// <summary>
+        /// The place in the batch was given back: the job stops writing there, if it still writes there. Asked of the body
+        /// that owned it, whichever body the unit looks to now: a model swapped while far (a promotion) set up the new body
+        /// before the old one let go, the job kept writing the unit into the freed place, and the next character given it
+        /// stood where that unit stood, with its clips read from another bake (stretched across the sky).
+        /// </summary>
+        internal static void ForgetDraw(AIBaseController a, int slot)
+        {
+            int i = a.crowdIndex;
+            if (i < 0 || !created || slot < 0) return;
+            Body b = bodies[i];
+            if (b.DrawSlot != slot) return;
+            b.DrawSlot = -1;
+            bodies[i] = b;
+        }
+
+        /// <summary>Each unit of the crowd with a place in the batch that the job writes (a check: GpuSkinnedCharacter.AuditBatch).</summary>
+        internal static void Draws(List<(AIBaseController unit, int slot)> into)
+        {
+            into.Clear();
+            if (!created) return;
+            for (int i = 0; i < count; i++) if (agents[i] != null && bodies[i].DrawSlot >= 0) into.Add((agents[i], bodies[i].DrawSlot));
         }
 
         private static void TakeOut(int i)
@@ -230,8 +303,10 @@ namespace BattleOfAges.AI
             if (i < 0 || !created) return;
             CharacterController cc = a.CharacterCtrl;
             float radius = cc != null ? cc.radius : 0.5f;
+            Body was = bodies[i];
             var b = new Body
             {
+                DrawSlot = was.DrawSlot, Idle = was.Idle, Walk = was.Walk, Run = was.Run,
                 Radius = radius, Stop = a.CrowdStop, RotSpeed = a.CrowdTurn, GridId = a.GridId, Team = a.CrowdTeam,
                 Slot = slots++ % AIBaseController.FarMoveStride, // (by its id every unit of a crowd made together had the same one)
                 Close = a.CrowdClose, Mid = a.CrowdMid, Far = a.CrowdFar, CapRadius = radius * 0.9f, CapBottom = 0.5f, CapTop = 1.5f
@@ -260,7 +335,7 @@ namespace BattleOfAges.AI
             bool has = a.HasDestination;
             Mind old = minds[i];
             if (!has || old.HasDest == 0) steer[i] = float3.zero; // a new walk: no direction kept from the last one
-            minds[i] = new Mind { Dest = d, Speed = a.CrowdSpeed, HasDest = (byte)(has ? 1 : 0), Fast = (byte)(a.CrowdFast ? 1 : 0) };
+            minds[i] = new Mind { Dest = d, Speed = a.CrowdSpeed, HasDest = (byte)(has ? 1 : 0), Fast = (byte)(a.CrowdFast ? 1 : 0), RouteRing = a.CrowdRouteRing };
         }
 
         /// <summary>The unit's ground speed as the job measured it (m/s, smoothed): what its animation follows far off.</summary>
@@ -309,25 +384,73 @@ namespace BattleOfAges.AI
             float r = reach + GroundMargin;
             for (int cx = Mathf.FloorToInt((x - r) / GroundCell); cx <= Mathf.FloorToInt((x + r) / GroundCell); cx++)
                 for (int cz = Mathf.FloorToInt((z - r) / GroundCell); cz <= Mathf.FloorToInt((z + r) / GroundCell); cz++)
+                {
                     cellClass.Remove(Key(cx, cz));
+                    cellRing.Remove(Key(cx, cz));
+                }
         }
 
         public static void GroundChangedEverywhere()
         {
-            if (created && cellClass.IsCreated) { cellClass.Clear(); GroundResets++; }
+            if (created && cellClass.IsCreated) { cellClass.Clear(); cellRing.Clear(); GroundResets++; }
+        }
+
+        // The towns' rings as the job reads them: a place each, kept while the town stands
+
+        /// <summary>The ring's place among those the job knows (-1: the crowd is not running).</summary>
+        internal static int RingSlot(KingdomTown town)
+        {
+            if (!created || town == null) return -1;
+            SyncRings();
+            return town.RingSlot;
+        }
+
+        private static void SyncRings()
+        {
+            if (ringsVersion == KingdomTown.RingsVersion) return;
+            ringsVersion = KingdomTown.RingsVersion;
+            for (int i = 0; i < ringOwner.Count; i++)
+            {
+                KingdomTown t = ringOwner[i];
+                if ((object)t == null) continue;
+                if (t != null && t.InGrid && t.RingSlot == i) continue;
+                if (t != null && t.RingSlot == i) t.RingSlot = -1;
+                ringOwner[i] = null;
+                rings[i] = default; // no walls: whoever still heads round it asks again
+            }
+            List<KingdomTown> all = KingdomTown.All;
+            for (int k = 0; k < all.Count; k++)
+            {
+                KingdomTown t = all[k];
+                if (t == null || !t.InGrid) continue;
+                if (t.RingSlot < 0 || t.RingSlot >= ringOwner.Count || ringOwner[t.RingSlot] != t)
+                {
+                    int free = ringOwner.IndexOf(null);
+                    if (free < 0) { free = ringOwner.Count; ringOwner.Add(null); rings.Add(default); }
+                    ringOwner[free] = t;
+                    t.RingSlot = free;
+                }
+                t.RingBits(out ulong low, out ulong high);
+                rings[t.RingSlot] = new Ring { Centre = t.Centre, Low = low, High = high, Walled = (byte)(t.HasWalls ? 1 : 0) };
+            }
         }
 
         /// <summary>How many times all the ground was looked at again, how many cells and height tiles are known (probes).</summary>
         public static int GroundResets;
         public static string GroundKnown => created ? $"{cellClass.Count()} cells, {tileAt.Count()} tiles, resets {GroundResets}" : "none";
 
-        /// <summary>Open ground (1): nothing but other units and the relief to mind. Anything else near (2): the old code moves a unit there.</summary>
-        private static byte Classify(int cx, int cz)
+        /// <summary>
+        /// Open ground (1): nothing but other units and the relief to mind. One town's ring near and nothing else (3): the job
+        /// keeps a unit out of its walls by the ring's own numbers (ring: its place). Anything else near (2): the old code moves
+        /// a unit there.
+        /// </summary>
+        private static byte Classify(int cx, int cz, out int ring)
         {
+            ring = -1;
             float minX = cx * GroundCell - GroundMargin, minZ = cz * GroundCell - GroundMargin, maxX = (cx + 1) * GroundCell + GroundMargin, maxZ = (cz + 1) * GroundCell + GroundMargin;
             float midX = (cx + 0.5f) * GroundCell, midZ = (cz + 0.5f) * GroundCell, round = GroundCell * 0.71f + GroundMargin;
             if (Footprints.AnyIn(minX, minZ, maxX, maxZ)) return 2; // (trunks and rocks the job goes round by itself)
-            if (Lakes.InWater(midX, midZ, round + 1f) || KingdomTown.RingNear(midX, midZ, round + 2f)) return 2;
+            if (Lakes.InWater(midX, midZ, round + 1f)) return 2;
             if (WorldSettings.Bounded && WorldSettings.OutsideBy(midX, midZ) > -(round + 4f)) return 2;
             IReadOnlyList<WallBarriers.Barrier> walls = WallBarriers.All;
             for (int i = 0; i < walls.Count; i++)
@@ -335,7 +458,11 @@ namespace BattleOfAges.AI
                 WallBarriers.Barrier w = walls[i];
                 if (w.Max.x >= minX && w.Min.x <= maxX && w.Max.y >= minZ && w.Min.y <= maxZ) return 2;
             }
-            return 1;
+            int near = KingdomTown.RingsNear(midX, midZ, round + 2f, out KingdomTown town);
+            if (near == 0) return 1;
+            if (near > 1) return 2;
+            ring = RingSlot(town);
+            return (byte)(ring >= 0 ? 3 : 2);
         }
 
         private static void FillTile(long key, int tx, int tz)
@@ -367,7 +494,13 @@ namespace BattleOfAges.AI
 
         private static void GiveGround()
         {
-            foreach (long c in wantedCells) if (!cellClass.ContainsKey(c)) cellClass[c] = Classify((int)(c >> 32), (int)(uint)c);
+            foreach (long c in wantedCells)
+            {
+                if (cellClass.ContainsKey(c)) continue;
+                byte kind = Classify((int)(c >> 32), (int)(uint)c, out int ring);
+                if (kind == 3) cellRing[c] = ring;
+                cellClass[c] = kind;
+            }
             wantedCells.Clear();
             float until = Time.realtimeSinceStartup + 0.002f; // the height tiles within 2 ms a frame
             foreach (long t in wantedTiles)
@@ -382,12 +515,13 @@ namespace BattleOfAges.AI
         private static void WatchWorld()
         {
             int walls = WallBarriers.Version;
-            if (walls != wallsVersion) { wallsVersion = walls; cellClass.Clear(); GroundResets++; }
+            if (walls != wallsVersion) { wallsVersion = walls; cellClass.Clear(); cellRing.Clear(); GroundResets++; }
             if (WorldSettings.Seed != worldSeed || WorldSettings.Size != worldSize)
             {
                 worldSeed = WorldSettings.Seed; worldSize = WorldSettings.Size;
-                cellClass.Clear(); tileAt.Clear(); tileData.Clear();
+                cellClass.Clear(); cellRing.Clear(); tileAt.Clear(); tileData.Clear();
             }
+            SyncRings();
             Footprints.Touch();
             SolidProps.Touch();
         }
@@ -466,6 +600,8 @@ namespace BattleOfAges.AI
             CopyGrid();
             gridMarker.End();
             jobMarker.Begin();
+            Utils.CrowdDraw.EnsureCreated();
+            Utils.CrowdDraw.CompleteCulling();
             for (int t = 0; t < 64; t++) fronts[t] = BattleFront.InBattle(t) ? (float3)BattleFront.Front(t) : float3.zero;
             GameObject player = Managers.GameContext.Player;
             Camera cam = Utils.ViewCamera.Current;
@@ -478,12 +614,17 @@ namespace BattleOfAges.AI
                 OutThink = outThink, OutProbe = outProbe, OutSpeed = outSpeed,
                 GridPos = gridPos, GridRadius = gridRadius, GridNext = gridNext, GridHead = gridHead, GridAlive = gridAlive, Fronts = fronts,
                 OutLook = outLook, OutWhy = outWhy, Eye = look != null ? (float3)look.transform.position : float3.zero, LookScale = lookScale, LookOrtho = lookOrtho,
-                Cells = cellClass, Tiles = tileAt, TileData = tileData.AsArray(), Props = props,
+                Cells = cellClass, Tiles = tileAt, TileData = tileData.AsArray(), Props = props, CellRing = cellRing, Rings = rings.AsArray(),
+                RingRadius = KingdomTown.WallRingRadius, RingStep = 360f / KingdomTown.RingSegments, WayHalfAngle = KingdomTown.WaySegments * (360f / KingdomTown.RingSegments),
+                WayApproach = KingdomTown.WayApproach, WayHalfWidth = KingdomTown.WaySegments * Utils.WallBuilder.Length, WallRoom = Utils.WallBuilder.Thickness * 0.5f,
                 Dt = dt, Frame = Time.frameCount, HasPlayer = player != null, Player = player != null ? (float3)player.transform.position : float3.zero,
                 HasCamera = cam != null, Camera = cam != null ? (float3)cam.transform.position : float3.zero,
-                WalkerSeparation = GameBalance.WalkerSeparation, StandingSeparation = GameBalance.StandingSeparation, BattlePull = GameBalance.BattlePull
+                WalkerSeparation = GameBalance.WalkerSeparation, StandingSeparation = GameBalance.StandingSeparation, BattlePull = GameBalance.BattlePull,
+                DrawPos = Utils.CrowdDraw.Pos, DrawRot = Utils.CrowdDraw.Rot, DrawLoco = Utils.CrowdDraw.Loco, DrawPrev = Utils.CrowdDraw.Prev, DrawFade = Utils.CrowdDraw.Fade,
+                DrawFlags = Utils.CrowdDraw.Flags, Now = Time.timeSinceLevelLoad
             };
             job.Schedule(transforms).Complete();
+            Utils.CrowdDraw.Touch();
             int gridCap = UnitSpatialGrid.Capacity;
             if (gridCap > 0) NativeArray<Vector3>.Copy(gridPos, 0, UnitSpatialGrid.PositionArray, 0, gridCap);
             if (fresh.Count > 0)
@@ -504,19 +645,23 @@ namespace BattleOfAges.AI
                 {
                     outLook[i] = 0;
                     WhyByHand[0]++;
+                    long tl = System.Diagnostics.Stopwatch.GetTimestamp();
                     if (agents[i] != null && (object)agents[i].crowdLook != null && agents[i].crowdLook != null) agents[i].crowdLook.CrowdLook(look);
+                    TicksLook += System.Diagnostics.Stopwatch.GetTimestamp() - tl;
                 }
-                byte f = outFlags[i];
+                ushort f = outFlags[i];
                 if (f == 0) continue;
                 AIBaseController a = agents[i];
                 if (a == null) continue;
                 if ((f & Glided) != 0) glided++;
+                if ((f & RouteDue) != 0) a.CrowdReroute();
                 if ((f & ColliderFlip) != 0)
                 {
                     CharacterController cc = a.CharacterCtrl;
                     if (cc != null) cc.enabled = states[i].ColliderOff == 0;
                 }
                 if ((f & (Arrived | Dropped)) != 0) a.CrowdArrived();
+                long tb = System.Diagnostics.Stopwatch.GetTimestamp();
                 if ((f & ByHand) != 0)
                 {
                     byHand++;
@@ -526,6 +671,8 @@ namespace BattleOfAges.AI
                     a.CrowdManagedMove(outDt[i]);
                     if (a.crowdIndex != i) continue; // (it died of it, or left)
                     Vector3 now = a.transform.position;
+                    int drawn = bodies[i].DrawSlot;
+                    if (drawn >= 0) Utils.CrowdDraw.SetPose(drawn, now, a.transform.rotation);
                     if (id >= 0)
                     {
                         places[id] = now;
@@ -534,8 +681,10 @@ namespace BattleOfAges.AI
                     }
                     if ((f & NeedGround) != 0) WantGround(now);
                 }
+                long tt = System.Diagnostics.Stopwatch.GetTimestamp();
+                TicksByHand += tt - tb;
                 if ((f & SteerDue) != 0 && a.crowdIndex == i) castAgent[probes++] = i;
-                if ((f & ThinkDue) != 0 && a.crowdIndex == i) { TotalThinks++; a.CrowdThink(outThink[i]); }
+                if ((f & ThinkDue) != 0 && a.crowdIndex == i) { TotalThinks++; a.CrowdThink(outThink[i]); TicksThink += System.Diagnostics.Stopwatch.GetTimestamp() - tt; }
             }
             TotalGlided += glided; TotalByHand += byHand; TotalProbes += probes; TotalFrames++;
             LastGlided = glided;
@@ -598,7 +747,11 @@ namespace BattleOfAges.AI
             [ReadOnly] public NativeArray<Mind> Minds;
             [NativeDisableParallelForRestriction] public NativeArray<State> States;
             [NativeDisableParallelForRestriction] public NativeArray<float3> Steer, OutDesired;
-            [NativeDisableParallelForRestriction] public NativeArray<byte> OutFlags, OutLook, OutWhy;
+            [NativeDisableParallelForRestriction] public NativeArray<ushort> OutFlags;
+            [NativeDisableParallelForRestriction] public NativeArray<byte> OutLook, OutWhy;
+            [ReadOnly] public NativeParallelHashMap<long, int> CellRing;
+            [ReadOnly] public NativeArray<Ring> Rings;
+            public float RingRadius, RingStep, WayHalfAngle, WayApproach, WayHalfWidth, WallRoom;
             public float3 Eye;
             public float LookScale;
             public bool LookOrtho;
@@ -613,6 +766,12 @@ namespace BattleOfAges.AI
             [ReadOnly] public NativeArray<float> TileData;
             [ReadOnly] public NativeParallelMultiHashMap<long, float3> Props;
             public float Dt, WalkerSeparation, StandingSeparation, BattlePull;
+            // The batch that draws the distant crowd (Utils.CrowdDraw): each unit writes its own place only
+            [NativeDisableParallelForRestriction] public NativeArray<float3> DrawPos;
+            [NativeDisableParallelForRestriction] public NativeArray<quaternion> DrawRot;
+            [NativeDisableParallelForRestriction] public NativeArray<float4> DrawLoco, DrawPrev, DrawFade;
+            [ReadOnly] public NativeArray<byte> DrawFlags;
+            public float Now;
             public int Frame;
             public bool HasPlayer, HasCamera;
             public float3 Player, Camera;
@@ -626,7 +785,7 @@ namespace BattleOfAges.AI
                 if (GridAlive[b.GridId] == 0) { OutFlags[i] = 0; return; }
                 State s = States[i];
                 Mind m = Minds[i];
-                byte f = 0;
+                ushort f = 0;
 
                 // How near the viewer: the hero, or the camera over the ground (AIBaseController.ViewerDistance)
                 float d = HasPlayer ? math.distance(p, Player) : 10f;
@@ -648,46 +807,82 @@ namespace BattleOfAges.AI
                     if (m.Fast == 0) { OutDt[i] = dt; f |= ByHand; OutWhy[i] = 1; }
                     else
                     {
-                        byte kept = f;
+                        ushort kept = f;
                         byte why = 0;
-                        if (!Ground(p, out float here)) why = 2;
+                        if (!Ground(p, out float here, out int ringHere)) why = 2;
                         else if (InProp(p, b.Radius * InsidePropShare)) why = 3;
-                        else if (!Move(i, ref t, b, m, ref s, p, here, dt, ref f)) why = 4;
+                        else if (!Move(i, ref t, b, m, ref s, p, here, ringHere, dt, ref f)) why = 4;
                         if (why != 0)
                         {
                             OutWhy[i] = why;
                             s = before;
                             OutDt[i] = dt;
-                            f = (byte)(kept | ByHand | NeedGround);
+                            f = (ushort)(kept | ByHand | NeedGround);
                         }
                     }
                 }
-                // How it looks from the camera: its body is told when its size on screen crosses a line or its pace changes
-                // (GpuSkinnedCharacter: the lines with their slack, idle / walk / run, and the clip's rate)
+                // How it looks from the camera: near, its Animator; far, a place in the crowd's batch. Its body is told only when
+                // its size on screen crosses that line (GpuSkinnedCharacter: the line with its slack)
                 float size = LookOrtho ? LookScale : LookScale / math.max(0.01f, math.distance(p, Eye));
-                byte band = (byte)(size < Utils.GpuSkinnedCharacter.CullScreenHeight ? 2
-                    : (s.LookBand == 0 ? size < Utils.GpuSkinnedCharacter.FarScreenHeight : size < Utils.GpuSkinnedCharacter.FarScreenHeight * 1.15f) ? 1 : 0);
-                // (a pace near a line does not flip to and fro: the line is crossed by a tenth before it counts)
-                byte pace = s.PaceBand;
-                if (pace == 0) { if (s.Speed > 0.44f) pace = (byte)(s.Speed < 2.8f ? 1 : 2); }
-                else if (pace == 1) { if (s.Speed < 0.36f) pace = 0; else if (s.Speed > 3.05f) pace = 2; }
-                else if (s.Speed < 2.55f) pace = (byte)(s.Speed < 0.4f ? 0 : 1);
-                bool told = band != s.LookBand || (band == 1 && (pace != s.PaceBand || (pace != 0 && math.abs(s.Speed - s.PaceTold) > 0.12f * math.max(s.PaceTold, 0.1f))));
-                if (told) { s.LookBand = band; s.PaceBand = pace; s.PaceTold = s.Speed; OutLook[i] = 1; }
+                byte band = (byte)((s.LookBand == 0 ? size < Utils.GpuSkinnedCharacter.FarScreenHeight : size < Utils.GpuSkinnedCharacter.FarScreenHeight * 1.15f) ? 1 : 0);
+                if (band != s.LookBand) { s.LookBand = band; OutLook[i] = 1; }
+                int drawn = b.DrawSlot;
+                if (drawn >= 0)
+                {
+                    // In the batch: where it stands now, and the clip its pace asks for (GpuSkinnedCharacter.FollowLocomotion)
+                    DrawPos[drawn] = t.position;
+                    DrawRot[drawn] = t.rotation;
+                    if ((DrawFlags[drawn] & Utils.CrowdDraw.Dead) == 0)
+                    {
+                        float speed = OutSpeed[i];
+                        // (a pace near a line does not flip to and fro: the line is crossed by a tenth before it counts)
+                        byte pace = s.PaceBand;
+                        if (pace == 0) { if (speed > 0.44f) pace = (byte)(speed < 2.8f ? 1 : 2); }
+                        else if (pace == 1) { if (speed < 0.36f) pace = 0; else if (speed > 3.05f) pace = 2; }
+                        else if (speed < 2.55f) pace = (byte)(speed < 0.4f ? 0 : 1);
+                        s.PaceBand = pace;
+                        float2 clip = pace == 0 ? b.Idle : pace == 1 ? b.Walk : b.Run;
+                        float rate = pace == 0 ? 1f : math.max(0.5f, speed / (pace == 1 ? Utils.CharacterAnimationDriver.WalkClipSpeed : Utils.CharacterAnimationDriver.RunClipSpeed));
+                        float fps = Utils.GpuSkinBake.FramesPerSecond * rate;
+                        float4 loco = DrawLoco[drawn];
+                        if (math.abs(loco.x - clip.x) > 0.5f)
+                        {
+                            // Another clip: the one it played fades out under it
+                            DrawPrev[drawn] = loco;
+                            DrawLoco[drawn] = new float4(clip.x, clip.y, fps, Now);
+                            DrawFade[drawn] = new float4(Now, 0.25f, 0f, 0f);
+                        }
+                        else if (loco.z > 0f && math.abs(fps / loco.z - 1f) >= 0.08f)
+                        {
+                            // Same clip, new pace: the phase kept, the rate changed (the feet follow the ground speed)
+                            float frames = (Now - loco.w) * loco.z;
+                            loco.z = fps;
+                            loco.w = Now - frames / fps;
+                            DrawLoco[drawn] = loco;
+                        }
+                    }
+                }
                 States[i] = s;
                 OutFlags[i] = f;
             }
 
             /// <summary>The step on open ground; false where the ground ahead is not known to be open (nothing is changed then).</summary>
-            private bool Move(int i, ref TransformAccess t, in Body b, in Mind m, ref State s, float3 p, float here, float dt, ref byte f)
+            private bool Move(int i, ref TransformAccess t, in Body b, in Mind m, ref State s, float3 p, float here, int ringHere, float dt, ref ushort f)
             {
                 float3 wish = float3.zero, facing = float3.zero;
-                bool walking = false, arrived = false, dropped = false, due = false;
+                bool walking = false, arrived = false, dropped = false, due = false, routeDue = false;
                 float3 desired = float3.zero, heading = Steer[i];
                 float probe = 0f;
                 if (m.HasDest != 0)
                 {
-                    float3 to = m.Dest - p;
+                    // A ring across its road: to the way through it, or round it (KingdomTown.Route). Past it, the road is asked again
+                    float3 goal = m.Dest;
+                    if (m.RouteRing >= 0)
+                    {
+                        if (m.RouteRing < Rings.Length && RouteRound(Rings[m.RouteRing], p, m.Dest, out float3 via)) goal = via;
+                        else routeDue = true;
+                    }
+                    float3 to = goal - p;
                     to.y = 0f;
                     float sqr = math.lengthsq(to);
                     if (sqr > b.Stop * b.Stop)
@@ -761,8 +956,10 @@ namespace BattleOfAges.AI
                 {
                     float top = math.max(math.length(wish) * 1.25f, 2f);
                     if (math.lengthsq(v) > top * top) v = math.normalize(v) * top;
-                    np = AroundProps(p, v * dt, b.Radius);
-                    if (!Ground(np, out float ground)) return false;
+                    float3 step = v * dt;
+                    if (ringHere >= 0 && ringHere < Rings.Length) step = ConstrainRing(Rings[ringHere], p, step, b.Radius);
+                    np = AroundProps(p, step, b.Radius);
+                    if (!Ground(np, out float ground, out int _)) return false;
                     v = (np - p) / dt;
                     v.y = 0f;
                     if (ground - p.y > math.length(v) * dt * 1.43f + 0.05f) { np = p; np.y = here; } // a cliff ahead: it stays (GroundMotor.MaxClimb)
@@ -788,8 +985,81 @@ namespace BattleOfAges.AI
                 if (due) { OutDesired[i] = desired; OutProbe[i] = probe; f |= SteerDue; }
                 if (arrived) f |= Arrived;
                 if (dropped) f |= Dropped;
+                if (routeDue) f |= RouteDue;
                 f |= Glided;
                 return true;
+            }
+
+            // ---- a town's ring (KingdomTown.Route, RouteRound, Constrain, by the same numbers)
+
+            private bool IsWay(float degrees) => math.abs(degrees - math.round(degrees / 90f) * 90f) < WayHalfAngle;
+
+            private bool UpAt(in Ring g, float degrees)
+            {
+                float d = degrees - math.floor(degrees / 360f) * 360f;
+                int k = math.clamp((int)math.floor(d / RingStep), 0, KingdomTown.RingSegments - 1);
+                return ((k < 64 ? g.Low >> k : g.High >> (k - 64)) & 1UL) != 0;
+            }
+
+            private bool RouteRound(in Ring g, float3 from, float3 to, out float3 via)
+            {
+                via = to;
+                if (g.Walled == 0) return false;
+                float2 a = from.xz - g.Centre, b = to.xz - g.Centre, ab = b - a;
+                float R = RingRadius, ra = math.length(a), rb = math.length(b);
+                bool aIn = ra < R, bIn = rb < R;
+                if (aIn && bIn) return false;
+                float abSqr = math.lengthsq(ab);
+                if (!aIn && !bIn)
+                {
+                    // Both outside: only a road that cuts through the ring goes round it
+                    float u = abSqr > 1e-6f ? math.saturate(-math.dot(a, ab) / abSqr) : 0f;
+                    float2 nearest = a + ab * u;
+                    float nearSqr = math.lengthsq(nearest);
+                    if (nearSqr >= (R + 1.5f) * (R + 1.5f)) return false;
+                    float2 side = nearSqr > 1f ? nearest / math.sqrt(nearSqr) : math.normalizesafe(new float2(-ab.y, ab.x));
+                    float2 at = g.Centre + side * (R + WayApproach + 1f);
+                    via = new float3(at.x, from.y, at.y);
+                    return true;
+                }
+                // Across the ring: where the road meets it
+                float qb = 2f * math.dot(a, ab), qc = math.lengthsq(a) - R * R;
+                float w = abSqr > 1e-6f ? (-qb + (aIn ? 1f : -1f) * math.sqrt(math.max(0f, qb * qb - 4f * abSqr * qc))) / (2f * abSqr) : 0f;
+                float2 meet = a + ab * math.saturate(w);
+                float meetAngle = math.degrees(math.atan2(meet.y, meet.x));
+                if (IsWay(meetAngle) || !UpAt(g, meetAngle)) return false;
+                // The way that makes the shortest road
+                float2 best = float2.zero;
+                float bestLength = float.MaxValue;
+                for (int k = 0; k < 4; k++)
+                {
+                    float rad = k * math.PI * 0.5f;
+                    float2 axis = new float2(math.cos(rad), math.sin(rad));
+                    float length = math.length(a - axis * R) + math.length(b - axis * R);
+                    if (length < bestLength) { bestLength = length; best = axis; }
+                }
+                float2 across = new float2(-best.y, best.x);
+                bool inCorridor = math.abs(math.dot(a, across)) < WayHalfWidth - 1f && math.abs(ra - R) < WayApproach + 1f;
+                // In front of the way, then out behind it
+                float2 gate = g.Centre + best * (R + (aIn == inCorridor ? WayApproach : -WayApproach));
+                via = new float3(gate.x, from.y, gate.y);
+                return true;
+            }
+
+            /// <summary>The step against the ring: one deeper into a standing wall slides along it, one out of it is free.</summary>
+            private float3 ConstrainRing(in Ring g, float3 p, float3 step, float radius)
+            {
+                if (g.Walled == 0) return step;
+                float2 to = new float2(p.x + step.x, p.z + step.z) - g.Centre;
+                float r = math.length(to), room = WallRoom + radius;
+                if (math.abs(r - RingRadius) >= room || r < 1f) return step;
+                if (!UpAt(g, math.degrees(math.atan2(to.y, to.x)))) return step;
+                float2 from = p.xz - g.Centre;
+                float fromLength = math.length(from);
+                if (math.abs(fromLength - RingRadius) <= math.abs(r - RingRadius)) return step; // on its way out
+                float2 outward = fromLength > 1e-3f ? from / fromLength : to / r;
+                float into = step.x * outward.x + step.z * outward.y;
+                return step - new float3(outward.x, 0f, outward.y) * into;
             }
 
             /// <summary>World.SolidProps.Inside: the unit stands in a trunk or a rock (the old code takes it out).</summary>
@@ -844,11 +1114,15 @@ namespace BattleOfAges.AI
                 return new float3(x, p.y + step.y, z);
             }
 
-            private bool Ground(float3 p, out float height)
+            /// <summary>The ground under a point the job may walk: its height, and the ring that runs near it (-1: none).</summary>
+            private bool Ground(float3 p, out float height, out int ring)
             {
                 height = 0f;
+                ring = -1;
                 int cx = (int)math.floor(p.x / GroundCell), cz = (int)math.floor(p.z / GroundCell);
-                if (!Cells.TryGetValue(((long)cx << 32) ^ (uint)cz, out byte open) || open != 1) return false;
+                long spot = ((long)cx << 32) ^ (uint)cz;
+                if (!Cells.TryGetValue(spot, out byte open) || (open != 1 && open != 3)) return false;
+                if (open == 3 && !CellRing.TryGetValue(spot, out ring)) return false;
                 int tx = (int)math.floor(p.x / TileSize), tz = (int)math.floor(p.z / TileSize);
                 if (!Tiles.TryGetValue(((long)tx << 32) ^ (uint)tz, out int at)) return false;
                 float cell = TileSize / (TileSide - 1);

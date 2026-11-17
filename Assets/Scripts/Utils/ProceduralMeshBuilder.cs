@@ -58,6 +58,59 @@ namespace BattleOfAges.Utils
             return FlatShaded("StylizedFoliageCluster", displaced, origTris, _ => Color.white, p => new Vector2(p.x * 0.5f, p.z * 0.5f));
         }
 
+        /// <summary>
+        /// A lump of ore-bearing rock: squat, with a flat foot and an uneven, humped top (the displacement is a 3D noise, where
+        /// the faceted rock's is one across the ground, which left its top a flat plate), grey faces with a muted moss where
+        /// they face up, and some faces flecked with the ore's colour.
+        /// </summary>
+        public static Mesh CreateOreRockMesh(int seed, Color ore)
+        {
+            Mesh ico = CreateIcoSphere(1f, 2);
+            Vector3[] v = ico.vertices;
+            int[] tris = ico.triangles;
+            Discard(ico);
+            float o = seed * 1.37f + 3.1f;
+            for (int i = 0; i < v.Length; i++)
+            {
+                Vector3 p = v[i];
+                float n = (Mathf.PerlinNoise(p.x * 1.7f + o, p.y * 1.7f - o) + Mathf.PerlinNoise(p.y * 1.7f + 2f * o, p.z * 1.7f) + Mathf.PerlinNoise(p.z * 1.7f - o, p.x * 1.7f + 5f)) / 1.5f - 1f;
+                p *= 1f + n * 0.32f;
+                p.y = p.y > 0f ? p.y * 0.8f : p.y * 0.35f; // humped on top, flat at the foot
+                v[i] = p;
+            }
+            Color stone = new Color(0.47f, 0.45f, 0.43f), moss = new Color(0.43f, 0.47f, 0.32f);
+            return FlatShaded("OreRock", v, tris, normal =>
+            {
+                float fleck = Mathf.Repeat(Mathf.Sin(Vector3.Dot(normal, new Vector3(12.9898f, 78.233f, 37.719f)) + seed) * 43758.5453f, 1f);
+                if (fleck < 0.16f) return Color.Lerp(stone, ore, 0.75f); // a vein of the ore showing on this face
+                float up = Mathf.Clamp01(normal.y * 1.4f - 0.55f);
+                return Color.Lerp(stone, moss, up * 0.55f) * Mathf.Lerp(0.92f, 1.06f, fleck);
+            }, p => new Vector2(p.x + p.y, p.z + p.y));
+        }
+
+        /// <summary>A few small irregular nuggets of ore as one mesh, each centred at its point (rock-local) and as big as given.</summary>
+        public static Mesh CreateNuggetsMesh(Vector3[] centres, float[] sizes, int seed)
+        {
+            var combine = new CombineInstance[centres.Length];
+            var made = new Mesh[centres.Length];
+            for (int i = 0; i < centres.Length; i++)
+            {
+                made[i] = CreateFacetedRockMesh(1f, 1, seed + i * 17, 0.55f);
+                Quaternion turn = Quaternion.Euler(seed * 13f + i * 71f, i * 113f, seed * 7f + i * 29f);
+                combine[i] = new CombineInstance { mesh = made[i], transform = Matrix4x4.TRS(centres[i], turn, new Vector3(1f, 0.8f, 1.15f) * sizes[i]) };
+            }
+            var mesh = new Mesh { name = "OreNuggets" };
+            mesh.CombineMeshes(combine, true, true);
+            foreach (Mesh m in made) Discard(m);
+            Color[] colors = new Color[mesh.vertexCount];
+            for (int i = 0; i < colors.Length; i++) colors[i] = Color.white; // (the moss of the faceted rock is not the ore's)
+            mesh.colors = colors;
+            mesh.RecalculateBounds();
+            return mesh;
+        }
+
+        private static void Discard(Object o) { if (Application.isPlaying) Object.Destroy(o); else Object.DestroyImmediate(o); }
+
         /// <summary>Unshares the vertices so every triangle is flat shaded; colour per face (from its normal), UV per vertex.</summary>
         private static Mesh FlatShaded(string name, Vector3[] verts, int[] tris, System.Func<Vector3, Color> faceColor, System.Func<Vector3, Vector2> uv)
         {

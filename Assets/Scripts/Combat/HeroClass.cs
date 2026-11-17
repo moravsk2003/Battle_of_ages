@@ -61,10 +61,10 @@ namespace BattleOfAges.Combat
         {
             switch (c)
             {
-                case HeroClass.Tank: return UI.Loc.Pick("Танк", "Tank");
+                case HeroClass.Tank: return UI.Loc.Pick("Вартовий", "Warden");
                 case HeroClass.Archer: return UI.Loc.Pick("Лучник", "Archer");
                 case HeroClass.Mage: return UI.Loc.Pick("Маг", "Mage");
-                case HeroClass.Dd: return UI.Loc.Pick("ДД", "DD");
+                case HeroClass.Dd: return UI.Loc.Pick("Дуелянт", "Duelist");
                 default: return UI.Loc.Pick("без класу", "No Class");
             }
         }

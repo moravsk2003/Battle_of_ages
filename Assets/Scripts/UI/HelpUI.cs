@@ -151,8 +151,8 @@ namespace BattleOfAges.UI
             $"{Key(KeyAction.StopUnits)} — стій: кинути роботу й похід\n" +
             $"{K("Мінімапа")}: ЛКМ — камера туди, ПКМ — обрані йдуть туди\n\n" +
             Head("Камера") + "\n" +
-            $"{K("ПКМ")} (тягнути) або {K("W A S D")} — рухати,  {K("Колесо")} — наближення\n" +
-            $"{K("Q / E")} — повернути,  {K("R / F")} — нахил,  {K("Середня кнопка")} — крутити\n" +
+            $"{K(CameraSystem.MapMouseSettings.PanWithMiddle ? "Середня кнопка" : "ПКМ")} (тягнути) або {K("W A S D")} — рухати,  {K("Колесо")} — наближення\n" +
+            $"{K("Q / E")} — повернути,  {K("R / F")} — нахил,  {K(CameraSystem.MapMouseSettings.PanWithMiddle ? "Shift+середня" : "Середня кнопка")} — крутити (якою кнопкою рухати мапу — «Налаштування → Гра»)\n" +
             $"{Key(KeyAction.CenterSelection)} — до обраних,  {Key(KeyAction.AlertJump)} — до місця нападу\n\n" +
             Head("Позначки") + "\n" +
             "• Кільце під юнітом: сині — свої, червоні — бандити, інші кольори — королівства. Ромб над головою — ранг.";
@@ -189,7 +189,7 @@ namespace BattleOfAges.UI
 
         private static string Fight() =>
             Head("Герой") + "\n" +
-            $"{Key(KeyAction.Hero)}: досвід за вбивства, рівні, очки сили й здоров'я. Клас: танк, лучник, маг або ДД.\n" +
+            $"{Key(KeyAction.Hero)}: досвід за вбивства, рівні, очки сили й здоров'я. Клас: вартовий, лучник, маг або дуелянт.\n" +
             $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — уміння класу,  {Key(KeyAction.UseFullHeal)} / {Key(KeyAction.UseLightning)} — одноразові артефакти\n\n" +
             Head("Тривога") + "\n" +
             $"{Key(KeyAction.Alarm)}: люди кидають роботу й захищають дім. Сама вмикається, коли ворог підходить до ратуші, і вимикається після бою.\n\n" +
@@ -256,8 +256,8 @@ namespace BattleOfAges.UI
             $"{Key(KeyAction.StopUnits)} — stop current job or march\n" +
             $"{K("Minimap")}: LMB — move camera, RMB — move selected units\n\n" +
             Head("Camera") + "\n" +
-            $"{K("RMB")} (drag) or {K("W A S D")} — pan,  {K("Wheel")} — zoom\n" +
-            $"{K("Q / E")} — rotate,  {K("R / F")} — tilt,  {K("Middle mouse")} — orbit\n" +
+            $"{K(CameraSystem.MapMouseSettings.PanWithMiddle ? "Middle mouse" : "RMB")} (drag) or {K("W A S D")} — pan,  {K("Wheel")} — zoom\n" +
+            $"{K("Q / E")} — rotate,  {K("R / F")} — tilt,  {K(CameraSystem.MapMouseSettings.PanWithMiddle ? "Shift+Middle mouse" : "Middle mouse")} — orbit (map drag button: Settings → Game)\n" +
             $"{Key(KeyAction.CenterSelection)} — center on selected,  {Key(KeyAction.AlertJump)} — jump to last attack\n\n" +
             Head("Markers") + "\n" +
             "• Ground ring: blue — allies, red — bandits, other colors — kingdoms. Diamond above head shows rank.";
@@ -294,7 +294,7 @@ namespace BattleOfAges.UI
 
         private static string FightEn() =>
             Head("Hero") + "\n" +
-            $"{Key(KeyAction.Hero)}: XP from kills, level ups, strength & health points. Class: Tank, Archer, Mage, or DD.\n" +
+            $"{Key(KeyAction.Hero)}: XP from kills, level ups, strength & health points. Class: Warden, Archer, Mage, or Duelist.\n" +
             $"{Key(KeyAction.Ability)} / {Key(KeyAction.Ability2)} — class skills,  {Key(KeyAction.UseFullHeal)} / {Key(KeyAction.UseLightning)} — consumable artifacts\n\n" +
             Head("Alarm") + "\n" +
             $"{Key(KeyAction.Alarm)}: everyone drops work and arms up. Triggers automatically when enemies approach the Town Hall and stands down after battle.\n\n" +

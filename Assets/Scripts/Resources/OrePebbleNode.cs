@@ -19,6 +19,8 @@ namespace BattleOfAges.Resources
 
         /// <summary>The rock's foot, to walk round (its collider is much wider: it is what a click finds).</summary>
         private const float SolidRadius = 0.35f;
+        /// <summary>The ground its rock hides from the grass (the rock is wider than its foot).</summary>
+        private const float CoverRadius = 0.72f;
 
         private void OnEnable() { gridCell = ResourceGrid.Add(this); inGrid = true; transform.hasChanged = false; StandSolid(); }
         private void OnDisable() { if (inGrid) ResourceGrid.Remove(this, gridCell); inGrid = false; World.SolidProps.Remove(this); }
@@ -36,7 +38,7 @@ namespace BattleOfAges.Resources
         private void StandSolid()
         {
             if (IsPickedUp) World.SolidProps.Remove(this);
-            else World.SolidProps.Set(this, transform.position, SolidRadius);
+            else World.SolidProps.Set(this, transform.position, SolidRadius, CoverRadius);
         }
 
         public int PickupPebble()
@@ -88,72 +90,95 @@ namespace BattleOfAges.Resources
             }
         }
 
-        private static Mesh sharedPebbleMesh;
+        // ------------------------------------------------------------------ its look
+
+        /// <summary>Share of the screen height below which a pebble is not drawn.</summary>
+        public const float CullScreenHeight = 0.008f;
+        /// <summary>The rock's frame in the pebble: squat and wider than deep; its foot a little in the ground.</summary>
+        private static readonly Vector3 RockAt = new Vector3(0f, 0.13f, 0f), RockSize = new Vector3(0.62f, 0.55f, 0.56f);
+        private static readonly Color OreColour = new Color(0.86f, 0.64f, 0.2f);
+        private static Mesh rockMesh, nuggetMesh;
+
+        /// <summary>The rock (veins of the ore on some faces) and the nuggets in it: the same two meshes for every pebble.</summary>
+        private static void EnsureMeshes()
+        {
+            if (rockMesh != null && nuggetMesh != null) return;
+            rockMesh = ProceduralMeshBuilder.CreateOreRockMesh(42, OreColour);
+            // Three nuggets half sunk where the rock faces up (rock-local), the biggest near the top
+            Vector3[] v = rockMesh.vertices, n = rockMesh.normals;
+            var centres = new Vector3[3];
+            float[] sizes = { 0.24f, 0.18f, 0.14f };
+            Vector2[] aim = { new Vector2(0.15f, 0.1f), new Vector2(-0.45f, -0.3f), new Vector2(0.35f, -0.55f) }; // across the top, apart
+            for (int k = 0; k < 3; k++)
+            {
+                float best = float.MaxValue;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    if (n[i].y < 0.35f) continue;
+                    float d = new Vector2(v[i].x - aim[k].x, v[i].z - aim[k].y).sqrMagnitude;
+                    if (d < best) { best = d; centres[k] = v[i] * 0.97f; }
+                }
+            }
+            nuggetMesh = ProceduralMeshBuilder.CreateNuggetsMesh(centres, sizes, 5);
+        }
 
         public static GameObject CreatePebblePrefab(string name = "OrePebble")
         {
             GameObject root = new GameObject(name);
-            root.AddComponent<OrePebbleNode>();
-
-            Material stoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.42f, 0.40f, 0.38f), 0.05f, 0.25f);
-            Material oreMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Gold, new Color(1.0f, 0.78f, 0.22f), 0.85f, 0.75f);
-            Material rubyMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.GemRuby, new Color(0.95f, 0.15f, 0.25f), 0.35f, 0.90f);
-
-            GameObject visual = new GameObject("VisualModel");
-            visual.transform.SetParent(root.transform, false);
-
-            // Faceted Rock Core
-            GameObject coreRock = new GameObject("RockCore");
-            coreRock.transform.SetParent(visual.transform, false);
-            coreRock.transform.localPosition = new Vector3(0f, 0.22f, 0f);
-            coreRock.transform.localScale = new Vector3(0.65f, 0.45f, 0.58f);
-            MeshFilter mfCore = coreRock.AddComponent<MeshFilter>();
-            if (sharedPebbleMesh == null)
-            {
-                sharedPebbleMesh = ProceduralMeshBuilder.CreateFacetedRockMesh(1.0f, 2, 42, 0.4f);
-                sharedPebbleMesh.name = "PebbleCoreMesh";
-            }
-            mfCore.sharedMesh = sharedPebbleMesh;
-            MeshRenderer mrCore = coreRock.AddComponent<MeshRenderer>();
-            mrCore.sharedMaterial = stoneMat;
-            mrCore.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // tiny props: shadows cost hundreds of draw calls for no visible gain
-            mrCore.receiveShadows = true;
-
-            // Embedded Glowing Crystal Gems
-            CreateGemShard("GemShard_1", visual.transform, new Vector3(0.18f, 0.38f, 0.12f), new Vector3(0.18f, 0.28f, 0.18f), Quaternion.Euler(25f, 35f, 15f), oreMat);
-            CreateGemShard("GemShard_2", visual.transform, new Vector3(-0.16f, 0.32f, -0.10f), new Vector3(0.14f, 0.22f, 0.14f), Quaternion.Euler(-20f, -45f, 10f), rubyMat);
+            BuildVisual(root.transform);
 
             SphereCollider col = root.AddComponent<SphereCollider>();
             col.center = new Vector3(0, 0.35f, 0);
             col.radius = 1.2f;
 
-            // Hundreds of these, three renderers each, were drawn however far: gone once they are a speck (~65 m)
-            LODGroup lod = root.AddComponent<LODGroup>();
-            lod.SetLODs(new[] { new LOD(CullScreenHeight, visual.GetComponentsInChildren<Renderer>()) });
-            lod.RecalculateBounds();
-
+            root.AddComponent<OrePebbleNode>(); // (after its look: one made before it is remade below)
             return root;
         }
 
-        /// <summary>Share of the screen height below which a pebble is not drawn.</summary>
-        public const float CullScreenHeight = 0.008f;
-
-        private static void CreateGemShard(string name, Transform parent, Vector3 localPos, Vector3 localScale, Quaternion localRot, Material mat)
+        private static void BuildVisual(Transform root)
         {
-            GameObject shard = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            shard.name = name;
-            shard.transform.SetParent(parent, false);
-            shard.transform.localPosition = localPos;
-            shard.transform.localScale = localScale;
-            shard.transform.localRotation = localRot;
+            EnsureMeshes();
+            Material stoneMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Stone, new Color(0.42f, 0.40f, 0.38f), 0.05f, 0.25f);
+            Material oreMat = ProceduralVisualMaterials.Get(ProceduralVisualMaterials.Surface.Gold, new Color(1.0f, 0.78f, 0.22f), 0.85f, 0.75f);
 
-            MeshRenderer mr = shard.GetComponent<MeshRenderer>();
-            mr.sharedMaterial = mat;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // tiny props: shadows cost hundreds of draw calls for no visible gain
-            mr.receiveShadows = true;
+            var visual = new GameObject("VisualModel");
+            visual.transform.SetParent(root, false);
+            Part("RockCore", visual.transform, rockMesh, stoneMat);
+            Part("OreNuggets", visual.transform, nuggetMesh, oreMat);
 
-            Collider c = shard.GetComponent<Collider>();
-            if (c != null) Object.DestroyImmediate(c);
+            // Hundreds of these were drawn however far: gone once they are a speck (~65 m)
+            LODGroup lod = root.GetComponent<LODGroup>();
+            if (lod == null) lod = root.gameObject.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(CullScreenHeight, visual.GetComponentsInChildren<Renderer>()) });
+            lod.RecalculateBounds();
+        }
+
+        private static void Part(string name, Transform parent, Mesh mesh, Material material)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = RockAt;
+            go.transform.localScale = RockSize;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            MeshRenderer r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = material;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; // tiny props: shadows cost hundreds of draw calls for no visible gain
+            r.receiveShadows = true;
+        }
+
+        /// <summary>A pebble kept in the scene with an older look (a rock with two cylinders on it) is made anew.</summary>
+        private void Awake()
+        {
+            Transform visual = transform.Find("VisualModel");
+            Transform rock = visual != null ? visual.Find("RockCore") : null;
+            MeshFilter mf = rock != null ? rock.GetComponent<MeshFilter>() : null;
+            if (mf != null && mf.sharedMesh != null && mf.sharedMesh.name == "OreRock" && visual.Find("OreNuggets") != null) return;
+            if (visual != null)
+            {
+                visual.SetParent(null, false);
+                if (Application.isPlaying) Destroy(visual.gameObject); else DestroyImmediate(visual.gameObject);
+            }
+            BuildVisual(transform);
         }
     }
 }

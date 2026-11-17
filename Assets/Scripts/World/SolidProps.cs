@@ -10,7 +10,7 @@ namespace BattleOfAges.World
     /// </summary>
     public static class SolidProps
     {
-        private struct Circle { public Object Key; public float X, Z, Radius; }
+        private struct Circle { public Object Key; public float X, Z, Radius, Cover; }
 
         private const float CellSize = 8f;
         /// <summary>The widest unit: a circle is listed in every cell a unit touching it could stand in.</summary>
@@ -18,6 +18,8 @@ namespace BattleOfAges.World
         private const float BoulderLook = 1f;
         /// <summary>How much of a boulder's size its foot really covers: the rock narrows and is uneven.</summary>
         private const float BoulderFoot = 0.85f;
+        /// <summary>How much of a boulder's size hides the ground from the grass (its widest, near the ground).</summary>
+        private const float BoulderCover = 0.95f;
         /// <summary>A step cut to less than this share of itself by a prop was aimed at its middle.</summary>
         private const float HeadOnShare = 0.3f;
 
@@ -54,12 +56,16 @@ namespace BattleOfAges.World
             return false;
         }
 
-        /// <summary>This prop stands here now (again: wherever it stood before, it no longer does).</summary>
-        public static void Set(Object key, Vector3 at, float radius)
+        /// <summary>
+        /// This prop stands here now (again: wherever it stood before, it no longer does). Its foot (radius) is what units walk
+        /// round; cover, if wider, is the ground it hides from the grass (a rock is wider at the top than at its foot).
+        /// </summary>
+        public static void Set(Object key, Vector3 at, float radius, float cover = -1f)
         {
             Remove(key);
-            var c = new Circle { Key = key, X = at.x, Z = at.z, Radius = radius };
+            var c = new Circle { Key = key, X = at.x, Z = at.z, Radius = radius, Cover = Mathf.Min(Mathf.Max(radius, cover), radius + UnitReach) };
             known[key] = c;
+            GrassFieldRenderer.ForgetArea(c.X, c.Z, c.Cover);
             float reach = radius + UnitReach;
             for (int x = Cell(at.x - reach); x <= Cell(at.x + reach); x++)
                 for (int z = Cell(at.z - reach); z <= Cell(at.z + reach); z++)
@@ -74,6 +80,7 @@ namespace BattleOfAges.World
         {
             if (!known.TryGetValue(key, out Circle c)) return;
             known.Remove(key);
+            GrassFieldRenderer.ForgetArea(c.X, c.Z, c.Cover); // (the grass grows back)
             float reach = c.Radius + UnitReach;
             for (int x = Cell(c.X - reach); x <= Cell(c.X + reach); x++)
                 for (int z = Cell(c.Z - reach); z <= Cell(c.Z + reach); z++)
@@ -83,6 +90,18 @@ namespace BattleOfAges.World
                     for (int i = list.Count - 1; i >= 0; i--) if (list[i].Key == key) list.RemoveAt(i);
                     if (list.Count == 0) cells.Remove((x, z));
                 }
+        }
+
+        /// <summary>Some prop covers this point of the ground (no grass grows here).</summary>
+        public static bool Covered(float x, float z)
+        {
+            if (!cells.TryGetValue((Cell(x), Cell(z)), out List<Circle> list)) return false;
+            foreach (Circle c in list)
+            {
+                float dx = x - c.X, dz = z - c.Z;
+                if (dx * dx + dz * dz < c.Cover * c.Cover) return true;
+            }
+            return false;
         }
 
         /// <summary>A unit of this radius stands inside a prop: the shortest way out.</summary>
@@ -168,7 +187,7 @@ namespace BattleOfAges.World
                 Vector3 s = t.lossyScale;
                 float radius = Mathf.Max(s.x, s.z) * BoulderFoot;
                 if (known.TryGetValue(t, out Circle c) && Mathf.Abs(c.X - t.position.x) < 0.1f && Mathf.Abs(c.Z - t.position.z) < 0.1f) continue;
-                Set(t, t.position, radius);
+                Set(t, t.position, radius, Mathf.Max(s.x, s.z) * BoulderCover);
             }
         }
     }

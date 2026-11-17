@@ -55,7 +55,7 @@ namespace BattleOfAges.Combat
 
         // ------------------------------------------------------------------ artifacts (§9.1.1)
 
-        public static float VampiricShare = 0.1f, SwordArtifactMultiplier = 5f, ArmorArtifactReduction = 0.8f; // the armour: a whole set (helmet, chest, gloves, boots)
+        public static float VampiricShare = 0.1f, SwordArtifactMultiplier = 3.5f, ArmorArtifactReduction = 0.7f; // the armour: a whole set (helmet, chest, gloves, boots)
         public static float WisdomXpBonus = 0.2f;
         /// <summary>Full heal: all HP back and nothing hurts the hero for this long.</summary>
         public static float FullHealInvulnerableSeconds = 1f;
@@ -198,7 +198,7 @@ namespace BattleOfAges.Combat
         // ------------------------------------------------------------------ promotions (§11.1)
 
         /// <summary>Battle XP to leave the rank: person -> warrior, warrior -> knight, knight -> general.</summary>
-        public static int[] PromotionXp = { 30, 100, 500 };
+        public static int[] PromotionXp = { 15, 50, 250 };
         public static int XpPerHit = 1, XpPerKill = 10, XpPerSurvival = 5;
         /// <summary>Survival XP is given at most once per this many seconds (one fight, not every target).</summary>
         public static float SurvivalAwardWindow = 30f;
@@ -214,7 +214,7 @@ namespace BattleOfAges.Combat
         public static float[] KingdomKnightTraining = { 0f, 0.002f, 0.004f, 0.006f, 0.008f, 0.01f };
         public static float[] KingdomGeneralTraining = { 0f, 0f, 0f, 0f, 0.001f, 0.002f };
         /// <summary>Chance per worked game hour that a working person becomes a warrior.</summary>
-        public static float WorkPromotionPerHour = 0.005f;
+        public static float WorkPromotionPerHour = 0.01f;
 
         /// <summary>Seconds between attacks for every unit and hero: only the weapon, gloves and class change it (§8).</summary>
         public static float BaseAttackCooldown = 2f;

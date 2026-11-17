@@ -124,8 +124,8 @@ namespace BattleOfAges.CameraSystem
             if (keyR) currentPitch = Mathf.Clamp(currentPitch + 45f * Time.deltaTime, minPitch, maxPitch);
             if (keyF) currentPitch = Mathf.Clamp(currentPitch - 45f * Time.deltaTime, minPitch, maxPitch);
 
-            // Middle Mouse Button drag or Right Mouse Button drag while holding Shift to rotate camera
-            if (UniversalInput.GetMouseButton(2))
+            // The middle button turns the camera (with Shift, when it drags the map: MapMouseSettings)
+            if (MapMouseSettings.Turning(UniversalInput.GetMouseButton(2), UniversalInput.IsShiftHeld()))
             {
                 Vector3 mouseDelta = UniversalInput.GetMouseDelta();
                 currentYaw += mouseDelta.x * 0.4f * dragSensitivity;
@@ -157,8 +157,8 @@ namespace BattleOfAges.CameraSystem
                 lastMousePosition = UniversalInput.GetMousePosition();
             }
 
-            // Right click drag pan (when not holding shift)
-            if (UniversalInput.GetMouseButton(1) && !UniversalInput.IsShiftHeld())
+            // The right button drags the map, or the middle one (MapMouseSettings), not with Shift
+            if (MapMouseSettings.Panning(UniversalInput.GetMouseButton(1), UniversalInput.GetMouseButton(2), UniversalInput.IsShiftHeld()))
             {
                 Vector3 currentMousePos = UniversalInput.GetMousePosition();
                 Vector3 delta = currentMousePos - lastMousePosition;

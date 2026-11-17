@@ -102,7 +102,9 @@ namespace BattleOfAges.Managers
         {
             if (playerController != null && mapCameraController != null)
             {
-                mapCameraController.FocusOnPosition(playerController.transform.position);
+                // The hero in the middle of the view. The camera looks down at a slant: put right above him, as it was, he stood
+                // out of sight below the view's bottom edge, the map opened "somewhere in a field" (a tester, 2026-11-17)
+                mapCameraController.LookAtGround(playerController.transform.position);
             }
 
             if (playerController != null) playerController.EnableControl(false);

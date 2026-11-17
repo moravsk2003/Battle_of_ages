@@ -45,7 +45,7 @@ namespace BattleOfAges.Tests
             gear.Equip(new Item(ItemType.Sword, 5)); // x2
             Assert.AreEqual(100, combat.AttackDamage);
             bag.Add(ArtifactType.SwordX5);
-            Assert.AreEqual(250, combat.AttackDamage, "Strength 50 x 5: the artifact replaces the worn sword's x2.");
+            Assert.AreEqual(175, combat.AttackDamage, "Strength 50 x 3.5: the artifact replaces the worn sword's x2.");
         }
 
         [Test]
@@ -53,9 +53,9 @@ namespace BattleOfAges.Tests
         {
             bag.Add(ArtifactType.Armor90);
             hp.TakeDamage(100);
-            Assert.AreEqual(hp.MaxHealth - 20, hp.CurrentHealth, "-80%");
+            Assert.AreEqual(hp.MaxHealth - 30, hp.CurrentHealth, "-70%");
             hp.TakeDamage(100, ignoreArmor: true);
-            Assert.AreEqual(hp.MaxHealth - 120, hp.CurrentHealth, "The mage goes through.");
+            Assert.AreEqual(hp.MaxHealth - 130, hp.CurrentHealth, "The mage goes through.");
         }
 
         [Test]
@@ -69,7 +69,7 @@ namespace BattleOfAges.Tests
             {
                 victim.GetComponent<HealthComponent>().InitializeHealth(1000);
                 combat.DeliverHit(victim.GetComponent<HealthComponent>(), combat.AttackDamage, ignoreArmor: false);
-                Assert.AreEqual(100 + 25, hp.CurrentHealth, "10% of 250 = 25 HP a hit.");
+                Assert.AreEqual(100 + 18, hp.CurrentHealth, "10% of 175 = 17.5, rounded to 18 HP a hit.");
             }
             finally { Object.DestroyImmediate(victim); }
         }
@@ -142,7 +142,8 @@ namespace BattleOfAges.Tests
             gear.Equip(new Item(ItemType.Shield, 2));
             Assert.AreEqual(GameBalance.ArmorArtifactReduction + ItemStatCalculator.DamageReduction(new Item(ItemType.Shield, 2)), gear.DamageReduction, 1e-4f, "a shield adds");
             gear.Equip(new Item(ItemType.Shield, 5));
-            Assert.AreEqual(GameBalance.MaxDamageReduction, gear.DamageReduction, 1e-4f, "up to the cap");
+            Assert.AreEqual(Mathf.Min(GameBalance.MaxDamageReduction, GameBalance.ArmorArtifactReduction + ItemStatCalculator.DamageReduction(new Item(ItemType.Shield, 5))),
+                gear.DamageReduction, 1e-4f, "a better shield adds more, up to the cap");
         }
 
         [Test]

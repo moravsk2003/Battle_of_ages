@@ -95,6 +95,57 @@ namespace BattleOfAges.Utils
             }, Vector3.up);
         }
 
+        /// <summary>
+        /// The field from afar: the land as a coarse sheet and each row of corn as one low block. Flat, the same mesh for every
+        /// field (so they are drawn as one batch): it is laid on the slope by turning it (AttachField), not vertex by vertex.
+        /// </summary>
+        public static Mesh FieldFarModel
+        {
+            get
+            {
+                if (fieldFar != null) return fieldFar;
+                var kit = new MeshKit();
+                B(kit, new Vector3(0f, 0.02f, 0f), new Vector3(13.2f, 0.12f, 13.2f), Soil * 0.9f);
+                Color corn = Color.Lerp(new Color(0.55f, 0.58f, 0.24f), Color.Lerp(Crop, new Color(0.88f, 0.72f, 0.33f), 0.5f), 0.6f);
+                for (int r = 0; r < 8; r++) B(kit, new Vector3(0f, 0.6f, -5.6f + r * 1.6f), new Vector3(12.3f, 1.1f, 0.85f), r % 2 == 0 ? corn : corn * 0.94f);
+                return fieldFar = kit.ToMesh("FieldFar");
+            }
+        }
+        private static Mesh fieldFar;
+
+        /// <summary>
+        /// A field's model under its root: near, the mesh given (draped over the relief, this field's own); past ~55 m the
+        /// shared far one, tilted to the slope under the field. Its 18 thousand triangles and a draw of its own were paid for
+        /// every field in sight, however far. Neither casts a shadow (tilth lying on the ground).
+        /// </summary>
+        public static void AttachField(GameObject root, Mesh nearDraped)
+        {
+            Material look = MeshKit.PropMaterial();
+            if (look == null) return;
+            Renderer Part(string name, Mesh m)
+            {
+                var p = new GameObject(name);
+                p.transform.SetParent(root.transform, false);
+                p.AddComponent<MeshFilter>().sharedMesh = m;
+                MeshRenderer mr = p.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = look;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                return mr;
+            }
+            Renderer near = Part("Near", nearDraped), far = Part("Far", FieldFarModel);
+            // The slope under it, in the field's own frame
+            const float half = 6.5f;
+            Transform t = root.transform;
+            float H(float x, float z) => RTS.RtsUnit.GetTerrainHeight(t.TransformPoint(new Vector3(x, 0f, z)));
+            float xp = H(half, 0f), xm = H(-half, 0f), zp = H(0f, half), zm = H(0f, -half);
+            Vector3 normal = new Vector3(-(xp - xm) / (2f * half), 1f, -(zp - zm) / (2f * half)).normalized;
+            far.transform.localRotation = Quaternion.FromToRotation(Vector3.up, normal);
+            far.transform.localPosition = new Vector3(0f, (xp + xm + zp + zm) * 0.25f - t.position.y, 0f);
+            LODGroup lod = root.AddComponent<LODGroup>();
+            lod.SetLODs(new[] { new LOD(0.25f, new[] { near }), new LOD(0.004f, new[] { far }) });
+            lod.RecalculateBounds();
+        }
+
         /// <summary>The bare models, for a kingdom's town (no building of the player's).</summary>
         public static Mesh FieldModel => field != null ? field : (field = FieldMesh());
         public static Mesh SawmillModel => sawmill != null ? sawmill : (sawmill = SawmillMesh());

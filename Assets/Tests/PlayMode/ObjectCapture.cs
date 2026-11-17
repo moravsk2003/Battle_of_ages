@@ -105,8 +105,10 @@ namespace BattleOfAges.PlayModeTests
                 string[] c = eq.Split(',');
                 if (c.Length == 3) RenderSettings.ambientEquatorColor = new Color(float.Parse(c[0], System.Globalization.CultureInfo.InvariantCulture), float.Parse(c[1], System.Globalization.CultureInfo.InvariantCulture), float.Parse(c[2], System.Globalization.CultureInfo.InvariantCulture));
             }
+            // CAPTURE_GRASS = 1: the grass kept (does it grow through the rocks?)
+            bool withGrass = Environment.GetEnvironmentVariable("CAPTURE_GRASS") == "1";
             GrassFieldRenderer grassField = UnityEngine.Object.FindFirstObjectByType<GrassFieldRenderer>();
-            if (grassField != null) grassField.enabled = false;
+            if (grassField != null && !withGrass) grassField.enabled = false;
             stage.Add(campCentre);
             ModelCapture.ClearStage(stage.ToArray(), 7f);
             yield return null;
@@ -155,10 +157,11 @@ namespace BattleOfAges.PlayModeTests
                 ("wall_walkway", () => (wallStairs.transform.position - fwd * 1.6f - right * 1.5f + Vector3.up * 5.4f, gate.transform.position + Vector3.up * 3.8f)),
             };
 
-            // CAPTURE_FOCUS = house / chest / mine / workbench / wall / dummy: 14 views around that one object instead
+            // CAPTURE_FOCUS = house / chest / mine / workbench / wall / dummy / camp / ore / boulder: 14 views around that one object instead
             var focusObjects = new Dictionary<string, GameObject>
             {
-                { "house", house }, { "chest", chest }, { "mine", mine }, { "workbench", bench }, { "wall", wall }, { "dummy", dummy }, { "camp", camp }
+                { "house", house }, { "chest", chest }, { "mine", mine }, { "workbench", bench }, { "wall", wall }, { "dummy", dummy }, { "camp", camp },
+                { "ore", pebbles[1] }, { "boulder", boulder }
             };
             string focus = Environment.GetEnvironmentVariable("CAPTURE_FOCUS");
             if (!string.IsNullOrEmpty(focus) && focusObjects.TryGetValue(focus, out GameObject fo) && fo != null)
@@ -202,7 +205,7 @@ namespace BattleOfAges.PlayModeTests
                 int from = Mathf.Clamp(int.TryParse(Environment.GetEnvironmentVariable("CAPTURE_FROM"), out int f0) ? f0 : 0, 0, views.Count - 1);
                 for (int i = from; i < Mathf.Min(from + count, views.Count); i++) picked.Add(i);
             }
-            var capture = new CaptureRenderer(dir, picked.Count, 50f, drawGrass: false);
+            var capture = new CaptureRenderer(dir, picked.Count, 50f, drawGrass: withGrass);
             for (int j = 0; j < picked.Count; j++)
             {
                 (Vector3 pos, Vector3 target) = views[picked[j]].Item2();

@@ -95,9 +95,9 @@ namespace BattleOfAges.PlayModeTests
             Equipment gear = hero.GetComponent<Equipment>();
             Assert.IsTrue(gear.HasBow, "a bow in hand from the start");
             Assert.IsTrue(gear.IsLocked(EquipSlot.Weapon), "the artifact holds the slot");
-            Assert.AreEqual("Лук ×5", Artifacts.Name(ArtifactType.SwordX5, HeroClass.Archer));
-            Assert.AreEqual("Меч ×5", Artifacts.Name(ArtifactType.SwordX5, HeroClass.Tank));
-            Assert.AreEqual("Посох ×5", Artifacts.Name(ArtifactType.SwordX5, HeroClass.Mage));
+            Assert.AreEqual("Лук ×3,5", Artifacts.Name(ArtifactType.SwordX5, HeroClass.Archer));
+            Assert.AreEqual("Меч ×3,5", Artifacts.Name(ArtifactType.SwordX5, HeroClass.Tank));
+            Assert.AreEqual("Посох ×3,5", Artifacts.Name(ArtifactType.SwordX5, HeroClass.Mage));
             Assert.IsTrue(hero.GetComponent<CombatUnit>().IsRanged, "and it shoots");
         }
 

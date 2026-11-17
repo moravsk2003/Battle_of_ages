@@ -101,7 +101,7 @@ namespace BattleOfAges.Tests
             Loc.Set(Loc.Lang.Uk, save: false);
             Assert.AreEqual("Будинок", BuildingData.GetDefinition(BuildingType.WorkerHouse).DisplayName);
             Assert.AreEqual("Меч", ItemTypeNames.Display(ItemType.Sword));
-            Assert.AreEqual("Танк", HeroClassRules.Name(HeroClass.Tank));
+            Assert.AreEqual("Вартовий", HeroClassRules.Name(HeroClass.Tank));
             Assert.AreEqual("Блискавка", Artifacts.Name(ArtifactType.Lightning));
             Assert.AreEqual("Пробіл", KeybindsManager.GetKeyDisplayString(KeyCode.Space));
             Assert.AreEqual("Меню будівництва", KeybindsManager.GetActionDisplayName(KeyAction.BuildMenu));
@@ -115,7 +115,7 @@ namespace BattleOfAges.Tests
             Loc.Set(Loc.Lang.En, save: false);
             Assert.AreEqual("House", BuildingData.GetDefinition(BuildingType.WorkerHouse).DisplayName);
             Assert.AreEqual("Sword", ItemTypeNames.Display(ItemType.Sword));
-            Assert.AreEqual("Tank", HeroClassRules.Name(HeroClass.Tank));
+            Assert.AreEqual("Warden", HeroClassRules.Name(HeroClass.Tank));
             Assert.AreEqual("Lightning", Artifacts.Name(ArtifactType.Lightning));
             Assert.AreEqual("Space", KeybindsManager.GetKeyDisplayString(KeyCode.Space));
             Assert.AreEqual("Build Menu", KeybindsManager.GetActionDisplayName(KeyAction.BuildMenu));

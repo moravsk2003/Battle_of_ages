@@ -62,6 +62,17 @@ namespace BattleOfAges.World
                 current.cacheVersion++;
             }
         }
+        /// <summary>A prop came or went here (World.SolidProps): the tiles it reaches are made anew, without or with grass under it.</summary>
+        public static void ForgetArea(float x, float z, float radius)
+        {
+            if (current == null || current.tileCache.Count == 0) return;
+            bool any = false;
+            for (int tx = Mathf.FloorToInt((x - radius) / TileSize); tx <= Mathf.FloorToInt((x + radius) / TileSize); tx++)
+                for (int tz = Mathf.FloorToInt((z - radius) / TileSize); tz <= Mathf.FloorToInt((z + radius) / TileSize); tz++)
+                    any |= current.tileCache.Remove(new Vector2Int(tx, tz));
+            if (any) current.cacheVersion++;
+        }
+
         private readonly List<Vector2Int> evictBuffer = new List<Vector2Int>();
         private readonly Plane[] frustum = new Plane[6];
         private static readonly int BiomeTintId = Shader.PropertyToID("_BiomeTint");
@@ -231,6 +242,7 @@ namespace BattleOfAges.World
 
                     float density = GrassDensity(x, z, out float y);
                     if (r2 > density) continue;
+                    if (SolidProps.Covered(x, z)) continue; // under a rock or an ore lump: no blade through it
 
                     float scale = Mathf.Lerp(0.75f, 1.25f, r1) * Mathf.Lerp(0.7f, 1f, density);
                     var m = Matrix4x4.TRS(new Vector3(x, y - 0.03f, z), Quaternion.Euler(0f, r0 * 360f, 0f), new Vector3(scale, scale * Mathf.Lerp(0.8f, 1.3f, r2), scale));

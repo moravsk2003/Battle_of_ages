@@ -376,7 +376,7 @@ namespace BattleOfAges.UI
                 () => Hero(HeroCommand.Act.CombineShards), 15);
             Tooltip.Set(combine.gameObject, () => TipText.Title(Loc.Pick("Об'єднати осколки", "Combine Shards"), UiTheme.Gold)
                 + Loc.Pick("\nКує цілий артефакт із 2 осколків (шанс 50/50 отримати один із двох видів осколків).", "\nForges a complete artifact from 2 shards (50/50 chance between the two shard types).")
-                + "\n" + TipText.Bad(Loc.Pick("Увага: другий світозмінний артефакт (зброя ×5, броня 80%, вампіризм або мудрість) миттєво вб'є героя!", "Warning: a second world-changing artifact (weapon ×5, 80% armor, vampirism, or wisdom) will instantly kill the hero!")));
+                + "\n" + TipText.Bad(Loc.Pick("Увага: другий світозмінний артефакт (зброя ×3,5, броня 70%, вампіризм або мудрість) миттєво вб'є героя!", "Warning: a second world-changing artifact (weapon ×3.5, 70% armor, vampirism, or wisdom) will instantly kill the hero!")));
 
             // Class skills share the row with the class picker (shown once the class is chosen)
             for (int i = 0; i < skillButtons.Length; i++)

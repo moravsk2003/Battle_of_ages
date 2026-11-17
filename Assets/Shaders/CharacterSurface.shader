@@ -16,6 +16,15 @@ Shader "Custom/CharacterSurface"
         _UseVertexColor ("Multiply By Vertex Color", Float) = 0
         _VertexSurface ("Per-Vertex Surface (colour, uv2 = pattern, metallic, smoothness)", Float) = 0
         _Weathering ("Weathering (props and buildings: sun, rain, moss, mud)", Float) = 0
+        // GPU skin (set by code; listed here because a batch draws only what is wholly in the material's block)
+        // (the bake's texture is listed too: where a batch drew the crowd, an unlisted texture was not the material's own but
+        // whichever another draw left bound, another bake's: a whole kind of bodies skinned by the wrong bones)
+        [HideInInspector][NoScaleOffset] _BoneTex ("Bone Texture", 2D) = "black" {}
+        [HideInInspector] _BoneTexInfo ("Bone Texture Info", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _BrgLoco ("Clip", Vector) = (0, 1, 30, 0)
+        [HideInInspector] _BrgLocoPrev ("Clip Before", Vector) = (0, 1, 30, 0)
+        [HideInInspector] _BrgSwing ("Swing", Vector) = (0, 0, 1, -1)
+        [HideInInspector] _BrgFade ("Fade", Vector) = (0, 0, 0, 0)
     }
 
     SubShader
@@ -27,8 +36,21 @@ Shader "Custom/CharacterSurface"
 
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseColor;
+            float4 _BoneTexInfo; // GPU skin: x anchor column, y mask row
+            float4 _BrgLoco, _BrgLocoPrev, _BrgSwing, _BrgFade; // GPU skin where a batch draws the crowd (Utils.CrowdDraw): one each instance
             float _Metallic, _Smoothness, _Pattern, _PatternScale, _DetailStrength, _ObjectSpace, _UseVertexColor, _VertexSurface, _Weathering;
         CBUFFER_END
+
+        // Drawn in batches (the GPU Resident Drawer for buildings and props, Utils.CrowdDraw for the distant crowd): the
+        // instance's own values come from the batch's buffer
+        #ifdef UNITY_DOTS_INSTANCING_ENABLED
+        UNITY_DOTS_INSTANCING_START(MaterialPropertyMetadata)
+            UNITY_DOTS_INSTANCED_PROP(float4, _BrgLoco)
+            UNITY_DOTS_INSTANCED_PROP(float4, _BrgLocoPrev)
+            UNITY_DOTS_INSTANCED_PROP(float4, _BrgSwing)
+            UNITY_DOTS_INSTANCED_PROP(float4, _BrgFade)
+        UNITY_DOTS_INSTANCING_END(MaterialPropertyMetadata)
+        #endif
         float _SurfaceDetailCut; // global, set by the graphics preset: 0 all fine detail, 1 none
 
         float hash31(float3 p) { p = frac(p * 0.3183099 + 0.1); p *= 17.0; return frac(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -192,7 +214,8 @@ Shader "Custom/CharacterSurface"
 
         float3 RestPosition(float3 uv3, float3 positionOS)
         {
-            float3 objectScale = float3(length(unity_ObjectToWorld._m00_m10_m20), length(unity_ObjectToWorld._m01_m11_m21), length(unity_ObjectToWorld._m02_m12_m22));
+            float4x4 m = GetObjectToWorldMatrix(); // (the instance's own where a batch draws it)
+            float3 objectScale = float3(length(m._m00_m10_m20), length(m._m01_m11_m21), length(m._m02_m12_m22));
             return (_ObjectSpace > 0.5 ? positionOS * objectScale : uv3) * _PatternScale;
         }
 
@@ -201,14 +224,19 @@ Shader "Custom/CharacterSurface"
         // bone's matrix and its inverse; the last row holds the upper-body mask. Weights and bone indices come in UV4 / UV5.
         #if defined(_GPU_SKIN)
             TEXTURE2D(_BoneTex);
-            float4 _BoneTexInfo; // x anchor column, y mask row
+            // The clips' clock, set by the code each frame (Utils.CrowdDraw: Time.timeSinceLevelLoad). URP's _Time.y is
+            // Time.time, which in a built game runs ahead by the time spent in the menu: every attack and every crossfade
+            // the code timed was over before the shader began it.
+            float _GpuSkinTime;
 
+            #ifndef UNITY_DOTS_INSTANCING_ENABLED
             UNITY_INSTANCING_BUFFER_START(GpuSkinProps)
                 UNITY_DEFINE_INSTANCED_PROP(float4, _Loco)     // first row, frames (negative: holds the last frame), fps, start time
                 UNITY_DEFINE_INSTANCED_PROP(float4, _LocoPrev) // the clip fading out
                 UNITY_DEFINE_INSTANCED_PROP(float4, _Swing)    // upper-body attack like _Loco; start time < 0: none
                 UNITY_DEFINE_INSTANCED_PROP(float4, _Fade)     // fade start time, fade duration
             UNITY_INSTANCING_BUFFER_END(GpuSkinProps)
+            #endif
 
             float3x4 BoneLoad(int column, int row)
             {
@@ -221,7 +249,7 @@ Shader "Custom/CharacterSurface"
             void ClipRows(float4 clip, out int r0, out int r1, out float k)
             {
                 float frames = abs(clip.y);
-                float t = max(0.0, (_Time.y - clip.w) * clip.z);
+                float t = max(0.0, (_GpuSkinTime - clip.w) * clip.z);
                 t = clip.y > 0.0 ? fmod(t, frames) : min(t, frames - 1.0);
                 float f = floor(t);
                 k = t - f;
@@ -242,14 +270,28 @@ Shader "Custom/CharacterSurface"
 
             void GpuSkin(inout float3 position, inout float3 normal, float4 weights, float4 bones)
             {
+                #ifdef UNITY_DOTS_INSTANCING_ENABLED
+                float4 loco = UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BrgLoco);
+                float4 prev = UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BrgLocoPrev);
+                float4 swing = UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BrgSwing);
+                float4 fade = UNITY_ACCESS_DOTS_INSTANCED_PROP_WITH_DEFAULT(float4, _BrgFade);
+                #else
                 float4 loco = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _Loco);
                 float4 prev = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _LocoPrev);
                 float4 swing = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _Swing);
                 float4 fade = UNITY_ACCESS_INSTANCED_PROP(GpuSkinProps, _Fade);
+                #endif
+
+                // The anchor's columns and the mask's row from the texture itself (the last six columns, the last row): read
+                // from the material they were not what the bake set where a batch drew the crowd, and the mask became the
+                // numbers of a bone's matrix, the rig's unit scale among them (x100): bodies stretched across the sky
+                uint texWidth, texHeight;
+                _BoneTex.GetDimensions(texWidth, texHeight);
+                int anchor = (int)texWidth - 6, maskRow = (int)texHeight - 1;
 
                 int a0, a1; float ak;
                 ClipRows(loco, a0, a1, ak);
-                float fadeK = fade.y > 0.0 ? saturate((_Time.y - fade.x) / fade.y) : 1.0;
+                float fadeK = fade.y > 0.0 ? saturate((_GpuSkinTime - fade.x) / fade.y) : 1.0;
                 int p0 = 0, p1 = 0; float pk = 0.0;
                 if (fadeK < 1.0) ClipRows(prev, p0, p1, pk);
 
@@ -260,12 +302,11 @@ Shader "Custom/CharacterSurface"
                 float3x4 seat = (float3x4)0;
                 if (swing.w >= 0.0)
                 {
-                    float t = _Time.y - swing.w, clipLength = abs(swing.y) / swing.z;
+                    float t = _GpuSkinTime - swing.w, clipLength = abs(swing.y) / swing.z;
                     swingW = saturate(t * 12.0) * saturate(1.0 - (t - (clipLength - 0.18)) * 5.0);
                     if (swingW > 0.0)
                     {
                         ClipRows(swing, s0, s1, sk);
-                        int anchor = (int)_BoneTexInfo.x;
                         seat = MulAffine(BoneAt(anchor, a0, a1, ak), BoneAt(anchor + 3, s0, s1, sk));
                     }
                 }
@@ -280,7 +321,7 @@ Shader "Custom/CharacterSurface"
                     if (fadeK < 1.0) m = lerp(BoneAt(column, p0, p1, pk), m, fadeK);
                     if (swingW > 0.0)
                     {
-                        float mask = LOAD_TEXTURE2D_LOD(_BoneTex, int2(column, (int)_BoneTexInfo.y), 0).x;
+                        float mask = saturate(LOAD_TEXTURE2D_LOD(_BoneTex, int2(column, maskRow), 0).x);
                         if (mask > 0.0) m = lerp(m, MulAffine(seat, BoneAt(column, s0, s1, sk)), swingW * mask);
                     }
                     p += w * mul(m, float4(position, 1.0));
@@ -307,6 +348,7 @@ Shader "Custom/CharacterSurface"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
             #pragma multi_compile_local _ _GPU_SKIN
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
@@ -328,12 +370,14 @@ Shader "Custom/CharacterSurface"
                 float fogFactor : TEXCOORD3;
                 float3 surface : TEXCOORD4; // pattern, metallic, smoothness
                 float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             Varyings vert(Attributes input)
             {
                 UNITY_SETUP_INSTANCE_ID(input); GPU_SKIN(input);
                 Varyings o;
+                UNITY_TRANSFER_INSTANCE_ID(input, o);
                 o.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);
@@ -346,6 +390,7 @@ Shader "Custom/CharacterSurface"
 
             half4 frag(Varyings i) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(i);
                 float3 n = normalize(i.normalWS);
                 float detail = (1.0 - smoothstep(4.0, 25.0, distance(_WorldSpaceCameraPos.xyz, i.positionWS))) * _DetailStrength * (1.0 - _SurfaceDetailCut);
                 float pattern = floor(i.surface.x + 0.5);
@@ -451,6 +496,7 @@ Shader "Custom/CharacterSurface"
             #pragma vertex ShadowVert
             #pragma fragment ShadowFrag
             #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
             #pragma multi_compile_local _ _GPU_SKIN
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };
@@ -474,6 +520,7 @@ Shader "Custom/CharacterSurface"
             #pragma vertex DepthVert
             #pragma fragment DepthFrag
             #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
             #pragma multi_compile_local _ _GPU_SKIN
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };
             float4 DepthVert(Attributes input) : SV_POSITION { UNITY_SETUP_INSTANCE_ID(input); GPU_SKIN(input); return TransformObjectToHClip(input.positionOS.xyz); }
@@ -490,6 +537,7 @@ Shader "Custom/CharacterSurface"
             #pragma vertex DNVert
             #pragma fragment DNFrag
             #pragma multi_compile_instancing
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DOTS.hlsl"
             #pragma multi_compile_local _ _GPU_SKIN
             #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; GPU_SKIN_INPUT UNITY_VERTEX_INPUT_INSTANCE_ID };

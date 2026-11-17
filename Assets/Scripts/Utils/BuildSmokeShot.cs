@@ -51,6 +51,8 @@ namespace BattleOfAges.Utils
             if (zones) Settlements();
             if (zones) yield return new WaitForSecondsRealtime(3f);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeknights") >= 0) yield return Knights(path);
+            int mass = Array.IndexOf(Environment.GetCommandLineArgs(), "-smokemass");
+            if (mass >= 0) yield return Mass(path, mass + 1 < Environment.GetCommandLineArgs().Length && int.TryParse(Environment.GetCommandLineArgs()[mass + 1], out int towns) ? towns : 100);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokelabor") >= 0) yield return LaborWindows(path);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokehelp") >= 0) yield return HelpTabs(path);
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeworld") >= 0) yield return WorldWindows(path);
@@ -77,6 +79,115 @@ namespace BattleOfAges.Utils
                 yield return new WaitForSecondsRealtime(1.5f);
             }
             Application.Quit();
+        }
+
+        /// <summary>
+        /// With "-smokemass N": N towns of a hundred people each round the hero, all on one side (Tests' MassProbe, in the
+        /// player itself): the frame rate from the first person, inside a town and on the map goes to the log, with a shot
+        /// of each beside path (".mass_field.png", ".mass_town.png", ".mass_map.png").
+        /// </summary>
+        private static IEnumerator Mass(string path, int towns)
+        {
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = -1;
+            // "-smokequality 0|1|2": the preset (low, medium, high); "-smokedynamic": the dynamic resolution left on
+            string[] args = Environment.GetCommandLineArgs();
+            int q = Array.IndexOf(args, "-smokequality");
+            if (q >= 0 && q + 1 < args.Length && int.TryParse(args[q + 1], out int level)) Managers.GraphicsQuality.Apply((Managers.GraphicsQuality.Level)Mathf.Clamp(level, 0, 2));
+            Managers.GraphicsQuality.DynamicResolution = Array.IndexOf(args, "-smokedynamic") >= 0;
+            // (the scale the dynamic resolution reached while the scene loaded is not kept: runs are compared at the full one)
+            if (!Managers.GraphicsQuality.DynamicResolution) Managers.GraphicsQuality.Apply(Managers.GraphicsQuality.Current);
+            // "-smoketarget N": the frame rate the dynamic resolution and the processor's relief hold (60 as played; more shows them at work on a fast machine)
+            int target = Array.IndexOf(args, "-smoketarget");
+            if (target >= 0 && target + 1 < args.Length && float.TryParse(args[target + 1], out float fps) && fps > 1f)
+            {
+                Managers.GraphicsQuality.LowerMs = 1000f / fps * 1.05f;
+                Managers.GraphicsQuality.RaiseMs = 1000f / fps * 0.72f;
+                Managers.GraphicsQuality.CpuRaiseMs = 1000f / fps * 0.54f;
+            }
+            GameObject player = Managers.GameContext.Player;
+            CharacterController cc = player.GetComponent<CharacterController>();
+            Vector3 centre = new Vector3(1500f, 0f, 1500f);
+            centre.y = World.InfiniteWorldManager.GetSampledTerrainHeight(centre.x, centre.z) + 1f;
+            cc.enabled = false;
+            player.transform.SetPositionAndRotation(centre, Quaternion.LookRotation(new Vector3(1f, 0f, 1f)));
+            for (float waited = 0f; waited < 60f && !Physics.Raycast(centre + Vector3.up * 50f, Vector3.down, 200f, ~0, QueryTriggerInteraction.Ignore); waited += Time.unscaledDeltaTime) yield return null;
+            cc.enabled = true;
+            Combat.HealthComponent hp = player.GetComponent<Combat.HealthComponent>();
+            if (hp != null) hp.InitializeHealth(100000000);
+            int side = Mathf.CeilToInt(Mathf.Sqrt(towns));
+            var made = new System.Collections.Generic.List<AI.NpcKingdom>();
+            for (int i = 0; i < towns; i++)
+            {
+                Vector3 at = centre + new Vector3((i % side - (side - 1) * 0.5f) * 150f, 0f, (i / side - (side - 1) * 0.5f) * 150f);
+                AI.NpcKingdom k = AI.NpcKingdom.Found(at, "Mass" + i, 100, 100000, Combat.HeroClass.Tank, RTS.UnitSpatialGrid.TeamKingdomFirst);
+                k.FirstRaidAt = 1e9f;
+                k.SetHallLevel(4);
+                if (k.Town != null) k.Town.RaiseAllNow();
+                made.Add(k);
+                if (i % 4 == 3) yield return null;
+            }
+            yield return new WaitForSecondsRealtime(6f);
+            Debug.Log($"[Smoke] mass: {towns} towns, {RTS.UnitSpatialGrid.Count} in the unit grid, {AI.CrowdSim.Count} in the crowd, {CrowdDraw.Count} drawn in the batch; {SystemInfo.graphicsDeviceName}, {Screen.width}x{Screen.height}, quality {Managers.GraphicsQuality.CurrentName}");
+            yield return MassPhase("first person, between four towns", path + ".mass_field.png");
+            Vector3 inTown = made[(side / 2) * side + side / 2].transform.position + new Vector3(14f, 0f, 0f);
+            inTown.y = World.InfiniteWorldManager.GetSampledTerrainHeight(inTown.x, inTown.z) + 1f;
+            cc.enabled = false;
+            player.transform.SetPositionAndRotation(inTown, Quaternion.LookRotation(Vector3.left));
+            cc.enabled = true;
+            yield return new WaitForSecondsRealtime(3f);
+            yield return MassPhase("first person, inside a town", path + ".mass_town.png");
+            Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.RtsMap);
+            yield return new WaitForSecondsRealtime(2f);
+            Camera map = ViewCamera.Current;
+            if (map != null && map.orthographic) map.orthographicSize = 100f;
+            yield return new WaitForSecondsRealtime(2f);
+            yield return MassPhase("map, zoomed out", path + ".mass_map.png");
+            if (map != null && map.orthographic) map.orthographicSize = 30f;
+            yield return new WaitForSecondsRealtime(1f);
+            yield return MassPhase("map, zoomed in", path + ".mass_map_near.png");
+            Managers.GameContext.Modes?.SetGameMode(Managers.GameMode.FirstPerson);
+            yield return new WaitForSecondsRealtime(1f);
+        }
+
+        private static IEnumerator MassPhase(string name, string shot)
+        {
+            var frames = new System.Collections.Generic.List<float>();
+            var timing = new FrameTiming[1];
+            double main = 0, render = 0, gpu = 0;
+            int timed = 0;
+            for (float end = Time.realtimeSinceStartup + 8f; Time.realtimeSinceStartup < end;)
+            {
+                yield return null;
+                frames.Add(Time.unscaledDeltaTime * 1000f);
+                FrameTimingManager.CaptureFrameTimings();
+                if (FrameTimingManager.GetLatestTimings(1, timing) == 0) continue;
+                main += timing[0].cpuMainThreadFrameTime; render += timing[0].cpuRenderThreadFrameTime; gpu += timing[0].gpuFrameTime;
+                timed++;
+            }
+            if (timed > 0) Debug.Log($"[Smoke] mass, {name}: main thread {main / timed:0.0} ms, render thread {render / timed:0.0} ms, GPU {gpu / timed:0.0} ms; render scale {Managers.GraphicsQuality.Scale:0.00}, quality {Managers.GraphicsQuality.Current}, processor relief {Managers.GraphicsQuality.CpuRelief}");
+            frames.Sort();
+            float sum = 0f;
+            foreach (float f in frames) sum += f;
+            float avg = sum / Mathf.Max(1, frames.Count);
+            Debug.Log($"[Smoke] mass, {name}: {1000f / avg:0} FPS, {avg:0.0} ms a frame, 95% under {frames[(int)(frames.Count * 0.95f)]:0.0} ms, 99% under {frames[Mathf.Min(frames.Count - 1, (int)(frames.Count * 0.99f))]:0.0} ms; the batch drew {CrowdDraw.LastSeen}");
+            ScreenCapture.CaptureScreenshot(shot);
+            GpuSkinnedCharacter.DumpBatch(name); // every place of the crowd's batch as the shot was taken (bodies drawn the wrong size)
+            yield return new WaitForSecondsRealtime(1f);
+            // "-smokeprofile" (a development player): the profiler's frames of this view beside the shot, read by
+            // Editor's ProfileDumpTool
+            if (Debug.isDebugBuild && Array.IndexOf(Environment.GetCommandLineArgs(), "-smokeprofile") >= 0)
+            {
+                UnityEngine.Profiling.Profiler.maxUsedMemory = 1 << 30;
+                UnityEngine.Profiling.Profiler.logFile = shot + ".raw";
+                UnityEngine.Profiling.Profiler.enableBinaryLog = true;
+                UnityEngine.Profiling.Profiler.enabled = true;
+                for (int i = 0; i < 40; i++) yield return null;
+                UnityEngine.Profiling.Profiler.enabled = false;
+                UnityEngine.Profiling.Profiler.enableBinaryLog = false;
+                UnityEngine.Profiling.Profiler.logFile = "";
+                yield return null;
+            }
         }
 
         /// <summary>With "-smokehelp": every tab of the help (path + ".help0.png" and on).</summary>

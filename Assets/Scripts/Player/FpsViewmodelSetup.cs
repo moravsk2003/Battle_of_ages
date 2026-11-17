@@ -6,8 +6,9 @@ namespace BattleOfAges.Player
 {
     /// <summary>
     /// Separates the local first-person body from the hands viewmodel.
-    /// The main camera never renders the local body, while a URP overlay camera
-    /// renders the arms in a stable foreground pass.
+    /// The main camera never renders the local body; the arms are drawn in its frame by ViewmodelPass, over the
+    /// world and with their own field of view. The "FPS Viewmodel Camera" object only holds the arms and those
+    /// numbers: its Camera is off (a second camera in the stack cost close to a millisecond a frame).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class FpsViewmodelSetup : MonoBehaviour
@@ -78,9 +79,10 @@ namespace BattleOfAges.Player
             int worldBodyMask = 1 << worldBodyLayer;
             int viewmodelMask = 1 << viewmodelLayer;
 
-            // Do not let the FPS camera see its own body or the viewmodel twice.
+            // The FPS camera does not see its own body. It does cull the arms: ViewmodelPass draws them in its frame
+            // (the renderer's own passes leave the layer out).
             mainCamera.cullingMask &= ~worldBodyMask;
-            mainCamera.cullingMask &= ~viewmodelMask;
+            mainCamera.cullingMask |= viewmodelMask;
 
             viewmodelCamera.transform.SetParent(mainCamera.transform, false);
             viewmodelCamera.transform.localPosition = Vector3.zero;
@@ -94,6 +96,35 @@ namespace BattleOfAges.Player
             viewmodelCamera.allowMSAA = mainCamera.allowMSAA;
 
             ConfigureUrpCameraStack();
+            ViewmodelPass.Owner = mainCamera;
+            ViewmodelPass.FieldOfView = viewmodelFieldOfView;
+            ViewmodelPass.Near = viewmodelNearClip;
+            ViewmodelPass.Far = viewmodelFarClip;
+            ViewmodelPass.Ensure();
+            ArmsCastNoShadow();
+        }
+
+        private static readonly System.Collections.Generic.List<Renderer> armRenderers = new System.Collections.Generic.List<Renderer>();
+        private float nextShadowCheck;
+
+        /// <summary>
+        /// The arms are in the main camera's view now, so they would cast into the world's shadow map: a pair of arms'
+        /// shadow on the ground with no body. A weapon taken later joins them: looked at twice a second.
+        /// </summary>
+        private void ArmsCastNoShadow()
+        {
+            if (viewmodelRoot == null) return;
+            viewmodelRoot.GetComponentsInChildren(true, armRenderers);
+            foreach (Renderer r in armRenderers)
+                if (r.shadowCastingMode != ShadowCastingMode.Off) r.shadowCastingMode = ShadowCastingMode.Off;
+            armRenderers.Clear();
+        }
+
+        private void LateUpdate()
+        {
+            if (Time.unscaledTime < nextShadowCheck) return;
+            nextShadowCheck = Time.unscaledTime + 0.5f;
+            ArmsCastNoShadow();
         }
 
         public void SetReferences(Camera worldCamera, Camera armsCamera, Transform bodyRoot, Transform armsRoot)
@@ -140,14 +171,12 @@ namespace BattleOfAges.Player
 
         private void ConfigureUrpCameraStack()
         {
+            // No second camera: it stays an overlay (so it never renders on its own), off and out of the stack
             UniversalAdditionalCameraData mainData = mainCamera.GetUniversalAdditionalCameraData();
             UniversalAdditionalCameraData viewmodelData = viewmodelCamera.GetUniversalAdditionalCameraData();
             viewmodelData.renderType = CameraRenderType.Overlay;
-
-            if (!mainData.cameraStack.Contains(viewmodelCamera))
-            {
-                mainData.cameraStack.Add(viewmodelCamera);
-            }
+            if (mainData.cameraStack != null) mainData.cameraStack.Remove(viewmodelCamera);
+            viewmodelCamera.enabled = false;
         }
 
         private void ApplyWorldBodyShadowMode()

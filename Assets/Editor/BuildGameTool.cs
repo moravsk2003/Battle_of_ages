@@ -55,7 +55,8 @@ namespace BattleOfAges.EditorTools
                 scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
                 locationPathName = Path.Combine(dir, file),
                 target = target,
-                options = BuildOptions.None
+                // BUILD_DEV=1: a development player, whose profiler can write to a file (BuildSmokeShot -smokeprofile)
+                options = Environment.GetEnvironmentVariable("BUILD_DEV") == "1" ? BuildOptions.Development : BuildOptions.None
             };
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary s = report.summary;

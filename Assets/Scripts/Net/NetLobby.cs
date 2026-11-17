@@ -241,7 +241,7 @@ namespace BattleOfAges.Net
             return r.Hero;
         }
 
-        /// <summary>"рівень 5 · Танк" of a save's hero.</summary>
+        /// <summary>"рівень 5 · Вартовий" of a save's hero.</summary>
         public static string HeroLine(SaveData d)
         {
             if (d == null || d.Player == null) return "";

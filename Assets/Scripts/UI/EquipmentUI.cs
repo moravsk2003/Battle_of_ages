@@ -263,7 +263,7 @@ namespace BattleOfAges.UI
                     // The artifact sword or a piece of the artifact armour set holds the slot: shown as the artifact, it does not come off
                     v.icon.enabled = true;
                     v.icon.sprite = UiTheme.ItemSprite(ArtifactLook(s), 5);
-                    v.level.text = s == EquipSlot.Weapon ? "×5" : s == EquipSlot.Chest ? "80%" : "";
+                    v.level.text = s == EquipSlot.Weapon ? "×3,5" : s == EquipSlot.Chest ? "70%" : "";
                     v.level.color = ArtifactGold;
                     v.caption.text = Loc.Pick("артефакт", "artifact");
                     v.rim.color = ArtifactGold;

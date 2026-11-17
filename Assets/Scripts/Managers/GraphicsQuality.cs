@@ -38,8 +38,26 @@ namespace BattleOfAges.Managers
         public static float Scale { get; private set; } = 1f;
         public static bool DynamicResolution = true;
 
-        /// <summary>Frames slower than this (ms, averaged over a second) push the scale down; faster than RaiseMs let it up.</summary>
-        public static float LowerMs = 30f, RaiseMs = 19f, MinScale = 0.5f;
+        /// <summary>
+        /// The dynamic resolution keeps 60 frames a second where the graphics card is what holds the frame: frames slower
+        /// than LowerMs (ms, averaged over a second) with the card busy for most of them push the scale down; a card done
+        /// in under RaiseMs lets it up. Where the card's time is not known, the frame's own time decides both.
+        /// (It used to wait for 33 frames a second before it did anything: a middling card sat at 40.)
+        /// </summary>
+        public static float LowerMs = 17.5f, RaiseMs = 12f, MinScale = 0.5f;
+        /// <summary>The share of a slow frame the card must be busy for the resolution to be what is lowered (a slow processor is not helped by fewer pixels).</summary>
+        public const float GpuBoundShare = 0.7f;
+
+        /// <summary>What the dynamic resolution does with a second like this: -1 lower, 1 raise, 0 stay (gpuMs 0: the card's time is not known).</summary>
+        public static int Verdict(float frameMs, float gpuMs)
+        {
+            if (gpuMs > 0f)
+            {
+                if (frameMs > LowerMs && gpuMs > frameMs * GpuBoundShare) return -1;
+                return gpuMs < RaiseMs ? 1 : 0;
+            }
+            return frameMs > LowerMs ? -1 : frameMs < RaiseMs ? 1 : 0;
+        }
 
         private static GraphicsQuality instance;
         private static UniversalRenderPipelineAsset original, runtimeCopy;
@@ -47,11 +65,44 @@ namespace BattleOfAges.Managers
         private static float lodBiasBefore;
         private static readonly Dictionary<ScriptableRendererFeature, bool> featureDefaults = new Dictionary<ScriptableRendererFeature, bool>();
 
-        private float sumMs, windowStart, slowFor, fastFor;
-        private int frames;
+        private float sumMs, windowStart, slowFor, fastFor, gpuSum, workSum, cpuSlowFor, cpuFastFor, lastRaise = -1000f, holdUntil;
+        private int frames, gpuFrames;
+        private static float raiseHold = 20f;
+
+        /// <summary>
+        /// Where the processor is what holds the frame under 60 a second, fewer pixels do not help: the sun's shadows are
+        /// what the main thread pays most for on top of the game itself (every cascade culls and draws the casters again),
+        /// so they step down first (1: a cascade less, shorter), then to one short cascade with no ambient occlusion and
+        /// coarser distant models (2). Back up when the main thread has room again. 0: as the preset has it.
+        /// </summary>
+        public static int CpuRelief { get; private set; }
+        /// <summary>The main thread's own work a frame (ms, without waiting for the screen) under which the relief steps back up.</summary>
+        public static float CpuRaiseMs = 9f;
+        private static float presetShadowDistance, presetLodBias;
+        private static int presetCascades;
+        private static bool presetOcclusion;
+
+        /// <summary>What the processor's relief does with a second like this: 1 step down (less work), -1 step back up, 0 stay (workMs 0: not known).</summary>
+        public static int CpuVerdict(float frameMs, float gpuMs, float workMs)
+        {
+            if (workMs <= 0f) return 0;
+            if (frameMs > LowerMs && workMs > frameMs * GpuBoundShare && !(gpuMs > frameMs * GpuBoundShare)) return 1;
+            return workMs < CpuRaiseMs ? -1 : 0;
+        }
+
+        private static void ApplyRelief()
+        {
+            UniversalRenderPipelineAsset a = runtimeCopy;
+            if (a == null) return;
+            a.shadowCascadeCount = CpuRelief == 0 ? presetCascades : CpuRelief == 1 ? Mathf.Max(1, presetCascades - 1) : 1;
+            a.shadowDistance = CpuRelief == 0 ? presetShadowDistance : CpuRelief == 1 ? Mathf.Max(60f, presetShadowDistance * 0.65f) : Mathf.Min(presetShadowDistance, 60f);
+            QualitySettings.lodBias = CpuRelief == 2 ? presetLodBias * 0.75f : presetLodBias;
+            SetFeature("ScreenSpaceAmbientOcclusion", presetOcclusion && CpuRelief < 2);
+        }
+        private readonly FrameTiming[] timing = new FrameTiming[1];
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { instance = null; original = runtimeCopy = null; featureDefaults.Clear(); Scale = 1f; }
+        private static void ResetStatics() { instance = null; original = runtimeCopy = null; featureDefaults.Clear(); Scale = 1f; CpuRelief = 0; raiseHold = 20f; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Install()
@@ -75,7 +126,7 @@ namespace BattleOfAges.Managers
                               || gpu.Contains("radeon(tm) graphics") || gpu.Contains("radeon graphics") || gpu.Contains("vega")
                               || gpu.Contains("microsoft basic");
             if (integrated || vram < 2000) return Level.Low;
-            if (vram < 4000) return Level.Medium;
+            if (vram < 6000) return Level.Medium; // (a 4 GB card, GTX 1650 or RX 570, is a middling one: High held it under 60 in a town)
             return Level.High;
         }
 
@@ -149,7 +200,12 @@ namespace BattleOfAges.Managers
                     GrassFieldRenderer.Stride = 1;
                     break;
             }
-            SetFeature("ScreenSpaceAmbientOcclusion", level == Level.High);
+            presetShadowDistance = a.shadowDistance;
+            presetCascades = a.shadowCascadeCount;
+            presetLodBias = QualitySettings.lodBias;
+            presetOcclusion = level == Level.High;
+            CpuRelief = 0;
+            ApplyRelief();
             // The surfaces' fine procedural detail (weave, pores, pebbles, ragged leafy crowns): none on Low, half on Medium
             Shader.SetGlobalFloat(SurfaceDetailCutId, level == Level.Low ? 1f : level == Level.Medium ? 0.5f : 0f);
             Scale = MaxScale;
@@ -207,14 +263,41 @@ namespace BattleOfAges.Managers
             if (runtimeCopy == null || !DynamicResolution) return;
             sumMs += Time.unscaledDeltaTime * 1000f;
             frames++;
+            FrameTimingManager.CaptureFrameTimings();
+            if (FrameTimingManager.GetLatestTimings(1, timing) > 0 && timing[0].gpuFrameTime > 0.0)
+            {
+                gpuSum += (float)timing[0].gpuFrameTime;
+                workSum += (float)System.Math.Max(0.0, timing[0].cpuMainThreadFrameTime - timing[0].cpuMainThreadPresentWaitTime);
+                gpuFrames++;
+            }
             if (Time.unscaledTime - windowStart < 1f) return;
-            float avg = sumMs / Mathf.Max(1, frames);
+            float avg = sumMs / Mathf.Max(1, frames), gpu = gpuFrames > frames / 2 ? gpuSum / gpuFrames : 0f, work = gpuFrames > frames / 2 ? workSum / gpuFrames : 0f;
             float window = Time.unscaledTime - windowStart;
-            sumMs = 0f; frames = 0; windowStart = Time.unscaledTime;
+            sumMs = 0f; frames = 0; gpuSum = 0f; workSum = 0f; gpuFrames = 0; windowStart = Time.unscaledTime;
             if (window > 3f) return; // a load or a pause, not the frame rate
 
-            if (avg > LowerMs) { slowFor += window; fastFor = 0f; }
-            else if (avg < RaiseMs) { fastFor += window; slowFor = 0f; }
+            // The processor's side: three slow seconds step the shadows down; a good while of room steps them back up, and
+            // each time that only brings the slow frames back the wait before the next try doubles
+            int cpu = CpuVerdict(avg, gpu, work);
+            if (cpu > 0) { cpuSlowFor += window; cpuFastFor = 0f; }
+            else if (cpu < 0) { cpuFastFor += window; cpuSlowFor = 0f; }
+            else cpuSlowFor = cpuFastFor = 0f;
+            if (cpuSlowFor >= 3f && CpuRelief < 2)
+            {
+                if (Time.unscaledTime - lastRaise < 30f) raiseHold = Mathf.Min(raiseHold * 2f, 600f);
+                CpuRelief++; cpuSlowFor = 0f; holdUntil = Time.unscaledTime + raiseHold;
+                ApplyRelief();
+            }
+            else if (cpuFastFor >= 10f && CpuRelief > 0 && Time.unscaledTime >= holdUntil)
+            {
+                CpuRelief--; cpuFastFor = 0f; lastRaise = Time.unscaledTime;
+                ApplyRelief();
+            }
+
+            int verdict = Verdict(avg, gpu);
+            if (Scale >= MaxScale && verdict > 0) verdict = 0;
+            if (verdict < 0) { slowFor += window; fastFor = 0f; }
+            else if (verdict > 0) { fastFor += window; slowFor = 0f; }
             else slowFor = fastFor = 0f;
 
             float target = Scale;

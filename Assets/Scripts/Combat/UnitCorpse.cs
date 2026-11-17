@@ -53,6 +53,7 @@ namespace BattleOfAges.Combat
                 foreach (FootIK ik in GetComponentsInChildren<FootIK>()) ik.enabled = false;
                 foreach (CharacterAnimationDriver d in GetComponentsInChildren<CharacterAnimationDriver>()) d.enabled = false;
                 foreach (Renderer r in GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                foreach (GpuSkinnedCharacter g in GetComponentsInChildren<GpuSkinnedCharacter>(true)) g.SetCastShadows(false); // (its body in the crowd's batch)
             }
             if (t >= SinkAfter)
             {

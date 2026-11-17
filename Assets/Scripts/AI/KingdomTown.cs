@@ -123,7 +123,7 @@ namespace BattleOfAges.AI
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics() { towns.Clear(); grid.Clear(); }
+        private static void ResetStatics() { towns.Clear(); grid.Clear(); RingsVersion++; }
 
         /// <summary>A town holds this ground.</summary>
         public static bool Holds(float x, float z)
@@ -172,10 +172,56 @@ namespace BattleOfAges.AI
         /// </summary>
         public static Vector3 Route(Vector3 from, Vector3 to)
         {
+            RouteTown(from, to, out Vector3 via);
+            return via;
+        }
+
+        /// <summary>The town whose ring sends a unit at from, going to, round by via (null: the road is free, via is to).</summary>
+        public static KingdomTown RouteTown(Vector3 from, Vector3 to, out Vector3 via)
+        {
             List<KingdomTown> near = Along(from, to);
             for (int i = 0; i < near.Count; i++)
-                if (near[i] != null && near[i].Walled && near[i].RouteRound(from, to, out Vector3 via)) return via;
-            return to;
+                if (near[i] != null && near[i].Walled && near[i].RouteRound(from, to, out via)) return near[i];
+            via = to;
+            return null;
+        }
+
+        // ------------------------------------------------------------------ the rings as the crowd's job reads them (AI.CrowdSim)
+
+        /// <summary>Changes whenever a ring comes, goes, or a segment of one rises or falls.</summary>
+        public static int RingsVersion { get; private set; }
+        /// <summary>Its place among the rings the crowd's job knows (CrowdSim keeps it; -1: none yet).</summary>
+        internal int RingSlot = -1;
+        internal static List<KingdomTown> All => towns;
+        internal Vector2 Centre => centre;
+        internal bool InGrid => inGrid;
+        internal bool HasWalls => Walled;
+        internal const int WaySegments = GateSegments;
+        internal const float WayApproach = GateApproach;
+
+        /// <summary>Which of its ring's segments stand, a bit each.</summary>
+        internal void RingBits(out ulong low, out ulong high)
+        {
+            low = high = 0UL;
+            for (int i = 0; i < RingSegments; i++)
+            {
+                if (!segmentUp[i]) continue;
+                if (i < 64) low |= 1UL << i; else high |= 1UL << (i - 64);
+            }
+        }
+
+        /// <summary>How many towns' rings (standing or not yet) run within this margin of the point, and the last of them.</summary>
+        internal static int RingsNear(float x, float z, float margin, out KingdomTown last)
+        {
+            last = null;
+            int n = 0;
+            foreach (KingdomTown t in At(x, z))
+            {
+                if (t == null) continue;
+                float dx = x - t.centre.x, dz = z - t.centre.y;
+                if (Mathf.Abs(Mathf.Sqrt(dx * dx + dz * dz) - WallRingRadius) < margin) { n++; last = t; }
+            }
+            return n;
         }
 
         // ------------------------------------------------------------------ which towns are near (a grid: every unit asks every frame)
@@ -210,6 +256,7 @@ namespace BattleOfAges.AI
             LeaveGrid();
             if (plan[0] == null) return; // not planned yet: no place
             CrowdSim.GroundChangedEverywhere();
+            RingsVersion++;
             serial = ++serials;
             gridCentre = centre;
             for (int x = Cell(centre.x - Reach); x <= Cell(centre.x + Reach); x++)
@@ -225,6 +272,7 @@ namespace BattleOfAges.AI
         {
             if (!inGrid) return;
             inGrid = false;
+            RingsVersion++;
             for (int x = Cell(gridCentre.x - Reach); x <= Cell(gridCentre.x + Reach); x++)
                 for (int z = Cell(gridCentre.y - Reach); z <= Cell(gridCentre.y + Reach); z++)
                     if (grid.TryGetValue(Key(x, z), out List<KingdomTown> list)) list.Remove(this);
@@ -332,7 +380,7 @@ namespace BattleOfAges.AI
             int code = RuinCode(part.Kind, part.Index);
             if (!kingdom.Economy.Ruins.Contains(code)) kingdom.Economy.Ruins.Add(code);
             lastRuins = kingdom.Economy.Ruins.Count;
-            if (part.Kind == Kind.Wall && part.Index < plan[(int)Kind.Wall].Count) segmentUp[plan[(int)Kind.Wall][part.Index].Segment] = false;
+            if (part.Kind == Kind.Wall && part.Index < plan[(int)Kind.Wall].Count) { segmentUp[plan[(int)Kind.Wall][part.Index].Segment] = false; RingsVersion++; }
             built[(int)part.Kind][part.Index] = null;
             Destroy(part.gameObject);
         }
@@ -446,6 +494,7 @@ namespace BattleOfAges.AI
                     built[(int)kind].Add(null);
                     if (!kingdom.Economy.Ruins.Contains(RuinCode(kind, n))) { Raise(plan[(int)kind][n], n); budget--; } // (one in ruins stays down)
                     raised[(int)kind]++;
+                    if (kind == Kind.Wall) RingsVersion++;
                 }
             }
             unfinished = budget == 0;
@@ -468,6 +517,7 @@ namespace BattleOfAges.AI
                     built[(int)kind].Add(null);
                     if (!kingdom.Economy.Ruins.Contains(RuinCode(kind, n))) Raise(plan[(int)kind][n], n);
                     raised[(int)kind]++;
+                    if (kind == Kind.Wall) RingsVersion++;
                 }
             }
         }
@@ -490,7 +540,7 @@ namespace BattleOfAges.AI
                 case Kind.Field:
                     Mesh draped = ZoneBuildingBuilder.Draped(ZoneBuildingBuilder.FieldModel, go.transform);
                     ownMeshes.Add(draped);
-                    Model(go, draped);
+                    ZoneBuildingBuilder.AttachField(go, draped); // (no shadows; far off, one light mesh shared by every field)
                     break;
                 case Kind.Sawmill:
                     Model(go, ZoneBuildingBuilder.SawmillModel);
@@ -507,6 +557,7 @@ namespace BattleOfAges.AI
                     colliderSize = new Vector3(WallBuilder.Length, WallBuilder.WalkY + 0.6f, WallBuilder.Thickness);
                     colliderCentre = new Vector3(0f, (WallBuilder.WalkY + 0.6f) * 0.5f, 0f);
                     segmentUp[s.Segment] = true;
+                    RingsVersion++;
                     break;
                 case Kind.Pier:
                     WallBuilder.AttachPier(go.transform);

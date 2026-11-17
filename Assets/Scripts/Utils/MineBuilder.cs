@@ -145,6 +145,7 @@ namespace BattleOfAges.Utils
         // ------------------------------------------------------------------ the dark of the adit
 
         private static Mesh darkMesh;
+        private static Material darkMaterial;
 
         /// <summary>
         /// The mouth's dark, drawn unlit so that neither sun nor moon lights it: pure black at the heart, a little of the rock's
@@ -159,7 +160,9 @@ namespace BattleOfAges.Utils
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = darkMesh;
             MeshRenderer r = go.AddComponent<MeshRenderer>();
-            r.sharedMaterial = new Material(s) { name = "MAT_AditDark" };
+            // One material for every mine: a hundred mines were a hundred materials, each its own draw and state change
+            if (darkMaterial == null) darkMaterial = new Material(s) { name = "MAT_AditDark" };
+            r.sharedMaterial = darkMaterial;
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
         }

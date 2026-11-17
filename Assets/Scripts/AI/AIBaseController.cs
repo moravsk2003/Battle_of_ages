@@ -119,8 +119,25 @@ namespace BattleOfAges.AI
         /// <summary>Its body drawn on the GPU far off: the crowd's job says when its size on screen or its pace changed.</summary>
         internal Utils.GpuSkinnedCharacter crowdLook;
         private bool needsRoute;
-        /// <summary>The job may move it: no road round a town's ring to follow, and nothing else moving it (a climb).</summary>
-        internal bool CrowdFast => !needsRoute && CrowdCanGlide;
+        private int routeRing = -1;
+        /// <summary>The job may move it: nothing else is moving it (a climb), and a road round a town's ring is one the job knows.</summary>
+        internal bool CrowdFast => (!needsRoute || routeRing >= 0) && CrowdCanGlide;
+        /// <summary>The ring its road goes round, as the crowd's job knows it (-1: none).</summary>
+        internal int CrowdRouteRing => needsRoute ? routeRing : -1;
+
+        /// <summary>The ring in the way of its road now (asked when the road is set, and again when the job is past a ring).</summary>
+        private void FindRoute()
+        {
+            KingdomTown town = KingdomTown.RouteTown(transform.position, destination, out _);
+            needsRoute = town != null;
+            routeRing = needsRoute ? CrowdSim.RingSlot(town) : -1;
+        }
+
+        internal void CrowdReroute()
+        {
+            if (hasDestination) FindRoute(); else needsRoute = false;
+            CrowdSim.Push(this);
+        }
         protected virtual bool CrowdCanGlide => true;
         /// <summary>It has something of its own to do every frame (an animal's legs): CrowdEveryFrame is called.</summary>
         internal virtual bool CrowdWantsEveryFrame => false;
@@ -305,9 +322,8 @@ namespace BattleOfAges.AI
             hasDestination = true;
             if (crowdIndex >= 0)
             {
-                // A road round a town's ring is walked by the old code (KingdomTown.Route, asked every step)
-                Vector3 via = KingdomTown.Route(transform.position, destination);
-                needsRoute = via.x != destination.x || via.z != destination.z;
+                // A road round a town's ring: the job walks it by the ring's own numbers (the old code asks KingdomTown.Route every step)
+                FindRoute();
                 CrowdSim.Push(this);
             }
         }

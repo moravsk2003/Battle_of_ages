@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 using BattleOfAges.AI;
 using BattleOfAges.Combat;
+using BattleOfAges.Crafting;
 using BattleOfAges.Utils;
 
 namespace BattleOfAges.PlayModeTests
@@ -62,14 +63,18 @@ namespace BattleOfAges.PlayModeTests
         [UnityTest]
         public IEnumerator FarCharacters_AreDrawnOnTheGpu_NearOnesByTheAnimator()
         {
+            int warningsBefore = GpuSkinnedCharacter.SizeWarnings;
             var units = new[]
             {
                 Unit(HumanoidModelBuilder.HumanType.KnightGuard, new Vector3(-1f, 0f, 0f)),
                 Unit(HumanoidModelBuilder.HumanType.Bandit, new Vector3(1f, 0f, 0f)),
+                Unit(HumanoidModelBuilder.HumanType.Villager, new Vector3(2.5f, 0f, 0f)),
             };
             cam.transform.position = new Vector3(0f, 1.5f, -45f);
             cam.transform.LookAt(new Vector3(0f, 1f, 0f));
             yield return Frames(12);
+            cam.Render();
+            Assert.GreaterOrEqual(CrowdDraw.LastSeen, units.Length, "the batch drew them for the camera (and whoever other tests left in sight)");
 
             foreach (GameObject u in units)
             {
@@ -78,16 +83,17 @@ namespace BattleOfAges.PlayModeTests
                 Assert.IsTrue(gpu.IsFar, $"{u.name}: drawn on the GPU 45 m away");
                 Assert.IsFalse(u.GetComponentInChildren<Animator>().enabled, $"{u.name}: Animator off while far");
                 Assert.IsFalse(u.GetComponentInChildren<SkinnedMeshRenderer>().enabled, $"{u.name}: skinned body off while far");
-                MeshRenderer body = System.Array.Find(u.GetComponentsInChildren<MeshRenderer>(true), r => r.name == "GpuBody");
-                Assert.IsNotNull(body, $"{u.name}: GPU body");
-                Assert.IsTrue(body.enabled, $"{u.name}: GPU body drawn");
+                Assert.IsTrue(gpu.DrawnOnGpu, $"{u.name}: a place in the crowd's batch");
             }
 
             // An attack and a death while far must not break anything
             units[0].GetComponent<CombatUnit>().TriggerAttackAnimation();
             yield return Frames(5);
+            for (int swing = 0; swing < 3; swing++) { units[2].GetComponent<CombatUnit>().TriggerAttackAnimation(); yield return Frames(8); } // a builder's hammer
             units[1].GetComponent<HealthComponent>().TakeDamage(1000);
-            yield return Frames(10);
+            yield return Frames(40);
+            Assert.AreEqual(warningsBefore, GpuSkinnedCharacter.SizeWarnings, "no sound body is drawn the wrong size (the check would send it back)");
+            Assert.IsTrue(units[2].GetComponentInChildren<GpuSkinnedCharacter>().DrawnOnGpu, "the villager still in the batch after hammering");
 
             cam.transform.position = new Vector3(0f, 1.5f, -3f);
             cam.transform.LookAt(new Vector3(0f, 1f, 0f));
@@ -96,6 +102,133 @@ namespace BattleOfAges.PlayModeTests
             Assert.IsFalse(knight.IsFar, "close up: the Animator again");
             Assert.IsTrue(units[0].GetComponentInChildren<Animator>().enabled);
             Assert.IsTrue(units[0].GetComponentInChildren<SkinnedMeshRenderer>().enabled);
+        }
+
+        /// <summary>
+        /// Every bone a body's points hang on (with any weight) is one of its skeleton's: the GPU skin reads bone b at columns
+        /// 3b..3b+2 of the bake, and past the last bone lie the anchor's matrix and its inverse (the rig's unit scale, ×100):
+        /// a point given a bone the skeleton has not is thrown across the sky. Each look of a man with each kind of gear.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator EveryBodyWithAnyGear_HangsOnlyOnItsOwnBones()
+        {
+            var problems = new System.Text.StringBuilder();
+            var types = new[] { HumanoidModelBuilder.HumanType.Villager, HumanoidModelBuilder.HumanType.Soldier, HumanoidModelBuilder.HumanType.KnightGuard,
+                                HumanoidModelBuilder.HumanType.General, HumanoidModelBuilder.HumanType.Bandit };
+            var kits = new[]
+            {
+                new Item[0],
+                new[] { new Item(ItemType.Axe, 1) }, new[] { new Item(ItemType.Pickaxe, 2) }, new[] { new Item(ItemType.Sword, 3), new Item(ItemType.Shield, 2) },
+                new[] { new Item(ItemType.Bow, 2) }, new[] { new Item(ItemType.Staff, 2) },
+                new[] { new Item(ItemType.Helmet, 3), new Item(ItemType.Armor, 3), new Item(ItemType.Gloves, 3), new Item(ItemType.Boots, 3), new Item(ItemType.Sword, 2) },
+            };
+            var weights = new List<Vector4>();
+            var bones = new List<Vector4>();
+            foreach (HumanoidModelBuilder.HumanType type in types)
+                foreach (Item[] kit in kits)
+                {
+                    GameObject go = Unit(type, new Vector3(0f, -300f, 0f));
+                    Equipment gear = go.GetComponent<Equipment>() ?? go.AddComponent<Equipment>();
+                    foreach (Item item in kit) gear.Equip(item);
+                    yield return null;
+                    foreach (SkinnedMeshRenderer body in go.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                    {
+                        var meshes = new List<Mesh> { body.sharedMesh };
+                        SkinnedMeshLod lod = body.GetComponentInParent<SkinnedMeshLod>();
+                        if (lod != null) { meshes.Add(lod.Near); meshes.Add(lod.Far); }
+                        foreach (Mesh source in meshes)
+                        {
+                            if (source == null) continue;
+                            Mesh skin = GpuSkinBake.SkinMesh(source);
+                            if (skin == null) continue;
+                            foreach (Mesh m in new[] { skin, GpuSkinBake.LowMesh(skin) })
+                            {
+                                if (m == null) continue;
+                                m.GetUVs(4, weights); m.GetUVs(5, bones);
+                                int bad = 0, worst = -1, unweighted = 0;
+                                float worstSum = 1f;
+                                for (int i = 0; i < bones.Count; i++)
+                                {
+                                    float sum = 0f;
+                                    for (int k = 0; k < 4; k++)
+                                    {
+                                        sum += weights[i][k];
+                                        if (weights[i][k] > 0f && (bones[i][k] < 0f || (int)bones[i][k] >= body.bones.Length)) { bad++; worst = Mathf.Max(worst, (int)bones[i][k]); }
+                                    }
+                                    if (Mathf.Abs(sum - 1f) > 0.02f) { unweighted++; if (Mathf.Abs(sum - 1f) > Mathf.Abs(worstSum - 1f)) worstSum = sum; }
+                                }
+                                if (bad > 0) problems.AppendLine($"{type} with [{string.Join(", ", kit)}]: {m.name}: {bad} weights on bones up to {worst}, the skeleton has {body.bones.Length}");
+                                if (unweighted > 0) problems.AppendLine($"{type} with [{string.Join(", ", kit)}]: {m.name}: {unweighted} of {bones.Count} points weigh not 1 in all (one {worstSum:0.###})");
+                            }
+                        }
+                    }
+                    UnityEngine.Object.Destroy(go);
+                    yield return null;
+                }
+            Assert.AreEqual("", problems.ToString());
+        }
+
+        /// <summary>
+        /// A unit drawn far off whose model is swapped (a promotion, a bow on a knight) leaves nothing behind in the batch:
+        /// the crowd's job stops writing it into its old place, and no character plays clips outside its own bake. Once the
+        /// job went on writing a promoted unit into the freed place, and the next character given it stood stretched across
+        /// the sky where that unit was (a tester's shot, 0.3.10).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AModelSwappedFarOff_LeavesNothingBehindInTheBatch()
+        {
+            GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            ground.transform.localScale = new Vector3(20f, 1f, 20f);
+            spawned.Add(ground);
+            var units = new List<GameObject>();
+            for (int i = 0; i < 3; i++)
+            {
+                // One the crowd moves (an AI unit) and one followed by its transform (a player's unit), side by side
+                GameObject mob = HostileCampBuilder.CreateHostileMob(HostileMobType.Bandit, "CrowdUnit_" + i);
+                mob.transform.position = new Vector3(i * 0.7f - 1f, 0.05f, 0f);
+                mob.AddComponent<Equipment>();
+                UnitProgress.Setup(mob, UnitRank.Person);
+                mob.AddComponent<RankModel>();
+                spawned.Add(mob);
+                units.Add(mob);
+
+                GameObject loose = Unit(HumanoidModelBuilder.HumanType.Villager, new Vector3(i * 0.7f - 0.6f, 0f, 0.5f));
+                loose.name = "LooseUnit_" + i;
+                loose.AddComponent<Equipment>();
+                UnitProgress.Setup(loose, UnitRank.Person);
+                loose.AddComponent<RankModel>();
+                units.Add(loose);
+            }
+
+            cam.transform.position = new Vector3(0f, 1.5f, -45f);
+            cam.transform.LookAt(new Vector3(0f, 1f, 0f));
+            yield return Frames(12);
+            foreach (GameObject u in units) Assert.IsTrue(u.GetComponentInChildren<GpuSkinnedCharacter>().DrawnOnGpu, $"{u.name}: in the batch 45 m away");
+            Assert.AreEqual("", GpuSkinnedCharacter.AuditBatch(), "before any swap");
+
+            // Up to the edge: still far by the slack, while a body made there starts near (the Animator's)
+            float d = GpuSkinnedCharacter.ViewScale(cam, out _) / (GpuSkinnedCharacter.FarScreenHeight * 1.07f);
+            cam.transform.position = new Vector3(0f, 1.5f, -d);
+            cam.transform.LookAt(new Vector3(0f, 1f, 0f));
+            yield return Frames(4);
+
+            foreach (GameObject u in units) u.GetComponent<UnitProgress>().Promote(); // a new model for every one
+            yield return Frames(3);
+            Assert.AreEqual("", GpuSkinnedCharacter.AuditBatch(), "after the promotions");
+            foreach (GameObject u in units)
+            {
+                Equipment e = u.GetComponent<Equipment>();
+                e.Equip(new Item(ItemType.Bow, 2)); // (a knight's model is sculpted with its bow: swapped again)
+                u.GetComponent<UnitProgress>().Promote();
+            }
+            yield return Frames(3);
+            Assert.AreEqual("", GpuSkinnedCharacter.AuditBatch(), "after a bow and another promotion");
+
+            // Back far: everyone in the batch again, every place its own
+            cam.transform.position = new Vector3(0f, 1.5f, -45f);
+            cam.transform.LookAt(new Vector3(0f, 1f, 0f));
+            yield return Frames(30);
+            Assert.AreEqual("", GpuSkinnedCharacter.AuditBatch(), "far again");
         }
     }
 
@@ -140,8 +273,9 @@ namespace BattleOfAges.PlayModeTests
             sun.transform.rotation = Quaternion.Euler(40f, 150f, 0f);
             GpuSkinnedCharacter.ViewerOverride = cam;
 
-            string[] poses = { "idle", "walk", "run", "attack", "death" };
-            var types = new[] { HumanoidModelBuilder.HumanType.KnightGuard, HumanoidModelBuilder.HumanType.Bandit };
+            // "work": a builder's hammer, a swing every 0.8 s, shot in the middle of the third
+            string[] poses = { "idle", "walk", "run", "attack", "work", "death" };
+            var types = new[] { HumanoidModelBuilder.HumanType.KnightGuard, HumanoidModelBuilder.HumanType.Bandit, HumanoidModelBuilder.HumanType.Villager };
             var sheet = new Texture2D(400 * poses.Length, 520 * 2 * types.Length, TextureFormat.RGB24, false);
             for (int t = 0; t < types.Length; t++)
                 for (int gpu = 0; gpu < 2; gpu++)
@@ -156,6 +290,12 @@ namespace BattleOfAges.PlayModeTests
                         cam.transform.LookAt(new Vector3(0f, 1f, 0f));
                         for (int i = 0; i < 20; i++) { cam.Render(); yield return null; }
                         if (poses[p] == "attack") { go.GetComponent<CombatUnit>().TriggerAttackAnimation(); for (float end = Time.time + 0.35f; Time.time < end;) { cam.Render(); yield return null; } }
+                        if (poses[p] == "work")
+                            for (int swing = 0; swing < 3; swing++)
+                            {
+                                go.GetComponent<CombatUnit>().TriggerAttackAnimation();
+                                for (float end = Time.time + (swing < 2 ? 0.8f : 0.3f); Time.time < end;) { cam.Render(); yield return null; }
+                            }
                         if (poses[p] == "death") { go.GetComponent<HealthComponent>().TakeDamage(1000); for (float end = Time.time + 2.2f; Time.time < end;) { cam.Render(); yield return null; } }
                         GpuSkinnedCharacter.RefreshAll(cam);
                         cam.Render();

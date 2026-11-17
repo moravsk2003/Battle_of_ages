@@ -422,6 +422,7 @@ namespace BattleOfAges.UI
             Transform game = ScrollList(SettingsTab(win, "Гра", 4));
             CycleRow(game, "Row_Language", "Мова", () => Loc.Name, Loc.Cycle);
             CycleRow(game, "Row_AutoRun", "Автобіг", () => BattleOfAges.Player.MoveSettings.AutoRun ? Loc.Pick("увімк. (Shift — ходьба)", "On (Shift walks)") : Loc.Pick("вимк. (Shift — біг)", "Off (Shift runs)"), BattleOfAges.Player.MoveSettings.ToggleAutoRun);
+            CycleRow(game, "Row_MapPan", "Рух мапи", () => BattleOfAges.CameraSystem.MapMouseSettings.PanWithMiddle ? Loc.Pick("середня кнопка (Shift — поворот)", "Middle button (Shift turns)") : Loc.Pick("права кнопка (середня — поворот)", "Right button (middle turns)"), BattleOfAges.CameraSystem.MapMouseSettings.Toggle);
             CycleRow(game, "Row_Advisor", "Поради «Перші кроки»", () => Advisor.Hidden ? Loc.Pick("сховано", "Hidden") : Loc.Pick("показано", "Shown"), () => Advisor.Hidden = !Advisor.Hidden);
 
             if (closeSettingsButton != null)

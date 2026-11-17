@@ -100,9 +100,16 @@ namespace BattleOfAges.RTS
             float badgeSize = WorldSize(BadgeMetres, BadgePixels, cam.orthographicSize, Screen.height);
             Quaternion facing = cam.transform.rotation;
             UnitSpatialGrid.EnsureCurrent();
+            // Only those in the picture: among ten thousand units a ring each was 4 ms a frame, most of them out of sight
+            Matrix4x4 view = cam.worldToCameraMatrix;
+            float halfHeight = cam.orthographicSize + ringSize, halfWidth = cam.orthographicSize * cam.aspect + ringSize;
+            byte[] alive = UnitSpatialGrid.AliveArray;
             for (int id = 0; id < UnitSpatialGrid.Capacity; id++)
             {
-                if (!UnitSpatialGrid.IsAlive(id)) continue;
+                if (alive[id] == 0) continue;
+                Vector3 where = UnitSpatialGrid.Position(id);
+                float vx = view.m00 * where.x + view.m01 * where.y + view.m02 * where.z + view.m03, vy = view.m10 * where.x + view.m11 * where.y + view.m12 * where.z + view.m13;
+                if (vx < -halfWidth || vx > halfWidth || vy < -halfHeight || vy > halfHeight) continue;
                 Component owner = UnitSpatialGrid.Owner(id);
                 if (owner == null || UnitSpatialGrid.Radius(id) > 1.5f) continue; // a kingdom's hall is in the grid too
                 Color side = SideColour(UnitSpatialGrid.Team(id));
