@@ -291,8 +291,8 @@ namespace BattleOfAges.UI
                 : Loc.Pick($"\nМіцність {def.MaxHealth}", $"\nHP {def.MaxHealth}"));
             if (def.NpcSpawnCount > 0)
                 sb.Append(Loc.Pick(
-                    $"\nДає +{def.NpcSpawnCount} робітника (в межах ліміту ратуші); у кампанії +{Combat.GameBalance.HouseBirthsPerHour:0.#} народжень/год",
-                    $"\nGrants +{def.NpcSpawnCount} worker (within Town Hall cap); +{Combat.GameBalance.HouseBirthsPerHour:0.#} births/h in campaigns"));
+                    $"\nДає +{def.NpcSpawnCount} робітника (в межах ліміту ратуші); у кампанії хати прискорюють народження: {Combat.GameBalance.HouseBirthsPerHour:0.#} × √хат на год",
+                    $"\nGrants +{def.NpcSpawnCount} worker (within Town Hall cap); in campaigns houses add {Combat.GameBalance.HouseBirthsPerHour:0.#} × √houses births/h"));
             sb.Append("\n").Append(TipText.Dim(wall
                 ? Loc.Pick("Z / X — повернути, Tab — руда, ЛКМ — поставити, ПКМ — скасувати", "Z / X — rotate, Tab — ore tier, LMB — place, RMB — cancel")
                 : Loc.Pick("Z / X — повернути, ЛКМ — поставити, ПКМ — скасувати", "Z / X — rotate, LMB — place, RMB — cancel")));

@@ -283,9 +283,15 @@ namespace BattleOfAges.Building
 
         private float birthCarry;
 
-        /// <summary>Births per game hour for this population: base + per-capita share.</summary>
+        /// <summary>Births per game hour for this population: base + per-capita share + the houses' share.</summary>
         public static float GrowthPerHour(int population, TownHall hall = null) =>
-            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population + GameBalance.HouseBirthsPerHour * (hall != null ? hall.OwnHouses() : Houses());
+            GameBalance.GrowthBasePerHour + GameBalance.GrowthPerCapitaPerHour * population + HousesShare(hall != null ? hall.OwnHouses() : Houses());
+
+        /// <summary>
+        /// What houses add to the births: 0.1 × √houses (author's call, 2026-11-17) — 1 house 0.1, 4 houses 0.2, 25 houses 0.5,
+        /// 100 houses 1 a game hour, so a district painted without end does not run the births away.
+        /// </summary>
+        public static float HousesShare(int houses) => houses <= 0 ? 0f : GameBalance.HouseBirthsPerHour * Mathf.Sqrt(houses);
 
         private static int housesFrame = -1, housesCount;
 

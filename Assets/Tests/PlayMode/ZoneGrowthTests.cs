@@ -417,6 +417,9 @@ namespace BattleOfAges.PlayModeTests
             house.GetComponent<BuildingNode>().SetType(BuildingType.WorkerHouse);
             yield return null;
             Assert.AreEqual(without + GameBalance.HouseBirthsPerHour, TownHall.GrowthPerHour(10), 1e-3f, "a house adds to the births");
+            Assert.AreEqual(2f * GameBalance.HouseBirthsPerHour, TownHall.HousesShare(4), 1e-4f, "four houses twice one: the root of their count");
+            Assert.AreEqual(10f * GameBalance.HouseBirthsPerHour, TownHall.HousesShare(100), 1e-4f, "a hundred, ten times");
+            Assert.AreEqual(0f, TownHall.HousesShare(0));
             int workers = WorkerRegistry.WorkerCount;
             house.GetComponent<BuildingNode>().OnBuilt();
             Assert.AreEqual(workers, WorkerRegistry.WorkerCount, "and gives no worker in a campaign");

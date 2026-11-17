@@ -44,9 +44,9 @@ namespace BattleOfAges.Building
             {
                 Type = BuildingType.WorkerHouse,
                 DisplayName = "Будинок",
-                Description = "Новий робітник (у межах ліміту ратуші); у кампанії +0,1 народжень/год",
-                WoodCost = 2,
-                OreCost = 1,
+                Description = "Новий робітник (у межах ліміту ратуші); у кампанії хати прискорюють народження (0,1 × √хат на год)",
+                WoodCost = 5,
+                OreCost = 3,
                 OreTierRequired = 0,
                 NpcSpawnCount = 1,
                 Size = new Vector3(3.0f, 2.5f, 3.0f),
@@ -149,7 +149,7 @@ namespace BattleOfAges.Building
             {
                 case BuildingType.WorkerHouse:
                     def.DisplayName = "House";
-                    def.Description = "Spawns a worker (within Town Hall cap); +0.1 births/h in campaigns";
+                    def.Description = "Spawns a worker (within Town Hall cap); in campaigns houses quicken births (0.1 × √houses per h)";
                     break;
                 case BuildingType.StorageChest:
                     def.DisplayName = "Storage Chest";
