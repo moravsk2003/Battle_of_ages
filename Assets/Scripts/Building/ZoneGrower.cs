@@ -152,8 +152,22 @@ namespace BattleOfAges.Building
             StrategyHud.Notify($"{ZoneMap.Name(zone)}: на «{def.DisplayName}» треба {def.WoodCost} дерева й {def.OreCost} руди");
         }
 
-        /// <summary>The free cell of the zone nearest the hall: no building's footprint there, no tree (a forest zone may stand among trees).</summary>
+        /// <summary>
+        /// How far apart a zone sets its own buildings: the side of the plot its cells give one (a little less, so the cells
+        /// a zone was painted with still hold its count). Keeps a district spread over the ground it was given, not packed by the hall.
+        /// </summary>
+        public static float Spacing(ZoneType zone) => ZoneMap.CellSize * Mathf.Sqrt(CellsPerBuilding(zone)) * 0.9f;
+
+        /// <summary>
+        /// The free cell of the zone nearest the hall: no building's footprint there, no tree (a forest zone may stand among trees),
+        /// and a plot's width from the zone's other buildings; if the zone's shape leaves no such cell, any free one.
+        /// </summary>
         public static bool TryFindSpot(ZoneType zone, BuildingDefinition def, out Vector3 spot, TownHall hall = null)
+        {
+            return TryFindSpot(zone, def, out spot, hall, Spacing(zone)) || TryFindSpot(zone, def, out spot, hall, 0f);
+        }
+
+        private static bool TryFindSpot(ZoneType zone, BuildingDefinition def, out Vector3 spot, TownHall hall, float spacing)
         {
             TownHall homeHall = hall != null ? hall : TownHall.Current;
             bool several = hall != null && TownHall.All.Count > 1;
@@ -169,12 +183,23 @@ namespace BattleOfAges.Building
                 if (d >= best) continue;
                 if (several && TownHall.Nearest(c) != hall) continue;
                 c.y = InfiniteWorldManager.GetSampledTerrainHeight(c.x, c.z);
-                if (!Free(c, reach, zone)) continue;
+                if (!Free(c, reach, zone) || (spacing > 0f && Crowded(c, def.Type, spacing))) continue;
                 best = d;
                 spot = c;
                 found = true;
             }
             return found;
+        }
+
+        private static bool Crowded(Vector3 at, BuildingType type, float spacing)
+        {
+            foreach (BuildingNode b in BuildingNode.Active)
+            {
+                if (b == null || b.Type != type) continue;
+                Vector3 off = b.transform.position - at; off.y = 0f;
+                if (off.sqrMagnitude < spacing * spacing) return true;
+            }
+            return false;
         }
 
         private static bool Free(Vector3 at, float reach, ZoneType zone)

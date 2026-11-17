@@ -304,6 +304,34 @@ namespace BattleOfAges.PlayModeTests
         }
 
         [UnityTest, Timeout(120000)]
+        public IEnumerator AHousingZone_SpreadsItsHouses_OverTheGroundItWasGiven()
+        {
+            Vector3 at = new Vector3(60f, 0f, -60f);
+            int cells = ZoneMap.Paint(at, 20f, ZoneType.Housing, out _);
+            Assert.Greater(cells, 8);
+            Assert.AreEqual(cells, ZoneGrower.Wanted(ZoneType.Housing, cells), "a house to a cell");
+            ResourceManager.Instance.SetState(5000, new[] { new KeyValuePair<int, int>(0, 5000) });
+            for (int i = 0; i < 8; i++)
+            {
+                Grower().Tick();
+                yield return null;
+                foreach (ConstructionSite s in new List<ConstructionSite>(ConstructionSite.All)) s.Work(s.WorkSeconds + 1f);
+                yield return null;
+            }
+            var houses = new List<Vector3>();
+            foreach (BuildingNode b in BuildingNode.Active) if (b != null && b.Type == BuildingType.WorkerHouse) houses.Add(b.transform.position);
+            Assert.GreaterOrEqual(houses.Count, 6, "the zone grew");
+            float near = float.MaxValue;
+            for (int i = 0; i < houses.Count; i++)
+                for (int j = i + 1; j < houses.Count; j++)
+                {
+                    Vector3 d = houses[i] - houses[j]; d.y = 0f;
+                    near = Mathf.Min(near, d.magnitude);
+                }
+            Assert.GreaterOrEqual(near, ZoneGrower.Spacing(ZoneType.Housing) - 0.01f, "a plot apart, not packed by the hall (was 4 m)");
+        }
+
+        [UnityTest, Timeout(120000)]
         public IEnumerator AField_Feeds_AutoWorkersComeWhenShort_LeaveWhenEnough()
         {
             Vector3 at = new Vector3(-60f, 0f, 60f);

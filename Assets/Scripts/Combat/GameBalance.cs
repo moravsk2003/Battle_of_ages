@@ -310,7 +310,7 @@ namespace BattleOfAges.Combat
         /// the food days under which Auto workers go to the fields, and over which they leave; sawyers and wood; births per
         /// game hour a house adds (§10.3).
         /// </summary>
-        public static int ZoneCellsHouse = 3, ZoneCellsField = 6, ZoneCellsSawmill = 12, ZoneCellsBench = 10, ZoneCellsMine = 10, ZoneCellsMarket = 12, ZoneSitesAtOnce = 2;
+        public static int ZoneCellsHouse = 1, ZoneCellsField = 4, ZoneCellsSawmill = 3, ZoneCellsBench = 2, ZoneCellsMine = 2, ZoneCellsMarket = 3, ZoneSitesAtOnce = 2;
         public static int FieldFarmers = 2, SawmillWorkers = 2, SawmillWantWood = 150, SawmillEnoughWood = 300;
         /// <summary>In a campaign workers on their own go down a mine, this many to each, while the ore (stock and mines' buffers) is under Want, and come out at Enough.</summary>
         public static int MineAutoMiners = 2, MineWantOre = 60, MineEnoughOre = 200;
